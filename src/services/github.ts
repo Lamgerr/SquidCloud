@@ -14,6 +14,18 @@ export interface GithubRepo {
   visibility: string;
 }
 
+export interface GithubUser {
+  login: string;
+  id: number;
+  avatar_url: string;
+  html_url: string;
+  name: string;
+  bio: string;
+  public_repos: number;
+  followers: number;
+  following: number;
+}
+
 export async function getUserRepositories(username: string): Promise<GithubRepo[]> {
   try {
     const { data, error } = await supabase.functions.invoke('github-api', {
@@ -50,7 +62,7 @@ export async function getRepository(owner: string, repo: string): Promise<Github
   }
 }
 
-export async function getUser(username: string): Promise<any> {
+export async function getUser(username: string): Promise<GithubUser> {
   try {
     const { data, error } = await supabase.functions.invoke('github-api', {
       body: {

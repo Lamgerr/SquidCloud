@@ -60,6 +60,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { generateWithGemini } from '@/services/gemini';
 import { supabase } from '@/integrations/supabase/client';
+import GitHubRepositories from '@/components/GitHubRepositories';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
@@ -146,7 +147,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen flex flex-col font-inter bg-slate-50 dark:bg-slate-900/50">
-      {/* Dashboard Header */}
       <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center space-x-2">
@@ -205,7 +205,6 @@ const Dashboard = () => {
       </header>
 
       <div className="flex flex-1">
-        {/* Sidebar */}
         <aside className="hidden md:block w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4">
           <div className="space-y-1">
             <Button
@@ -249,7 +248,6 @@ const Dashboard = () => {
           </div>
         </aside>
 
-        {/* Main Content */}
         <main className="flex-1 p-4 md:p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="md:hidden mb-4">
@@ -410,28 +408,11 @@ const Dashboard = () => {
               <div className="mb-6">
                 <h1 className="text-2xl font-bold mb-2">GitHub Integration</h1>
                 <p className="text-muted-foreground">
-                  Connect your GitHub account to access repositories directly.
+                  Search for GitHub users and explore their repositories.
                 </p>
               </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>GitHub Connection</CardTitle>
-                  <CardDescription>Link your GitHub account to InflateStorage</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-center py-4">
-                    <Github className="h-16 w-16 text-slate-800 dark:text-slate-200" />
-                  </div>
-                  <p className="text-center">
-                    Connect your GitHub account to manage repositories and keep your code secure with InflateStorage's encryption.
-                  </p>
-                  <Button className="w-full">
-                    <Github className="mr-2 h-4 w-4" />
-                    Connect GitHub Account
-                  </Button>
-                </CardContent>
-              </Card>
+              
+              <GitHubRepositories />
             </TabsContent>
           </Tabs>
         </main>
