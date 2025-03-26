@@ -5,7 +5,6 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, X, Lock, FileSymlink, UploadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile } from '@/lib/api';
-import { needsChunking, splitFileIntoChunks, generateEncryptionKey, encryptData } from '@/lib/encryption';
 import { Card } from '@/components/ui/card';
 
 interface UploadButtonProps {
@@ -32,9 +31,15 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
     setIsUploading(true);
     setUploadProgress(0);
     
-    // Check if file needs to be chunked (> 10MB)
-    const requiresChunking = needsChunking(file.size);
-    setIsChunkedUpload(requiresChunking);
+    // Check if file is larger than 10MB for chunking
+    const isLarge = file.size > 10 * 1024 * 1024;
+    setIsChunkedUpload(isLarge);
+    
+    if (isLarge) {
+      // Estimate number of chunks (10MB each)
+      const estimatedChunks = Math.ceil(file.size / (10 * 1024 * 1024));
+      setTotalChunks(estimatedChunks);
+    }
     
     try {
       // Notify user about encryption
@@ -43,60 +48,48 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
         description: "Your file is being encrypted before upload",
       });
       
-      if (requiresChunking) {
-        // Handle large file with chunking
-        const chunks = splitFileIntoChunks(file);
-        setTotalChunks(chunks.length);
-        
-        // Process each chunk
-        for (let i = 0; i < chunks.length; i++) {
-          setCurrentChunk(i + 1);
-          
-          // Simulate chunk processing and uploading
-          await new Promise<void>((resolve) => {
-            const chunkProgress = setInterval(() => {
-              setUploadProgress(prev => {
-                const newProgress = prev + (Math.random() * 5);
-                if (newProgress >= (((i + 1) / chunks.length) * 100)) {
-                  clearInterval(chunkProgress);
-                  resolve();
-                  return (((i + 1) / chunks.length) * 100);
-                }
-                return newProgress;
-              });
-            }, 200);
-          });
-        }
-      } else {
-        // Handle regular file upload
-        const progressInterval = setInterval(() => {
+      // Start progress animation
+      let progressInterval: NodeJS.Timeout;
+      
+      if (isLarge) {
+        // For chunked uploads, progress updates differently
+        progressInterval = setInterval(() => {
           setUploadProgress(prev => {
             if (prev >= 95) {
               clearInterval(progressInterval);
               return 95;
             }
-            return prev + Math.random() * 10;
+            return prev + (Math.random() * 2); // Slower progress for large files
+          });
+          
+          // Update current chunk indicator periodically
+          setCurrentChunk(prev => {
+            if (prev >= totalChunks) return totalChunks;
+            const elapsed = uploadProgress / 100;
+            return Math.min(Math.ceil(elapsed * totalChunks), totalChunks);
           });
         }, 300);
-        
-        // Simulate encryption and upload
-        const encryptionKey = generateEncryptionKey();
-        
-        // In a real implementation, we would read the file, encrypt it, and upload
-        // For demo purposes, we're just simulating this process
-        
-        // Upload the file and get the result
-        const uploadedFile = await uploadFile(file);
-        
-        // Complete the progress
-        clearInterval(progressInterval);
-        setUploadProgress(100);
+      } else {
+        // For regular uploads, simple progress
+        progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev >= 95) {
+              clearInterval(progressInterval);
+              return 95;
+            }
+            return prev + Math.random() * 5;
+          });
+        }, 200);
       }
       
-      // Upload the file and get the result (in real implementation, this would happen after encryption)
+      // Perform the actual upload
       const uploadedFile = await uploadFile(file);
       
-      // Complete the process
+      // Complete the progress
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      // Finish up
       setTimeout(() => {
         setIsUploading(false);
         setCurrentFile(null);
@@ -119,7 +112,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
       
       toast({
         title: "Upload failed",
-        description: "There was a problem uploading your file",
+        description: error.message || "There was a problem uploading your file",
         variant: "destructive",
       });
       

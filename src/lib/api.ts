@@ -1,5 +1,8 @@
 
-// Mock API functions for InflateStorage
+// InflateStorage API with GitHub storage backend integration
+
+import { supabase } from '@/integrations/supabase/client';
+import { encryptData, decryptData, generateEncryptionKey, needsChunking, splitFileIntoChunks } from '@/lib/encryption';
 
 const STORAGE_KEY = 'inflate_storage_auth';
 
@@ -27,6 +30,8 @@ export interface FileItem {
   thumbnail?: string;
   chunks?: number;
   encryptionKey?: string;
+  githubRepo?: string;
+  githubPath?: string;
 }
 
 // Folder types
@@ -49,61 +54,7 @@ const mockUser: User = {
   },
 };
 
-// Mock files
-const mockFiles: FileItem[] = [
-  {
-    id: '1',
-    name: 'Project Presentation.pdf',
-    type: 'application/pdf',
-    size: 4.7 * 1024 * 1024, // 4.7 MB
-    lastModified: new Date('2023-09-15'),
-    path: '/Documents/',
-    encrypted: true,
-    shared: false,
-  },
-  {
-    id: '2',
-    name: 'Vacation Photos.zip',
-    type: 'application/zip',
-    size: 1.2 * 1024 * 1024 * 1024, // 1.2 GB
-    lastModified: new Date('2023-07-22'),
-    path: '/Photos/',
-    encrypted: true,
-    shared: true,
-  },
-  {
-    id: '3',
-    name: 'Financial Report 2023.xlsx',
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    size: 2.8 * 1024 * 1024, // 2.8 MB
-    lastModified: new Date('2023-10-05'),
-    path: '/Documents/Work/',
-    encrypted: true,
-    shared: false,
-  },
-  {
-    id: '4',
-    name: 'Marketing Strategy.docx',
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    size: 1.5 * 1024 * 1024, // 1.5 MB
-    lastModified: new Date('2023-11-01'),
-    path: '/Documents/Work/',
-    encrypted: true,
-    shared: false,
-  },
-  {
-    id: '5',
-    name: 'Family Reunion.mp4',
-    type: 'video/mp4',
-    size: 755 * 1024 * 1024, // 755 MB
-    lastModified: new Date('2023-08-17'),
-    path: '/Videos/',
-    encrypted: true,
-    shared: true,
-  },
-];
-
-// Mock authentication
+// Authentication functions
 export const login = async (email: string, password: string): Promise<User> => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 800));
@@ -139,68 +90,249 @@ export const getCurrentUser = (): User | null => {
   return userData ? JSON.parse(userData) : null;
 };
 
-// File operations
+// File operations with GitHub backend
 export const getFiles = async (): Promise<FileItem[]> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 600));
-  
-  return mockFiles;
-};
-
-// Enhanced upload file function with encryption and chunking support
-export const uploadFile = async (file: File): Promise<FileItem> => {
-  // Simulate network delay and encryption
-  await new Promise(resolve => setTimeout(resolve, file.size / 200000)); // Larger files take longer
-  
-  // For demo purposes, we're simulating the encryption/chunking process
-  // In a real app, you would use the encryption.ts utility functions
-  const isLargeFile = file.size > 10 * 1024 * 1024; // 10MB
-  const numberOfChunks = isLargeFile ? Math.ceil(file.size / (10 * 1024 * 1024)) : 1;
-  
-  const newFile: FileItem = {
-    id: Math.random().toString(36).substring(2, 15),
-    name: file.name,
-    type: file.type,
-    size: file.size,
-    lastModified: new Date(),
-    path: '/',
-    encrypted: true,
-    shared: false,
-    chunks: isLargeFile ? numberOfChunks : undefined,
-    encryptionKey: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
-  };
-  
-  return newFile;
-};
-
-// Download file with decryption support
-export const downloadFile = async (fileId: string): Promise<Blob> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Simulate fetching and decrypting the file
-  // In a real app, you would fetch the encrypted data and use the decryption utility
-  const file = mockFiles.find(f => f.id === fileId);
-  if (!file) {
-    throw new Error('File not found');
+  try {
+    const { data, error } = await supabase
+      .from('files')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching files:', error);
+    return [];
   }
-  
-  // Simulate creating a file blob of the proper type
-  return new Blob(['Simulated file content'], { type: file.type });
+};
+
+// Upload file to GitHub-backed storage
+export const uploadFile = async (file: File): Promise<FileItem> => {
+  try {
+    // Generate a unique encryption key for this file
+    const encryptionKey = generateEncryptionKey();
+    
+    // Check if file needs chunking (> 10MB)
+    const isLargeFile = needsChunking(file.size);
+    let chunks = 1;
+    let uploadedPaths: string[] = [];
+    
+    // Create a unique file ID
+    const fileId = crypto.randomUUID();
+    const userId = getCurrentUser()?.id || 'anonymous';
+    
+    // For large files, we split and upload chunks in parallel
+    if (isLargeFile) {
+      const fileChunks = splitFileIntoChunks(file);
+      chunks = fileChunks.length;
+      
+      // Process all chunks in parallel
+      const chunkPromises = fileChunks.map(async (chunk, index) => {
+        const chunkData = await chunk.arrayBuffer();
+        const encryptedData = encryptData(chunkData, encryptionKey);
+        
+        // Upload to GitHub via Supabase Edge Function
+        const { data, error } = await supabase.functions.invoke('github-storage', {
+          body: {
+            action: 'upload',
+            fileName: `${fileId}_chunk_${index}`,
+            fileType: file.type,
+            data: encryptedData,
+            userId: userId
+          }
+        });
+        
+        if (error) throw error;
+        return data.path;
+      });
+      
+      uploadedPaths = await Promise.all(chunkPromises);
+    } else {
+      // For small files, we encrypt and upload in one go
+      const fileData = await file.arrayBuffer();
+      const encryptedData = encryptData(fileData, encryptionKey);
+      
+      // Upload to GitHub via Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('github-storage', {
+        body: {
+          action: 'upload',
+          fileName: fileId,
+          fileType: file.type,
+          data: encryptedData,
+          userId: userId
+        }
+      });
+      
+      if (error) throw error;
+      uploadedPaths = [data.path];
+    }
+    
+    // Create the file record in our database
+    const newFile = {
+      id: fileId,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: new Date(),
+      path: `/${userId}/`,
+      encrypted: true,
+      shared: false,
+      chunks: isLargeFile ? chunks : undefined,
+      encryptionKey: encryptionKey,
+      githubPath: uploadedPaths.join(',')
+    };
+    
+    // Save file metadata to Supabase
+    const { error } = await supabase
+      .from('files')
+      .insert([newFile]);
+    
+    if (error) throw error;
+    
+    return newFile;
+  } catch (error) {
+    console.error('Upload error:', error);
+    throw new Error(`Failed to upload file: ${error.message}`);
+  }
+};
+
+// Download file from GitHub-backed storage
+export const downloadFile = async (fileId: string): Promise<Blob> => {
+  try {
+    // Get file metadata from database
+    const { data: fileData, error: fileError } = await supabase
+      .from('files')
+      .select('*')
+      .eq('id', fileId)
+      .single();
+    
+    if (fileError) throw fileError;
+    if (!fileData) throw new Error('File not found');
+    
+    const { githubPath, encryptionKey, chunks, type } = fileData;
+    
+    if (!githubPath || !encryptionKey) {
+      throw new Error('Missing file storage information');
+    }
+    
+    // For multi-chunk files
+    if (chunks && chunks > 1) {
+      const paths = githubPath.split(',');
+      if (paths.length !== chunks) {
+        throw new Error('Chunk count mismatch');
+      }
+      
+      // Download all chunks in parallel
+      const chunkPromises = paths.map(async (path) => {
+        // Download from GitHub via Supabase Edge Function
+        const { data, error } = await supabase.functions.invoke('github-storage', {
+          body: {
+            action: 'download',
+            path: path
+          }
+        });
+        
+        if (error) throw error;
+        
+        // Decrypt the chunk
+        const decryptedData = decryptData(data.content, encryptionKey);
+        return decryptedData;
+      });
+      
+      // Combine all chunks into one array buffer
+      const chunkBuffers = await Promise.all(chunkPromises);
+      const totalLength = chunkBuffers.reduce((acc, curr) => acc + curr.byteLength, 0);
+      const combinedBuffer = new Uint8Array(totalLength);
+      
+      let offset = 0;
+      for (const buffer of chunkBuffers) {
+        combinedBuffer.set(new Uint8Array(buffer), offset);
+        offset += buffer.byteLength;
+      }
+      
+      return new Blob([combinedBuffer], { type });
+    } else {
+      // For single-file downloads
+      // Download from GitHub via Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('github-storage', {
+        body: {
+          action: 'download',
+          path: githubPath
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Decrypt the file
+      const decryptedData = decryptData(data.content, encryptionKey);
+      return new Blob([decryptedData], { type });
+    }
+  } catch (error) {
+    console.error('Download error:', error);
+    throw new Error(`Failed to download file: ${error.message}`);
+  }
 };
 
 export const deleteFile = async (fileId: string): Promise<boolean> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  return true;
+  try {
+    // Get file metadata from database
+    const { data: fileData, error: fileError } = await supabase
+      .from('files')
+      .select('*')
+      .eq('id', fileId)
+      .single();
+    
+    if (fileError) throw fileError;
+    if (!fileData) throw new Error('File not found');
+    
+    const { githubPath } = fileData;
+    
+    if (githubPath) {
+      // Delete all chunks/paths
+      const paths = githubPath.split(',');
+      
+      // Delete from GitHub via Supabase Edge Function
+      await Promise.all(paths.map(path => 
+        supabase.functions.invoke('github-storage', {
+          body: {
+            action: 'delete',
+            path: path
+          }
+        })
+      ));
+    }
+    
+    // Delete file metadata from database
+    const { error } = await supabase
+      .from('files')
+      .delete()
+      .eq('id', fileId);
+    
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error('Delete error:', error);
+    throw new Error(`Failed to delete file: ${error.message}`);
+  }
 };
 
 export const shareFile = async (fileId: string): Promise<string> => {
-  // Simulate creating a share link
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  return `https://inflate-storage.app/share/${fileId}`;
+  try {
+    // Update file to mark as shared
+    const { error } = await supabase
+      .from('files')
+      .update({ shared: true })
+      .eq('id', fileId);
+    
+    if (error) throw error;
+    
+    // Generate a share link
+    return `${window.location.origin}/share/${fileId}`;
+  } catch (error) {
+    console.error('Share error:', error);
+    throw new Error(`Failed to share file: ${error.message}`);
+  }
 };
 
 export const formatBytes = (bytes: number, decimals = 2): string => {

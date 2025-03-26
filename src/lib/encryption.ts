@@ -9,17 +9,23 @@ export const generateEncryptionKey = (): string => {
   return CryptoJS.lib.WordArray.random(32).toString();
 };
 
-// Encrypt file data with AES-256
+// Encrypt file data with AES-256 and return as base64 string
 export const encryptData = (data: ArrayBuffer, encryptionKey: string): string => {
   const wordArray = CryptoJS.lib.WordArray.create(data);
-  return CryptoJS.AES.encrypt(wordArray, encryptionKey).toString();
+  const encrypted = CryptoJS.AES.encrypt(wordArray, encryptionKey).toString();
+  return encrypted;
 };
 
-// Decrypt file data
+// Decrypt file data from base64 string
 export const decryptData = (encryptedData: string, encryptionKey: string): ArrayBuffer => {
-  const decrypted = CryptoJS.AES.decrypt(encryptedData, encryptionKey);
-  const typedArray = convertWordArrayToUint8Array(decrypted);
-  return typedArray.buffer;
+  try {
+    const decrypted = CryptoJS.AES.decrypt(encryptedData, encryptionKey);
+    const typedArray = convertWordArrayToUint8Array(decrypted);
+    return typedArray.buffer;
+  } catch (error) {
+    console.error('Decryption error:', error);
+    throw new Error('Failed to decrypt data: ' + error.message);
+  }
 };
 
 // Convert CryptoJS WordArray to Uint8Array
@@ -37,7 +43,7 @@ export const convertWordArrayToUint8Array = (wordArray: CryptoJS.lib.WordArray):
     
     if (j < sigBytes) result[j] = byte1;
     if (j + 1 < sigBytes) result[j + 1] = byte2;
-    if (j + 2 < sigBytes) result[j + 3] = byte3;
+    if (j + 2 < sigBytes) result[j + 2] = byte3;
     if (j + 3 < sigBytes) result[j + 3] = byte4;
     
     i++;
