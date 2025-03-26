@@ -25,6 +25,8 @@ export interface FileItem {
   encrypted: boolean;
   shared: boolean;
   thumbnail?: string;
+  chunks?: number;
+  encryptionKey?: string;
 }
 
 // Folder types
@@ -145,9 +147,15 @@ export const getFiles = async (): Promise<FileItem[]> => {
   return mockFiles;
 };
 
+// Enhanced upload file function with encryption and chunking support
 export const uploadFile = async (file: File): Promise<FileItem> => {
   // Simulate network delay and encryption
-  await new Promise(resolve => setTimeout(resolve, file.size / 100000)); // Larger files take longer
+  await new Promise(resolve => setTimeout(resolve, file.size / 200000)); // Larger files take longer
+  
+  // For demo purposes, we're simulating the encryption/chunking process
+  // In a real app, you would use the encryption.ts utility functions
+  const isLargeFile = file.size > 10 * 1024 * 1024; // 10MB
+  const numberOfChunks = isLargeFile ? Math.ceil(file.size / (10 * 1024 * 1024)) : 1;
   
   const newFile: FileItem = {
     id: Math.random().toString(36).substring(2, 15),
@@ -158,9 +166,27 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     path: '/',
     encrypted: true,
     shared: false,
+    chunks: isLargeFile ? numberOfChunks : undefined,
+    encryptionKey: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
   };
   
   return newFile;
+};
+
+// Download file with decryption support
+export const downloadFile = async (fileId: string): Promise<Blob> => {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // Simulate fetching and decrypting the file
+  // In a real app, you would fetch the encrypted data and use the decryption utility
+  const file = mockFiles.find(f => f.id === fileId);
+  if (!file) {
+    throw new Error('File not found');
+  }
+  
+  // Simulate creating a file blob of the proper type
+  return new Blob(['Simulated file content'], { type: file.type });
 };
 
 export const deleteFile = async (fileId: string): Promise<boolean> => {

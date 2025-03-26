@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import UploadButton from '@/components/UploadButton';
-import { formatBytes } from '@/lib/api';
+import { formatBytes, getFiles, downloadFile, deleteFile, shareFile } from '@/lib/api';
 import {
   ShieldCheck,
   Lock,
@@ -19,7 +20,6 @@ import {
   MoreVertical,
   ChevronRight,
   ChevronDown,
-  Github,
   Settings,
   LogOut,
   File,
@@ -33,7 +33,16 @@ import {
   Loader2,
   RefreshCw,
   Download,
-  Trash
+  Trash,
+  Filter,
+  LayoutGrid,
+  List,
+  FileDigit,
+  ZoomIn,
+  ZoomOut,
+  Copy,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import {
   Card,
@@ -60,7 +69,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { generateWithGemini } from '@/services/gemini';
 import { supabase } from '@/integrations/supabase/client';
-import GitHubRepositories from '@/components/GitHubRepositories';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
@@ -71,8 +79,11 @@ const Dashboard = () => {
   const [aiResponse, setAiResponse] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('files');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchFiles();
   }, []);
 
@@ -102,6 +113,81 @@ const Dashboard = () => {
     setFiles((prevFiles) => [file, ...prevFiles]);
   };
 
+  const handleDownload = async (fileId: string, fileName: string) => {
+    try {
+      toast({
+        title: "Preparing download",
+        description: "Decrypting and preparing your file...",
+      });
+      
+      const fileBlob = await downloadFile(fileId);
+      
+      // Create a download link
+      const url = URL.createObjectURL(fileBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download complete",
+        description: `${fileName} has been successfully downloaded`,
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download failed",
+        description: "There was a problem downloading your file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string, fileName: string) => {
+    try {
+      await deleteFile(fileId);
+      setFiles(files.filter(file => file.id !== fileId));
+      
+      toast({
+        title: "File deleted",
+        description: `${fileName} has been deleted`
+      });
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Delete failed",
+        description: "There was a problem deleting your file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleShareFile = async (fileId: string) => {
+    try {
+      const shareLink = await shareFile(fileId);
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(shareLink);
+      
+      toast({
+        title: "Share link created",
+        description: "The secure link has been copied to your clipboard"
+      });
+    } catch (error) {
+      console.error("Share error:", error);
+      toast({
+        title: "Share failed",
+        description: "There was a problem creating a share link",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getFileIcon = (type: string) => {
     if (type.startsWith('image/')) return <Image className="h-6 w-6 text-blue-500" />;
     if (type.startsWith('video/')) return <Video className="h-6 w-6 text-red-500" />;
@@ -110,6 +196,8 @@ const Dashboard = () => {
       return <Archive className="h-6 w-6 text-yellow-500" />;
     if (type.includes('pdf'))
       return <FileText className="h-6 w-6 text-red-600" />;
+    if (type.includes('csv') || type.includes('excel') || type.includes('spreadsheet'))
+      return <FileDigit className="h-6 w-6 text-green-600" />;
     return <File className="h-6 w-6 text-gray-500" />;
   };
 
@@ -144,6 +232,23 @@ const Dashboard = () => {
   const totalStorage = (profile?.storage_used || 0);
   const unlimitedStorage = true; // Premium feature indicator
   const usagePercentage = unlimitedStorage ? 0 : Math.min((totalStorage / (1024 * 1024 * 1024 * 1024)) * 100, 100);
+
+  // Filter files based on search query and category
+  const filteredFiles = files.filter(file => {
+    const matchesSearch = searchQuery ? 
+      file.name.toLowerCase().includes(searchQuery.toLowerCase()) : 
+      true;
+    
+    const matchesCategory = filterCategory ? 
+      (filterCategory === 'images' && file.type.startsWith('image/')) ||
+      (filterCategory === 'videos' && file.type.startsWith('video/')) ||
+      (filterCategory === 'audio' && file.type.startsWith('audio/')) ||
+      (filterCategory === 'documents' && (file.type.includes('pdf') || file.type.includes('document') || file.type.includes('text'))) ||
+      (filterCategory === 'archives' && (file.type.includes('zip') || file.type.includes('tar') || file.type.includes('rar'))) : 
+      true;
+    
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="min-h-screen flex flex-col font-inter bg-slate-50 dark:bg-slate-900/50">
@@ -223,13 +328,63 @@ const Dashboard = () => {
               <MessageSquare className="mr-2 h-4 w-4" />
               AI Assistant
             </Button>
+          </div>
+
+          <div className="mt-6 space-y-1">
+            <p className="text-xs font-medium mb-2 text-muted-foreground">CATEGORIES</p>
             <Button
-              variant={activeTab === 'github' ? 'default' : 'ghost'}
+              variant="ghost"
+              size="sm"
               className="w-full justify-start"
-              onClick={() => setActiveTab('github')}
+              onClick={() => setFilterCategory('images')}
             >
-              <Github className="mr-2 h-4 w-4" />
-              GitHub Repos
+              <Image className="mr-2 h-4 w-4 text-blue-500" />
+              Images
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => setFilterCategory('videos')}
+            >
+              <Video className="mr-2 h-4 w-4 text-red-500" />
+              Videos
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => setFilterCategory('documents')}
+            >
+              <FileText className="mr-2 h-4 w-4 text-amber-500" />
+              Documents
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => setFilterCategory('audio')}
+            >
+              <Music className="mr-2 h-4 w-4 text-green-500" />
+              Audio
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => setFilterCategory('archives')}
+            >
+              <Archive className="mr-2 h-4 w-4 text-purple-500" />
+              Archives
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-primary"
+              onClick={() => setFilterCategory(null)}
+            >
+              <File className="mr-2 h-4 w-4" />
+              All Files
             </Button>
           </div>
 
@@ -253,7 +408,6 @@ const Dashboard = () => {
             <TabsList className="md:hidden mb-4">
               <TabsTrigger value="files">Files</TabsTrigger>
               <TabsTrigger value="ai">AI Assistant</TabsTrigger>
-              <TabsTrigger value="github">GitHub</TabsTrigger>
             </TabsList>
 
             <TabsContent value="files" className="space-y-4">
@@ -265,78 +419,216 @@ const Dashboard = () => {
                 />
               </div>
 
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="relative flex-grow">
+                  <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search files..." 
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('grid')}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('list')}
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon">
+                        <Filter className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setFilterCategory(null)}>
+                        All Files
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterCategory('images')}>
+                        Images
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterCategory('videos')}>
+                        Videos
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterCategory('documents')}>
+                        Documents
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterCategory('audio')}>
+                        Audio
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilterCategory('archives')}>
+                        Archives
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
               {fetchingFiles ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
                   <p className="text-muted-foreground">Loading your files...</p>
                 </div>
-              ) : files.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {files.map((file) => (
-                    <Card key={file.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                      <CardHeader className="p-4 pb-2 flex flex-row justify-between items-start">
-                        <div className="flex items-start space-x-3">
+              ) : filteredFiles.length > 0 ? (
+                viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredFiles.map((file) => (
+                      <Card key={file.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                        <CardHeader className="p-4 pb-2 flex flex-row justify-between items-start">
+                          <div className="flex items-start space-x-3">
+                            {getFileIcon(file.type)}
+                            <div>
+                              <CardTitle className="text-base truncate" title={file.name}>
+                                {file.name}
+                              </CardTitle>
+                              <CardDescription className="text-xs">
+                                {formatBytes(file.size)}
+                                {file.chunks && <span className="ml-1">• {file.chunks} parts</span>}
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDownload(file.id, file.name)}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleShareFile(file.id)}>
+                                <Share2 className="mr-2 h-4 w-4" />
+                                Share
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-red-500 focus:text-red-500"
+                                onClick={() => handleDeleteFile(file.id, file.name)}
+                              >
+                                <Trash className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </CardHeader>
+                        <CardFooter className="p-4 pt-2 flex justify-between text-xs text-muted-foreground">
+                          <span>
+                            {new Date(file.created_at).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </span>
+                          {file.encrypted && (
+                            <span className="flex items-center">
+                              <Lock className="h-3 w-3 mr-1" />
+                              AES-256
+                            </span>
+                          )}
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                        <div className="flex items-center space-x-3">
                           {getFileIcon(file.type)}
                           <div>
-                            <CardTitle className="text-base truncate" title={file.name}>
-                              {file.name}
-                            </CardTitle>
-                            <CardDescription className="text-xs">
-                              {formatBytes(file.size)}
-                            </CardDescription>
+                            <p className="font-medium">{file.name}</p>
+                            <div className="flex items-center text-xs text-muted-foreground">
+                              <span>{formatBytes(file.size)}</span>
+                              <span className="mx-2">•</span>
+                              <span>
+                                {new Date(file.created_at).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </span>
+                              {file.chunks && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span>{file.chunks} parts</span>
+                                </>
+                              )}
+                              {file.encrypted && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span className="flex items-center">
+                                    <Lock className="h-3 w-3 mr-1" />
+                                    Encrypted
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Download className="mr-2 h-4 w-4" />
-                              Download
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Share2 className="mr-2 h-4 w-4" />
-                              Share
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-500 focus:text-red-500">
-                              <Trash className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </CardHeader>
-                      <CardFooter className="p-4 pt-2 flex justify-between text-xs text-muted-foreground">
-                        <span>
-                          {new Date(file.created_at).toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </span>
-                        {file.encrypted && (
-                          <span className="flex items-center">
-                            <Lock className="h-3 w-3 mr-1" />
-                            Encrypted
-                          </span>
-                        )}
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleDownload(file.id, file.name)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleShareFile(file.id)}
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            onClick={() => handleDeleteFile(file.id, file.name)}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
               ) : (
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-12 text-center">
                   <div className="mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mb-4">
                     <Upload className="h-8 w-8 text-blue-500" />
                   </div>
-                  <h3 className="text-lg font-medium mb-2">No files uploaded yet</h3>
+                  <h3 className="text-lg font-medium mb-2">No files found</h3>
                   <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                    Upload your first file to get started with secure, encrypted storage.
+                    {searchQuery || filterCategory
+                      ? "Try adjusting your search or filters to find what you're looking for."
+                      : "Upload your first file to get started with secure, encrypted storage."}
                   </p>
-                  <UploadButton onFileUploaded={handleFileUploaded} />
+                  {!searchQuery && !filterCategory && (
+                    <UploadButton onFileUploaded={handleFileUploaded} />
+                  )}
+                  {(searchQuery || filterCategory) && (
+                    <Button variant="outline" onClick={() => {
+                      setSearchQuery('');
+                      setFilterCategory(null);
+                    }}>
+                      Clear filters
+                    </Button>
+                  )}
                 </div>
               )}
             </TabsContent>
@@ -402,17 +694,6 @@ const Dashboard = () => {
                   </CardContent>
                 </Card>
               )}
-            </TabsContent>
-
-            <TabsContent value="github" className="space-y-4">
-              <div className="mb-6">
-                <h1 className="text-2xl font-bold mb-2">GitHub Integration</h1>
-                <p className="text-muted-foreground">
-                  Search for GitHub users and explore their repositories.
-                </p>
-              </div>
-              
-              <GitHubRepositories />
             </TabsContent>
           </Tabs>
         </main>
