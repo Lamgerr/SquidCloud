@@ -20,6 +20,12 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["Inter var", ...fontFamily.sans],
+        inter: ["Inter var", ...fontFamily.sans],
+        display: ["Inter var", ...fontFamily.sans],
+        mono: ["JetBrains Mono", ...fontFamily.mono],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -123,9 +129,6 @@ export default {
         float: "float 6s ease-in-out infinite",
         pulse: "pulse 3s ease-in-out infinite",
         "blur-in": "blur-in 0.4s ease-out",
-      },
-      fontFamily: {
-        sans: ["var(--font-sans)", ...fontFamily.sans],
       },
     },
   },

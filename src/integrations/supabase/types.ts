@@ -9,7 +9,113 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      files: {
+        Row: {
+          created_at: string | null
+          encrypted: boolean | null
+          encryption_key: string | null
+          id: string
+          name: string
+          shared: boolean | null
+          size: number
+          storage_path: string
+          tags: string[] | null
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          encrypted?: boolean | null
+          encryption_key?: string | null
+          id?: string
+          name: string
+          shared?: boolean | null
+          size: number
+          storage_path: string
+          tags?: string[] | null
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          encrypted?: boolean | null
+          encryption_key?: string | null
+          id?: string
+          name?: string
+          shared?: boolean | null
+          size?: number
+          storage_path?: string
+          tags?: string[] | null
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string
+          storage_used: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id: string
+          storage_used?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          storage_used?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      shares: {
+        Row: {
+          access_code: string
+          created_at: string | null
+          expires_at: string | null
+          file_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          access_code: string
+          created_at?: string | null
+          expires_at?: string | null
+          file_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          access_code?: string
+          created_at?: string | null
+          expires_at?: string | null
+          file_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shares_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -1,240 +1,443 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { 
-  ShieldCheck, 
-  Zap, 
-  Lock, 
-  Search, 
-  Share2, 
-  Cloud, 
-  Smartphone, 
-  FileUp, 
-  ChevronRight 
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import UploadButton from '@/components/UploadButton';
+import { formatBytes } from '@/lib/api';
+import {
+  ShieldCheck,
+  Lock,
+  Search,
+  Share2,
+  Cloud,
+  Smartphone,
+  FileUp,
+  Folder,
+  MoreVertical,
+  ChevronRight,
+  ChevronDown,
+  Github,
+  Settings,
+  LogOut,
+  File,
+  Upload,
+  Image,
+  Video,
+  Music,
+  Archive,
+  MessageSquare,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Download,
+  Trash
 } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { generateWithGemini } from '@/services/gemini';
+import { supabase } from '@/integrations/supabase/client';
 
-const Index = () => {
+const Dashboard = () => {
+  const { user, profile, signOut } = useAuth();
+  const { toast } = useToast();
+  const [files, setFiles] = useState<any[]>([]);
+  const [fetchingFiles, setFetchingFiles] = useState(false);
+  const [promptInput, setPromptInput] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState('files');
+
+  React.useEffect(() => {
+    fetchFiles();
+  }, []);
+
+  const fetchFiles = async () => {
+    try {
+      setFetchingFiles(true);
+      const { data, error } = await supabase
+        .from('files')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setFiles(data || []);
+    } catch (error) {
+      console.error('Error fetching files:', error);
+      toast({
+        title: 'Error fetching files',
+        description: 'There was a problem loading your files',
+        variant: 'destructive',
+      });
+    } finally {
+      setFetchingFiles(false);
+    }
+  };
+
+  const handleFileUploaded = (file: any) => {
+    setFiles((prevFiles) => [file, ...prevFiles]);
+  };
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith('image/')) return <Image className="h-6 w-6 text-blue-500" />;
+    if (type.startsWith('video/')) return <Video className="h-6 w-6 text-red-500" />;
+    if (type.startsWith('audio/')) return <Music className="h-6 w-6 text-green-500" />;
+    if (type.includes('zip') || type.includes('tar') || type.includes('rar'))
+      return <Archive className="h-6 w-6 text-yellow-500" />;
+    if (type.includes('pdf'))
+      return <FileText className="h-6 w-6 text-red-600" />;
+    return <File className="h-6 w-6 text-gray-500" />;
+  };
+
+  const handleAskAI = async () => {
+    if (!promptInput.trim()) {
+      toast({
+        title: 'Empty prompt',
+        description: 'Please enter a question or prompt for the AI',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    setAiResponse('');
+
+    try {
+      const response = await generateWithGemini(promptInput);
+      setAiResponse(response);
+    } catch (error: any) {
+      console.error('Error with Gemini API:', error);
+      toast({
+        title: 'AI Error',
+        description: error.message || 'Error generating response',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const totalStorage = (profile?.storage_used || 0);
+  const unlimitedStorage = true; // Premium feature indicator
+  const usagePercentage = unlimitedStorage ? 0 : Math.min((totalStorage / (1024 * 1024 * 1024 * 1024)) * 100, 100);
+
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="w-full backdrop-blur-lg bg-white/75 dark:bg-slate-900/75 border-b border-slate-200/50 dark:border-slate-800/50 transition-all duration-200">
-        <div className="container mx-auto py-4 px-6 flex justify-between items-center">
+    <div className="min-h-screen flex flex-col font-inter bg-slate-50 dark:bg-slate-900/50">
+      {/* Dashboard Header */}
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center space-x-2">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center">
-              <div className="w-4 h-4 bg-white rounded-sm" />
-            </div>
-            <span className="font-semibold text-xl">InflateStorage</span>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <Link 
-              to="/auth" 
-              className="text-sm font-medium hover:text-primary transition-colors"
-            >
-              Login
-            </Link>
-            <Link to="/auth">
-              <Button>Get Started</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-      
-      {/* Hero Section */}
-      <section className="relative py-24 md:py-32 overflow-hidden">
-        <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto text-center relative z-10">
-            <div className="inline-block mb-4">
-              <div className="flex items-center space-x-2 rounded-full bg-blue-100 dark:bg-blue-900/30 px-3 py-1">
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                  Unlimited Secure Storage
-                </span>
-              </div>
-            </div>
-            
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 animate-slide-down">
-              Secure, Unlimited Cloud Storage
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-blue-700">
-                {" "}for Your Digital Life
-              </span>
-            </h1>
-            
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto animate-slide-down animation-delay-100">
-              Experience the future of secure storage with end-to-end encryption, unlimited space, and AI-powered organization.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12 animate-slide-down animation-delay-200">
-              <Link to="/auth">
-                <Button size="lg" className="w-full sm:w-auto">
-                  Get Started Free
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="#features">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  See Features
-                </Button>
-              </Link>
-            </div>
-            
-            {/* Security badges */}
-            <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground mb-8 animate-fade-in animation-delay-300">
-              <div className="flex items-center gap-1">
-                <ShieldCheck className="h-4 w-4 text-green-500" />
-                <span>AES-256 Encryption</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Lock className="h-4 w-4 text-green-500" />
-                <span>Zero-Knowledge Privacy</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Zap className="h-4 w-4 text-amber-500" />
-                <span>High-Speed Transfers</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Background decoration */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-gradient-to-br from-blue-400/10 to-purple-500/10 blur-3xl -z-10" />
-      </section>
-      
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-slate-50 dark:bg-slate-900/30">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Powerful Features</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              Everything you need to securely store, manage, and share your files.
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center mb-4">
-                <Lock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">End-to-End Encryption</h3>
-              <p className="text-muted-foreground">
-                Your files are encrypted before they leave your device. Only you can access your data.
-              </p>
-            </div>
-            
-            {/* Feature 2 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-100">
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center mb-4">
-                <Cloud className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Unlimited Storage</h3>
-              <p className="text-muted-foreground">
-                Store as much as you want without worrying about running out of space.
-              </p>
-            </div>
-            
-            {/* Feature 3 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-200">
-              <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center mb-4">
-                <Search className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">AI-Powered Search</h3>
-              <p className="text-muted-foreground">
-                Intelligent search helps you find any file instantly, even without the exact filename.
-              </p>
-            </div>
-            
-            {/* Feature 4 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-300">
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center mb-4">
-                <Share2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Secure Sharing</h3>
-              <p className="text-muted-foreground">
-                Share files securely with customized access controls and expiring links.
-              </p>
-            </div>
-            
-            {/* Feature 5 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-400">
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/50 rounded-lg flex items-center justify-center mb-4">
-                <Smartphone className="h-6 w-6 text-red-600 dark:text-red-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Cross-Device Sync</h3>
-              <p className="text-muted-foreground">
-                Access your files from any device with real-time synchronization.
-              </p>
-            </div>
-            
-            {/* Feature 6 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-500">
-              <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg flex items-center justify-center mb-4">
-                <FileUp className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Large File Support</h3>
-              <p className="text-muted-foreground">
-                Upload files of any size with our optimized large file transfer system.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-      
-      {/* CTA Section */}
-      <section className="relative py-20 overflow-hidden">
-        <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-3xl font-bold mb-4">Ready to Secure Your Files?</h2>
-            <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-              Join thousands of users who trust InflateStorage for their secure storage needs.
-            </p>
-            
-            <Link to="/auth">
-              <Button size="lg" className="animate-pulse">
-                Get Started Now
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-        
-        {/* Background decoration */}
-        <div className="absolute top-1/2 right-0 transform -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-blue-400/5 to-purple-500/5 blur-3xl -z-10" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-green-400/5 to-blue-500/5 blur-3xl -z-10" />
-      </section>
-      
-      {/* Footer */}
-      <footer className="py-12 bg-slate-50 dark:bg-slate-900/50">
-        <div className="container mx-auto px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
+            <Link to="/" className="flex items-center space-x-2">
               <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center">
                 <div className="w-4 h-4 bg-white rounded-sm" />
               </div>
-              <span className="font-semibold">InflateStorage</span>
-            </div>
-            
-            <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-6">
-              <span className="text-sm text-muted-foreground">
-                &copy; {new Date().getFullYear()} InflateStorage. All rights reserved.
-              </span>
-              <div className="flex space-x-4">
-                <Link to="#" className="text-sm text-muted-foreground hover:text-foreground">
-                  Privacy
-                </Link>
-                <Link to="#" className="text-sm text-muted-foreground hover:text-foreground">
-                  Terms
-                </Link>
-                <Link to="#" className="text-sm text-muted-foreground hover:text-foreground">
-                  Contact
-                </Link>
-              </div>
-            </div>
+              <span className="font-semibold text-xl hidden sm:inline-block">InflateStorage</span>
+            </Link>
+          </div>
+
+          <div className="flex items-center space-x-1 sm:space-x-4">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={fetchFiles}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh</TooltipContent>
+            </Tooltip>
+
+            <UploadButton
+              onFileUploaded={handleFileUploaded}
+              className="hidden sm:block"
+            />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium">
+                    {user?.email?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="font-medium truncate">{profile?.full_name || user?.email}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-      </footer>
+      </header>
+
+      <div className="flex flex-1">
+        {/* Sidebar */}
+        <aside className="hidden md:block w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4">
+          <div className="space-y-1">
+            <Button
+              variant={activeTab === 'files' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveTab('files')}
+            >
+              <File className="mr-2 h-4 w-4" />
+              My Files
+            </Button>
+            <Button
+              variant={activeTab === 'ai' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveTab('ai')}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              AI Assistant
+            </Button>
+            <Button
+              variant={activeTab === 'github' ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => setActiveTab('github')}
+            >
+              <Github className="mr-2 h-4 w-4" />
+              GitHub Repos
+            </Button>
+          </div>
+
+          <div className="mt-8">
+            <div className="text-xs font-medium mb-2">Storage Usage</div>
+            <div className="bg-slate-100 dark:bg-slate-700 rounded-full h-2 mb-2">
+              <div
+                className="bg-blue-500 h-2 rounded-full"
+                style={{ width: `${usagePercentage}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{formatBytes(totalStorage)}</span>
+              <span>{unlimitedStorage ? 'Unlimited' : '1 TB'}</span>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 md:p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="md:hidden mb-4">
+              <TabsTrigger value="files">Files</TabsTrigger>
+              <TabsTrigger value="ai">AI Assistant</TabsTrigger>
+              <TabsTrigger value="github">GitHub</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="files" className="space-y-4">
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold">My Files</h1>
+                <UploadButton
+                  onFileUploaded={handleFileUploaded}
+                  className="sm:hidden"
+                />
+              </div>
+
+              {fetchingFiles ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
+                  <p className="text-muted-foreground">Loading your files...</p>
+                </div>
+              ) : files.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {files.map((file) => (
+                    <Card key={file.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                      <CardHeader className="p-4 pb-2 flex flex-row justify-between items-start">
+                        <div className="flex items-start space-x-3">
+                          {getFileIcon(file.type)}
+                          <div>
+                            <CardTitle className="text-base truncate" title={file.name}>
+                              {file.name}
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                              {formatBytes(file.size)}
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Share2 className="mr-2 h-4 w-4" />
+                              Share
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-500 focus:text-red-500">
+                              <Trash className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </CardHeader>
+                      <CardFooter className="p-4 pt-2 flex justify-between text-xs text-muted-foreground">
+                        <span>
+                          {new Date(file.created_at).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </span>
+                        {file.encrypted && (
+                          <span className="flex items-center">
+                            <Lock className="h-3 w-3 mr-1" />
+                            Encrypted
+                          </span>
+                        )}
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-12 text-center">
+                  <div className="mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mb-4">
+                    <Upload className="h-8 w-8 text-blue-500" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">No files uploaded yet</h3>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    Upload your first file to get started with secure, encrypted storage.
+                  </p>
+                  <UploadButton onFileUploaded={handleFileUploaded} />
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="ai" className="space-y-4">
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold mb-2">AI Assistant</h1>
+                <p className="text-muted-foreground">
+                  Ask about file organization, security, or get help with content generation.
+                </p>
+              </div>
+
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle>Ask Gemini AI</CardTitle>
+                  <CardDescription>Powered by Google's Gemini 1.5 Flash</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <Textarea
+                        placeholder="Ask anything about your files, storage, or ask for content generation..."
+                        className="min-h-20"
+                        value={promptInput}
+                        onChange={(e) => setPromptInput(e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      onClick={handleAskAI} 
+                      disabled={isGenerating || !promptInput.trim()}
+                      className="w-full"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          Ask AI
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {aiResponse && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">AI Response</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="prose dark:prose-invert">
+                      {aiResponse.split('\n').map((line, i) => (
+                        <React.Fragment key={i}>
+                          {line}
+                          <br />
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="github" className="space-y-4">
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold mb-2">GitHub Integration</h1>
+                <p className="text-muted-foreground">
+                  Connect your GitHub account to access repositories directly.
+                </p>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>GitHub Connection</CardTitle>
+                  <CardDescription>Link your GitHub account to InflateStorage</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-center py-4">
+                    <Github className="h-16 w-16 text-slate-800 dark:text-slate-200" />
+                  </div>
+                  <p className="text-center">
+                    Connect your GitHub account to manage repositories and keep your code secure with InflateStorage's encryption.
+                  </p>
+                  <Button className="w-full">
+                    <Github className="mr-2 h-4 w-4" />
+                    Connect GitHub Account
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </main>
+      </div>
     </div>
   );
 };
 
-export default Index;
+export default Dashboard;

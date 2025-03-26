@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,10 +13,12 @@ import {
   EyeOff, 
   Shield, 
   ShieldCheck, 
-  ShieldAlert
+  ShieldAlert,
+  Github
 } from 'lucide-react';
-import { login, register } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -30,6 +32,14 @@ const Auth = () => {
   
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, signUp, githubSignIn, user } = useAuth();
+  
+  useEffect(() => {
+    // Redirect if already authenticated
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
   
   // Password strength checker
   const checkPasswordStrength = (pass: string) => {
@@ -99,35 +109,30 @@ const Auth = () => {
     
     try {
       if (isLogin) {
-        await login(email, password);
-        toast({
-          title: "Login successful",
-          description: "Welcome back to InflateStorage",
-        });
+        await signIn(email, password);
+        // Navigation happens in the auth context
       } else {
-        await register(email, password, name);
-        toast({
-          title: "Registration successful",
-          description: "Your secure storage has been created",
-        });
+        await signUp(email, password, name);
+        // Don't navigate after signup as email verification may be required
       }
-      
-      // Redirect to dashboard
-      navigate('/dashboard');
     } catch (error) {
       console.error('Authentication error:', error);
-      toast({
-        title: isLogin ? "Login failed" : "Registration failed",
-        description: "Please check your credentials and try again",
-        variant: "destructive",
-      });
+      // Error toast is shown in the auth context
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleGithubSignIn = async () => {
+    try {
+      await githubSignIn();
+    } catch (error) {
+      console.error('GitHub authentication error:', error);
+    }
+  };
   
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col font-inter">
       <div className="flex flex-1">
         {/* Left side - form */}
         <div className="w-full lg:w-1/2 xl:w-2/5 p-8 flex flex-col justify-center">
@@ -143,7 +148,7 @@ const Auth = () => {
             </div>
             
             <div className="space-y-2 mb-8">
-              <h1 className="text-3xl font-bold">{isLogin ? 'Welcome back' : 'Create your account'}</h1>
+              <h1 className="text-3xl font-bold tracking-tight">{isLogin ? 'Welcome back' : 'Create your account'}</h1>
               <p className="text-muted-foreground">
                 {isLogin ? 'Sign in to access your secure storage' : 'Start your secure storage journey'}
               </p>
@@ -258,6 +263,29 @@ const Auth = () => {
               </div>
             </form>
             
+            <div className="relative mt-6">
+              <div className="absolute inset-0 flex items-center">
+                <Separator className="w-full" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+            
+            <div className="mt-6">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleGithubSignIn}
+              >
+                <Github className="mr-2 h-4 w-4" />
+                GitHub
+              </Button>
+            </div>
+            
             <div className="mt-6 text-center">
               <button
                 type="button"
@@ -285,7 +313,7 @@ const Auth = () => {
                 </div>
               </div>
               
-              <h2 className="text-3xl font-bold">Secure Cloud Storage with Zero Compromises</h2>
+              <h2 className="text-3xl font-bold tracking-tight">Secure Cloud Storage with Zero Compromises</h2>
               
               <p className="text-lg text-slate-700 dark:text-slate-300">
                 InflateStorage offers end-to-end encrypted cloud storage. Your files are encrypted before they leave your device, ensuring only you can access them.
