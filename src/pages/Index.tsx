@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import {
   Search, 
   Share2, 
   Cloud, 
-  Devices, 
+  Smartphone, 
   FileUp, 
   ChevronRight 
 } from 'lucide-react';
@@ -159,7 +158,7 @@ const Index = () => {
             {/* Feature 5 */}
             <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-400">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/50 rounded-lg flex items-center justify-center mb-4">
-                <Devices className="h-6 w-6 text-red-600 dark:text-red-400" />
+                <Smartphone className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
               <h3 className="text-xl font-semibold mb-2">Cross-Device Sync</h3>
               <p className="text-muted-foreground">
