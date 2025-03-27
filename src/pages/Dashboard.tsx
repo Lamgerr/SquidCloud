@@ -43,33 +43,8 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  Github,
 } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { generateWithGemini } from '@/services/gemini';
-import { supabase } from '@/integrations/supabase/client';
-import FilePreview from '@/components/FilePreview';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();

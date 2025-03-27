@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -82,7 +83,7 @@ export const getFiles = async (): Promise<FileItem[]> => {
   }));
 };
 
-export const uploadFile = async (file: File): Promise<FileItem> => {
+export const uploadFile = async (file: File, createRepo: boolean = false): Promise<FileItem> => {
   const { user } = useAuth();
 
   if (!user) {
@@ -114,6 +115,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     user_id: user.id,
     encrypted: false, // Set to true if you implement encryption
     shared: false,
+    github_repo: createRepo ? `${user.id}/file-${Date.now()}` : null // Add github repo if createRepo is true
   };
 
   const { data: dbFile, error: dbError } = await supabase
@@ -140,9 +142,9 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     shared: dbFile.shared,
     encryptionKey: dbFile.encryption_key,
     chunks: 0,
-    githubRepo: null,
-    githubPath: null,
-    htmlUrl: null,
+    githubRepo: dbFile.github_repo,
+    githubPath: dbFile.github_repo ? `https://github.com/${dbFile.github_repo}/blob/main/${dbFile.name}` : null,
+    htmlUrl: dbFile.github_repo ? `https://github.com/${dbFile.github_repo}/blob/main/${dbFile.name}` : null,
   };
 };
 

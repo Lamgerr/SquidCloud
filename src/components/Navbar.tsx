@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
@@ -10,13 +9,13 @@ import {
   Menu,
   X
 } from 'lucide-react';
-import { getCurrentUser, logout } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
 
 const Navbar = () => {
-  const [user, setUser] = React.useState(getCurrentUser());
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [isDark, setIsDark] = React.useState(false);
+  const { user, signOut } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -28,8 +27,7 @@ const Navbar = () => {
   
   const handleLogout = async () => {
     try {
-      await logout();
-      setUser(null);
+      await signOut();
       toast({
         title: "Logged out successfully",
         description: "You have been logged out of your account",
@@ -49,7 +47,6 @@ const Navbar = () => {
     <header className="sticky top-0 z-50 w-full backdrop-blur-lg bg-white/75 dark:bg-slate-900/75 border-b border-slate-200/50 dark:border-slate-800/50 transition-all duration-200">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
-          {/* Mobile menu button */}
           <Button 
             variant="ghost" 
             size="icon" 
@@ -59,7 +56,6 @@ const Navbar = () => {
             {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </Button>
           
-          {/* Logo */}
           <Link to="/dashboard" className="flex items-center space-x-2">
             <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center">
               <div className="w-4 h-4 bg-white rounded-sm" />
@@ -67,7 +63,6 @@ const Navbar = () => {
             <span className="font-semibold text-xl hidden sm:inline-block">InflateStorage</span>
           </Link>
           
-          {/* Desktop navigation */}
           <nav className="ml-6 hidden md:flex items-center space-x-4">
             <Link to="/dashboard" className="text-sm font-medium transition-colors hover:text-primary">
               Dashboard
@@ -82,7 +77,6 @@ const Navbar = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Search */}
           <div className="hidden sm:flex items-center relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <input
@@ -92,7 +86,6 @@ const Navbar = () => {
             />
           </div>
           
-          {/* User actions */}
           <div className="flex items-center gap-2">
             <Button 
               variant="ghost" 
@@ -119,7 +112,7 @@ const Navbar = () => {
                   className="rounded-full h-8 w-8 p-0 overflow-hidden"
                 >
                   <div className="h-full w-full rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                    {user.name.charAt(0).toUpperCase()}
+                    {user.email?.charAt(0).toUpperCase() || 'U'}
                   </div>
                 </Button>
               </>
@@ -128,7 +121,6 @@ const Navbar = () => {
         </div>
       </div>
       
-      {/* Mobile menu */}
       {isMenuOpen && (
         <div className="fixed inset-0 top-16 bg-background/95 backdrop-blur-sm z-50 p-4 md:hidden animate-fade-in">
           <nav className="flex flex-col gap-4 mt-4">

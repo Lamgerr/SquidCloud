@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -112,7 +111,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
           description: `${file.name} has been securely uploaded, encrypted${repoMessage}`,
         });
       }, 500);
-    } catch (error) {
+    } catch (error: any) {
       setIsUploading(false);
       
       toast({
