@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -20,6 +21,13 @@ interface DbFileItem {
   encryption_key: string;
   tags: string[];
   github_repo?: string; // Add this field as optional
+}
+
+interface DbRepository {
+  id: string;
+  repo_name: string;
+  user_id: string;
+  created_at: string;
 }
 
 export interface FileItem {
@@ -61,7 +69,7 @@ export const initializeRepos = async (count: number = MAX_REPOS): Promise<string
     // Check if we have existing repos in the database
     const { data: existingRepos, error: fetchError } = await supabase
       .from('repositories')
-      .select('repo_name')
+      .select('*')
       .limit(MAX_REPOS);
 
     if (fetchError) {
@@ -71,7 +79,7 @@ export const initializeRepos = async (count: number = MAX_REPOS): Promise<string
 
     // If we have existing repos, use them
     if (existingRepos && existingRepos.length > 0) {
-      availableRepos = existingRepos.map(repo => repo.repo_name);
+      availableRepos = existingRepos.map((repo: DbRepository) => repo.repo_name);
       console.log("Using existing repositories:", availableRepos);
       return availableRepos;
     }
@@ -87,30 +95,35 @@ export const initializeRepos = async (count: number = MAX_REPOS): Promise<string
       throw new Error("User not authenticated");
     }
 
-    // Create each repo
-    const newRepos: string[] = [];
-    for (let i = 0; i < actualCount; i++) {
-      const repoName = `storage-${userId?.substring(0, 8)}-${Date.now()}-${i}`;
-      
-      // Store repo in database for future use
-      const { error: insertError } = await supabase
-        .from('repositories')
-        .insert({ 
-          repo_name: repoName,
-          user_id: userId,
-          created_at: new Date().toISOString()
-        });
+    // Create repositories via Supabase Edge Function
+    const { data, error } = await supabase.functions.invoke('create-repos', {
+      body: { count: actualCount, userId }
+    });
 
-      if (insertError) {
-        console.error(`Error creating repository record ${i}:`, insertError);
-        continue;
-      }
-
-      newRepos.push(repoName);
+    if (error) {
+      console.error("Error invoking create-repos function:", error);
+      throw new Error("Failed to create repositories");
     }
 
-    availableRepos = newRepos;
-    console.log("Created new repositories:", availableRepos);
+    if (data && data.repositories) {
+      // Store repositories in database for future use
+      for (const repo of data.repositories) {
+        const { error: insertError } = await supabase
+          .from('repositories')
+          .insert({ 
+            repo_name: repo.name,
+            user_id: userId
+          });
+
+        if (insertError) {
+          console.error(`Error creating repository record:`, insertError);
+        }
+      }
+
+      availableRepos = data.repositories.map((repo: any) => repo.name);
+      console.log("Created new repositories:", availableRepos);
+    }
+    
     return availableRepos;
   } catch (error) {
     console.error("Error initializing repositories:", error);

@@ -84,6 +84,27 @@ export type Database = {
         }
         Relationships: []
       }
+      repositories: {
+        Row: {
+          created_at: string
+          id: string
+          repo_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          repo_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          repo_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shares: {
         Row: {
           access_code: string
