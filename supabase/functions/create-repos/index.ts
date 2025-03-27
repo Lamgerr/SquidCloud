@@ -40,7 +40,7 @@ serve(async (req) => {
     
     // Create each repository
     for (let i = 0; i < validCount; i++) {
-      const repoName = `storage-${userId.substring(0, 8)}-${Date.now()}-${i}`;
+      const repoName = `kl-${userId.substring(0, 8)}-${Date.now()}-${i}`;
       
       // Check if repository already exists
       const existsResponse = await fetch(
@@ -68,7 +68,7 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               name: repoName,
-              description: 'Universal storage repository',
+              description: 'shya256  im data',
               private: true,
               auto_init: true
             })
