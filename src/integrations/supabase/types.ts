@@ -14,6 +14,7 @@ export type Database = {
           created_at: string | null
           encrypted: boolean | null
           encryption_key: string | null
+          github_repo: string | null
           id: string
           name: string
           shared: boolean | null
@@ -28,6 +29,7 @@ export type Database = {
           created_at?: string | null
           encrypted?: boolean | null
           encryption_key?: string | null
+          github_repo?: string | null
           id?: string
           name: string
           shared?: boolean | null
@@ -42,6 +44,7 @@ export type Database = {
           created_at?: string | null
           encrypted?: boolean | null
           encryption_key?: string | null
+          github_repo?: string | null
           id?: string
           name?: string
           shared?: boolean | null
