@@ -16,9 +16,10 @@ interface FilePreviewProps {
     htmlUrl?: string;
     encrypted: boolean;
   };
+  onClose?: () => void;
 }
 
-const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
+const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -30,6 +31,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
       loadPreview();
     }
   }, [open, previewContent]);
+
+  // Handle onClose when dialog closes
+  useEffect(() => {
+    if (!open && onClose) {
+      onClose();
+    }
+  }, [open, onClose]);
 
   const loadPreview = async () => {
     if (!file.id) return;
@@ -196,7 +204,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file }) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      setOpen(newOpen);
+      if (!newOpen && onClose) {
+        onClose();
+      }
+    }}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
           <Eye className="h-4 w-4" />

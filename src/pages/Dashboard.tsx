@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -298,7 +297,7 @@ const Dashboard = () => {
                       <FileItem
                         key={file.id}
                         file={file}
-                        onSelect={() => handleSelectFile(file)}
+                        onSelect={handleSelectFile}
                         onDelete={handleFileDelete}
                         onDownload={handleFileDownload}
                         onShare={handleFileShare}

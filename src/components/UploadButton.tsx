@@ -4,15 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Upload, X, Lock, FileSymlink, UploadCloud, Github } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { uploadFile } from '@/lib/api';
+import { uploadFile, FileItem } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 
 interface UploadButtonProps {
+  onUploadComplete?: (file: FileItem) => void;
   onFileUploaded?: (file: any) => void;
   className?: string;
 }
 
-const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }) => {
+const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUploaded, className }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -82,7 +83,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
         }, 200);
       }
       
-      // Perform the actual upload - we no longer need the createPrivateRepo parameter
+      // Perform the actual upload
       const uploadedFile = await uploadFile(file);
       
       // Complete the progress
@@ -97,8 +98,10 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
         setCurrentChunk(0);
         setTotalChunks(0);
         
-        // Notify the parent component
-        if (onFileUploaded) {
+        // Notify the parent component using the appropriate callback
+        if (onUploadComplete) {
+          onUploadComplete(uploadedFile);
+        } else if (onFileUploaded) {
           onFileUploaded(uploadedFile);
         }
         

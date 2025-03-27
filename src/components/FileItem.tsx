@@ -29,16 +29,20 @@ import {
 
 interface FileItemProps {
   file: FileItemType;
+  onSelect?: (file: FileItemType) => void;
   onDelete?: (id: string) => void;
   onShare?: (id: string) => void;
   onDownload?: (id: string) => void;
+  selected?: boolean;
 }
 
 const FileItem: React.FC<FileItemProps> = ({ 
   file, 
+  onSelect,
   onDelete, 
   onShare, 
-  onDownload 
+  onDownload,
+  selected
 }) => {
   const getFileIcon = () => {
     if (file.type.startsWith('image/')) {
@@ -63,6 +67,12 @@ const FileItem: React.FC<FileItemProps> = ({
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const handleClick = () => {
+    if (onSelect) {
+      onSelect(file);
+    }
   };
 
   const handleDownload = () => {
@@ -96,7 +106,10 @@ const FileItem: React.FC<FileItemProps> = ({
   };
 
   return (
-    <div className="group p-4 rounded-xl transition-all duration-200 hover:bg-secondary/80 flex items-center gap-4 animate-fade-in">
+    <div 
+      className={`group p-4 rounded-xl transition-all duration-200 hover:bg-secondary/80 flex items-center gap-4 animate-fade-in ${selected ? 'bg-secondary' : ''}`}
+      onClick={handleClick}
+    >
       <div className="shrink-0">
         {getFileIcon()}
       </div>
