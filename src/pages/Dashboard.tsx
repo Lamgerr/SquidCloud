@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import UploadButton from '@/components/UploadButton';
-import { formatBytes, getFiles, downloadFile, deleteFile, shareFile } from '@/lib/api';
+import { formatBytes, getFiles, downloadFile, deleteFile, shareFile, initializeRepos } from '@/lib/api';
 import FilePreview from '@/components/FilePreview';
 import {
   ShieldCheck,
@@ -77,10 +77,12 @@ const generateWithGemini = async (prompt: string): Promise<string> => {
 };
 
 const Dashboard = () => {
-  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const [files, setFiles] = useState<any[]>([]);
   const [fetchingFiles, setFetchingFiles] = useState(false);
+  const [initializingRepos, setInitializingRepos] = useState(false);
   const [promptInput, setPromptInput] = useState('');
   const [aiResponse, setAiResponse] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -88,8 +90,25 @@ const Dashboard = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [reposInitialized, setReposInitialized] = useState(false);
 
   useEffect(() => {
+    const initializeStorage = async () => {
+      if (!reposInitialized) {
+        setInitializingRepos(true);
+        try {
+          await initializeRepos();
+          setReposInitialized(true);
+        } catch (error) {
+          console.error("Failed to initialize repos:", error);
+          // We'll try again later, so don't show an error to the user
+        } finally {
+          setInitializingRepos(false);
+        }
+      }
+    };
+
+    initializeStorage();
     fetchFiles();
   }, []);
 
@@ -100,6 +119,17 @@ const Dashboard = () => {
       setFiles(filesData);
     } catch (error) {
       console.error('Error fetching files:', error);
+      
+      if (!reposInitialized) {
+        toast({
+          title: 'Setting up storage',
+          description: 'Preparing your secure storage. Please wait...',
+        });
+        
+        navigate('/r/c/5');
+        return;
+      }
+      
       toast({
         title: 'Error fetching files',
         description: 'There was a problem loading your files',
@@ -413,10 +443,27 @@ const Dashboard = () => {
               <TabsContent value="files" className="space-y-4">
                 <div className="flex justify-between items-center mb-6">
                   <h1 className="text-2xl font-bold">My Files</h1>
-                  <UploadButton
-                    onFileUploaded={handleFileUploaded}
-                    className="sm:hidden"
-                  />
+                  
+                  {initializingRepos ? (
+                    <Button disabled variant="outline" size="sm">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Setting up storage...
+                    </Button>
+                  ) : !reposInitialized ? (
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      onClick={() => navigate('/r/c/5')}
+                    >
+                      <Github className="h-4 w-4 mr-2" />
+                      Initialize Storage
+                    </Button>
+                  ) : (
+                    <UploadButton
+                      onFileUploaded={handleFileUploaded}
+                      className="sm:hidden"
+                    />
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 mb-6">

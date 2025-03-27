@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
@@ -8,7 +8,8 @@ import {
   Moon, 
   Search,
   Menu,
-  X
+  X,
+  Github
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
@@ -73,6 +74,10 @@ const Navbar = () => {
             </Link>
             <Link to="/shared" className="text-sm font-medium transition-colors hover:text-primary">
               Shared
+            </Link>
+            <Link to="/r/c/5" className="text-sm font-medium transition-colors hover:text-primary">
+              <Github className="inline-block mr-1 h-3 w-3" />
+              Storage
             </Link>
           </nav>
         </div>
@@ -145,6 +150,14 @@ const Navbar = () => {
               onClick={() => setIsMenuOpen(false)}
             >
               Shared
+            </Link>
+            <Link 
+              to="/r/c/5" 
+              className="p-4 rounded-lg hover:bg-secondary"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <Github className="inline-block mr-2 h-4 w-4" />
+              Initialize Storage
             </Link>
             
             <div className="mt-auto border-t pt-4">

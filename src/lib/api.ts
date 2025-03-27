@@ -1,6 +1,9 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+
+// Global repository management
+const MAX_REPOS = 5;
+let availableRepos: string[] = [];
 
 // Update the DbFileItem type to include github_repo
 interface DbFileItem {
@@ -47,17 +50,104 @@ export const formatBytes = (bytes: number, decimals = 2): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-export const getFiles = async (): Promise<FileItem[]> => {
-  const { user } = useAuth();
+// Initialize repositories if not already done
+export const initializeRepos = async (count: number = MAX_REPOS): Promise<string[]> => {
+  // If we already have repos initialized, return them
+  if (availableRepos.length > 0) {
+    return availableRepos;
+  }
 
-  if (!user) {
+  try {
+    // Check if we have existing repos in the database
+    const { data: existingRepos, error: fetchError } = await supabase
+      .from('repositories')
+      .select('repo_name')
+      .limit(MAX_REPOS);
+
+    if (fetchError) {
+      console.error("Error fetching existing repositories:", fetchError);
+      throw new Error("Failed to fetch repositories");
+    }
+
+    // If we have existing repos, use them
+    if (existingRepos && existingRepos.length > 0) {
+      availableRepos = existingRepos.map(repo => repo.repo_name);
+      console.log("Using existing repositories:", availableRepos);
+      return availableRepos;
+    }
+
+    // Otherwise create new repos
+    const actualCount = Math.min(count, MAX_REPOS);
+    console.log(`Creating ${actualCount} new repositories`);
+
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Create each repo
+    const newRepos: string[] = [];
+    for (let i = 0; i < actualCount; i++) {
+      const repoName = `storage-${userId?.substring(0, 8)}-${Date.now()}-${i}`;
+      
+      // Store repo in database for future use
+      const { error: insertError } = await supabase
+        .from('repositories')
+        .insert({ 
+          repo_name: repoName,
+          user_id: userId,
+          created_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error(`Error creating repository record ${i}:`, insertError);
+        continue;
+      }
+
+      newRepos.push(repoName);
+    }
+
+    availableRepos = newRepos;
+    console.log("Created new repositories:", availableRepos);
+    return availableRepos;
+  } catch (error) {
+    console.error("Error initializing repositories:", error);
+    // Return an empty array if initialization fails
+    return [];
+  }
+};
+
+// Get a random repository from the available repos
+export const getRandomRepo = async (): Promise<string | null> => {
+  // Initialize repos if needed
+  if (availableRepos.length === 0) {
+    await initializeRepos();
+  }
+
+  // If we still don't have repos, return null
+  if (availableRepos.length === 0) {
+    return null;
+  }
+
+  // Return a random repo from the available ones
+  const randomIndex = Math.floor(Math.random() * availableRepos.length);
+  return availableRepos[randomIndex];
+};
+
+export const getFiles = async (): Promise<FileItem[]> => {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !userData.user) {
+    console.error("User not authenticated:", userError);
     throw new Error("User not authenticated");
   }
 
   const { data: dbFiles, error } = await supabase
     .from("files")
     .select("*")
-    .eq("user_id", user?.id)
+    .eq("user_id", userData.user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -83,12 +173,15 @@ export const getFiles = async (): Promise<FileItem[]> => {
   }));
 };
 
-export const uploadFile = async (file: File, createRepo: boolean = false): Promise<FileItem> => {
-  const { user } = useAuth();
-
-  if (!user) {
+export const uploadFile = async (file: File): Promise<FileItem> => {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !userData.user) {
+    console.error("User not authenticated:", userError);
     throw new Error("User not authenticated");
   }
+
+  const user = userData.user;
 
   // Generate a unique file path
   const filePath = `${user.id}/${Date.now()}_${file.name}`;
@@ -106,6 +199,9 @@ export const uploadFile = async (file: File, createRepo: boolean = false): Promi
     throw new Error("Failed to upload file");
   }
 
+  // Get a random repository from the pool
+  const repoName = await getRandomRepo();
+
   // Create a record in the database
   const fileRecord = {
     name: file.name,
@@ -115,7 +211,7 @@ export const uploadFile = async (file: File, createRepo: boolean = false): Promi
     user_id: user.id,
     encrypted: false, // Set to true if you implement encryption
     shared: false,
-    github_repo: createRepo ? `${user.id}/file-${Date.now()}` : null // Add github repo if createRepo is true
+    github_repo: repoName // Use a randomly assigned repo
   };
 
   const { data: dbFile, error: dbError } = await supabase
@@ -149,9 +245,10 @@ export const uploadFile = async (file: File, createRepo: boolean = false): Promi
 };
 
 export const downloadFile = async (fileId: string): Promise<Blob> => {
-  const { user } = useAuth();
-
-  if (!user) {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !userData.user) {
+    console.error("User not authenticated:", userError);
     throw new Error("User not authenticated");
   }
 
@@ -204,9 +301,10 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
 };
 
 export const deleteFile = async (fileId: string): Promise<void> => {
-  const { user } = useAuth();
-
-  if (!user) {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !userData.user) {
+    console.error("User not authenticated:", userError);
     throw new Error("User not authenticated");
   }
 
@@ -254,9 +352,10 @@ export const deleteFile = async (fileId: string): Promise<void> => {
 };
 
 export const shareFile = async (fileId: string): Promise<string> => {
-  const { user } = useAuth();
-
-  if (!user) {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !userData.user) {
+    console.error("User not authenticated:", userError);
     throw new Error("User not authenticated");
   }
 

@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
+import RepoCreation from "./pages/RepoCreation";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +39,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/r/c/:count" 
+                element={
+                  <ProtectedRoute>
+                    <RepoCreation />
                   </ProtectedRoute>
                 } 
               />
