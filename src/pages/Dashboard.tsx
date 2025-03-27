@@ -41,7 +41,8 @@ import {
   ZoomOut,
   Copy,
   Eye,
-  EyeOff
+  EyeOff,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Card,
@@ -79,9 +80,9 @@ const Dashboard = () => {
   const [aiResponse, setAiResponse] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('files');
-  const [viewMode, setViewMode<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFiles();
@@ -228,7 +229,6 @@ const Dashboard = () => {
   const unlimitedStorage = true; // Premium feature indicator
   const usagePercentage = unlimitedStorage ? 0 : Math.min((totalStorage / (1024 * 1024 * 1024 * 1024)) * 100, 100);
 
-  // Filter files based on search query and category
   const filteredFiles = files.filter(file => {
     const matchesSearch = searchQuery ? 
       file.name.toLowerCase().includes(searchQuery.toLowerCase()) : 
@@ -584,7 +584,6 @@ const Dashboard = () => {
                                 <>
                                   <span className="mx-2">•</span>
                                   <span className="flex items-center">
-                                    <Github className="h-3 w-3 mr-1" />
                                     {file.githubRepo}
                                   </span>
                                 </>
