@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -69,6 +68,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { generateWithGemini } from '@/services/gemini';
 import { supabase } from '@/integrations/supabase/client';
+import FilePreview from '@/components/FilePreview';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
@@ -79,9 +79,9 @@ const Dashboard = () => {
   const [aiResponse, setAiResponse] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('files');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory<string | null>(null);
 
   useEffect(() => {
     fetchFiles();
@@ -90,13 +90,8 @@ const Dashboard = () => {
   const fetchFiles = async () => {
     try {
       setFetchingFiles(true);
-      const { data, error } = await supabase
-        .from('files')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setFiles(data || []);
+      const filesData = await getFiles();
+      setFiles(filesData);
     } catch (error) {
       console.error('Error fetching files:', error);
       toast({
@@ -499,35 +494,44 @@ const Dashboard = () => {
                               </CardDescription>
                             </div>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleDownload(file.id, file.name)}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleShareFile(file.id)}>
-                                <Share2 className="mr-2 h-4 w-4" />
-                                Share
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-500 focus:text-red-500"
-                                onClick={() => handleDeleteFile(file.id, file.name)}
-                              >
-                                <Trash className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center">
+                            <FilePreview file={file} />
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleDownload(file.id, file.name)}>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleShareFile(file.id)}>
+                                  <Share2 className="mr-2 h-4 w-4" />
+                                  Share
+                                </DropdownMenuItem>
+                                {file.htmlUrl && (
+                                  <DropdownMenuItem onClick={() => window.open(file.htmlUrl, '_blank')}>
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    View on GitHub
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="text-red-500 focus:text-red-500"
+                                  onClick={() => handleDeleteFile(file.id, file.name)}
+                                >
+                                  <Trash className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </CardHeader>
                         <CardFooter className="p-4 pt-2 flex justify-between text-xs text-muted-foreground">
                           <span>
-                            {new Date(file.created_at).toLocaleDateString(undefined, {
+                            {new Date(file.lastModified).toLocaleDateString(undefined, {
                               month: 'short',
                               day: 'numeric',
                               year: 'numeric',
@@ -555,7 +559,7 @@ const Dashboard = () => {
                               <span>{formatBytes(file.size)}</span>
                               <span className="mx-2">•</span>
                               <span>
-                                {new Date(file.created_at).toLocaleDateString(undefined, {
+                                {new Date(file.lastModified).toLocaleDateString(undefined, {
                                   month: 'short',
                                   day: 'numeric',
                                   year: 'numeric',
@@ -576,10 +580,20 @@ const Dashboard = () => {
                                   </span>
                                 </>
                               )}
+                              {file.githubRepo && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span className="flex items-center">
+                                    <Github className="h-3 w-3 mr-1" />
+                                    {file.githubRepo}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
+                          <FilePreview file={file} />
                           <Button 
                             variant="ghost" 
                             size="icon"
@@ -594,6 +608,15 @@ const Dashboard = () => {
                           >
                             <Share2 className="h-4 w-4" />
                           </Button>
+                          {file.htmlUrl && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => window.open(file.htmlUrl, '_blank')}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button 
                             variant="ghost" 
                             size="icon"

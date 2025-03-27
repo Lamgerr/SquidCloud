@@ -16,19 +16,46 @@ serve(async (req) => {
   const GITHUB_USERNAME = Deno.env.get('GITHUB_USERNAME');
   const STORAGE_REPO = Deno.env.get('GITHUB_STORAGE_REPO');
   
-  if (!GITHUB_TOKEN || !GITHUB_USERNAME || !STORAGE_REPO) {
+  if (!GITHUB_TOKEN || !GITHUB_USERNAME) {
     return new Response(
-      JSON.stringify({ error: 'GitHub configuration not complete. GITHUB_TOKEN, GITHUB_USERNAME, and GITHUB_STORAGE_REPO are required.' }),
+      JSON.stringify({ error: 'GitHub configuration not complete. GITHUB_TOKEN and GITHUB_USERNAME are required.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 
   try {
-    const { action, fileName, fileType, data, userId, path } = await req.json();
+    const { action, fileName, fileType, data, userId, path, createRepo } = await req.json();
     
     if (!action) {
       return new Response(
         JSON.stringify({ error: 'Action is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Determine which repo to use - either the configured one or a user-specific one
+    let storageRepo = STORAGE_REPO;
+    
+    // If createRepo flag is true, we'll create a user-specific repository
+    if (createRepo) {
+      // Generate a repository name for this user if not provided
+      const userStorageRepo = `inflate-storage-${userId.slice(0, 8)}`;
+      
+      // Check if the repository already exists
+      const repoExists = await checkRepoExists(userStorageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+      
+      if (!repoExists) {
+        // Create a new private repository for this user
+        await createRepository(userStorageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+        console.log(`Created new repository: ${userStorageRepo} for user ${userId}`);
+      }
+      
+      storageRepo = userStorageRepo;
+    }
+    
+    if (!storageRepo) {
+      return new Response(
+        JSON.stringify({ error: 'No storage repository specified. Either set GITHUB_STORAGE_REPO or use createRepo flag.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -47,10 +74,15 @@ serve(async (req) => {
         const filePath = `${userId}/${fileName}`;
         
         // Upload file to GitHub
-        const uploadResponse = await uploadToGitHub(filePath, data, fileType);
+        const uploadResponse = await uploadToGitHub(filePath, data, fileType, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
         
         return new Response(
-          JSON.stringify({ success: true, path: filePath, ...uploadResponse }),
+          JSON.stringify({ 
+            success: true, 
+            path: filePath, 
+            repo: storageRepo,
+            ...uploadResponse 
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -64,7 +96,7 @@ serve(async (req) => {
         }
         
         // Download file from GitHub
-        const content = await downloadFromGitHub(path);
+        const content = await downloadFromGitHub(path, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
         
         return new Response(
           JSON.stringify({ success: true, content }),
@@ -81,10 +113,27 @@ serve(async (req) => {
         }
         
         // Delete file from GitHub
-        await deleteFromGitHub(path);
+        await deleteFromGitHub(path, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
         
         return new Response(
           JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      case 'list': {
+        if (!userId) {
+          return new Response(
+            JSON.stringify({ error: 'userId is required for listing files' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // List files for this user
+        const files = await listUserFiles(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+        
+        return new Response(
+          JSON.stringify({ success: true, files }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -104,18 +153,105 @@ serve(async (req) => {
     );
   }
   
+  // Check if repository exists
+  async function checkRepoExists(repo: string, username: string, token: string): Promise<boolean> {
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${username}/${repo}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'InflateStorage-App'
+          }
+        }
+      );
+      
+      return response.status === 200;
+    } catch (error) {
+      console.error('Error checking repository:', error);
+      return false;
+    }
+  }
+  
+  // Create a new private GitHub repository
+  async function createRepository(repo: string, username: string, token: string): Promise<void> {
+    const response = await fetch(
+      'https://api.github.com/user/repos',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'InflateStorage-App',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: repo,
+          description: 'InflateStorage secure file repository',
+          private: true,
+          auto_init: true
+        })
+      }
+    );
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Failed to create repository: ${response.status} ${response.statusText} - ${errorData}`);
+    }
+  }
+  
+  // List files for a specific user
+  async function listUserFiles(userId: string, repo: string, username: string, token: string): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${username}/${repo}/contents/${userId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'InflateStorage-App'
+          }
+        }
+      );
+      
+      if (response.status === 404) {
+        // Directory doesn't exist yet, which is fine
+        return [];
+      }
+      
+      if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error listing files:', error);
+      // Return empty array to avoid breaking the client
+      return [];
+    }
+  }
+  
   // Helper function to upload a file to GitHub
-  async function uploadToGitHub(path: string, content: string, contentType: string): Promise<any> {
-    console.log(`Uploading to GitHub: ${path}`);
+  async function uploadToGitHub(
+    path: string, 
+    content: string, 
+    contentType: string, 
+    repo: string,
+    username: string,
+    token: string
+  ): Promise<any> {
+    console.log(`Uploading to GitHub: ${path} in repo ${repo}`);
     
     // First, check if the file already exists to get the SHA if it does
     let existingSha;
     try {
       const fileResponse = await fetch(
-        `https://api.github.com/repos/${GITHUB_USERNAME}/${STORAGE_REPO}/contents/${path}`,
+        `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
         {
           headers: {
-            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Authorization': `Bearer ${token}`,
             'Accept': 'application/vnd.github.v3+json',
             'User-Agent': 'InflateStorage-App',
           },
@@ -133,11 +269,11 @@ serve(async (req) => {
     
     // Now upload/update the file
     const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_USERNAME}/${STORAGE_REPO}/contents/${path}`,
+      `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
       {
         method: 'PUT',
         headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'InflateStorage-App',
           'Content-Type': 'application/json',
@@ -157,18 +293,27 @@ serve(async (req) => {
     }
     
     const data = await response.json();
-    return { url: data.content.download_url, sha: data.content.sha };
+    return { 
+      url: data.content.download_url, 
+      sha: data.content.sha,
+      html_url: data.content.html_url 
+    };
   }
   
   // Helper function to download a file from GitHub
-  async function downloadFromGitHub(path: string): Promise<string> {
-    console.log(`Downloading from GitHub: ${path}`);
+  async function downloadFromGitHub(
+    path: string,
+    repo: string,
+    username: string,
+    token: string
+  ): Promise<string> {
+    console.log(`Downloading from GitHub: ${path} from repo ${repo}`);
     
     const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_USERNAME}/${STORAGE_REPO}/contents/${path}`,
+      `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
       {
         headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'InflateStorage-App',
         },
@@ -184,15 +329,20 @@ serve(async (req) => {
   }
   
   // Helper function to delete a file from GitHub
-  async function deleteFromGitHub(path: string): Promise<void> {
-    console.log(`Deleting from GitHub: ${path}`);
+  async function deleteFromGitHub(
+    path: string,
+    repo: string,
+    username: string,
+    token: string
+  ): Promise<void> {
+    console.log(`Deleting from GitHub: ${path} from repo ${repo}`);
     
     // First, get the current SHA
     const fileResponse = await fetch(
-      `https://api.github.com/repos/${GITHUB_USERNAME}/${STORAGE_REPO}/contents/${path}`,
+      `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
       {
         headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'InflateStorage-App',
         },
@@ -211,11 +361,11 @@ serve(async (req) => {
     
     // Now delete the file
     const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_USERNAME}/${STORAGE_REPO}/contents/${path}`,
+      `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
       {
         method: 'DELETE',
         headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'InflateStorage-App',
           'Content-Type': 'application/json',

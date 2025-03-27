@@ -17,7 +17,7 @@ export interface User {
   };
 }
 
-// File types
+// File types for the frontend
 export interface FileItem {
   id: string;
   name: string;
@@ -31,10 +31,13 @@ export interface FileItem {
   chunks?: number;
   encryptionKey?: string;
   githubPath?: string;
+  githubRepo?: string;
+  previewUrl?: string;
+  htmlUrl?: string;
 }
 
 // Database file type (matches Supabase schema)
-interface DbFileItem {
+export interface DbFileItem {
   id: string;
   name: string;
   type: string;
@@ -47,6 +50,9 @@ interface DbFileItem {
   encryption_key: string | null;
   shared: boolean;
   tags: string[] | null;
+  github_repo?: string;
+  preview_url?: string;
+  html_url?: string;
 }
 
 // Folder types
@@ -127,7 +133,10 @@ export const getFiles = async (): Promise<FileItem[]> => {
       shared: dbFile.shared,
       encryptionKey: dbFile.encryption_key || undefined,
       chunks: dbFile.tags?.includes('chunked') ? parseInt(dbFile.tags.find(tag => tag.startsWith('chunks:'))?.split(':')[1] || '1') : undefined,
-      githubPath: dbFile.storage_path
+      githubPath: dbFile.storage_path,
+      githubRepo: dbFile.github_repo,
+      previewUrl: dbFile.preview_url,
+      htmlUrl: dbFile.html_url
     }));
   } catch (error) {
     console.error('Error fetching files:', error);
@@ -136,7 +145,7 @@ export const getFiles = async (): Promise<FileItem[]> => {
 };
 
 // Upload file to GitHub-backed storage
-export const uploadFile = async (file: File): Promise<FileItem> => {
+export const uploadFile = async (file: File, createRepo: boolean = true): Promise<FileItem> => {
   try {
     // Generate a unique encryption key for this file
     const encryptionKey = generateEncryptionKey();
@@ -167,15 +176,66 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
             fileName: `${fileId}_chunk_${index}`,
             fileType: file.type,
             data: encryptedData,
-            userId: userId
+            userId: userId,
+            createRepo: createRepo
           }
         });
         
         if (error) throw error;
-        return data.path;
+        return data;
       });
       
-      uploadedPaths = await Promise.all(chunkPromises);
+      const responses = await Promise.all(chunkPromises);
+      uploadedPaths = responses.map(res => res.path);
+      // Store the GitHub repo from the first response
+      const githubRepo = responses[0]?.repo;
+      const htmlUrl = responses[0]?.html_url;
+      
+      // Prepare tags array
+      const tags: string[] = [];
+      tags.push('chunked');
+      tags.push(`chunks:${chunks}`);
+      
+      // Database file record
+      const dbFileData = {
+        id: fileId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        user_id: userId,
+        storage_path: uploadedPaths.join(','), // Store all paths
+        encrypted: true,
+        encryption_key: encryptionKey,
+        shared: false,
+        tags: tags,
+        github_repo: githubRepo,
+        html_url: htmlUrl
+      };
+      
+      // Save file metadata to Supabase
+      const { error } = await supabase
+        .from('files')
+        .insert([dbFileData]);
+      
+      if (error) throw error;
+      
+      // Return frontend file format
+      return {
+        id: fileId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: new Date(),
+        path: uploadedPaths.join(','),
+        encrypted: true,
+        shared: false,
+        chunks: chunks,
+        encryptionKey: encryptionKey,
+        githubPath: uploadedPaths.join(','),
+        githubRepo: githubRepo,
+        htmlUrl: htmlUrl
+      };
+      
     } else {
       // For small files, we encrypt and upload in one go
       const fileData = await file.arrayBuffer();
@@ -188,62 +248,63 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
           fileName: fileId,
           fileType: file.type,
           data: encryptedData,
-          userId: userId
+          userId: userId,
+          createRepo: createRepo
         }
       });
       
       if (error) throw error;
-      uploadedPaths = [data.path];
+      
+      const githubRepo = data.repo;
+      const htmlUrl = data.html_url;
+      let previewUrl = undefined;
+      
+      // For images and PDFs, we can potentially create a preview URL
+      if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+        previewUrl = data.url;
+      }
+      
+      // Database file record
+      const dbFileData = {
+        id: fileId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        user_id: userId,
+        storage_path: data.path,
+        encrypted: true,
+        encryption_key: encryptionKey,
+        shared: false,
+        tags: isLargeFile ? ['chunked', `chunks:${chunks}`] : null,
+        github_repo: githubRepo,
+        preview_url: previewUrl,
+        html_url: htmlUrl
+      };
+      
+      // Save file metadata to Supabase
+      const { error: insertError } = await supabase
+        .from('files')
+        .insert([dbFileData]);
+      
+      if (insertError) throw insertError;
+      
+      // Return frontend file format
+      return {
+        id: fileId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: new Date(),
+        path: data.path,
+        encrypted: true,
+        shared: false,
+        encryptionKey: encryptionKey,
+        githubPath: data.path,
+        githubRepo: githubRepo,
+        previewUrl: previewUrl,
+        htmlUrl: htmlUrl
+      };
     }
-    
-    // Create the file record in our database
-    const githubPath = uploadedPaths.join(',');
-    const storagePath = `/${userId}/${fileId}`;
-    
-    // Prepare tags array
-    const tags: string[] = [];
-    if (isLargeFile) {
-      tags.push('chunked');
-      tags.push(`chunks:${chunks}`);
-    }
-    
-    // Database file record
-    const dbFileData = {
-      id: fileId,
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      user_id: userId,
-      storage_path: githubPath, // Store the GitHub path
-      encrypted: true,
-      encryption_key: encryptionKey,
-      shared: false,
-      tags: tags
-    };
-    
-    // Save file metadata to Supabase
-    const { error } = await supabase
-      .from('files')
-      .insert([dbFileData]);
-    
-    if (error) throw error;
-    
-    // Return frontend file format
-    const newFile: FileItem = {
-      id: fileId,
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      lastModified: new Date(),
-      path: storagePath,
-      encrypted: true,
-      shared: false,
-      chunks: isLargeFile ? chunks : undefined,
-      encryptionKey: encryptionKey,
-      githubPath: githubPath
-    };
-    
-    return newFile;
   } catch (error) {
     console.error('Upload error:', error);
     throw new Error(`Failed to upload file: ${error.message}`);
@@ -266,6 +327,7 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     const storagePath = fileData.storage_path;
     const encryptionKey = fileData.encryption_key;
     const fileType = fileData.type;
+    const githubRepo = fileData.github_repo;
     const chunks = fileData.tags?.find(tag => tag.startsWith('chunks:'))?.split(':')[1];
     const isChunked = fileData.tags?.includes('chunked');
     
@@ -288,7 +350,8 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
         const { data, error } = await supabase.functions.invoke('github-storage', {
           body: {
             action: 'download',
-            path: path
+            path: path,
+            repo: githubRepo
           }
         });
         
@@ -317,7 +380,8 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
       const { data, error } = await supabase.functions.invoke('github-storage', {
         body: {
           action: 'download',
-          path: storagePath
+          path: storagePath,
+          repo: githubRepo
         }
       });
       
@@ -346,6 +410,7 @@ export const deleteFile = async (fileId: string): Promise<boolean> => {
     if (!fileData) throw new Error('File not found');
     
     const storagePath = fileData.storage_path;
+    const githubRepo = fileData.github_repo;
     
     if (storagePath) {
       // Delete all chunks/paths
@@ -356,7 +421,8 @@ export const deleteFile = async (fileId: string): Promise<boolean> => {
         supabase.functions.invoke('github-storage', {
           body: {
             action: 'delete',
-            path: path
+            path: path,
+            repo: githubRepo
           }
         })
       ));

@@ -2,10 +2,12 @@
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, X, Lock, FileSymlink, UploadCloud } from 'lucide-react';
+import { Upload, X, Lock, FileSymlink, UploadCloud, Github } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile } from '@/lib/api';
 import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface UploadButtonProps {
   onFileUploaded?: (file: any) => void;
@@ -19,6 +21,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
   const [isChunkedUpload, setIsChunkedUpload] = useState(false);
   const [currentChunk, setCurrentChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
+  const [createPrivateRepo, setCreatePrivateRepo] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -82,8 +85,8 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
         }, 200);
       }
       
-      // Perform the actual upload
-      const uploadedFile = await uploadFile(file);
+      // Perform the actual upload with repo creation if enabled
+      const uploadedFile = await uploadFile(file, createPrivateRepo);
       
       // Complete the progress
       clearInterval(progressInterval);
@@ -102,9 +105,11 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
           onFileUploaded(uploadedFile);
         }
         
+        const repoMessage = createPrivateRepo ? ' and stored in your private GitHub repository' : '';
+        
         toast({
           title: "Upload complete",
-          description: `${file.name} has been securely uploaded and encrypted`,
+          description: `${file.name} has been securely uploaded, encrypted${repoMessage}`,
         });
       }, 500);
     } catch (error) {
@@ -154,22 +159,36 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
       />
       
       {!isUploading ? (
-        <Button
-          onClick={triggerFileInput}
-          className="relative overflow-hidden group bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <div className="flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            <span>Upload Files</span>
-          </div>
-          
-          <div className="absolute inset-0 flex items-center justify-center bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="space-y-4">
+          <Button
+            onClick={triggerFileInput}
+            className="relative overflow-hidden group bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
+          >
             <div className="flex items-center gap-2">
-              <Lock className="h-4 w-4" />
-              <span>End-to-End Encrypted</span>
+              <Upload className="h-4 w-4" />
+              <span>Upload Files</span>
             </div>
+            
+            <div className="absolute inset-0 flex items-center justify-center bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                <span>End-to-End Encrypted</span>
+              </div>
+            </div>
+          </Button>
+          
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="repo-creation"
+              checked={createPrivateRepo}
+              onCheckedChange={setCreatePrivateRepo}
+            />
+            <Label htmlFor="repo-creation" className="flex items-center text-sm gap-1">
+              <Github className="h-4 w-4" />
+              Create private GitHub repository
+            </Label>
           </div>
-        </Button>
+        </div>
       ) : (
         <Card className="w-full p-4 animate-fade-in">
           <div className="flex justify-between items-center mb-2">
@@ -216,6 +235,13 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onFileUploaded, className }
               <UploadCloud className="h-3 w-3 text-purple-500" />
               <span className="text-xs text-muted-foreground">AES-256 encryption</span>
             </div>
+            
+            {createPrivateRepo && (
+              <div className="flex items-center gap-1">
+                <Github className="h-3 w-3 text-gray-500" />
+                <span className="text-xs text-muted-foreground">Private GitHub storage</span>
+              </div>
+            )}
           </div>
         </Card>
       )}
