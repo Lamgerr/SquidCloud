@@ -2,34 +2,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Global repository management
-const MAX_REPOS = 5;
-let availableRepos: string[] = [];
-
-// Update the DbFileItem type to include github_repo
-interface DbFileItem {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  storage_path: string;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-  shared: boolean;
-  encrypted: boolean;
-  encryption_key: string;
-  tags: string[];
-  github_repo?: string; // Add this field as optional
-}
-
-interface DbRepository {
-  id: string;
-  repo_name: string;
-  user_id: string;
-  created_at: string;
-}
-
 export interface FileItem {
   id: string;
   name: string;
@@ -41,9 +13,6 @@ export interface FileItem {
   shared: boolean;
   encryptionKey?: string;
   chunks?: number;
-  githubRepo?: string | null;
-  githubPath?: string | null;
-  htmlUrl?: string | null;
 }
 
 export const formatBytes = (bytes: number, decimals = 2): string => {
@@ -56,97 +25,6 @@ export const formatBytes = (bytes: number, decimals = 2): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-};
-
-// Initialize repositories if not already done
-export const initializeRepos = async (count: number = MAX_REPOS): Promise<string[]> => {
-  // If we already have repos initialized, return them
-  if (availableRepos.length > 0) {
-    return availableRepos;
-  }
-
-  try {
-    // Check if we have existing repos in the database
-    const { data: existingRepos, error: fetchError } = await supabase
-      .from('repositories')
-      .select('*')
-      .limit(MAX_REPOS);
-
-    if (fetchError) {
-      console.error("Error fetching existing repositories:", fetchError);
-      throw new Error("Failed to fetch repositories");
-    }
-
-    // If we have existing repos, use them
-    if (existingRepos && existingRepos.length > 0) {
-      availableRepos = existingRepos.map((repo: DbRepository) => repo.repo_name);
-      console.log("Using existing repositories:", availableRepos);
-      return availableRepos;
-    }
-
-    // Otherwise create new repos
-    const actualCount = Math.min(count, MAX_REPOS);
-    console.log(`Creating ${actualCount} new repositories`);
-
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-
-    if (!userId) {
-      throw new Error("User not authenticated");
-    }
-
-    // Create repositories via Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke('create-repos', {
-      body: { count: actualCount, userId }
-    });
-
-    if (error) {
-      console.error("Error invoking create-repos function:", error);
-      throw new Error("Failed to create repositories");
-    }
-
-    if (data && data.repositories) {
-      // Store repositories in database for future use
-      for (const repo of data.repositories) {
-        const { error: insertError } = await supabase
-          .from('repositories')
-          .insert({ 
-            repo_name: repo.name,
-            user_id: userId
-          });
-
-        if (insertError) {
-          console.error(`Error creating repository record:`, insertError);
-        }
-      }
-
-      availableRepos = data.repositories.map((repo: any) => repo.name);
-      console.log("Created new repositories:", availableRepos);
-    }
-    
-    return availableRepos;
-  } catch (error) {
-    console.error("Error initializing repositories:", error);
-    // Return an empty array if initialization fails
-    return [];
-  }
-};
-
-// Get a random repository from the available repos
-export const getRandomRepo = async (): Promise<string | null> => {
-  // Initialize repos if needed
-  if (availableRepos.length === 0) {
-    await initializeRepos();
-  }
-
-  // If we still don't have repos, return null
-  if (availableRepos.length === 0) {
-    return null;
-  }
-
-  // Return a random repo from the available ones
-  const randomIndex = Math.floor(Math.random() * availableRepos.length);
-  return availableRepos[randomIndex];
 };
 
 export const getFiles = async (): Promise<FileItem[]> => {
@@ -169,7 +47,7 @@ export const getFiles = async (): Promise<FileItem[]> => {
   }
 
   // Map database schema to app schema
-  return (dbFiles as DbFileItem[]).map((file) => ({
+  return (dbFiles as any[]).map((file) => ({
     id: file.id,
     name: file.name,
     type: file.type,
@@ -180,9 +58,6 @@ export const getFiles = async (): Promise<FileItem[]> => {
     shared: file.shared,
     encryptionKey: file.encryption_key,
     chunks: file.tags?.length || 0,
-    githubRepo: file.github_repo || null,
-    githubPath: file.github_repo ? `https://github.com/${file.github_repo}/blob/main/${file.name}` : null,
-    htmlUrl: file.github_repo ? `https://github.com/${file.github_repo}/blob/main/${file.name}` : null,
   }));
 };
 
@@ -212,9 +87,6 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     throw new Error("Failed to upload file");
   }
 
-  // Get a random repository from the pool
-  const repoName = await getRandomRepo();
-
   // Create a record in the database
   const fileRecord = {
     name: file.name,
@@ -223,8 +95,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     storage_path: filePath,
     user_id: user.id,
     encrypted: false, // Set to true if you implement encryption
-    shared: false,
-    github_repo: repoName // Use a randomly assigned repo
+    shared: false
   };
 
   const { data: dbFile, error: dbError } = await supabase
@@ -250,10 +121,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     encrypted: dbFile.encrypted,
     shared: dbFile.shared,
     encryptionKey: dbFile.encryption_key,
-    chunks: 0,
-    githubRepo: dbFile.github_repo,
-    githubPath: dbFile.github_repo ? `https://github.com/${dbFile.github_repo}/blob/main/${dbFile.name}` : null,
-    htmlUrl: dbFile.github_repo ? `https://github.com/${dbFile.github_repo}/blob/main/${dbFile.name}` : null,
+    chunks: 0
   };
 };
 
@@ -277,40 +145,24 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     throw new Error("Failed to fetch file metadata");
   }
 
-  // Adjust the code to handle the github_repo property
-  if (file.github_repo) {
-    // Handle GitHub download
-    const repoPath = file.github_repo;
-    const fileName = file.name;
-    
-    // Fetch from GitHub raw content URL
-    const response = await fetch(`https://raw.githubusercontent.com/${repoPath}/main/${fileName}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to download from GitHub: ${response.statusText}`);
-    }
-    
-    return await response.blob();
-  } else {
-    // Download from Supabase storage
-    const { data, error } = await supabase.storage
-      .from('files')
-      .download(file.storage_path);
+  // Download from Supabase storage
+  const { data, error } = await supabase.storage
+    .from('files')
+    .download(file.storage_path);
 
-    if (error) {
-      console.error("Error downloading file:", error);
-      throw new Error("Failed to download file");
-    }
+  if (error) {
+    console.error("Error downloading file:", error);
+    throw new Error("Failed to download file");
+  }
 
-    // If the file is encrypted, decrypt it
-    if (file.encrypted && file.encryption_key) {
-      // Implement decryption logic here
-      // For now, just return the file as is
-      return data;
-    }
-
+  // If the file is encrypted, decrypt it
+  if (file.encrypted && file.encryption_key) {
+    // Implement decryption logic here
+    // For now, just return the file as is
     return data;
   }
+
+  return data;
 };
 
 export const deleteFile = async (fileId: string): Promise<void> => {
@@ -333,23 +185,14 @@ export const deleteFile = async (fileId: string): Promise<void> => {
     throw new Error("Failed to fetch file metadata");
   }
 
-  // Adjust the code to handle the github_repo property
-  if (file.github_repo) {
-    // For GitHub files, we might just remove the reference in our database
-    // since we might not have permission to delete from the actual GitHub repo
-    console.log(`Note: File is stored in GitHub repo ${file.github_repo}. Only removing reference.`);
-  }
+  // Delete from storage
+  const { error: storageError } = await supabase.storage
+    .from('files')
+    .remove([file.storage_path]);
 
-  // Delete from storage if it's not a GitHub file
-  if (!file.github_repo) {
-    const { error: storageError } = await supabase.storage
-      .from('files')
-      .remove([file.storage_path]);
-
-    if (storageError) {
-      console.error("Error deleting file from storage:", storageError);
-      throw new Error("Failed to delete file from storage");
-    }
+  if (storageError) {
+    console.error("Error deleting file from storage:", storageError);
+    throw new Error("Failed to delete file from storage");
   }
 
   // Delete from database

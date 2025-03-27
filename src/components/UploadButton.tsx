@@ -2,7 +2,7 @@
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, X, Lock, FileSymlink, UploadCloud, Github } from 'lucide-react';
+import { Upload, X, Lock, FileSymlink, UploadCloud, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile, FileItem } from '@/lib/api';
 import { Card } from '@/components/ui/card';
@@ -223,8 +223,8 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
             </div>
             
             <div className="flex items-center gap-1">
-              <Github className="h-3 w-3 text-gray-500" />
-              <span className="text-xs text-muted-foreground">Universal storage</span>
+              <Shield className="h-3 w-3 text-gray-500" />
+              <span className="text-xs text-muted-foreground">Secure storage</span>
             </div>
           </div>
         </Card>

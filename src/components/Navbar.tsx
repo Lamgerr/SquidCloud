@@ -9,7 +9,7 @@ import {
   Search,
   Menu,
   X,
-  Github
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
@@ -62,7 +62,7 @@ const Navbar = () => {
             <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center">
               <div className="w-4 h-4 bg-white rounded-sm" />
             </div>
-            <span className="font-semibold text-xl hidden sm:inline-block">InflateStorage</span>
+            <span className="font-semibold text-xl hidden sm:inline-block">SecureVault</span>
           </Link>
           
           <nav className="ml-6 hidden md:flex items-center space-x-4">
@@ -74,10 +74,6 @@ const Navbar = () => {
             </Link>
             <Link to="/shared" className="text-sm font-medium transition-colors hover:text-primary">
               Shared
-            </Link>
-            <Link to="/r/c/5" className="text-sm font-medium transition-colors hover:text-primary">
-              <Github className="inline-block mr-1 h-3 w-3" />
-              Storage
             </Link>
           </nav>
         </div>
@@ -150,14 +146,6 @@ const Navbar = () => {
               onClick={() => setIsMenuOpen(false)}
             >
               Shared
-            </Link>
-            <Link 
-              to="/r/c/5" 
-              className="p-4 rounded-lg hover:bg-secondary"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              <Github className="inline-block mr-2 h-4 w-4" />
-              Initialize Storage
             </Link>
             
             <div className="mt-auto border-t pt-4">
