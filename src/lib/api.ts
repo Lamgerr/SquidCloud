@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -244,4 +243,29 @@ export const shareFile = async (fileId: string): Promise<string> => {
   const shareLink = `${window.location.origin}/share/${fileId}`;
 
   return shareLink;
+};
+
+export const initializeRepos = async (count: number): Promise<string[]> => {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  
+  if (userError || !userData.user) {
+    console.error("User not authenticated:", userError);
+    throw new Error("User not authenticated");
+  }
+
+  const { data, error } = await supabase.functions.invoke('create-repos', {
+    body: { count, userId: userData.user.id }
+  });
+
+  if (error) {
+    console.error("Error initializing repositories:", error);
+    throw new Error(error.message || "Failed to initialize repositories");
+  }
+
+  if (!data || !data.repositories) {
+    throw new Error("Invalid response from server");
+  }
+
+  // Return the repository names
+  return data.repositories.map((repo: any) => repo.name);
 };
