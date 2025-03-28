@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   splitFileIntoJsonChunks, 
@@ -95,6 +96,8 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     throw new Error("No secure vaults available for storage. Please create vaults first.");
   }
 
+  console.log("Available repositories:", reposData);
+
   // Process file into JSON chunks
   const { chunks, encryptionKey, totalChunks } = await splitFileIntoJsonChunks(file);
   
@@ -105,33 +108,47 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     const randomRepoIndex = Math.floor(Math.random() * reposData.length);
     const repo = reposData[randomRepoIndex].repo_name;
     
+    console.log(`Uploading chunk ${i} to repository: ${repo}`);
+    
     // Upload chunk to GitHub via Supabase Edge Function
     const chunkId = `chunk_${Date.now()}_${i}`;
-    const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
-      body: {
-        action: 'upload',
-        fileName: `${chunkId}.json`,
-        fileType: 'application/json',
-        data: chunks[i],
-        userId: user.id,
-        path: null,
-        createRepo: false,
-        repo: repo
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
+        body: {
+          action: 'upload',
+          fileName: `${chunkId}.json`,
+          fileType: 'application/json',
+          data: chunks[i],
+          userId: user.id,
+          path: null,
+          createRepo: false,
+          repo: repo
+        }
+      });
+
+      if (uploadError) {
+        console.error(`Error uploading chunk ${i}:`, uploadError);
+        throw new Error(`Failed to upload chunk ${i}: ${uploadError.message}`);
       }
-    });
 
-    if (uploadError) {
-      console.error(`Error uploading chunk ${i}:`, uploadError);
-      throw new Error(`Failed to upload chunk ${i}: ${uploadError.message}`);
+      if (!uploadData) {
+        console.error(`No data returned when uploading chunk ${i}`);
+        throw new Error(`Failed to upload chunk ${i}: No data returned`);
+      }
+
+      console.log(`Successfully uploaded chunk ${i} to ${repo}:`, uploadData);
+
+      // Save chunk location
+      chunkLocations.push({
+        repo: repo,
+        path: `${user.id}/${chunkId}.json`,
+        index: i,
+        sha: uploadData.sha
+      });
+    } catch (error: any) {
+      console.error(`Error in upload process for chunk ${i}:`, error);
+      throw new Error(`Failed to upload chunk ${i}: ${error.message}`);
     }
-
-    // Save chunk location
-    chunkLocations.push({
-      repo: repo,
-      path: `${user.id}/${chunkId}.json`,
-      index: i,
-      sha: uploadData.sha
-    });
   }
 
   // Create a record in the database
@@ -144,7 +161,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     encrypted: true,
     shared: false,
     encryption_key: encryptionKey,
-    tags: chunkLocations // Store chunk locations in the tags field
+    tags: JSON.stringify(chunkLocations) // Store chunk locations as JSON string
   };
 
   const { data: dbFile, error: dbError } = await supabase
@@ -194,9 +211,16 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
   }
 
   // Check if this is a distributed file
-  if (file.storage_path === "distributed_storage" && file.tags && file.tags.length > 0) {
+  if (file.storage_path === "distributed_storage" && file.tags) {
     // Retrieve all chunks
-    const chunkLocations = file.tags as ChunkLocation[];
+    let chunkLocations: ChunkLocation[] = [];
+    try {
+      chunkLocations = JSON.parse(file.tags);
+    } catch (e) {
+      console.error("Error parsing chunk locations:", e);
+      throw new Error("Failed to parse chunk locations");
+    }
+    
     const chunks: string[] = [];
 
     for (const location of chunkLocations) {
@@ -266,9 +290,15 @@ export const deleteFile = async (fileId: string): Promise<void> => {
   }
 
   // Check if this is a distributed file
-  if (file.storage_path === "distributed_storage" && file.tags && file.tags.length > 0) {
+  if (file.storage_path === "distributed_storage" && file.tags) {
     // Delete all chunks
-    const chunkLocations = file.tags as ChunkLocation[];
+    let chunkLocations: ChunkLocation[] = [];
+    try {
+      chunkLocations = JSON.parse(file.tags);
+    } catch (e) {
+      console.error("Error parsing chunk locations:", e);
+      throw new Error("Failed to parse chunk locations");
+    }
     
     for (const location of chunkLocations) {
       try {

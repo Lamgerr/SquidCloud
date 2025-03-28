@@ -117,6 +117,18 @@ serve(async (req) => {
       );
     }
     
+    console.log(`Using repository: ${storageRepo} for action: ${action}`);
+    
+    // Verify the repository exists before attempting operations
+    const repoExists = await checkRepoExists(storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+    if (!repoExists) {
+      console.error(`Repository ${storageRepo} does not exist for ${GITHUB_USERNAME}`);
+      return new Response(
+        JSON.stringify({ error: `Repository ${storageRepo} does not exist` }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     // Handle different file operations
     switch (action) {
       case 'upload': {
@@ -129,6 +141,18 @@ serve(async (req) => {
         
         // Create a file path for this user
         const filePath = `${userId}/${fileName}`;
+        
+        // Ensure user directory exists
+        try {
+          const dirExists = await checkPathExists(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+          if (!dirExists) {
+            // Create directory by adding a README file
+            await createDirectory(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+          }
+        } catch (dirError) {
+          console.log("Creating directory since it might not exist:", dirError);
+          await createDirectory(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+        }
         
         // Convert data to base64 if it's not already (for JSON chunks, it's already a string)
         let base64Content = data;
@@ -263,6 +287,42 @@ serve(async (req) => {
       const errorData = await response.text();
       throw new Error(`Failed to create repository: ${response.status} ${response.statusText} - ${errorData}`);
     }
+  }
+  
+  // Check if a path exists in the repository
+  async function checkPathExists(path: string, repo: string, username: string, token: string): Promise<boolean> {
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'InflateStorage-App'
+          }
+        }
+      );
+      
+      return response.status === 200;
+    } catch (error) {
+      console.error('Error checking path:', error);
+      return false;
+    }
+  }
+  
+  // Create a directory by adding a README.md file
+  async function createDirectory(dirPath: string, repo: string, username: string, token: string): Promise<void> {
+    const readmePath = `${dirPath}/README.md`;
+    const readmeContent = 'This directory contains encrypted storage chunks.';
+    
+    await uploadToGitHub(
+      readmePath,
+      btoa(readmeContent),
+      'text/markdown',
+      repo,
+      username,
+      token
+    );
   }
   
   // List files for a specific user
