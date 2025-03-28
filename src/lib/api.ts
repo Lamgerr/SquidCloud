@@ -160,12 +160,21 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     encrypted: true,
     shared: false,
     encryption_key: encryptionKey,
-    tags: JSON.stringify(chunkLocations) // Store chunk locations as JSON string
+    tags: JSON.stringify(chunkLocations) // Store chunk locations as JSON string in a way that will be stored as string[] in DB
+  };
+
+  // Fix: Convert the JSON string to an array with one element to match the expected string[] type
+  const tagsArray = [JSON.stringify(chunkLocations)];
+
+  // Updated file record with the correct tags type
+  const fileRecordWithCorrectTags = {
+    ...fileRecord,
+    tags: tagsArray
   };
 
   const { data: dbFile, error: dbError } = await supabase
     .from('files')
-    .insert(fileRecord)
+    .insert(fileRecordWithCorrectTags)
     .select()
     .single();
 
@@ -214,7 +223,9 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     // Retrieve all chunks
     let chunkLocations: ChunkLocation[] = [];
     try {
-      chunkLocations = JSON.parse(file.tags);
+      // Fix: Parse the JSON string from the first element of the tags array
+      const tagsJson = Array.isArray(file.tags) && file.tags.length > 0 ? file.tags[0] : '[]';
+      chunkLocations = JSON.parse(tagsJson);
     } catch (e) {
       console.error("Error parsing chunk locations:", e);
       throw new Error("Failed to parse chunk locations");
@@ -260,7 +271,9 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     // If the file is encrypted, decrypt it
     if (file.encrypted && file.encryption_key) {
       const fileBuffer = await data.arrayBuffer();
-      const decryptedBuffer = await decryptData(fileBuffer, file.encryption_key);
+      // Fix: Convert ArrayBuffer to string before decrypting
+      const encryptedString = new TextDecoder().decode(new Uint8Array(fileBuffer));
+      const decryptedBuffer = decryptData(encryptedString, file.encryption_key);
       return new Blob([decryptedBuffer], { type: file.type });
     }
 
@@ -293,7 +306,9 @@ export const deleteFile = async (fileId: string): Promise<void> => {
     // Delete all chunks
     let chunkLocations: ChunkLocation[] = [];
     try {
-      chunkLocations = file.tags;
+      // Fix: Parse the JSON string from the first element of the tags array
+      const tagsJson = Array.isArray(file.tags) && file.tags.length > 0 ? file.tags[0] : '[]';
+      chunkLocations = JSON.parse(tagsJson);
     } catch (e) {
       console.error("Error parsing chunk locations:", e);
       throw new Error("Failed to parse chunk locations");

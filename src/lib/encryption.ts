@@ -23,7 +23,7 @@ export const decryptData = (encryptedData: string, encryptionKey: string): Array
     return typedArray.buffer;
   } catch (error) {
     console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt data: ' + error.message);
+    throw new Error('Failed to decrypt data: ' + (error as Error).message);
   }
 };
 
