@@ -21,7 +21,7 @@ export interface FileItem {
 }
 
 // Define the chunk location type
-interface ChunkLocation {
+export interface ChunkLocation {
   repo: string;
   path: string;
   index: number;
@@ -160,7 +160,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     encrypted: true,
     shared: false,
     encryption_key: encryptionKey,
-    tags: chunkLocations // This will be automatically serialized to JSON by Supabase
+    tags: JSON.stringify(chunkLocations) // Store chunk locations as JSON string
   };
 
   const { data: dbFile, error: dbError } = await supabase
@@ -214,7 +214,7 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     // Retrieve all chunks
     let chunkLocations: ChunkLocation[] = [];
     try {
-      chunkLocations = file.tags;
+      chunkLocations = JSON.parse(file.tags);
     } catch (e) {
       console.error("Error parsing chunk locations:", e);
       throw new Error("Failed to parse chunk locations");
@@ -396,7 +396,12 @@ export const shareFile = async (fileId: string): Promise<string> => {
   return shareLink;
 };
 
-export const initializeRepos = async (count: number): Promise<string[]> => {
+export const initializeRepos = async (count: number, password?: string): Promise<string[]> => {
+  // Verify access password if provided
+  if (password && password !== '9016') {
+    throw new Error("Invalid access password");
+  }
+
   const { data: userData, error: userError } = await supabase.auth.getUser();
   
   if (userError || !userData.user) {

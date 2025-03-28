@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -12,17 +11,17 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const GITHUB_TOKEN = Deno.env.get('GITHUB_TOKEN');
-  const GITHUB_USERNAME = Deno.env.get('GITHUB_USERNAME');
-  
-  if (!GITHUB_TOKEN || !GITHUB_USERNAME) {
-    return new Response(
-      JSON.stringify({ error: 'GitHub configuration not complete. GITHUB_TOKEN and GITHUB_USERNAME are required.' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
   try {
+    const GITHUB_TOKEN = Deno.env.get('GITHUB_TOKEN');
+    const GITHUB_USERNAME = Deno.env.get('GITHUB_USERNAME');
+    
+    if (!GITHUB_TOKEN || !GITHUB_USERNAME) {
+      return new Response(
+        JSON.stringify({ error: 'GitHub configuration not complete. GITHUB_TOKEN and GITHUB_USERNAME are required.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { action, fileName, fileType, data, userId, path, createRepo, repo } = await req.json();
     
     if (!action) {
@@ -119,12 +118,17 @@ serve(async (req) => {
     
     console.log(`Using repository: ${storageRepo} for action: ${action}`);
     
-    // Verify the repository exists before attempting operations
+    // Before performing any operation, verify the repository exists and create it if it doesn't
     const repoExists = await checkRepoExists(storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
-    if (!repoExists) {
+    
+    if (!repoExists && createRepo) {
+      console.log(`Repository ${storageRepo} does not exist for ${GITHUB_USERNAME}, creating it now.`);
+      await createRepository(storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+      console.log(`Successfully created repository: ${storageRepo}`);
+    } else if (!repoExists) {
       console.error(`Repository ${storageRepo} does not exist for ${GITHUB_USERNAME}`);
       return new Response(
-        JSON.stringify({ error: `Repository ${storageRepo} does not exist` }),
+        JSON.stringify({ error: `Repository ${storageRepo} does not exist. Please check the repository name or create it first.` }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -142,15 +146,15 @@ serve(async (req) => {
         // Create a file path for this user
         const filePath = `${userId}/${fileName}`;
         
-        // Ensure user directory exists
+        // Ensure user directory exists - always try to create the directory
         try {
           const dirExists = await checkPathExists(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
           if (!dirExists) {
-            // Create directory by adding a README file
             await createDirectory(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+            console.log(`Created directory for user ${userId} in repository ${storageRepo}`);
           }
         } catch (dirError) {
-          console.log("Creating directory since it might not exist:", dirError);
+          console.log(`Creating directory for user ${userId} in repository ${storageRepo}`);
           await createDirectory(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
         }
         

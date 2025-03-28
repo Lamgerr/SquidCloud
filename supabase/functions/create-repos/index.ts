@@ -40,7 +40,7 @@ serve(async (req) => {
     const createdRepos = [];
     
     // Generate creative names using Gemini API
-    const repoNames = await generateRepoNames(validCount, GEMINI_API_KEY);
+    const repoNames = await generateCreativeRepoNames(validCount, GEMINI_API_KEY);
     
     // Create each repository
     for (let i = 0; i < validCount; i++) {
@@ -64,6 +64,10 @@ serve(async (req) => {
       
       // If repo doesn't exist, create it
       if (existsResponse.status === 404) {
+        // Generate a creative description
+        const descriptions = await generateCreativeDescriptions(1, GEMINI_API_KEY);
+        const description = descriptions[0] || "Secure data vault";
+        
         const createResponse = await fetch(
           'https://api.github.com/user/repos',
           {
@@ -76,7 +80,7 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               name: repoName,
-              description: 'Secure data vault',
+              description: description,
               private: true,
               auto_init: true
             })
@@ -117,7 +121,8 @@ serve(async (req) => {
         
         createdRepos.push({
           name: repoName,
-          html_url: repoData.html_url
+          html_url: repoData.html_url,
+          description: description
         });
         
         console.log(`Created repository: ${repoName}`);
@@ -126,7 +131,8 @@ serve(async (req) => {
         const repoData = await existsResponse.json();
         createdRepos.push({
           name: repoName,
-          html_url: repoData.html_url
+          html_url: repoData.html_url,
+          description: repoData.description
         });
         
         console.log(`Repository already exists: ${repoName}`);
@@ -153,20 +159,17 @@ serve(async (req) => {
 });
 
 // Helper function to generate creative repository names using Gemini API
-async function generateRepoNames(count: number, apiKey?: string): Promise<string[]> {
+async function generateCreativeRepoNames(count: number, apiKey?: string): Promise<string[]> {
   if (!apiKey) {
     console.log("No Gemini API key provided, using fallback names");
-    return Array(count).fill("").map(() => {
-      const adjectives = ["mystic", "arcane", "enigmatic", "cryptic", "phantom", "celestial", "quantum", "cosmic", "ethereal", "astral"];
-      const nouns = ["nexus", "cipher", "sanctum", "citadel", "sentinel", "bastion", "matrix", "aegis", "paradox", "vortex"];
-      const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
-      const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
-      return `${randomAdj}_${randomNoun}`;
-    });
+    return generateFallbackNames(count);
   }
   
   try {
-    const prompt = `Generate ${count} unique, creative names for private secure vaults. Each name should be a single word or two words connected by underscore, like "cosmic_nexus" or "phantom_matrix". The names should be unique, memorable, and should NOT contain words like "storage", "repo", "github", "vault", "file", "data", or anything that suggests file storage. Return only the names as a comma-separated list with no additional text.`;
+    const prompt = `Generate ${count} unique, creative names for private secure data repositories. 
+    Each name should be a single word or two words connected by underscore, like "cosmic_nexus" or "phantom_matrix". 
+    The names should be unique, memorable, and should NOT contain words like "storage", "repo", "github", "vault", "file", "data", or anything that suggests file storage. 
+    Return only the names as a comma-separated list with no additional text.`;
     
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", {
       method: "POST",
@@ -195,13 +198,12 @@ async function generateRepoNames(count: number, apiKey?: string): Promise<string
         // Replace spaces with underscores and remove any characters that aren't alphanumeric or underscore
         .map(name => name.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''));
       
-      // Ensure we have the requested number of names
+      // Ensure we have the requested number of names and none contain the word "storage"
+      names = names.filter(name => !name.includes('storage'));
+      
+      // Fill in if we don't have enough names
       while (names.length < count) {
-        const adjectives = ["mystic", "arcane", "enigmatic", "cryptic", "phantom", "celestial", "quantum", "cosmic", "ethereal", "astral"];
-        const nouns = ["nexus", "cipher", "sanctum", "citadel", "sentinel", "bastion", "matrix", "aegis", "paradox", "vortex"];
-        const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
-        const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
-        names.push(`${randomAdj}_${randomNoun}`);
+        names.push(...generateFallbackNames(count - names.length));
       }
       
       // Return just the number of names requested
@@ -212,12 +214,67 @@ async function generateRepoNames(count: number, apiKey?: string): Promise<string
   } catch (error) {
     console.error("Error generating names with Gemini:", error);
     // Fallback to basic names
-    return Array(count).fill("").map(() => {
-      const adjectives = ["mystic", "arcane", "enigmatic", "cryptic", "phantom", "celestial", "quantum", "cosmic", "ethereal", "astral"];
-      const nouns = ["nexus", "cipher", "sanctum", "citadel", "sentinel", "bastion", "matrix", "aegis", "paradox", "vortex"];
-      const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
-      const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
-      return `${randomAdj}_${randomNoun}`;
+    return generateFallbackNames(count);
+  }
+}
+
+// Generate fallback repository names without using "storage" word
+function generateFallbackNames(count: number): string[] {
+  const adjectives = ["mystic", "arcane", "enigmatic", "cryptic", "phantom", "celestial", "quantum", "cosmic", "ethereal", "astral"];
+  const nouns = ["nexus", "cipher", "sanctum", "citadel", "sentinel", "bastion", "matrix", "aegis", "paradox", "vortex"];
+  
+  return Array(count).fill("").map(() => {
+    const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+    return `${randomAdj}_${randomNoun}`;
+  });
+}
+
+// Generate creative descriptions for repositories
+async function generateCreativeDescriptions(count: number, apiKey?: string): Promise<string[]> {
+  if (!apiKey) {
+    return ["Secure digital nexus for encrypted assets"];
+  }
+  
+  try {
+    const prompt = `Generate ${count} unique, creative descriptions for private secure data repositories.
+    Each description should be a short phrase (under 50 characters) that sounds secure and professional,
+    but does NOT directly mention storage, files, data, or anything that obviously suggests file storage.
+    Return only the descriptions as a comma-separated list with no additional text.`;
+    
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 100
+        }
+      })
     });
+    
+    const data = await response.json();
+    
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      const text = data.candidates[0].content.parts[0].text;
+      let descriptions = text.split(',')
+        .map(desc => desc.trim())
+        .filter(desc => desc.length > 0 && desc.length < 50);
+      
+      while (descriptions.length < count) {
+        descriptions.push("Secure digital nexus for encrypted assets");
+      }
+      
+      return descriptions.slice(0, count);
+    }
+    
+    return ["Secure digital nexus for encrypted assets"];
+  } catch (error) {
+    console.error("Error generating descriptions with Gemini:", error);
+    return ["Secure digital nexus for encrypted assets"];
   }
 }

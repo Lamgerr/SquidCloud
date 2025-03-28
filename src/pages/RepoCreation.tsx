@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { initializeRepos } from '@/lib/api';
@@ -10,12 +10,17 @@ import { Progress } from '@/components/ui/progress';
 
 const RepoCreation = () => {
   const { count } = useParams<{ count: string }>();
+  const location = useLocation();
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [vaults, setVaults] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Extract password from query string
+  const queryParams = new URLSearchParams(location.search);
+  const password = queryParams.get('password');
 
   useEffect(() => {
     const createVaults = async () => {
@@ -29,8 +34,8 @@ const RepoCreation = () => {
         
         setProgress(30);
         
-        // Create the secure vaults
-        const createdVaults = await initializeRepos(validCount);
+        // Create the secure vaults with password if provided
+        const createdVaults = await initializeRepos(validCount, password || undefined);
         
         setProgress(90);
         setVaults(createdVaults);
@@ -61,7 +66,7 @@ const RepoCreation = () => {
     };
 
     createVaults();
-  }, [count, navigate, toast]);
+  }, [count, navigate, toast, password]);
 
   return (
     <div className="container max-w-md py-12">
