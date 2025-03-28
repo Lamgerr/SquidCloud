@@ -12,32 +12,32 @@ const RepoCreation = () => {
   const { count } = useParams<{ count: string }>();
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [repos, setRepos] = useState<string[]>([]);
+  const [vaults, setVaults] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const createRepos = async () => {
+    const createVaults = async () => {
       setCreating(true);
       setProgress(10);
       
       try {
         // Parse the count parameter, default to 5 if not provided or invalid
-        const repoCount = count ? parseInt(count, 10) : 5;
-        const validCount = isNaN(repoCount) ? 5 : Math.min(Math.max(1, repoCount), 5);
+        const vaultCount = count ? parseInt(count, 10) : 5;
+        const validCount = isNaN(vaultCount) ? 5 : Math.min(Math.max(1, vaultCount), 5);
         
         setProgress(30);
         
         // Create the repositories
-        const createdRepos = await initializeRepos(validCount);
+        const createdVaults = await initializeRepos(validCount);
         
         setProgress(90);
-        setRepos(createdRepos);
+        setVaults(createdVaults);
         
         toast({
-          title: "Repository creation complete",
-          description: `Successfully created ${createdRepos.length} repositories for storage`,
+          title: "Setup complete",
+          description: `Successfully created ${createdVaults.length} secure vaults for your files`,
         });
         
         // Redirect back to dashboard after a short delay
@@ -46,12 +46,12 @@ const RepoCreation = () => {
         }, 2000);
         
       } catch (err: any) {
-        console.error("Repository creation error:", err);
-        setError(err.message || "Failed to create repositories");
+        console.error("Vault creation error:", err);
+        setError(err.message || "Failed to create secure vaults");
         
         toast({
-          title: "Repository creation failed",
-          description: err.message || "There was a problem creating the repositories",
+          title: "Setup failed",
+          description: err.message || "There was a problem creating your secure vaults",
           variant: "destructive",
         });
       } finally {
@@ -60,16 +60,16 @@ const RepoCreation = () => {
       }
     };
 
-    createRepos();
+    createVaults();
   }, [count, navigate, toast]);
 
   return (
     <div className="container max-w-md py-12">
       <Card>
         <CardHeader>
-          <CardTitle>Universal Storage Setup</CardTitle>
+          <CardTitle>Secure Vault Setup</CardTitle>
           <CardDescription>
-            Creating secure repositories for your encrypted files
+            Creating secure vaults for your encrypted files
           </CardDescription>
         </CardHeader>
         
@@ -80,7 +80,7 @@ const RepoCreation = () => {
             {creating ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <p>Creating repositories...</p>
+                <p>Creating secure vaults...</p>
               </div>
             ) : error ? (
               <div className="bg-destructive/10 p-4 rounded-md text-center">
@@ -94,12 +94,12 @@ const RepoCreation = () => {
                   Back to Dashboard
                 </Button>
               </div>
-            ) : repos.length > 0 ? (
+            ) : vaults.length > 0 ? (
               <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-md text-center">
                 <Check className="h-6 w-6 text-green-500 mx-auto mb-2" />
-                <p className="font-medium">Repositories created successfully!</p>
+                <p className="font-medium">Setup completed successfully!</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Created {repos.length} secure storage repositories
+                  Created {vaults.length} secure vaults
                 </p>
                 <Button 
                   variant="default" 
