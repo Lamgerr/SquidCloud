@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   splitFileIntoJsonChunks, 
@@ -161,7 +160,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     encrypted: true,
     shared: false,
     encryption_key: encryptionKey,
-    tags: JSON.stringify(chunkLocations) // Store chunk locations as JSON string
+    tags: chunkLocations // This will be automatically serialized to JSON by Supabase
   };
 
   const { data: dbFile, error: dbError } = await supabase
@@ -215,7 +214,7 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     // Retrieve all chunks
     let chunkLocations: ChunkLocation[] = [];
     try {
-      chunkLocations = JSON.parse(file.tags);
+      chunkLocations = file.tags;
     } catch (e) {
       console.error("Error parsing chunk locations:", e);
       throw new Error("Failed to parse chunk locations");
@@ -261,7 +260,7 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     // If the file is encrypted, decrypt it
     if (file.encrypted && file.encryption_key) {
       const fileBuffer = await data.arrayBuffer();
-      const decryptedBuffer = decryptData(await encryptData(fileBuffer, file.encryption_key), file.encryption_key);
+      const decryptedBuffer = await decryptData(fileBuffer, file.encryption_key);
       return new Blob([decryptedBuffer], { type: file.type });
     }
 
@@ -294,7 +293,7 @@ export const deleteFile = async (fileId: string): Promise<void> => {
     // Delete all chunks
     let chunkLocations: ChunkLocation[] = [];
     try {
-      chunkLocations = JSON.parse(file.tags);
+      chunkLocations = file.tags;
     } catch (e) {
       console.error("Error parsing chunk locations:", e);
       throw new Error("Failed to parse chunk locations");
