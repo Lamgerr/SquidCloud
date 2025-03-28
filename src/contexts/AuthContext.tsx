@@ -2,8 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   session: Session | null;
@@ -24,7 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -66,12 +65,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             title: "Welcome back!",
             description: "You have successfully signed in"
           });
+          // We'll handle navigation in the components using this context
         } else if (event === 'SIGNED_OUT') {
           toast({
             title: "Signed out",
             description: "You have been successfully signed out"
           });
-          navigate('/auth');
+          // We'll handle navigation in the components using this context
         }
       }
     );
@@ -80,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshSession();
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, []);
 
   const refreshSession = async () => {
     try {
@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      navigate('/dashboard');
+      // Navigation will be handled by the onAuthStateChange listener
     } catch (error: any) {
       toast({
         title: "Login failed",
