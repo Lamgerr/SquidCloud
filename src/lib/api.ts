@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   splitFileIntoJsonChunks, 
@@ -19,6 +18,14 @@ export interface FileItem {
   shared: boolean;
   encryptionKey?: string;
   chunks?: number;
+}
+
+// Define the chunk location type
+interface ChunkLocation {
+  repo: string;
+  path: string;
+  index: number;
+  sha?: string;
 }
 
 export const formatBytes = (bytes: number, decimals = 2): string => {
@@ -92,7 +99,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
   const { chunks, encryptionKey, totalChunks } = await splitFileIntoJsonChunks(file);
   
   // Randomly distribute chunks across repositories
-  const chunkLocations = [];
+  const chunkLocations: ChunkLocation[] = [];
   for (let i = 0; i < chunks.length; i++) {
     // Select a random repository
     const randomRepoIndex = Math.floor(Math.random() * reposData.length);
@@ -189,8 +196,8 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
   // Check if this is a distributed file
   if (file.storage_path === "distributed_storage" && file.tags && file.tags.length > 0) {
     // Retrieve all chunks
-    const chunkLocations = file.tags;
-    const chunks = [];
+    const chunkLocations = file.tags as ChunkLocation[];
+    const chunks: string[] = [];
 
     for (const location of chunkLocations) {
       const { data: chunkData, error: chunkError } = await supabase.functions.invoke('github-storage', {
@@ -230,7 +237,7 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     // If the file is encrypted, decrypt it
     if (file.encrypted && file.encryption_key) {
       const fileBuffer = await data.arrayBuffer();
-      const decryptedBuffer = decryptData(fileBuffer, file.encryption_key);
+      const decryptedBuffer = decryptData(await encryptData(fileBuffer, file.encryption_key), file.encryption_key);
       return new Blob([decryptedBuffer], { type: file.type });
     }
 
@@ -261,7 +268,7 @@ export const deleteFile = async (fileId: string): Promise<void> => {
   // Check if this is a distributed file
   if (file.storage_path === "distributed_storage" && file.tags && file.tags.length > 0) {
     // Delete all chunks
-    const chunkLocations = file.tags;
+    const chunkLocations = file.tags as ChunkLocation[];
     
     for (const location of chunkLocations) {
       try {
@@ -327,14 +334,15 @@ export const shareFile = async (fileId: string): Promise<string> => {
   // Generate a secure access code
   const accessCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   
-  // Create a share record
+  // Create a share record with ISO string format for expires_at
+  const expirationDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
   const { error: shareError } = await supabase
     .from('shares')
     .insert({
       file_id: fileId,
       user_id: userData.user.id,
       access_code: accessCode,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days expiry
+      expires_at: expirationDate.toISOString() // Convert Date to ISO string
     });
 
   if (shareError) {

@@ -2,7 +2,7 @@
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, X, Lock, FileSymlink, UploadCloud, Shield, Layers, KeyRound } from 'lucide-react';
+import { Upload, X, Lock, FileSymlink, UploadCloud, Shield, Layers, KeyRound, Check, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile, FileItem } from '@/lib/api';
 import { Card } from '@/components/ui/card';

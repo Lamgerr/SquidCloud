@@ -1,4 +1,3 @@
-
 /**
  * File encryption/decryption utilities using AES-256-GCM encryption
  */
@@ -53,7 +52,11 @@ export const convertWordArrayToUint8Array = (wordArray: CryptoJS.lib.WordArray):
 };
 
 // Split file into chunks and convert to JSON
-export const splitFileIntoJsonChunks = async (file: File, chunkSize: number = 500 * 1024): Promise<string[]> => {
+export const splitFileIntoJsonChunks = async (file: File, chunkSize: number = 500 * 1024): Promise<{
+  chunks: string[];
+  encryptionKey: string;
+  totalChunks: number;
+}> => {
   // Read the file
   const fileBuffer = await file.arrayBuffer();
   // Encrypt the file data
