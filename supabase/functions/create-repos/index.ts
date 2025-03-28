@@ -45,7 +45,7 @@ serve(async (req) => {
     // Create each repository
     for (let i = 0; i < validCount; i++) {
       // Use the generated name, or fall back to a standard pattern
-      const baseName = repoNames[i] || `vault_${Math.random().toString(36).substring(2, 7)}`;
+      const baseName = repoNames[i] || `nexus_${Math.random().toString(36).substring(2, 7)}`;
       // Add a unique identifier to ensure uniqueness
       const uniqueSuffix = `${Date.now().toString(36)}_${i}`;
       const repoName = `${baseName}_${uniqueSuffix}`;
@@ -89,6 +89,32 @@ serve(async (req) => {
         }
         
         const repoData = await createResponse.json();
+        
+        // Store repository information in database
+        try {
+          const dbResponse = await fetch(
+            `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({
+                user_id: userId,
+                repo_name: repoName
+              })
+            }
+          );
+          
+          if (!dbResponse.ok) {
+            console.error(`Failed to store repo record for ${repoName}:`, await dbResponse.text());
+          }
+        } catch (dbError) {
+          console.error(`Database error for ${repoName}:`, dbError);
+        }
+        
         createdRepos.push({
           name: repoName,
           html_url: repoData.html_url
@@ -131,8 +157,8 @@ async function generateRepoNames(count: number, apiKey?: string): Promise<string
   if (!apiKey) {
     console.log("No Gemini API key provided, using fallback names");
     return Array(count).fill("").map(() => {
-      const adjectives = ["mystic", "hidden", "secure", "quantum", "cosmic", "digital", "crypto", "private", "shadow", "silent"];
-      const nouns = ["vault", "archive", "nexus", "haven", "sanctuary", "domain", "fortress", "chamber", "enclave", "cache"];
+      const adjectives = ["mystic", "arcane", "enigmatic", "cryptic", "phantom", "celestial", "quantum", "cosmic", "ethereal", "astral"];
+      const nouns = ["nexus", "cipher", "sanctum", "citadel", "sentinel", "bastion", "matrix", "aegis", "paradox", "vortex"];
       const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
       const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
       return `${randomAdj}_${randomNoun}`;
@@ -140,7 +166,7 @@ async function generateRepoNames(count: number, apiKey?: string): Promise<string
   }
   
   try {
-    const prompt = `Generate ${count} unique, creative names for private vaults or repositories. Each name should be a single word or two words connected by underscore, like "cosmic_vault" or "stardust". The names should be unique, memorable, and should NOT contain words like "storage", "repo", "github", or anything that suggests file storage. Return only the names as a comma-separated list with no additional text.`;
+    const prompt = `Generate ${count} unique, creative names for private secure vaults. Each name should be a single word or two words connected by underscore, like "cosmic_nexus" or "phantom_matrix". The names should be unique, memorable, and should NOT contain words like "storage", "repo", "github", "vault", "file", "data", or anything that suggests file storage. Return only the names as a comma-separated list with no additional text.`;
     
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", {
       method: "POST",
@@ -171,7 +197,11 @@ async function generateRepoNames(count: number, apiKey?: string): Promise<string
       
       // Ensure we have the requested number of names
       while (names.length < count) {
-        names.push(`vault_${Math.random().toString(36).substring(2, 7)}`);
+        const adjectives = ["mystic", "arcane", "enigmatic", "cryptic", "phantom", "celestial", "quantum", "cosmic", "ethereal", "astral"];
+        const nouns = ["nexus", "cipher", "sanctum", "citadel", "sentinel", "bastion", "matrix", "aegis", "paradox", "vortex"];
+        const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+        names.push(`${randomAdj}_${randomNoun}`);
       }
       
       // Return just the number of names requested
@@ -183,8 +213,8 @@ async function generateRepoNames(count: number, apiKey?: string): Promise<string
     console.error("Error generating names with Gemini:", error);
     // Fallback to basic names
     return Array(count).fill("").map(() => {
-      const adjectives = ["mystic", "hidden", "secure", "quantum", "cosmic", "digital", "crypto", "private", "shadow", "silent"];
-      const nouns = ["vault", "archive", "nexus", "haven", "sanctuary", "domain", "fortress", "chamber", "enclave", "cache"];
+      const adjectives = ["mystic", "arcane", "enigmatic", "cryptic", "phantom", "celestial", "quantum", "cosmic", "ethereal", "astral"];
+      const nouns = ["nexus", "cipher", "sanctum", "citadel", "sentinel", "bastion", "matrix", "aegis", "paradox", "vortex"];
       const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
       const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
       return `${randomAdj}_${randomNoun}`;

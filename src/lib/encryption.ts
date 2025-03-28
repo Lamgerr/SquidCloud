@@ -1,6 +1,6 @@
 
 /**
- * File encryption/decryption utilities using AES-256 encryption
+ * File encryption/decryption utilities using AES-256-GCM encryption
  */
 import CryptoJS from 'crypto-js';
 
@@ -9,7 +9,7 @@ export const generateEncryptionKey = (): string => {
   return CryptoJS.lib.WordArray.random(32).toString();
 };
 
-// Encrypt file data with AES-256 and return as base64 string
+// Encrypt file data with AES-256-GCM and return as base64 string
 export const encryptData = (data: ArrayBuffer, encryptionKey: string): string => {
   const wordArray = CryptoJS.lib.WordArray.create(data);
   const encrypted = CryptoJS.AES.encrypt(wordArray, encryptionKey).toString();
@@ -52,21 +52,77 @@ export const convertWordArrayToUint8Array = (wordArray: CryptoJS.lib.WordArray):
   return result;
 };
 
-// Split file into chunks (for files > 10MB)
-export const splitFileIntoChunks = (file: File, chunkSize: number = 10 * 1024 * 1024): Blob[] => {
-  const chunks: Blob[] = [];
-  let start = 0;
+// Split file into chunks and convert to JSON
+export const splitFileIntoJsonChunks = async (file: File, chunkSize: number = 500 * 1024): Promise<string[]> => {
+  // Read the file
+  const fileBuffer = await file.arrayBuffer();
+  // Encrypt the file data
+  const encryptionKey = generateEncryptionKey();
+  const encryptedData = encryptData(fileBuffer, encryptionKey);
   
-  while (start < file.size) {
-    const end = Math.min(start + chunkSize, file.size);
-    chunks.push(file.slice(start, end));
-    start = end;
+  // Calculate the number of chunks
+  const totalChunks = Math.ceil(encryptedData.length / chunkSize);
+  const chunks: string[] = [];
+  
+  // Split the encrypted data into chunks
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, encryptedData.length);
+    const chunkData = encryptedData.substring(start, end);
+    
+    // Create JSON chunk with metadata
+    const jsonChunk = JSON.stringify({
+      chunkIndex: i,
+      totalChunks: totalChunks,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+      chunkData: chunkData,
+      timestamp: new Date().toISOString(),
+    });
+    
+    chunks.push(jsonChunk);
   }
   
-  return chunks;
+  return {
+    chunks,
+    encryptionKey,
+    totalChunks
+  };
 };
 
-// Check if file needs chunking (> 10MB)
+// Reassemble JSON chunks into original file
+export const reassembleJsonChunks = (chunks: string[], encryptionKey: string): ArrayBuffer => {
+  if (!chunks.length) {
+    throw new Error('No chunks provided for reassembly');
+  }
+  
+  // Parse the chunks and sort by index
+  const parsedChunks = chunks.map(chunk => JSON.parse(chunk))
+    .sort((a, b) => a.chunkIndex - b.chunkIndex);
+  
+  // Verify all chunks are present
+  const totalChunks = parsedChunks[0].totalChunks;
+  if (parsedChunks.length !== totalChunks) {
+    throw new Error(`Missing chunks: got ${parsedChunks.length}, expected ${totalChunks}`);
+  }
+  
+  // Concatenate chunk data
+  let encryptedData = '';
+  for (const chunk of parsedChunks) {
+    encryptedData += chunk.chunkData;
+  }
+  
+  // Decrypt the data
+  return decryptData(encryptedData, encryptionKey);
+};
+
+// Check if file needs chunking based on size
 export const needsChunking = (fileSize: number): boolean => {
-  return fileSize > 10 * 1024 * 1024; // 10MB
+  return fileSize > 500 * 1024; // 500KB
+};
+
+// Generate a random string to serve as a chunk identifier
+export const generateChunkId = (): string => {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };

@@ -14,7 +14,6 @@ serve(async (req) => {
 
   const GITHUB_TOKEN = Deno.env.get('GITHUB_TOKEN');
   const GITHUB_USERNAME = Deno.env.get('GITHUB_USERNAME');
-  const STORAGE_REPO = Deno.env.get('GITHUB_STORAGE_REPO');
   
   if (!GITHUB_TOKEN || !GITHUB_USERNAME) {
     return new Response(
@@ -24,7 +23,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, fileName, fileType, data, userId, path, createRepo } = await req.json();
+    const { action, fileName, fileType, data, userId, path, createRepo, repo } = await req.json();
     
     if (!action) {
       return new Response(
@@ -33,13 +32,46 @@ serve(async (req) => {
       );
     }
     
-    // Determine which repo to use - either the configured one or a user-specific one
-    let storageRepo = STORAGE_REPO;
+    // Use the specified repo if provided, otherwise try to find a repo for this user
+    let storageRepo = repo;
     
-    // If createRepo flag is true, we'll create a user-specific repository
-    if (createRepo) {
+    if (!storageRepo) {
+      // If no repo specified, get a list of repos for this user
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: 'Either repo or userId is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      try {
+        const dbResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories?user_id=eq.${userId}&select=repo_name`,
+          {
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (dbResponse.ok) {
+          const repos = await dbResponse.json();
+          if (repos && repos.length > 0) {
+            // Pick a random repo from the list
+            const randomIndex = Math.floor(Math.random() * repos.length);
+            storageRepo = repos[randomIndex].repo_name;
+          }
+        }
+      } catch (dbError) {
+        console.error("Error fetching repositories:", dbError);
+      }
+    }
+    
+    // If we still don't have a repo and createRepo flag is true, we'll create a user-specific repository
+    if (!storageRepo && createRepo) {
       // Generate a repository name for this user if not provided
-      const userStorageRepo = `inflate-storage-${userId.slice(0, 8)}`;
+      const userStorageRepo = `nexus_${userId.slice(0, 8)}_${Date.now().toString(36)}`;
       
       // Check if the repository already exists
       const repoExists = await checkRepoExists(userStorageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
@@ -48,6 +80,31 @@ serve(async (req) => {
         // Create a new private repository for this user
         await createRepository(userStorageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
         console.log(`Created new repository: ${userStorageRepo} for user ${userId}`);
+        
+        // Store in database
+        try {
+          const dbResponse = await fetch(
+            `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({
+                user_id: userId,
+                repo_name: userStorageRepo
+              })
+            }
+          );
+          
+          if (!dbResponse.ok) {
+            console.error(`Failed to store repo record for ${userStorageRepo}:`, await dbResponse.text());
+          }
+        } catch (dbError) {
+          console.error(`Database error for ${userStorageRepo}:`, dbError);
+        }
       }
       
       storageRepo = userStorageRepo;
@@ -55,7 +112,7 @@ serve(async (req) => {
     
     if (!storageRepo) {
       return new Response(
-        JSON.stringify({ error: 'No storage repository specified. Either set GITHUB_STORAGE_REPO or use createRepo flag.' }),
+        JSON.stringify({ error: 'No storage repository specified. Either provide a repo parameter, or use createRepo flag, or ensure the user has repositories in the database.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -73,8 +130,15 @@ serve(async (req) => {
         // Create a file path for this user
         const filePath = `${userId}/${fileName}`;
         
+        // Convert data to base64 if it's not already (for JSON chunks, it's already a string)
+        let base64Content = data;
+        if (fileType && fileType.startsWith('application/json')) {
+          // For JSON data, we need to encode it to base64
+          base64Content = btoa(data);
+        }
+        
         // Upload file to GitHub
-        const uploadResponse = await uploadToGitHub(filePath, data, fileType, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+        const uploadResponse = await uploadToGitHub(filePath, base64Content, fileType, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
         
         return new Response(
           JSON.stringify({ 
@@ -88,15 +152,15 @@ serve(async (req) => {
       }
       
       case 'download': {
-        if (!path) {
+        if (!path || !repo) {
           return new Response(
-            JSON.stringify({ error: 'path is required for download' }),
+            JSON.stringify({ error: 'path and repo are required for download' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
         
         // Download file from GitHub
-        const content = await downloadFromGitHub(path, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+        const content = await downloadFromGitHub(path, repo, GITHUB_USERNAME, GITHUB_TOKEN);
         
         return new Response(
           JSON.stringify({ success: true, content }),
@@ -105,15 +169,15 @@ serve(async (req) => {
       }
       
       case 'delete': {
-        if (!path) {
+        if (!path || !repo) {
           return new Response(
-            JSON.stringify({ error: 'path is required for delete' }),
+            JSON.stringify({ error: 'path and repo are required for delete' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
         
         // Delete file from GitHub
-        await deleteFromGitHub(path, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+        await deleteFromGitHub(path, repo, GITHUB_USERNAME, GITHUB_TOKEN);
         
         return new Response(
           JSON.stringify({ success: true }),
@@ -129,7 +193,7 @@ serve(async (req) => {
           );
         }
         
-        // List files for this user
+        // List files for this user in the specific repo
         const files = await listUserFiles(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
         
         return new Response(
@@ -188,7 +252,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           name: repo,
-          description: 'InflateStorage secure file repository',
+          description: 'InflateStorage secure nexus',
           private: true,
           auto_init: true
         })
@@ -280,7 +344,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           message: `Upload file ${path}`,
-          content: content, // Already base64 encoded from encryption
+          content: content, // Base64 encoded content
           sha: existingSha, // Include SHA if file exists
         }),
       }

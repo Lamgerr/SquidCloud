@@ -2,7 +2,7 @@
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, X, Lock, FileSymlink, UploadCloud, Shield } from 'lucide-react';
+import { Upload, X, Lock, FileSymlink, UploadCloud, Shield, Layers, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile, FileItem } from '@/lib/api';
 import { Card } from '@/components/ui/card';
@@ -17,7 +17,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [isChunkedUpload, setIsChunkedUpload] = useState(false);
+  const [processingStage, setProcessingStage] = useState<string>('initializing');
   const [currentChunk, setCurrentChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,16 +31,11 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
     setCurrentFile(file);
     setIsUploading(true);
     setUploadProgress(0);
+    setProcessingStage('encrypting');
     
-    // Check if file is larger than 10MB for chunking
-    const isLarge = file.size > 10 * 1024 * 1024;
-    setIsChunkedUpload(isLarge);
-    
-    if (isLarge) {
-      // Estimate number of chunks (10MB each)
-      const estimatedChunks = Math.ceil(file.size / (10 * 1024 * 1024));
-      setTotalChunks(estimatedChunks);
-    }
+    // Estimate number of chunks
+    const estimatedChunks = Math.ceil(file.size / (500 * 1024)); // 500KB chunks
+    setTotalChunks(estimatedChunks);
     
     try {
       // Notify user about encryption
@@ -49,67 +44,113 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
         description: "Your file is being encrypted before upload",
       });
       
-      // Start progress animation
-      let progressInterval: NodeJS.Timeout;
+      // Start progress animation for encryption phase
+      let progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 25) {
+            clearInterval(progressInterval);
+            return 25;
+          }
+          return prev + Math.random() * 2;
+        });
+      }, 200);
       
-      if (isLarge) {
-        // For chunked uploads, progress updates differently
+      // Simulate JSON conversion phase
+      setTimeout(() => {
+        clearInterval(progressInterval);
+        setProcessingStage('converting');
+        setUploadProgress(25);
+        
         progressInterval = setInterval(() => {
           setUploadProgress(prev => {
-            if (prev >= 95) {
+            if (prev >= 40) {
               clearInterval(progressInterval);
-              return 95;
+              return 40;
             }
-            return prev + (Math.random() * 2); // Slower progress for large files
-          });
-          
-          // Update current chunk indicator periodically
-          setCurrentChunk(prev => {
-            if (prev >= totalChunks) return totalChunks;
-            const elapsed = uploadProgress / 100;
-            return Math.min(Math.ceil(elapsed * totalChunks), totalChunks);
-          });
-        }, 300);
-      } else {
-        // For regular uploads, simple progress
-        progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            if (prev >= 95) {
-              clearInterval(progressInterval);
-              return 95;
-            }
-            return prev + Math.random() * 5;
+            return prev + Math.random() * 1.5;
           });
         }, 200);
-      }
-      
-      // Perform the actual upload
-      const uploadedFile = await uploadFile(file);
-      
-      // Complete the progress
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      
-      // Finish up
-      setTimeout(() => {
-        setIsUploading(false);
-        setCurrentFile(null);
-        setUploadProgress(0);
-        setCurrentChunk(0);
-        setTotalChunks(0);
         
-        // Notify the parent component using the appropriate callback
-        if (onUploadComplete) {
-          onUploadComplete(uploadedFile);
-        } else if (onFileUploaded) {
-          onFileUploaded(uploadedFile);
-        }
-        
-        toast({
-          title: "Upload complete",
-          description: `${file.name} has been securely uploaded and encrypted`,
-        });
-      }, 500);
+        // Simulate chunking phase
+        setTimeout(() => {
+          clearInterval(progressInterval);
+          setProcessingStage('chunking');
+          setUploadProgress(40);
+          
+          progressInterval = setInterval(() => {
+            setUploadProgress(prev => {
+              if (prev >= 60) {
+                clearInterval(progressInterval);
+                return 60;
+              }
+              return prev + Math.random() * 1.5;
+            });
+            setCurrentChunk(prev => Math.min(prev + 1, Math.floor(estimatedChunks * 0.6)));
+          }, 300);
+          
+          // Simulate distributing phase
+          setTimeout(async () => {
+            clearInterval(progressInterval);
+            setProcessingStage('distributing');
+            setUploadProgress(60);
+            
+            progressInterval = setInterval(() => {
+              setUploadProgress(prev => {
+                if (prev >= 95) {
+                  clearInterval(progressInterval);
+                  return 95;
+                }
+                return prev + Math.random() * 1;
+              });
+              setCurrentChunk(prev => Math.min(prev + 1, estimatedChunks));
+            }, 400);
+            
+            try {
+              // Perform the actual upload
+              const uploadedFile = await uploadFile(file);
+              
+              // Complete the progress
+              clearInterval(progressInterval);
+              setProcessingStage('completed');
+              setUploadProgress(100);
+              
+              // Finish up
+              setTimeout(() => {
+                setIsUploading(false);
+                setCurrentFile(null);
+                setUploadProgress(0);
+                setCurrentChunk(0);
+                setTotalChunks(0);
+                setProcessingStage('initializing');
+                
+                // Notify the parent component using the appropriate callback
+                if (onUploadComplete) {
+                  onUploadComplete(uploadedFile);
+                } else if (onFileUploaded) {
+                  onFileUploaded(uploadedFile);
+                }
+                
+                toast({
+                  title: "Upload complete",
+                  description: `${file.name} has been securely uploaded, encrypted, and distributed`,
+                });
+              }, 1000);
+            } catch (error: any) {
+              clearInterval(progressInterval);
+              setIsUploading(false);
+              
+              toast({
+                title: "Upload failed",
+                description: error.message || "There was a problem uploading your file",
+                variant: "destructive",
+              });
+              
+              console.error("Upload error:", error);
+            }
+          }, 3000);
+        }, 2000);
+      }, 2000);
+      
     } catch (error: any) {
       setIsUploading(false);
       
@@ -140,11 +181,46 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
     setUploadProgress(0);
     setCurrentChunk(0);
     setTotalChunks(0);
+    setProcessingStage('initializing');
     
     toast({
       title: "Upload cancelled",
       description: "Your file upload has been cancelled",
     });
+  };
+
+  const getStageIcon = () => {
+    switch (processingStage) {
+      case 'encrypting':
+        return <Lock className="h-4 w-4 text-blue-500 animate-pulse" />;
+      case 'converting':
+        return <FileSymlink className="h-4 w-4 text-purple-500 animate-pulse" />;
+      case 'chunking':
+        return <Layers className="h-4 w-4 text-orange-500 animate-pulse" />;
+      case 'distributing':
+        return <UploadCloud className="h-4 w-4 text-green-500 animate-pulse" />;
+      case 'completed':
+        return <Check className="h-4 w-4 text-green-500" />;
+      default:
+        return <Loader2 className="h-4 w-4 animate-spin" />;
+    }
+  };
+
+  const getStageText = () => {
+    switch (processingStage) {
+      case 'encrypting':
+        return "Encrypting with AES-256-GCM...";
+      case 'converting':
+        return "Converting to secure JSON format...";
+      case 'chunking':
+        return `Creating JSON chunks (${currentChunk}/${totalChunks})...`;
+      case 'distributing':
+        return `Distributing chunks to secure vaults (${currentChunk}/${totalChunks})...`;
+      case 'completed':
+        return "Upload complete!";
+      default:
+        return "Preparing file...";
+    }
   };
 
   return (
@@ -169,8 +245,8 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
             
             <div className="absolute inset-0 flex items-center justify-center bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div className="flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                <span>End-to-End Encrypted</span>
+                <Layers className="h-4 w-4" />
+                <span>Multi-Layer Encryption</span>
               </div>
             </div>
           </Button>
@@ -198,33 +274,35 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
             </span>
           </div>
           
-          {isChunkedUpload && (
-            <div className="text-xs text-muted-foreground mt-1">
-              Uploading chunk {currentChunk} of {totalChunks}
-            </div>
-          )}
+          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+            {getStageIcon()}
+            <span>{getStageText()}</span>
+          </div>
           
-          <div className="flex flex-wrap items-center gap-2 mt-2">
+          <div className="flex flex-wrap items-center gap-2 mt-3">
             <div className="flex items-center gap-1">
               <Lock className="h-3 w-3 text-green-500" />
-              <span className="text-xs text-muted-foreground">End-to-end encrypted</span>
+              <span className="text-xs text-muted-foreground">AES-256-GCM</span>
             </div>
             
-            {isChunkedUpload && (
-              <div className="flex items-center gap-1">
-                <FileSymlink className="h-3 w-3 text-blue-500" />
-                <span className="text-xs text-muted-foreground">Multi-part upload</span>
-              </div>
-            )}
+            <div className="flex items-center gap-1">
+              <FileSymlink className="h-3 w-3 text-blue-500" />
+              <span className="text-xs text-muted-foreground">JSON Format</span>
+            </div>
             
             <div className="flex items-center gap-1">
-              <UploadCloud className="h-3 w-3 text-purple-500" />
-              <span className="text-xs text-muted-foreground">AES-256 encryption</span>
+              <Layers className="h-3 w-3 text-purple-500" />
+              <span className="text-xs text-muted-foreground">Chunked Data</span>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <KeyRound className="h-3 w-3 text-orange-500" />
+              <span className="text-xs text-muted-foreground">Unique Key</span>
             </div>
             
             <div className="flex items-center gap-1">
               <Shield className="h-3 w-3 text-gray-500" />
-              <span className="text-xs text-muted-foreground">Secure storage</span>
+              <span className="text-xs text-muted-foreground">Distributed</span>
             </div>
           </div>
         </Card>

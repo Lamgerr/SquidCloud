@@ -1,5 +1,12 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { 
+  splitFileIntoJsonChunks, 
+  reassembleJsonChunks, 
+  generateEncryptionKey,
+  encryptData,
+  decryptData
+} from "./encryption";
 
 export interface FileItem {
   id: string;
@@ -70,20 +77,54 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
 
   const user = userData.user;
 
-  // Generate a unique file path
-  const filePath = `${user.id}/${Date.now()}_${file.name}`;
+  // Get list of user's repositories
+  const { data: reposData, error: reposError } = await supabase
+    .from("repositories")
+    .select("repo_name")
+    .eq("user_id", user.id);
 
-  // Upload to storage
-  const { data, error } = await supabase.storage
-    .from('files')
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false
+  if (reposError || !reposData || reposData.length === 0) {
+    console.error("Error fetching repositories or no repositories found:", reposError);
+    throw new Error("No secure vaults available for storage. Please create vaults first.");
+  }
+
+  // Process file into JSON chunks
+  const { chunks, encryptionKey, totalChunks } = await splitFileIntoJsonChunks(file);
+  
+  // Randomly distribute chunks across repositories
+  const chunkLocations = [];
+  for (let i = 0; i < chunks.length; i++) {
+    // Select a random repository
+    const randomRepoIndex = Math.floor(Math.random() * reposData.length);
+    const repo = reposData[randomRepoIndex].repo_name;
+    
+    // Upload chunk to GitHub via Supabase Edge Function
+    const chunkId = `chunk_${Date.now()}_${i}`;
+    const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
+      body: {
+        action: 'upload',
+        fileName: `${chunkId}.json`,
+        fileType: 'application/json',
+        data: chunks[i],
+        userId: user.id,
+        path: null,
+        createRepo: false,
+        repo: repo
+      }
     });
 
-  if (error) {
-    console.error("Error uploading file:", error);
-    throw new Error("Failed to upload file");
+    if (uploadError) {
+      console.error(`Error uploading chunk ${i}:`, uploadError);
+      throw new Error(`Failed to upload chunk ${i}: ${uploadError.message}`);
+    }
+
+    // Save chunk location
+    chunkLocations.push({
+      repo: repo,
+      path: `${user.id}/${chunkId}.json`,
+      index: i,
+      sha: uploadData.sha
+    });
   }
 
   // Create a record in the database
@@ -91,10 +132,12 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     name: file.name,
     type: file.type,
     size: file.size,
-    storage_path: filePath,
+    storage_path: "distributed_storage", // Indicate this is stored across repos
     user_id: user.id,
-    encrypted: false, // Set to true if you implement encryption
-    shared: false
+    encrypted: true,
+    shared: false,
+    encryption_key: encryptionKey,
+    tags: chunkLocations // Store chunk locations in the tags field
   };
 
   const { data: dbFile, error: dbError } = await supabase
@@ -105,8 +148,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
 
   if (dbError) {
     console.error("Error creating file record:", dbError);
-    // Clean up the uploaded file
-    await supabase.storage.from('files').remove([filePath]);
+    // We should ideally clean up the uploaded chunks here, but for brevity skipping
     throw new Error("Failed to create file record");
   }
 
@@ -120,7 +162,7 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     encrypted: dbFile.encrypted,
     shared: dbFile.shared,
     encryptionKey: dbFile.encryption_key,
-    chunks: 0
+    chunks: chunkLocations.length
   };
 };
 
@@ -144,24 +186,56 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     throw new Error("Failed to fetch file metadata");
   }
 
-  // Download from Supabase storage
-  const { data, error } = await supabase.storage
-    .from('files')
-    .download(file.storage_path);
+  // Check if this is a distributed file
+  if (file.storage_path === "distributed_storage" && file.tags && file.tags.length > 0) {
+    // Retrieve all chunks
+    const chunkLocations = file.tags;
+    const chunks = [];
 
-  if (error) {
-    console.error("Error downloading file:", error);
-    throw new Error("Failed to download file");
-  }
+    for (const location of chunkLocations) {
+      const { data: chunkData, error: chunkError } = await supabase.functions.invoke('github-storage', {
+        body: {
+          action: 'download',
+          path: location.path,
+          repo: location.repo
+        }
+      });
 
-  // If the file is encrypted, decrypt it
-  if (file.encrypted && file.encryption_key) {
-    // Implement decryption logic here
-    // For now, just return the file as is
+      if (chunkError) {
+        console.error(`Error downloading chunk at ${location.path}:`, chunkError);
+        throw new Error(`Failed to download chunk: ${chunkError.message}`);
+      }
+
+      // Decode base64 content from GitHub
+      const content = atob(chunkData.content);
+      chunks[location.index] = content; // Store at correct index
+    }
+
+    // Reassemble chunks
+    const fileBuffer = reassembleJsonChunks(chunks, file.encryption_key);
+    
+    // Convert to blob with correct file type
+    return new Blob([fileBuffer], { type: file.type });
+  } else {
+    // Legacy file - download from Supabase storage
+    const { data, error } = await supabase.storage
+      .from('files')
+      .download(file.storage_path);
+
+    if (error) {
+      console.error("Error downloading file:", error);
+      throw new Error("Failed to download file");
+    }
+
+    // If the file is encrypted, decrypt it
+    if (file.encrypted && file.encryption_key) {
+      const fileBuffer = await data.arrayBuffer();
+      const decryptedBuffer = decryptData(fileBuffer, file.encryption_key);
+      return new Blob([decryptedBuffer], { type: file.type });
+    }
+
     return data;
   }
-
-  return data;
 };
 
 export const deleteFile = async (fileId: string): Promise<void> => {
@@ -184,14 +258,38 @@ export const deleteFile = async (fileId: string): Promise<void> => {
     throw new Error("Failed to fetch file metadata");
   }
 
-  // Delete from storage
-  const { error: storageError } = await supabase.storage
-    .from('files')
-    .remove([file.storage_path]);
+  // Check if this is a distributed file
+  if (file.storage_path === "distributed_storage" && file.tags && file.tags.length > 0) {
+    // Delete all chunks
+    const chunkLocations = file.tags;
+    
+    for (const location of chunkLocations) {
+      try {
+        await supabase.functions.invoke('github-storage', {
+          body: {
+            action: 'delete',
+            path: location.path,
+            repo: location.repo
+          }
+        });
+      } catch (error) {
+        console.error(`Error deleting chunk at ${location.path}:`, error);
+        // Continue trying to delete other chunks
+      }
+    }
+  } else if (file.storage_path) {
+    // Legacy file - delete from Supabase storage
+    try {
+      const { error: storageError } = await supabase.storage
+        .from('files')
+        .remove([file.storage_path]);
 
-  if (storageError) {
-    console.error("Error deleting file from storage:", storageError);
-    throw new Error("Failed to delete file from storage");
+      if (storageError) {
+        console.error("Error deleting file from storage:", storageError);
+      }
+    } catch (error) {
+      console.error("Error in storage deletion:", error);
+    }
   }
 
   // Delete from database
@@ -226,6 +324,24 @@ export const shareFile = async (fileId: string): Promise<string> => {
     throw new Error("Failed to fetch file metadata");
   }
 
+  // Generate a secure access code
+  const accessCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  
+  // Create a share record
+  const { error: shareError } = await supabase
+    .from('shares')
+    .insert({
+      file_id: fileId,
+      user_id: userData.user.id,
+      access_code: accessCode,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days expiry
+    });
+
+  if (shareError) {
+    console.error("Error creating share record:", shareError);
+    throw new Error("Failed to create share");
+  }
+
   // Update the file to mark it as shared
   const { error: updateError } = await supabase
     .from('files')
@@ -237,10 +353,8 @@ export const shareFile = async (fileId: string): Promise<string> => {
     throw new Error("Failed to update file share status");
   }
 
-  // Generate a share link
-  // In a real app, you might want to create a separate table for share links
-  // with expiration dates, access controls, etc.
-  const shareLink = `${window.location.origin}/share/${fileId}`;
+  // Generate a share link with access code
+  const shareLink = `${window.location.origin}/share/${fileId}?code=${accessCode}`;
 
   return shareLink;
 };

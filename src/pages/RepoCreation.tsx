@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { initializeRepos } from '@/lib/api';
-import { Loader2, Check, AlertCircle } from 'lucide-react';
+import { Loader2, Check, AlertCircle, KeyRound, Lock, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 
@@ -29,7 +29,7 @@ const RepoCreation = () => {
         
         setProgress(30);
         
-        // Create the repositories
+        // Create the secure vaults
         const createdVaults = await initializeRepos(validCount);
         
         setProgress(90);
@@ -37,7 +37,7 @@ const RepoCreation = () => {
         
         toast({
           title: "Setup complete",
-          description: `Successfully created ${createdVaults.length} secure vaults for your files`,
+          description: `Successfully created ${createdVaults.length} secure vaults for your encrypted data`,
         });
         
         // Redirect back to dashboard after a short delay
@@ -67,9 +67,12 @@ const RepoCreation = () => {
     <div className="container max-w-md py-12">
       <Card>
         <CardHeader>
-          <CardTitle>Secure Vault Setup</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            Secure Vault Setup
+          </CardTitle>
           <CardDescription>
-            Creating secure vaults for your encrypted files
+            Creating distributed secure vaults for your encrypted files
           </CardDescription>
         </CardHeader>
         
@@ -98,12 +101,19 @@ const RepoCreation = () => {
               <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-md text-center">
                 <Check className="h-6 w-6 text-green-500 mx-auto mb-2" />
                 <p className="font-medium">Setup completed successfully!</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Created {vaults.length} secure vaults
-                </p>
+                <div className="mt-2 mb-4 grid grid-cols-1 gap-2">
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                    <span>End-to-End Encryption Setup Complete</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <KeyRound className="h-4 w-4" />
+                    <span>Generated {vaults.length} Secure Vault Keys</span>
+                  </div>
+                </div>
                 <Button 
                   variant="default" 
-                  className="mt-4" 
+                  className="mt-2" 
                   onClick={() => navigate('/dashboard')}
                 >
                   Continue to Dashboard
