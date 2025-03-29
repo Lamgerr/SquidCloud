@@ -5,18 +5,14 @@ import { Home, FolderOpen, Share2, Settings, Plus, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { 
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 const MobileBottomNav = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   
-  if (!isMobile) return null;
+  // Hide bottom nav on root path and auth page
+  if (!isMobile || location.pathname === '/' || location.pathname === '/auth') return null;
   
   const isActive = (path: string) => {
     return location.pathname === path;

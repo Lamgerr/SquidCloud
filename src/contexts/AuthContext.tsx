@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null;
   profile: any | null;
   loading: boolean;
+  isNewUser: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -23,6 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isNewUser, setIsNewUser] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -61,17 +63,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN') {
+          // Check if this is a new registration
+          if (session?.user?.app_metadata?.provider === 'email' && 
+              new Date(session.user.created_at).getTime() > Date.now() - 60000) {
+            console.log('New user detected');
+            setIsNewUser(true);
+          }
+          
           toast({
             title: "Welcome back!",
             description: "You have successfully signed in"
           });
-          // We'll handle navigation in the components using this context
         } else if (event === 'SIGNED_OUT') {
+          setIsNewUser(false);
           toast({
             title: "Signed out",
             description: "You have been successfully signed out"
           });
-          // We'll handle navigation in the components using this context
         }
       }
     );
@@ -122,6 +130,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
       if (error) throw error;
+      
+      setIsNewUser(true);
       
       toast({
         title: "Account created",
@@ -174,6 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       profile,
       loading,
+      isNewUser,
       signIn,
       signUp,
       signOut,

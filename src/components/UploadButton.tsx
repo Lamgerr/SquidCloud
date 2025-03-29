@@ -1,10 +1,11 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Upload, X, Lock, FileSymlink, UploadCloud, Shield, Layers, KeyRound, Check, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { uploadFile, FileItem } from '@/lib/api';
+import { uploadFile, FileItem, getFiles } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -21,9 +22,25 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
   const [processingStage, setProcessingStage] = useState<string>('initializing');
   const [currentChunk, setCurrentChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
+  const [isFirstUpload, setIsFirstUpload] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if user has uploaded files before
+    const checkPreviousUploads = async () => {
+      try {
+        const files = await getFiles();
+        setIsFirstUpload(files.length === 0);
+      } catch (error) {
+        console.error("Error checking previous uploads:", error);
+      }
+    };
+
+    checkPreviousUploads();
+  }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -31,6 +48,24 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
     
     const file = files[0];
     setCurrentFile(file);
+    
+    // If this is the first upload, redirect to repository creation
+    if (isFirstUpload) {
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+      toast({
+        title: "First upload detected",
+        description: "Please set up your repository before uploading files"
+      });
+      
+      // Redirect to repository creation
+      navigate('/r/c/1');
+      return;
+    }
+    
     setIsUploading(true);
     setUploadProgress(0);
     setProcessingStage('encrypting');
@@ -115,6 +150,9 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
               clearInterval(progressInterval);
               setProcessingStage('completed');
               setUploadProgress(100);
+              
+              // Update first upload status
+              setIsFirstUpload(false);
               
               // Finish up
               setTimeout(() => {
