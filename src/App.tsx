@@ -1,6 +1,5 @@
-
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
@@ -28,6 +27,28 @@ const NewUserRedirect = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Mobile redirect component
+const MobileRedirect = () => {
+  const isMobile = useIsMobile();
+  const { user } = useAuth();
+  
+  // If on mobile, redirect to dashboard if logged in, otherwise to auth
+  if (isMobile) {
+    if (user) {
+      return <Navigate to="/dashboard" replace />;
+    } else {
+      return <Navigate to="/auth" replace />;
+    }
+  }
+  
+  // If not on mobile, show the landing page
+  return (
+    <AppLayout showMobileNav={false}>
+      <Index />
+    </AppLayout>
+  );
+};
+
 // Shared layout component that includes the main navigation elements
 const AppLayout = ({ children, showMobileNav = true }: { children: React.ReactNode, showMobileNav?: boolean }) => {
   const isMobile = useIsMobile();
@@ -49,11 +70,7 @@ const AppWithAuth = () => {
       <Routes>
         <Route 
           path="/" 
-          element={
-            <AppLayout showMobileNav={false}>
-              <Index />
-            </AppLayout>
-          } 
+          element={<MobileRedirect />} 
         />
         <Route 
           path="/auth" 
@@ -95,7 +112,6 @@ const AppWithAuth = () => {
             </ProtectedRoute>
           } 
         />
-        {/* Add routes for mobile navigation */}
         <Route 
           path="/files" 
           element={
