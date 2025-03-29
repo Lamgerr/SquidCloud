@@ -32,16 +32,12 @@ const MobileRedirect = () => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   
-  // If on mobile, redirect to dashboard if logged in, otherwise to auth
-  if (isMobile) {
-    if (user) {
-      return <Navigate to="/dashboard" replace />;
-    } else {
-      return <Navigate to="/auth" replace />;
-    }
+  // If on mobile and logged in, redirect to dashboard
+  if (isMobile && user) {
+    return <Navigate to="/dashboard" replace />;
   }
   
-  // If not on mobile, show the landing page
+  // Otherwise show the landing page (for desktop users or mobile users who aren't logged in)
   return (
     <AppLayout showMobileNav={false}>
       <Index />
