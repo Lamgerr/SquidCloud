@@ -26,6 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface FileItemProps {
   file: FileItemType;
@@ -44,6 +45,8 @@ const FileItem: React.FC<FileItemProps> = ({
   onDownload,
   selected
 }) => {
+  const isMobile = useIsMobile();
+  
   const getFileIcon = () => {
     if (file.type.startsWith('image/')) {
       return <FileImage className="h-10 w-10 text-blue-500" />;
@@ -75,7 +78,10 @@ const FileItem: React.FC<FileItemProps> = ({
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     if (onDownload) {
       onDownload(file.id);
     }
@@ -85,7 +91,10 @@ const FileItem: React.FC<FileItemProps> = ({
     });
   };
 
-  const handleShare = () => {
+  const handleShare = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     if (onShare) {
       onShare(file.id);
     }
@@ -95,7 +104,10 @@ const FileItem: React.FC<FileItemProps> = ({
     });
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     if (onDelete) {
       onDelete(file.id);
     }
@@ -128,45 +140,33 @@ const FileItem: React.FC<FileItemProps> = ({
         </div>
       </div>
       
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" onClick={handleDownload}>
-          <Download className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={handleShare}>
-          <Share2 className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="text-destructive" onClick={handleDelete}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>File Actions</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleDownload}>
-              <Download className="mr-2 h-4 w-4" />
-              <span>Download</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleShare}>
-              <Share2 className="mr-2 h-4 w-4" />
-              <span>Share</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={handleDelete}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="icon">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48 bg-background">
+          <DropdownMenuLabel>File Actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleDownload}>
+            <Download className="mr-2 h-4 w-4" />
+            <span>Download</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleShare}>
+            <Share2 className="mr-2 h-4 w-4" />
+            <span>Share</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem 
+            onClick={handleDelete}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            <span>Delete</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 };

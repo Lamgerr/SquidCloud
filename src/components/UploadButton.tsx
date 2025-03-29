@@ -6,6 +6,7 @@ import { Upload, X, Lock, FileSymlink, UploadCloud, Shield, Layers, KeyRound, Ch
 import { useToast } from '@/hooks/use-toast';
 import { uploadFile, FileItem } from '@/lib/api';
 import { Card } from '@/components/ui/card';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UploadButtonProps {
   onUploadComplete?: (file: FileItem) => void;
@@ -22,6 +23,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
   const [totalChunks, setTotalChunks] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -236,7 +238,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
         <div className="space-y-4">
           <Button
             onClick={triggerFileInput}
-            className="relative overflow-hidden group bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
+            className={`relative overflow-hidden group bg-primary text-primary-foreground hover:bg-primary/90 ${isMobile ? 'w-full' : 'w-full sm:w-auto'}`}
           >
             <div className="flex items-center gap-2">
               <Upload className="h-4 w-4" />

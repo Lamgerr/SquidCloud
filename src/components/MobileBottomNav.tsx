@@ -1,23 +1,42 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Home, FolderOpen, Share2, Settings, Plus } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Home, FolderOpen, Share2, Settings, Plus, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const MobileBottomNav = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   
   if (!isMobile) return null;
   
   const isActive = (path: string) => {
     return location.pathname === path;
   };
+
+  const handleUploadClick = () => {
+    if (location.pathname === '/dashboard') {
+      // If already on dashboard, scroll to top and focus on the upload button
+      window.scrollTo(0, 0);
+      const uploadBtn = document.querySelector('.upload-button-container button');
+      if (uploadBtn) {
+        (uploadBtn as HTMLElement).click();
+      }
+    } else {
+      navigate('/dashboard');
+    }
+  };
   
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50 px-2 py-1 md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg z-50 px-2 py-1 md:hidden">
       <div className="flex items-center justify-between">
         <NavItem 
           to="/dashboard" 
@@ -31,13 +50,15 @@ const MobileBottomNav = () => {
           label="Files" 
           isActive={isActive('/files')} 
         />
-        <NavItem 
-          to="/upload" 
-          icon={Plus} 
-          label="Upload" 
-          isActive={isActive('/upload')} 
-          isPrimary
-        />
+        <div className="w-1/5 flex flex-col items-center justify-center">
+          <Button 
+            onClick={handleUploadClick} 
+            className="rounded-full bg-primary p-3 -mt-6 shadow-lg"
+          >
+            <Upload className="h-5 w-5 text-primary-foreground" />
+          </Button>
+          <span className="text-[10px] text-muted-foreground mt-1">Upload</span>
+        </div>
         <NavItem 
           to="/shared" 
           icon={Share2} 

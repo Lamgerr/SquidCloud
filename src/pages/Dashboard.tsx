@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,17 +15,40 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
 
-const Dashboard = () => {
+interface DashboardProps {
+  defaultTab?: string;
+  openUpload?: boolean;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload = false }) => {
   const [files, setFiles] = useState<FileItemType[]>([]);
   const [selectedFile, setSelectedFile] = useState<FileItemType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalSize, setTotalSize] = useState(0);
-  const [activeTab, setActiveTab] = useState('files');
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
+  const [uploadButtonRef, setUploadButtonRef] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Set active tab when defaultTab changes
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
+
+  useEffect(() => {
+    // If openUpload is true, trigger the upload button
+    if (openUpload && uploadButtonRef) {
+      const uploadBtn = uploadButtonRef.querySelector('button');
+      if (uploadBtn) {
+        (uploadBtn as HTMLElement).click();
+      }
+    }
+  }, [openUpload, uploadButtonRef]);
 
   useEffect(() => {
     // Fetch files
@@ -299,148 +323,179 @@ const Dashboard = () => {
     );
   };
 
+  const renderSharedContent = () => {
+    const sharedFiles = files.filter(file => file.shared);
+    
+    if (sharedFiles.length === 0) {
+      return (
+        <Card>
+          <CardContent className="py-12 flex flex-col items-center justify-center">
+            <div className="rounded-full bg-muted p-3 mb-4">
+              <Share2 className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No shared files</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              You haven't shared any files yet. Share your files to collaborate with others.
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+    
+    return (
+      <div className="grid grid-cols-1 gap-3">
+        {sharedFiles.map((file) => (
+          <FileItem
+            key={file.id}
+            file={file}
+            onSelect={handleSelectFile}
+            onDelete={handleFileDelete}
+            onDownload={handleFileDownload}
+            onShare={handleFileShare}
+            selected={selectedFile?.id === file.id}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <>
-      <div className={`container ${isMobile ? 'px-4 pb-16' : 'max-w-6xl'} py-6`}>
-        <div className="flex flex-col md:flex-row gap-6">
-          {!isMobile && renderStorageCards()}
+    <div className={`container ${isMobile ? 'px-4' : 'max-w-6xl'} py-6`}>
+      <div className="flex flex-col md:flex-row gap-6">
+        {!isMobile && renderStorageCards()}
+        
+        <div className="flex-1">
+          {isMobile && renderStorageCards()}
           
-          <div className="flex-1">
-            {isMobile && renderStorageCards()}
-            
-            {isMobile && renderMobileActivity()}
-            
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <div className="flex items-center justify-between mb-4">
-                {!isMobile && (
-                  <TabsList>
-                    <TabsTrigger value="files">Files</TabsTrigger>
-                    <TabsTrigger value="storage">Storage</TabsTrigger>
-                    <TabsTrigger value="about">About</TabsTrigger>
-                    <TabsTrigger value="settings">Settings</TabsTrigger>
-                  </TabsList>
-                )}
-                
-                {activeTab === 'files' && (
-                  <div className={isMobile ? 'w-full flex justify-center' : ''}>
-                    <UploadButton onUploadComplete={handleFileUpload} />
-                  </div>
-                )}
-              </div>
+          {isMobile && activeTab === 'files' && renderMobileActivity()}
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex items-center justify-between mb-4">
+              {!isMobile && (
+                <TabsList>
+                  <TabsTrigger value="files">Files</TabsTrigger>
+                  <TabsTrigger value="storage">Storage</TabsTrigger>
+                  <TabsTrigger value="shared">Shared</TabsTrigger>
+                  <TabsTrigger value="settings">Settings</TabsTrigger>
+                </TabsList>
+              )}
               
-              <TabsContent value="files" className="space-y-4">
-                {isMobile && files.length > 0 && (
-                  <div className="flex items-center justify-between mb-2 px-1">
-                    <h2 className="text-lg font-semibold">Your Files</h2>
-                    <Button variant="ghost" size="sm" className="text-xs">
-                      See all
-                    </Button>
+              {(activeTab === 'files' || activeTab === 'upload') && (
+                <div 
+                  className={`upload-button-container ${isMobile ? 'w-full flex justify-center' : ''}`}
+                  ref={setUploadButtonRef}
+                >
+                  <UploadButton onUploadComplete={handleFileUpload} />
+                </div>
+              )}
+            </div>
+            
+            <TabsContent value="files" className="space-y-4">
+              {isMobile && files.length > 0 && (
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <h2 className="text-lg font-semibold">Your Files</h2>
+                </div>
+              )}
+              
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
+                  <p className="text-muted-foreground">Loading your files...</p>
+                </div>
+              ) : error ? (
+                <Card>
+                  <CardContent className="py-6">
+                    <div className="text-center">
+                      <p className="text-red-500 mb-2">{error}</p>
+                      <Button onClick={() => window.location.reload()}>Retry</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : files.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 gap-3">
+                    {files.map((file) => (
+                      <FileItem
+                        key={file.id}
+                        file={file}
+                        onSelect={handleSelectFile}
+                        onDelete={handleFileDelete}
+                        onDownload={handleFileDownload}
+                        onShare={handleFileShare}
+                        selected={selectedFile?.id === file.id}
+                      />
+                    ))}
                   </div>
-                )}
-                
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-                    <p className="text-muted-foreground">Loading your files...</p>
-                  </div>
-                ) : error ? (
-                  <Card>
-                    <CardContent className="py-6">
-                      <div className="text-center">
-                        <p className="text-red-500 mb-2">{error}</p>
-                        <Button onClick={() => window.location.reload()}>Retry</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : files.length > 0 ? (
-                  <>
-                    <div className="grid grid-cols-1 gap-3">
-                      {files.map((file) => (
-                        <FileItem
-                          key={file.id}
-                          file={file}
-                          onSelect={handleSelectFile}
-                          onDelete={handleFileDelete}
-                          onDownload={handleFileDownload}
-                          onShare={handleFileShare}
-                          selected={selectedFile?.id === file.id}
-                        />
-                      ))}
+                  
+                  {selectedFile && (
+                    <div className="mt-6">
+                      <FilePreview file={selectedFile} onClose={() => setSelectedFile(null)} />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Card>
+                  <CardContent className="py-12 flex flex-col items-center justify-center">
+                    <div className="rounded-full bg-muted p-3 mb-4">
+                      <Plus className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-medium mb-2">No files yet</h3>
+                    <p className="text-muted-foreground text-center mb-4">
+                      Upload your first file to get started with secure storage.
+                    </p>
+                    <UploadButton onUploadComplete={handleFileUpload} />
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="storage">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Storage Management</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    Your files are stored securely with end-to-end encryption
+                    for maximum privacy and security.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="shared" className="space-y-4">
+              {renderSharedContent()}
+            </TabsContent>
+            
+            <TabsContent value="settings">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Settings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm">Email</Label>
+                      <p className="font-medium">{user?.email || 'No email available'}</p>
                     </div>
                     
-                    {selectedFile && (
-                      <div className="mt-6">
-                        <FilePreview file={selectedFile} onClose={() => setSelectedFile(null)} />
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <Card>
-                    <CardContent className="py-12 flex flex-col items-center justify-center">
-                      <div className="rounded-full bg-muted p-3 mb-4">
-                        <Plus className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <h3 className="text-lg font-medium mb-2">No files yet</h3>
-                      <p className="text-muted-foreground text-center mb-4">
-                        Upload your first file to get started with secure storage.
-                      </p>
-                      <UploadButton onUploadComplete={handleFileUpload} />
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="storage">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Storage Management</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Your files are stored securely with end-to-end encryption
-                      for maximum privacy and security.
-                    </p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="about">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>About Secure Storage</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Secure Storage is an encrypted file storage system that 
-                      provides end-to-end encryption for all your files. Your data
-                      remains private and secure at all times.
-                    </p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="settings">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Account Settings</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <Label className="text-sm">Email</Label>
-                        <p className="font-medium">{user?.email || 'No email available'}</p>
-                      </div>
+                    <div className="pt-4">
+                      <Button
+                        variant="destructive"
+                        onClick={() => signOut()}
+                        className="w-full"
+                      >
+                        Logout
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
-      
-      <MobileBottomNav />
-    </>
+    </div>
   );
 };
 

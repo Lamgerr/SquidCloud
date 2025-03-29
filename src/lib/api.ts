@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   splitFileIntoJsonChunks, 
@@ -142,6 +143,10 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     }
   }
 
+  // Convert chunkLocations to JSON string and then to string array
+  const tagsJsonString = JSON.stringify(chunkLocations);
+  const tagsArray: string[] = [tagsJsonString];
+
   const fileRecord = {
     name: file.name,
     type: file.type,
@@ -151,19 +156,12 @@ export const uploadFile = async (file: File): Promise<FileItem> => {
     encrypted: true,
     shared: false,
     encryption_key: encryptionKey,
-    tags: JSON.stringify(chunkLocations)
-  };
-
-  const tagsArray = [JSON.stringify(chunkLocations)];
-
-  const fileRecordWithCorrectTags = {
-    ...fileRecord,
     tags: tagsArray
   };
 
   const { data: dbFile, error: dbError } = await supabase
     .from('files')
-    .insert(fileRecordWithCorrectTags)
+    .insert(fileRecord)
     .select()
     .single();
 
