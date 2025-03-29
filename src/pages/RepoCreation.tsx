@@ -71,58 +71,75 @@ const RepoCreation = () => {
   }, [count, navigate, toast, password]);
 
   return (
-    <div className={`container ${isMobile ? 'px-4' : 'max-w-md'} py-6 md:py-12`}>
-      <Card className="shadow-lg">
+    <div className="h-full flex items-center justify-center p-4">
+      <Card className={`w-full ${isMobile ? 'max-w-[90%]' : 'max-w-md'} shadow-lg`}>
         <CardHeader className={isMobile ? 'px-4 py-4' : ''}>
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            Secure Vault Setup
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+            </div>
+            <CardTitle className="text-xl">Secure Vault Setup</CardTitle>
+          </div>
           <CardDescription className="text-sm">
             Creating distributed secure vaults for your encrypted files
           </CardDescription>
         </CardHeader>
         
         <CardContent className={isMobile ? 'px-4 pb-4' : ''}>
-          <div className="space-y-4">
+          <div className="space-y-5">
             <Progress value={progress} className="w-full h-2" />
             
             {creating ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <p className="text-sm md:text-base">Creating secure vaults...</p>
+              <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                </div>
+                <p className="text-lg font-medium mb-2">Creating secure vaults</p>
+                <p className="text-muted-foreground text-sm">
+                  Setting up your encrypted storage system...
+                </p>
               </div>
             ) : error ? (
-              <div className="bg-destructive/10 p-3 rounded-md text-center">
-                <AlertCircle className="h-5 w-5 text-destructive mx-auto mb-2" />
-                <p className="text-xs md:text-sm font-medium text-destructive">{error}</p>
+              <div className="bg-destructive/10 p-5 rounded-lg text-center">
+                <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="h-8 w-8 text-destructive" />
+                </div>
+                <p className="text-lg font-medium mb-2 text-destructive">Setup Failed</p>
+                <p className="text-sm mb-4 text-muted-foreground">{error}</p>
                 <Button 
                   variant="outline" 
                   size={isMobile ? "sm" : "default"}
-                  className="mt-3" 
+                  className="mt-2" 
                   onClick={() => navigate('/dashboard')}
                 >
                   Back to Dashboard
                 </Button>
               </div>
             ) : vaults.length > 0 ? (
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md text-center">
-                <Check className="h-5 w-5 text-green-500 mx-auto mb-2" />
-                <p className="font-medium text-sm md:text-base">Setup completed successfully!</p>
-                <div className="mt-2 mb-3 grid grid-cols-1 gap-1">
-                  <div className="flex items-center justify-center gap-1 text-xs md:text-sm text-muted-foreground">
-                    <Lock className="h-3 w-3" />
-                    <span>End-to-End Encryption Setup Complete</span>
+              <div className="bg-green-50 dark:bg-green-900/20 p-5 rounded-lg text-center">
+                <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+                  <Check className="h-8 w-8 text-green-500" />
+                </div>
+                <p className="text-lg font-medium mb-2">Setup Complete!</p>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Your secure vaults are ready to store encrypted files
+                </p>
+                
+                <div className="grid grid-cols-1 gap-3 mb-4">
+                  <div className="flex items-center justify-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 rounded-md">
+                    <Lock className="h-4 w-4 text-primary" />
+                    <span className="text-sm">End-to-End Encryption Active</span>
                   </div>
-                  <div className="flex items-center justify-center gap-1 text-xs md:text-sm text-muted-foreground">
-                    <KeyRound className="h-3 w-3" />
-                    <span>Generated {vaults.length} Secure Vault Keys</span>
+                  <div className="flex items-center justify-center gap-2 py-2 px-4 bg-white dark:bg-slate-800 rounded-md">
+                    <KeyRound className="h-4 w-4 text-primary" />
+                    <span className="text-sm">{vaults.length} Secure Vault Keys Generated</span>
                   </div>
                 </div>
+                
                 <Button 
                   variant="default" 
                   size={isMobile ? "sm" : "default"}
-                  className="mt-2 w-full md:w-auto" 
+                  className="mt-2 w-full" 
                   onClick={() => navigate('/dashboard')}
                 >
                   Continue to Dashboard

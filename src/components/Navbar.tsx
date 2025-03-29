@@ -9,10 +9,12 @@ import {
   Search,
   Menu,
   X,
-  Shield
+  Shield,
+  ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -21,6 +23,12 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  
+  useEffect(() => {
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    setIsDark(isDarkMode);
+  }, []);
   
   const toggleTheme = () => {
     document.documentElement.classList.toggle('dark');
@@ -40,65 +48,98 @@ const Navbar = () => {
     }
   };
   
+  const getPageTitle = () => {
+    const path = location.pathname;
+    if (path === '/dashboard') return 'Dashboard';
+    if (path === '/files') return 'My Files';
+    if (path === '/shared') return 'Shared Files';
+    if (path === '/settings') return 'Settings';
+    if (path.includes('/r/c/')) return 'Create Vault';
+    if (path.includes('/r/p/')) return 'Secure Vault';
+    return 'SecureVault';
+  };
+  
+  const canGoBack = location.pathname !== '/dashboard' && location.pathname !== '/';
+  
   // Don't show navbar on the landing or auth pages
   if (location.pathname === '/' || location.pathname === '/auth') {
     return null;
   }
   
   return (
-    <header className="sticky top-0 z-50 w-full backdrop-blur-lg bg-white/75 dark:bg-slate-900/75 border-b border-slate-200/50 dark:border-slate-800/50 transition-all duration-200">
-      <div className="container flex h-16 items-center justify-between">
+    <header className="sticky top-0 z-40 w-full backdrop-blur-lg bg-background/90 border-b border-border">
+      <div className="container px-4 flex h-14 items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="md:hidden"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </Button>
+          {isMobile && canGoBack ? (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="mr-1"
+              onClick={() => navigate(-1)}
+            >
+              <ChevronLeft size={20} />
+            </Button>
+          ) : (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="md:hidden"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </Button>
+          )}
           
           <Link to="/dashboard" className="flex items-center space-x-2">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center">
-              <div className="w-4 h-4 bg-white rounded-sm" />
+            <div className="bg-gradient-to-r from-primary to-blue-600 rounded-lg w-7 h-7 flex items-center justify-center">
+              <div className="w-3 h-3 bg-white rounded-sm" />
             </div>
-            <span className="font-semibold text-xl hidden sm:inline-block">SecureVault</span>
+            {!isMobile && (
+              <span className="font-semibold text-lg">SecureVault</span>
+            )}
+            {isMobile && (
+              <span className="font-semibold text-lg">{getPageTitle()}</span>
+            )}
           </Link>
           
-          <nav className="ml-6 hidden md:flex items-center space-x-4">
-            <Link to="/dashboard" className="text-sm font-medium transition-colors hover:text-primary">
-              Dashboard
-            </Link>
-            <Link to="/files" className="text-sm font-medium transition-colors hover:text-primary">
-              My Files
-            </Link>
-            <Link to="/shared" className="text-sm font-medium transition-colors hover:text-primary">
-              Shared
-            </Link>
-          </nav>
+          {!isMobile && (
+            <nav className="ml-6 hidden md:flex items-center space-x-4">
+              <Link to="/dashboard" className="text-sm font-medium transition-colors hover:text-primary">
+                Dashboard
+              </Link>
+              <Link to="/files" className="text-sm font-medium transition-colors hover:text-primary">
+                My Files
+              </Link>
+              <Link to="/shared" className="text-sm font-medium transition-colors hover:text-primary">
+                Shared
+              </Link>
+            </nav>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <input
-              className="bg-secondary rounded-full px-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary w-[200px] lg:w-[300px]"
-              placeholder="Search files..."
-              type="search"
-            />
-          </div>
+          {!isMobile && (
+            <div className="hidden sm:flex items-center relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <input
+                className="bg-secondary rounded-full px-10 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary w-[200px] lg:w-[300px]"
+                placeholder="Search files..."
+                type="search"
+              />
+            </div>
+          )}
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button 
               variant="ghost" 
               size="icon"
               onClick={toggleTheme}
               className="transition-all duration-200"
             >
-              {isDark ? <Sun size={20} /> : <Moon size={20} />}
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </Button>
             
-            {user && (
+            {user && !isMobile && (
               <>
                 <Button 
                   variant="ghost" 
@@ -106,12 +147,12 @@ const Navbar = () => {
                   onClick={handleLogout}
                   className="text-muted-foreground hover:text-destructive"
                 >
-                  <LogOut size={20} />
+                  <LogOut size={18} />
                 </Button>
                 
                 <Button
                   variant="ghost"
-                  className="rounded-full h-8 w-8 p-0 overflow-hidden"
+                  className="rounded-full h-7 w-7 p-0 overflow-hidden"
                 >
                   <div className="h-full w-full rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                     {user.email?.charAt(0).toUpperCase() || 'U'}
@@ -124,7 +165,7 @@ const Navbar = () => {
       </div>
       
       {isMenuOpen && (
-        <div className="fixed inset-0 top-16 bg-background/95 backdrop-blur-sm z-50 p-4 md:hidden animate-fade-in">
+        <div className="fixed inset-0 top-14 bg-background/95 backdrop-blur-sm z-50 p-4 md:hidden animate-fade-in">
           <nav className="flex flex-col gap-4 mt-4">
             <Link 
               to="/dashboard" 

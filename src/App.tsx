@@ -10,19 +10,23 @@ import RepoCreation from './pages/RepoCreation';
 import RepoCreationPassword from './pages/RepoCreationPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
+import Navbar from './components/Navbar';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/r/p/:count" element={<ProtectedRoute><RepoCreationPassword /></ProtectedRoute>} />
-          <Route path="/r/c/:count" element={<ProtectedRoute><RepoCreation /></ProtectedRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Navbar />
+        <main className="min-h-[calc(100vh-3.5rem)]">
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/r/p/:count" element={<ProtectedRoute><RepoCreationPassword /></ProtectedRoute>} />
+            <Route path="/r/c/:count" element={<ProtectedRoute><RepoCreation /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
       </Router>
     </AuthProvider>
   );
