@@ -10,7 +10,7 @@ import UploadButton from '@/components/UploadButton';
 import FileItem from '@/components/FileItem';
 import FilePreview from '@/components/FilePreview';
 import { FileItem as FileItemType, getFiles, formatBytes, deleteFile, downloadFile, shareFile } from '@/lib/api';
-import { Loader2, Plus, FileText, Info, Settings, FolderOpen, HardDrive, BarChart3 } from 'lucide-react';
+import { Loader2, Plus, FileText, Info, Settings, FolderOpen, HardDrive, BarChart3, Share2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
