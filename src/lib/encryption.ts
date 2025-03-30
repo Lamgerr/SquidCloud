@@ -8,23 +8,62 @@ export const generateEncryptionKey = (): string => {
   return CryptoJS.lib.WordArray.random(32).toString();
 };
 
-// Encrypt file data with AES-256-GCM and return as base64 string
-export const encryptData = (data: ArrayBuffer, encryptionKey: string): string => {
-  const wordArray = CryptoJS.lib.WordArray.create(data);
-  const encrypted = CryptoJS.AES.encrypt(wordArray, encryptionKey).toString();
-  return encrypted;
+// Encrypt file data with AES-256-GCM and return as ArrayBuffer
+export const encryptData = async (data: ArrayBuffer, key: string): Promise<ArrayBuffer> => {
+  // Convert key to proper format
+  const keyBuffer = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(key),
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
+  );
+
+  // Generate IV
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // Encrypt
+  const encryptedContent = await crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv
+    },
+    keyBuffer,
+    data
+  );
+
+  // Combine IV and encrypted content
+  const result = new Uint8Array(iv.length + encryptedContent.byteLength);
+  result.set(iv, 0);
+  result.set(new Uint8Array(encryptedContent), iv.length);
+
+  return result.buffer;
 };
 
-// Decrypt file data from base64 string
-export const decryptData = (encryptedData: string, encryptionKey: string): ArrayBuffer => {
-  try {
-    const decrypted = CryptoJS.AES.decrypt(encryptedData, encryptionKey);
-    const typedArray = convertWordArrayToUint8Array(decrypted);
-    return typedArray.buffer;
-  } catch (error) {
-    console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt data: ' + (error as Error).message);
-  }
+// Decrypt file data from ArrayBuffer
+export const decryptData = async (data: ArrayBuffer, key: string): Promise<ArrayBuffer> => {
+  // Extract IV
+  const iv = data.slice(0, 12);
+  const encryptedContent = data.slice(12);
+
+  // Import key
+  const keyBuffer = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(key),
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt']
+  );
+
+  // Decrypt
+  return await crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv: new Uint8Array(iv)
+    },
+    keyBuffer,
+    encryptedContent
+  );
 };
 
 // Convert CryptoJS WordArray to Uint8Array
@@ -61,17 +100,17 @@ export const splitFileIntoJsonChunks = async (file: File, chunkSize: number = 50
   const fileBuffer = await file.arrayBuffer();
   // Encrypt the file data
   const encryptionKey = generateEncryptionKey();
-  const encryptedData = encryptData(fileBuffer, encryptionKey);
+  const encryptedData = await encryptData(fileBuffer, encryptionKey);
   
   // Calculate the number of chunks
-  const totalChunks = Math.ceil(encryptedData.length / chunkSize);
+  const totalChunks = Math.ceil(encryptedData.byteLength / chunkSize);
   const chunks: string[] = [];
   
   // Split the encrypted data into chunks
   for (let i = 0; i < totalChunks; i++) {
     const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, encryptedData.length);
-    const chunkData = encryptedData.substring(start, end);
+    const end = Math.min(start + chunkSize, encryptedData.byteLength);
+    const chunkData = new Uint8Array(encryptedData.slice(start, end));
     
     // Create JSON chunk with metadata
     const jsonChunk = JSON.stringify({
@@ -80,7 +119,7 @@ export const splitFileIntoJsonChunks = async (file: File, chunkSize: number = 50
       fileName: file.name,
       fileType: file.type,
       fileSize: file.size,
-      chunkData: chunkData,
+      chunkData: Array.from(chunkData),
       timestamp: new Date().toISOString(),
     });
     
@@ -95,7 +134,7 @@ export const splitFileIntoJsonChunks = async (file: File, chunkSize: number = 50
 };
 
 // Reassemble JSON chunks into original file
-export const reassembleJsonChunks = (chunks: string[], encryptionKey: string): ArrayBuffer => {
+export const reassembleJsonChunks = async (chunks: string[], encryptionKey: string): Promise<ArrayBuffer> => {
   if (!chunks.length) {
     throw new Error('No chunks provided for reassembly');
   }
@@ -111,13 +150,12 @@ export const reassembleJsonChunks = (chunks: string[], encryptionKey: string): A
   }
   
   // Concatenate chunk data
-  let encryptedData = '';
-  for (const chunk of parsedChunks) {
-    encryptedData += chunk.chunkData;
-  }
+  const encryptedData = new Uint8Array(parsedChunks.reduce((acc, chunk) => {
+    return acc.concat(chunk.chunkData);
+  }, []));
   
   // Decrypt the data
-  return decryptData(encryptedData, encryptionKey);
+  return await decryptData(encryptedData.buffer, encryptionKey);
 };
 
 // Check if file needs chunking based on size

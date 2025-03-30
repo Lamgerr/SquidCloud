@@ -65,6 +65,25 @@ const validateRepoResponse = (response: any): boolean => {
          'repo_name' in response;
 };
 
+// Add buffer conversion utilities
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+};
+
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
 // Update determineChunkingStrategy for consistent chunk sizes
 export const determineChunkingStrategy = (fileSize: number): number => {
   const maxChunkSize = 1 * 1024 * 1024; // 1MB max chunk size for better reliability
@@ -275,14 +294,18 @@ export const uploadFileWithRes54 = async (
   
   // Update chunk upload validation
   const uploadChunk = async (chunk: ArrayBuffer, index: number, attempt = 0): Promise<any> => {
-    if (!validateChunkData(chunk)) {
-      throw new Error(`Invalid chunk data at index ${index}`);
-    }
     try {
-      // Validate chunk size
-      if (chunk.byteLength > 1 * 1024 * 1024) {
-        throw new Error('Chunk size too large');
-      }
+      const base64Data = arrayBufferToBase64(chunk);
+      const chunkMetadata = {
+        chunkIndex: index,
+        totalChunks: chunks.length,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        chunkData: base64Data,
+        chunkSize: chunk.byteLength,
+        checksum: await calculateSHA256(chunk)
+      };
 
       const repoIndex = index % repos.length;
       const repo = repos[repoIndex].repo_name;
@@ -293,18 +316,6 @@ export const uploadFileWithRes54 = async (
       // Compress chunk data with error handling
       const compressedChunk = compressData(new TextDecoder().decode(chunk));
       
-      const chunkMetadata = {
-        chunkIndex: index,
-        totalChunks: chunks.length,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        chunkData: compressedChunk,
-        timestamp: new Date().toISOString(),
-        checksum: await calculateSHA256(chunk),
-        version: "2.0"
-      };
-
       const chunkData = JSON.stringify(chunkMetadata);
 
       // Upload with timeout and validation
@@ -548,16 +559,21 @@ export const downloadFileWithRes54 = async (
       const content = atob(chunkData.content);
       const parsedChunk = JSON.parse(content);
       
-      if (!parsedChunk.chunkData) {
+      if (!parsedChunk.chunkData || !parsedChunk.chunkSize) {
         throw new Error('Invalid chunk format');
       }
 
-      const decompressedData = decompressData(parsedChunk.chunkData);
+      // Convert back to ArrayBuffer
+      const chunkBuffer = base64ToArrayBuffer(parsedChunk.chunkData);
       
-      // Verify chunk integrity
-      const checksum = await calculateSHA256(new TextEncoder().encode(decompressedData));
+      // Verify size and checksum
+      if (chunkBuffer.byteLength !== parsedChunk.chunkSize) {
+        throw new Error('Chunk size mismatch');
+      }
+
+      const checksum = await calculateSHA256(chunkBuffer);
       if (checksum !== parsedChunk.checksum) {
-        throw new Error('Chunk integrity check failed');
+        throw new Error('Chunk checksum verification failed');
       }
 
       // Update progress
@@ -570,10 +586,10 @@ export const downloadFileWithRes54 = async (
         );
       }
 
-      return { 
-        index: chunk.index, 
-        data: decompressedData,
-        size: chunk.size
+      return {
+        index: chunk.index,
+        data: chunkBuffer,
+        size: chunkBuffer.byteLength
       };
     } catch (error: any) {
       console.error(`Error downloading chunk at ${chunk.path} (attempt ${attempt + 1}):`, error);
@@ -606,18 +622,14 @@ export const downloadFileWithRes54 = async (
     }
     
     // Concatenate encrypted chunks
-    let encryptedData = '';
-    for (const chunk of sortedChunks) {
-      encryptedData += chunk.data;
-    }
-    
-    // Decrypt data
-    const decryptedBuffer = decryptData(encryptedData, metadata.encryptionKey);
-    
+    const decryptedChunks = await Promise.all(
+      sortedChunks.map(chunk => decryptData(chunk.data, metadata.encryptionKey))
+    );
+
     if (progressCallback) progressCallback(95, 'assembling');
     
     // Create blob from decrypted data
-    const blob = new Blob([decryptedBuffer], { type: metadata.fileType });
+    const blob = createBlobFromChunks(decryptedChunks, metadata.fileType);
     
     if (progressCallback) progressCallback(100, 'complete');
     
@@ -701,4 +713,9 @@ export const checkFilePreview = async (fileId: string): Promise<{
     console.error("Error checking file preview:", error);
     return { hasPreview: false };
   }
+};
+
+// Update blob creation
+const createBlobFromChunks = (chunks: ArrayBuffer[], type: string): Blob => {
+  return new Blob(chunks, { type });
 };
