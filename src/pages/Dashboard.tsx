@@ -32,7 +32,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
   const [uploadButtonRef, setUploadButtonRef] = useState<HTMLDivElement | null>(null);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(true);
   const [repoCount, setRepoCount] = useState(0);
 
   useEffect(() => {
@@ -87,20 +87,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('onboarding_complete, id')
+      .select('onboarding_complete, repo_count')
       .eq('id', session.user.id)
       .single();
 
-    if (!profile?.onboarding_complete) {
-      setNeedsOnboarding(true);
-    }
-
-    const { data: repos } = await supabase
-      .from('repositories')
-      .select('id')
-      .eq('user_id', session.user.id);
-
-    setRepoCount(repos?.length || 0);
+    setIsOnboarding(!profile?.onboarding_complete);
+    setRepoCount(profile?.repo_count || 0);
   };
 
   const handleCreateVault = () => {
@@ -112,12 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
       });
       return;
     }
-
-    if (needsOnboarding) {
-      navigate('/onboarding');
-    } else {
-      navigate('/r/c/1');
-    }
+    navigate('/r/c/1');
   };
 
   const handleFileUpload = (newFile: FileItemType) => {
@@ -395,6 +382,31 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
     );
   };
 
+  if (isOnboarding) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="max-w-2xl mx-auto text-center space-y-4">
+          <h1 className="text-2xl font-bold">Welcome to CloudBliss!</h1>
+          <p className="text-muted-foreground">To get started, create your first secure storage vault.</p>
+          
+          <div className="animate-pulse">
+            <Button
+              onClick={handleCreateVault}
+              className="bg-primary text-white"
+              size="lg"
+            >
+              Create Storage Vault {repoCount}/2
+            </Button>
+          </div>
+          
+          <p className="text-sm text-muted-foreground">
+            Other features will be unlocked after creating your first vault.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`container ${isMobile ? 'px-4' : 'max-w-6xl'} py-6`}>
       <div className="flex flex-col md:flex-row gap-6">
@@ -551,6 +563,16 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="fixed bottom-20 right-4 md:bottom-8 md:right-8">
+        <Button
+          onClick={handleCreateVault}
+          disabled={repoCount >= 2}
+          className="bg-primary text-white shadow-lg"
+        >
+          Create Storage Vault ({repoCount}/2)
+        </Button>
       </div>
     </div>
   );

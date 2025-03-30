@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,19 +6,24 @@ import { supabase } from '@/integrations/supabase/client';
 const Onboarding = () => {
   const navigate = useNavigate();
 
-  const completeOnboarding = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-    // Update onboarding status
-    await supabase
-      .from('profiles')
-      .update({ onboarding_complete: true })
-      .eq('id', session.user.id);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_complete')
+        .eq('id', session.user.id)
+        .single();
 
-    // Navigate to vault creation
-    navigate('/r/c/1');
-  };
+      if (profile?.onboarding_complete) {
+        navigate('/dashboard');
+      }
+    };
+
+    checkOnboarding();
+  }, [navigate]);
 
   return (
     <div className="container mx-auto max-w-2xl p-4">
@@ -26,23 +31,22 @@ const Onboarding = () => {
       
       <div className="space-y-6">
         <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-2">Secure Storage Vaults</h2>
+          <h2 className="text-xl font-semibold mb-2">Create Your First Storage Vault</h2>
           <p className="text-gray-600 mb-4">
-            Create up to 2 secure storage vaults for your encrypted files.
-            Each vault provides:
+            To get started with CloudBliss, you'll need to:
           </p>
           <ul className="list-disc pl-5 space-y-2">
-            <li>End-to-end encryption</li>
-            <li>Distributed storage</li>
-            <li>Secure file sharing</li>
+            <li>Create a secure storage vault (max 2 vaults per user)</li>
+            <li>Your files will be protected with end-to-end encryption</li>
+            <li>Access dashboard features after vault creation</li>
           </ul>
         </div>
 
         <Button 
-          onClick={completeOnboarding}
+          onClick={() => navigate('/dashboard')}
           className="w-full"
         >
-          Get Started
+          Continue to Dashboard
         </Button>
       </div>
     </div>

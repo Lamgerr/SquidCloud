@@ -82,6 +82,17 @@ const RepoCreation = () => {
 
         setProgress(30);
 
+        // Check repo count first
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('repo_count')
+          .eq('id', sessionData.session.user.id)
+          .single();
+
+        if (profile && profile.repo_count >= 2) {
+          throw new Error("Maximum number of vaults (2) reached");
+        }
+
         // Create repositories using Supabase Function
         const createdRepos = await createReposWithRetry(
           sessionData.session,
@@ -112,6 +123,15 @@ const RepoCreation = () => {
             await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
           }
         }
+
+        // Update repo count and onboarding status
+        await supabase
+          .from('profiles')
+          .update({ 
+            repo_count: (profile?.repo_count || 0) + createdRepos.length,
+            onboarding_complete: true
+          })
+          .eq('id', sessionData.session.user.id);
 
         setProgress(90);
         setVaults(createdRepos.map(repo => repo.name || repo.repo_name));
