@@ -298,27 +298,24 @@ export const uploadFileWithRes54 = async (
   }
   
   // Update chunk upload validation
-  const uploadChunk = async (chunk: ArrayBuffer, index: number, attempt = 0): Promise<any> => {
+  const uploadChunk = async (chunk: string, index: number, attempt = 0): Promise<any> => {
     try {
-      // Convert chunk to base64 string for transport
-      const base64Data = arrayBufferToBase64(chunk);
-      const checksum = await calculateSHA256(new Uint8Array(chunk));
-      
       const repoIndex = index % repos.length;
       const repo = repos[repoIndex].repo_name;
-      
       const chunkId = `res54_${Date.now()}_${index}`;
       const path = `${user.id}/${chunkId}.json`;
-      
+
       const chunkMetadata = {
         chunkIndex: index,
         totalChunks: chunks.length,
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
-        chunkData: base64Data,
-        chunkSize: chunk.byteLength,
-        checksum
+        chunkData: chunk,
+        chunkSize: chunk.length,
+        checksum: await calculateSHA256(new TextEncoder().encode(chunk)),
+        repo: repo,  // Store repo name
+        path: path   // Store path
       };
 
       const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
@@ -328,9 +325,8 @@ export const uploadFileWithRes54 = async (
           fileType: 'application/json',
           data: JSON.stringify(chunkMetadata),
           userId: user.id,
-          path: null,
-          createRepo: false,
-          repo: repo,
+          path,
+          repo,
           retryCount: attempt
         }
       });
@@ -338,20 +334,20 @@ export const uploadFileWithRes54 = async (
       if (uploadError) throw uploadError;
       if (!uploadData) throw new Error('No upload data received');
 
-      return { 
-        index,
+      // Update metadata to include storage location
+      metadata.chunks[index] = {
+        ...metadata.chunks[index],
         repo,
-        path,
-        sha: uploadData.sha,
-        size: chunk.byteLength
+        path
       };
+
+      return { index, repo, path, sha: uploadData?.sha };
     } catch (error) {
       console.error(`Upload error for chunk ${index}:`, error);
       throw error;
     }
   };
 
-  // Replace the chunk upload section in uploadFileWithRes54
   try {
     if (progressCallback) progressCallback(60, 'uploading');
     
@@ -378,7 +374,14 @@ export const uploadFileWithRes54 = async (
   if (progressCallback) progressCallback(90, 'finalizing');
   
   // Convert metadata to JSON string for storage
-  const metadataString = JSON.stringify(metadata);
+  const metadataString = JSON.stringify({
+    ...metadata,
+    chunks: metadata.chunks.map(chunk => ({
+      ...chunk,
+      repo: chunk.repo,
+      path: chunk.path
+    }))
+  });
   
   // Create a record in the files table WITHOUT using the processor field
   const fileRecord = {
@@ -589,6 +592,14 @@ export const downloadFileWithRes54 = async (
       throw new Error("Invalid metadata structure");
     }
 
+    // Verify all chunks have required metadata
+    for (const chunk of metadata.chunks) {
+      if (!chunk.repo || !chunk.path) {
+        console.error('Invalid chunk metadata:', chunk);
+        throw new Error(`Missing storage location for chunk ${chunk.index}`);
+      }
+    }
+
   } catch (e) {
     console.error("Error parsing chunk locations:", e);
     console.debug("File data:", file);
@@ -603,7 +614,13 @@ export const downloadFileWithRes54 = async (
   
   try {
     const downloadedChunks = await Promise.all(
-      metadata.chunks.map(chunk => downloadChunk(chunk))
+      metadata.chunks.map(async chunk => {
+        const result = await downloadChunk(chunk);
+        if (!result) {
+          throw new Error(`Failed to download chunk ${chunk.index} from ${chunk.repo}/${chunk.path}`);
+        }
+        return result;
+      })
     );
 
     // Sort chunks by index
