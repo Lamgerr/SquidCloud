@@ -68,6 +68,10 @@ const binaryUtils = {
 // Encrypt file data with AES-256-GCM and return as base64 string
 export const encryptData = async (data: ArrayBuffer, key: string): Promise<string> => {
   try {
+<<<<<<< HEAD
+=======
+    // Normalize key to exactly 32 bytes
+>>>>>>> fb0703e56aba8c41340d02e47aacf1b1546855f7
     const keyBytes = new TextEncoder().encode(key.slice(0, 32).padEnd(32, '0'));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     
@@ -90,8 +94,12 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
     combined.set(iv);
     combined.set(new Uint8Array(encryptedContent), iv.length);
     
+<<<<<<< HEAD
     // Convert to base64 in a safe way
     return btoa(String.fromCharCode.apply(null, Array.from(combined)));
+=======
+    return base64Utils.encode(combined.buffer);
+>>>>>>> fb0703e56aba8c41340d02e47aacf1b1546855f7
   } catch (error) {
     console.error('Encryption error:', error);
     throw new Error(`Encryption failed: ${error.message}`);
@@ -101,14 +109,26 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
 // Decrypt file data from base64 string
 export const decryptData = async (data: string, key: string): Promise<ArrayBuffer> => {
   try {
+<<<<<<< HEAD
     // Decode base64 data
     const binaryStr = atob(data);
     const bytes = new Uint8Array(binaryStr.length);
     for (let i = 0; i < binaryStr.length; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
+=======
+    // Decode and validate the encrypted data
+    let bytes: Uint8Array;
+    try {
+      bytes = base64Utils.decode(data);
+    } catch (decodeError) {
+      throw new Error(`Invalid encrypted data format: ${decodeError.message}`);
     }
 
-    // Extract IV and content
+    if (bytes.length < 12) {
+      throw new Error('Invalid encrypted data: too short');
+>>>>>>> fb0703e56aba8c41340d02e47aacf1b1546855f7
+    }
+
     const iv = bytes.slice(0, 12);
     const encryptedContent = bytes.slice(12);
 
@@ -122,12 +142,24 @@ export const decryptData = async (data: string, key: string): Promise<ArrayBuffe
       ['decrypt']
     );
 
+<<<<<<< HEAD
     // Decrypt data
     return await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       keyBuffer,
       encryptedContent
     );
+=======
+    try {
+      return await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        keyBuffer,
+        encryptedContent
+      );
+    } catch (decryptError) {
+      throw new Error('Failed to decrypt data: invalid key or corrupted data');
+    }
+>>>>>>> fb0703e56aba8c41340d02e47aacf1b1546855f7
   } catch (error) {
     console.error('Decryption error:', error);
     throw new Error(`Decryption failed: ${error.message}`);
