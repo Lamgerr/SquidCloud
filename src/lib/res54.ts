@@ -65,18 +65,22 @@ const validateRepoResponse = (response: any): boolean => {
          'repo_name' in response;
 };
 
-// Modify the determineChunkingStrategy function to create smaller chunks
+// Update determineChunkingStrategy for consistent chunk sizes
 export const determineChunkingStrategy = (fileSize: number): number => {
-  // Limit maximum chunk size to 2MB to prevent timeouts
-  const maxChunkSize = 2 * 1024 * 1024; // 2MB
+  const maxChunkSize = 1 * 1024 * 1024; // 1MB max chunk size for better reliability
   
-  if (fileSize < 10 * 1024 * 1024) { // Less than 10MB
+  if (fileSize < 5 * 1024 * 1024) { // Less than 5MB 
+    return Math.min(Math.ceil(fileSize / 3), maxChunkSize);
+  } else if (fileSize < 20 * 1024 * 1024) { // Less than 20MB
     return Math.min(Math.ceil(fileSize / 5), maxChunkSize);
-  } else if (fileSize < 50 * 1024 * 1024) { // Less than 50MB
-    return Math.min(Math.ceil(fileSize / 10), maxChunkSize);
   } else {
-    return maxChunkSize; // Use 2MB chunks for larger files
+    return maxChunkSize; // Use 1MB chunks for larger files
   }
+};
+
+// Add data validation helper
+const validateChunkData = (chunk: ArrayBuffer): boolean => {
+  return chunk && chunk.byteLength > 0;
 };
 
 // Create file chunks with Res54 system
@@ -91,40 +95,43 @@ export const createFileChunks = async (
   const totalChunks = Math.ceil(file.size / chunkSize);
   const chunks: ArrayBuffer[] = [];
   const chunkMetadata: ChunkMetadata[] = [];
+  let offset = 0;
   
   // Generate encryption key once for the entire file
   const encryptionKey = generateEncryptionKey();
   
-  // Create a FileReader for chunk reading
-  const reader = new FileReader();
-  
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(file.size, start + chunkSize);
-    const chunk = file.slice(start, end);
+  while (offset < file.size) {
+    const end = Math.min(offset + chunkSize, file.size);
+    const chunk = file.slice(offset, end);
     
-    // Read chunk as ArrayBuffer
+    // Read chunk as ArrayBuffer with verification
     const chunkBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-      reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const buffer = e.target?.result as ArrayBuffer;
+        if (validateChunkData(buffer)) {
+          resolve(buffer);
+        } else {
+          reject(new Error('Invalid chunk data'));
+        }
+      };
       reader.onerror = reject;
       reader.readAsArrayBuffer(chunk);
     });
     
-    // Store chunk
     chunks.push(chunkBuffer);
-    
-    // Create metadata
     chunkMetadata.push({
-      index: i,
-      totalChunks,
-      size: end - start,
-      offset: start,
+      index: chunks.length - 1,
+      totalChunks: Math.ceil(file.size / chunkSize),
+      size: chunkBuffer.byteLength,
+      offset: offset,
       sha256: await calculateSHA256(chunkBuffer)
     });
     
-    // Report progress
+    offset += chunkSize;
+    
     if (progressCallback) {
-      progressCallback((i + 1) / totalChunks * 50); // First 50% - chunking
+      progressCallback((offset / file.size) * 50);
     }
   }
   
@@ -242,6 +249,11 @@ export const uploadFileWithRes54 = async (
     throw new Error("Please create a Storage Vault before uploading files");
   }
 
+  // Add file size validation
+  if (file.size === 0) {
+    throw new Error('File is empty');
+  }
+
   // Start upload process
   if (progressCallback) progressCallback(0, 'preparing');
 
@@ -261,11 +273,14 @@ export const uploadFileWithRes54 = async (
     }
   }
   
-  // Step 3: Modify the uploadChunk function inside uploadFileWithRes54
-  const uploadChunk = async (chunk: string, index: number, attempt = 0): Promise<any> => {
+  // Update chunk upload validation
+  const uploadChunk = async (chunk: ArrayBuffer, index: number, attempt = 0): Promise<any> => {
+    if (!validateChunkData(chunk)) {
+      throw new Error(`Invalid chunk data at index ${index}`);
+    }
     try {
       // Validate chunk size
-      if (chunk.length > 2 * 1024 * 1024) {
+      if (chunk.byteLength > 1 * 1024 * 1024) {
         throw new Error('Chunk size too large');
       }
 
@@ -276,7 +291,7 @@ export const uploadFileWithRes54 = async (
       const path = `${user.id}/${chunkId}.json`;
       
       // Compress chunk data with error handling
-      const compressedChunk = compressData(chunk);
+      const compressedChunk = compressData(new TextDecoder().decode(chunk));
       
       const chunkMetadata = {
         chunkIndex: index,
@@ -286,7 +301,7 @@ export const uploadFileWithRes54 = async (
         fileSize: file.size,
         chunkData: compressedChunk,
         timestamp: new Date().toISOString(),
-        checksum: await calculateSHA256(new TextEncoder().encode(chunk)),
+        checksum: await calculateSHA256(chunk),
         version: "2.0"
       };
 
@@ -530,6 +545,21 @@ export const downloadFileWithRes54 = async (
       if (chunkError) throw chunkError;
       if (!chunkData?.content) throw new Error('No content in chunk data');
 
+      const content = atob(chunkData.content);
+      const parsedChunk = JSON.parse(content);
+      
+      if (!parsedChunk.chunkData) {
+        throw new Error('Invalid chunk format');
+      }
+
+      const decompressedData = decompressData(parsedChunk.chunkData);
+      
+      // Verify chunk integrity
+      const checksum = await calculateSHA256(new TextEncoder().encode(decompressedData));
+      if (checksum !== parsedChunk.checksum) {
+        throw new Error('Chunk integrity check failed');
+      }
+
       // Update progress
       completedDownloads++;
       if (progressCallback) {
@@ -540,26 +570,11 @@ export const downloadFileWithRes54 = async (
         );
       }
 
-      try {
-        const content = atob(chunkData.content);
-        const parsedChunk = JSON.parse(content);
-        
-        if (!parsedChunk.chunkData) {
-          throw new Error('Invalid chunk format');
-        }
-
-        // Decompress the chunk data
-        const decompressedData = decompressData(parsedChunk.chunkData);
-        
-        return { 
-          index: chunk.index, 
-          data: decompressedData,
-          checksum: parsedChunk.checksum
-        };
-      } catch (parseError) {
-        console.error('Chunk parsing error:', parseError);
-        throw new Error(`Failed to parse chunk data: ${parseError.message}`);
-      }
+      return { 
+        index: chunk.index, 
+        data: decompressedData,
+        size: chunk.size
+      };
     } catch (error: any) {
       console.error(`Error downloading chunk at ${chunk.path} (attempt ${attempt + 1}):`, error);
       
@@ -584,6 +599,12 @@ export const downloadFileWithRes54 = async (
     // Sort chunks by index
     const sortedChunks = downloadedChunks.sort((a, b) => a.index - b.index);
     
+    // Validate total size
+    const totalSize = sortedChunks.reduce((sum, chunk) => sum + chunk.size, 0);
+    if (totalSize !== metadata.fileSize) {
+      throw new Error('File size mismatch after download');
+    }
+    
     // Concatenate encrypted chunks
     let encryptedData = '';
     for (const chunk of sortedChunks) {
@@ -606,7 +627,7 @@ export const downloadFileWithRes54 = async (
     throw new Error("File download failed. Please try again later.");
   }
 };
-//
+
 // Mock preview generation function - would be more complex in a real implementation
 async function generatePreview(fileId: string, fileType: string): Promise<void> {
   // This would generate thumbnails, video transcoding, etc.
