@@ -450,7 +450,69 @@ const validateMetadata = (data: any): boolean => {
   );
 };
 
-// Download file using Res54 system
+// Fix the download chunk handling
+const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> => {
+  if (!chunk.repo || !chunk.path) {
+    throw new Error('Invalid chunk metadata: missing repo or path');
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('github-storage', {
+      body: {
+        action: 'download',
+        path: chunk.path,
+        repo: chunk.repo
+      }
+    });
+
+    if (error) throw error;
+    if (!data?.content) throw new Error('No content in response');
+
+    try {
+      const content = data.content;
+      const parsedChunk = JSON.parse(atob(content));
+      
+      if (!parsedChunk.chunkData || !parsedChunk.chunkSize) {
+        throw new Error('Invalid chunk format');
+      }
+
+      // Handle base64 data
+      const chunkBuffer = base64ToArrayBuffer(parsedChunk.chunkData);
+      
+      // Verify size and checksum
+      if (chunkBuffer.byteLength !== parsedChunk.chunkSize) {
+        throw new Error('Chunk size mismatch');
+      }
+
+      const checksum = await calculateSHA256(new Uint8Array(chunkBuffer));
+      if (checksum !== parsedChunk.checksum) {
+        throw new Error('Chunk checksum verification failed');
+      }
+
+      return {
+        index: parsedChunk.chunkIndex,
+        data: chunkBuffer,
+        size: chunkBuffer.byteLength,
+        metadata: parsedChunk
+      };
+    } catch (parseError) {
+      console.error('Chunk parsing error:', parseError);
+      throw new Error(`Failed to parse chunk data: ${parseError.message}`);
+    }
+  } catch (error: any) {
+    console.error(`Download error for chunk at ${chunk.path} (attempt ${attempt + 1}):`, error);
+
+    if (attempt < maxRetries) {
+      const delay = Math.pow(2, attempt) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return downloadChunk(chunk, attempt + 1);
+    }
+
+    throw error;
+  }
+};
+
+// Fix the downloadFileWithRes54 function
 export const downloadFileWithRes54 = async (
   fileId: string,
   progressCallback?: (progress: number, stage: string, details?: any) => void
@@ -539,100 +601,40 @@ export const downloadFileWithRes54 = async (
   let completedDownloads = 0;
   const maxRetries = 5; // Increased from 3 to 5 for more resilience
   
-  const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> => {
-    try {
-      const { data: chunkData, error: chunkError } = await supabase.functions.invoke('github-storage', {
-        body: {
-          action: 'download',
-          path: chunk.path,
-          repo: chunk.repo
-        }
-      });
-
-      if (chunkError) throw chunkError;
-      if (!chunkData?.content) throw new Error('No content in chunk data');
-
-      const content = atob(chunkData.content);
-      const parsedChunk = JSON.parse(content);
-      
-      if (!parsedChunk.chunkData || !parsedChunk.chunkSize) {
-        throw new Error('Invalid chunk format');
-      }
-
-      // Convert back to ArrayBuffer
-      const chunkBuffer = base64ToArrayBuffer(parsedChunk.chunkData);
-      
-      // Verify size and checksum
-      if (chunkBuffer.byteLength !== parsedChunk.chunkSize) {
-        throw new Error('Chunk size mismatch');
-      }
-
-      const checksum = await calculateSHA256(new Uint8Array(chunkBuffer));
-      if (checksum !== parsedChunk.checksum) {
-        throw new Error('Chunk checksum verification failed');
-      }
-
-      // Update progress
-      completedDownloads++;
-      if (progressCallback) {
-        progressCallback(
-          20 + (completedDownloads / metadata.chunks.length * 50), 
-          'downloading',
-          { current: completedDownloads, total: metadata.chunks.length }
-        );
-      }
-
-      return {
-        index: chunk.index,
-        data: chunkBuffer,
-        size: chunkBuffer.byteLength
-      };
-    } catch (error: any) {
-      console.error(`Error downloading chunk at ${chunk.path} (attempt ${attempt + 1}):`, error);
-      
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return downloadChunk(chunk, attempt + 1);
-      }
-      
-      throw error;
-    }
-  };
-  
   try {
-    // Download chunks with retry logic
-    const downloadPromises = metadata.chunks.map(chunk => downloadChunk(chunk));
-    const downloadedChunks = await Promise.all(downloadPromises);
-    
-    // Step 4: Sort chunks by index and decrypt
-    if (progressCallback) progressCallback(70, 'decrypting');
-    
+    const downloadedChunks = await Promise.all(
+      metadata.chunks.map(chunk => downloadChunk(chunk))
+    );
+
     // Sort chunks by index
-    const sortedChunks = downloadedChunks.sort((a, b) => a.index - b.index);
-    
-    // Validate total size
-    const totalSize = sortedChunks.reduce((sum, chunk) => sum + chunk.size, 0);
-    if (totalSize !== metadata.fileSize) {
-      throw new Error('File size mismatch after download');
-    }
-    
-    // Concatenate encrypted chunks
+    const sortedChunks = downloadedChunks
+      .sort((a, b) => a.index - b.index)
+      .map(chunk => chunk.data);
+
+    // Debug info
+    console.log(`Downloaded ${sortedChunks.length} chunks successfully`);
+
+    // Decrypt chunks
     const decryptedChunks = await Promise.all(
-      sortedChunks.map(chunk => decryptData(chunk.data, metadata.encryptionKey))
+      sortedChunks.map(chunk => decryptData(chunk, metadata.encryptionKey))
     );
 
     if (progressCallback) progressCallback(95, 'assembling');
     
-    // Create blob from decrypted data
-    const blob = createBlobFromChunks(decryptedChunks, metadata.fileType);
-    
+    // Create final blob
+    const blob = new Blob(decryptedChunks, { type: metadata.fileType });
+
+    // Verify final size
+    if (blob.size !== metadata.fileSize) {
+      throw new Error(`Size mismatch: expected ${metadata.fileSize}, got ${blob.size}`);
+    }
+
     if (progressCallback) progressCallback(100, 'complete');
     
     return blob;
   } catch (error) {
     console.error("Failed to download file:", error);
-    throw new Error("File download failed. Please try again later.");
+    throw new Error(`Download failed: ${error.message}`);
   }
 };
 

@@ -283,20 +283,57 @@ serve(async (req) => {
       }
       
       case 'download': {
-        if (!path || !repo) {
+        try {
+          if (!path || !repo) {
+            return new Response(
+              JSON.stringify({ error: 'path and repo are required for download' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+      
+          // Get file from GitHub
+          const response = await fetch(
+            `https://api.github.com/repos/${GITHUB_USERNAME}/${repo}/contents/${path}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'CloudBliss-Storage-App'
+              }
+            }
+          );
+      
+          if (!response.ok) {
+            throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+          }
+      
+          const data = await response.json();
+      
+          // Validate content exists
+          if (!data.content) {
+            throw new Error('No content found in GitHub response');
+          }
+      
           return new Response(
-            JSON.stringify({ error: 'path and repo are required for download' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ 
+              success: true, 
+              content: data.content,
+              size: data.size,
+              sha: data.sha 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error('Download error:', error);
+          return new Response(
+            JSON.stringify({ 
+              error: `Failed to download file: ${error.message}`,
+              path,
+              repo 
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        
-        // Download file from GitHub
-        const content = await downloadFromGitHub(path, repo, GITHUB_USERNAME, GITHUB_TOKEN);
-        
-        return new Response(
-          JSON.stringify({ success: true, content }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
       
       case 'delete': {
