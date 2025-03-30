@@ -27,7 +27,7 @@ const MobileBottomNav = () => {
           }
         }}
       />
-      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t h-16 flex items-center justify-around z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t h-16 flex items-center justify-around z-50">
         <button
           onClick={() => navigate('/files')}
           className={cn(
