@@ -483,41 +483,20 @@ const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> =>
     if (!data?.content) throw new Error('No content in response');
 
     try {
-<<<<<<< HEAD
       // Decode GitHub base64 content
       const decodedContent = atob(data.content.replace(/\s/g, ''));
       const parsedChunk = JSON.parse(decodedContent);
-      
+
       if (!parsedChunk.chunkData || !parsedChunk.version) {
         throw new Error('Invalid chunk format - missing required fields');
       }
 
       // Return the raw chunk data for decryption
-=======
-      // Safely decode the base64 content from GitHub
-      const decoded = atob(data.content.replace(/\s/g, ''));
-      const parsedChunk = JSON.parse(decoded);
-      
-      if (!parsedChunk.chunkData) {
-        console.error('Invalid chunk format:', parsedChunk);
-        throw new Error('Invalid chunk format - missing chunkData');
-      }
-
-      // Validate chunk data
-      if (typeof parsedChunk.chunkData !== 'string') {
-        throw new Error('Invalid chunk data format');
-      }
-
->>>>>>> fb0703e56aba8c41340d02e47aacf1b1546855f7
       return {
         index: parsedChunk.chunkIndex,
         data: parsedChunk.chunkData,
         size: parsedChunk.chunkSize,
-<<<<<<< HEAD
         version: parsedChunk.version
-=======
-        metadata: parsedChunk
->>>>>>> fb0703e56aba8c41340d02e47aacf1b1546855f7
       };
     } catch (parseError) {
       console.error('Chunk parsing error:', parseError);
