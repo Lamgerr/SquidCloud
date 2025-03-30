@@ -8,17 +8,31 @@ export const generateEncryptionKey = (): string => {
   return CryptoJS.lib.WordArray.random(32).toString();
 };
 
-// Helper function to safely handle base64 encoding/decoding
-const safeBase64 = {
+// More robust base64 utilities
+const base64Utils = {
   encode: (buffer: ArrayBuffer): string => {
-    const binary = Array.from(new Uint8Array(buffer))
-      .map(byte => String.fromCharCode(byte))
-      .join('');
-    return btoa(binary);
+    try {
+      const uint8Array = new Uint8Array(buffer);
+      const chunks: string[] = [];
+      for (let i = 0; i < uint8Array.length; i += 512) {
+        chunks.push(String.fromCharCode.apply(null, uint8Array.subarray(i, i + 512)));
+      }
+      return btoa(chunks.join(''));
+    } catch (error) {
+      console.error('Base64 encode error:', error);
+      throw new Error('Failed to encode data to base64');
+    }
   },
+  
   decode: (base64: string): Uint8Array => {
     try {
-      const binary = atob(base64);
+      // Remove any whitespace and validate base64 string
+      const cleaned = base64.replace(/\s/g, '');
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) {
+        throw new Error('Invalid base64 format');
+      }
+      
+      const binary = atob(cleaned);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
@@ -26,7 +40,7 @@ const safeBase64 = {
       return bytes;
     } catch (error) {
       console.error('Base64 decode error:', error);
-      throw new Error('Invalid base64 data');
+      throw new Error('Failed to decode base64 data');
     }
   }
 };
@@ -34,7 +48,7 @@ const safeBase64 = {
 // Encrypt file data with AES-256-GCM and return as base64 string
 export const encryptData = async (data: ArrayBuffer, key: string): Promise<string> => {
   try {
-    // Normalize key size
+    // Normalize key to exactly 32 bytes
     const keyBytes = new TextEncoder().encode(key.slice(0, 32).padEnd(32, '0'));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     
@@ -57,8 +71,7 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
     combined.set(iv);
     combined.set(new Uint8Array(encryptedContent), iv.length);
     
-    // Use safe base64 encoding
-    return safeBase64.encode(combined.buffer);
+    return base64Utils.encode(combined.buffer);
   } catch (error) {
     console.error('Encryption error:', error);
     throw new Error(`Encryption failed: ${error.message}`);
@@ -68,10 +81,18 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
 // Decrypt file data from base64 string
 export const decryptData = async (data: string, key: string): Promise<ArrayBuffer> => {
   try {
-    // Decode base64 safely
-    const bytes = safeBase64.decode(data);
+    // Decode and validate the encrypted data
+    let bytes: Uint8Array;
+    try {
+      bytes = base64Utils.decode(data);
+    } catch (decodeError) {
+      throw new Error(`Invalid encrypted data format: ${decodeError.message}`);
+    }
 
-    // Extract IV and content
+    if (bytes.length < 12) {
+      throw new Error('Invalid encrypted data: too short');
+    }
+
     const iv = bytes.slice(0, 12);
     const encryptedContent = bytes.slice(12);
 
@@ -92,8 +113,7 @@ export const decryptData = async (data: string, key: string): Promise<ArrayBuffe
         encryptedContent
       );
     } catch (decryptError) {
-      console.error('Decryption operation failed:', decryptError);
-      throw new Error('Failed to decrypt data');
+      throw new Error('Failed to decrypt data: invalid key or corrupted data');
     }
   } catch (error) {
     console.error('Decryption error:', error);
