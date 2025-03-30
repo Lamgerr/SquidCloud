@@ -13,7 +13,7 @@ import { Loader2, Plus, FileText, Info, Settings, FolderOpen, HardDrive, BarChar
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DashboardProps {
   defaultTab?: string;
