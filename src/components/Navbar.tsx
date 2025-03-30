@@ -22,7 +22,7 @@ const Navbar: React.FC = () => {
     <nav className="bg-background border-b sticky top-0 z-50">
       <div className="container flex items-center justify-between py-3">
         <Link to="/" className="flex items-center gap-2">
-          <CloudIcon className="h-6 w-6" />
+          <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center"><div class="w-4 h-4 bg-white rounded-sm"></div></div>
           <span className="font-semibold md:inline-block">CloudBliss</span>
           <span className="text-xs text-muted-foreground hidden md:inline-block">by Inflate</span>
         </Link>
