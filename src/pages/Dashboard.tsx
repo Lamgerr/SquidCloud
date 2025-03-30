@@ -382,6 +382,24 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
     );
   };
 
+  const renderActionButtons = () => {
+    return (
+      <div className="flex items-center gap-2">
+        {repoCount < 2 && (
+          <Button
+            onClick={handleCreateVault}
+            className="bg-primary text-white hover:bg-primary/90 flex items-center gap-2"
+            size={isMobile ? "sm" : "default"}
+          >
+            <HardDrive className="h-4 w-4" />
+            Create Vault ({repoCount}/2)
+          </Button>
+        )}
+        <UploadButton onUploadComplete={handleFileUpload} />
+      </div>
+    );
+  };
+
   if (isOnboarding) {
     return (
       <div className="container mx-auto p-4">
@@ -392,10 +410,11 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
           <div className="animate-pulse">
             <Button
               onClick={handleCreateVault}
-              className="bg-primary text-white"
+              className="bg-primary text-white hover:bg-primary/90 flex items-center gap-2"
               size="lg"
             >
-              Create Storage Vault {repoCount}/2
+              <HardDrive className="h-5 w-5" />
+              Create Storage Vault ({repoCount}/2)
             </Button>
           </div>
           
@@ -430,10 +449,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
               
               {(activeTab === 'files' || activeTab === 'upload') && (
                 <div 
-                  className={`upload-button-container ${isMobile ? 'w-full flex justify-center' : ''}`}
+                  className={`button-container ${isMobile ? 'w-full flex justify-center' : ''}`}
                   ref={setUploadButtonRef}
                 >
-                  <UploadButton onUploadComplete={handleFileUpload} />
+                  {renderActionButtons()}
                 </div>
               )}
             </div>
@@ -552,27 +571,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
               </Card>
             </TabsContent>
           </Tabs>
-
-          <div className="flex justify-center mt-4">
-            <Button
-              onClick={handleCreateVault}
-              disabled={repoCount >= 2}
-              className="bg-primary text-white"
-            >
-              Create Storage Vault {repoCount}/2
-            </Button>
-          </div>
         </div>
-      </div>
-
-      <div className="fixed bottom-20 right-4 md:bottom-8 md:right-8">
-        <Button
-          onClick={handleCreateVault}
-          disabled={repoCount >= 2}
-          className="bg-primary text-white shadow-lg"
-        >
-          Create Storage Vault ({repoCount}/2)
-        </Button>
       </div>
     </div>
   );
