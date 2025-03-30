@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { supabase } from '@/integrations/supabase/client';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface DashboardProps {
   defaultTab?: string;
@@ -385,6 +386,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   const renderActionButtons = () => {
     return (
       <div className="flex items-center gap-2">
+        <ThemeToggle />
         {repoCount < 2 && (
           <Button
             onClick={handleCreateVault}

@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
@@ -13,6 +12,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import MobileBottomNav from './components/MobileBottomNav';
 import { useIsMobile } from './hooks/use-mobile';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 // Component to handle new user redirection
 const NewUserRedirect = ({ children }: { children: React.ReactNode }) => {
@@ -177,9 +177,11 @@ const AppWithAuth = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppWithAuth />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppWithAuth />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
