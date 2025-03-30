@@ -31,7 +31,7 @@ const Navbar: React.FC = () => {
           user ? (
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon"> CloudBliss
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
