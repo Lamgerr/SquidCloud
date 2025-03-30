@@ -8,62 +8,78 @@ export const generateEncryptionKey = (): string => {
   return CryptoJS.lib.WordArray.random(32).toString();
 };
 
-// Encrypt file data with AES-256-GCM and return as ArrayBuffer
-export const encryptData = async (data: ArrayBuffer, key: string): Promise<ArrayBuffer> => {
-  // Convert key to proper format
-  const keyBuffer = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(key),
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt']
-  );
+// Encrypt file data with AES-256-GCM and return as base64 string
+export const encryptData = async (data: ArrayBuffer, key: string): Promise<string> => {
+  try {
+    // Convert key to proper format for crypto operations
+    const keyBytes = new TextEncoder().encode(key);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    
+    const keyBuffer = await crypto.subtle.importKey(
+      'raw',
+      keyBytes,
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt']
+    );
 
-  // Generate IV
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encryptedContent = await crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv
+      },
+      keyBuffer,
+      data
+    );
 
-  // Encrypt
-  const encryptedContent = await crypto.subtle.encrypt(
-    {
-      name: 'AES-GCM',
-      iv: iv
-    },
-    keyBuffer,
-    data
-  );
+    // Combine IV and encrypted content
+    const encryptedArray = new Uint8Array(iv.length + encryptedContent.byteLength);
+    encryptedArray.set(iv, 0);
+    encryptedArray.set(new Uint8Array(encryptedContent), iv.length);
 
-  // Combine IV and encrypted content
-  const result = new Uint8Array(iv.length + encryptedContent.byteLength);
-  result.set(iv, 0);
-  result.set(new Uint8Array(encryptedContent), iv.length);
-
-  return result.buffer;
+    // Convert to base64 for safe transmission
+    return btoa(String.fromCharCode.apply(null, Array.from(encryptedArray)));
+  } catch (error) {
+    console.error('Encryption error:', error);
+    throw new Error('Encryption failed');
+  }
 };
 
-// Decrypt file data from ArrayBuffer
-export const decryptData = async (data: ArrayBuffer, key: string): Promise<ArrayBuffer> => {
-  // Extract IV
-  const iv = data.slice(0, 12);
-  const encryptedContent = data.slice(12);
+// Decrypt file data from base64 string
+export const decryptData = async (data: string, key: string): Promise<ArrayBuffer> => {
+  try {
+    // Convert base64 back to array
+    const encryptedArray = new Uint8Array(
+      atob(data)
+        .split('')
+        .map(char => char.charCodeAt(0))
+    );
 
-  // Import key
-  const keyBuffer = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(key),
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt']
-  );
+    // Extract IV and encrypted content
+    const iv = encryptedArray.slice(0, 12);
+    const encryptedContent = encryptedArray.slice(12);
 
-  // Decrypt
-  return await crypto.subtle.decrypt(
-    {
-      name: 'AES-GCM',
-      iv: new Uint8Array(iv)
-    },
-    keyBuffer,
-    encryptedContent
-  );
+    const keyBytes = new TextEncoder().encode(key);
+    const keyBuffer = await crypto.subtle.importKey(
+      'raw',
+      keyBytes,
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    );
+
+    return await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv
+      },
+      keyBuffer,
+      encryptedContent
+    );
+  } catch (error) {
+    console.error('Decryption error:', error);
+    throw new Error('Decryption failed');
+  }
 };
 
 // Convert CryptoJS WordArray to Uint8Array
@@ -103,14 +119,14 @@ export const splitFileIntoJsonChunks = async (file: File, chunkSize: number = 50
   const encryptedData = await encryptData(fileBuffer, encryptionKey);
   
   // Calculate the number of chunks
-  const totalChunks = Math.ceil(encryptedData.byteLength / chunkSize);
+  const totalChunks = Math.ceil(encryptedData.length / chunkSize);
   const chunks: string[] = [];
   
   // Split the encrypted data into chunks
   for (let i = 0; i < totalChunks; i++) {
     const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, encryptedData.byteLength);
-    const chunkData = new Uint8Array(encryptedData.slice(start, end));
+    const end = Math.min(start + chunkSize, encryptedData.length);
+    const chunkData = encryptedData.slice(start, end);
     
     // Create JSON chunk with metadata
     const jsonChunk = JSON.stringify({
@@ -119,7 +135,7 @@ export const splitFileIntoJsonChunks = async (file: File, chunkSize: number = 50
       fileName: file.name,
       fileType: file.type,
       fileSize: file.size,
-      chunkData: Array.from(chunkData),
+      chunkData: chunkData,
       timestamp: new Date().toISOString(),
     });
     
@@ -150,12 +166,12 @@ export const reassembleJsonChunks = async (chunks: string[], encryptionKey: stri
   }
   
   // Concatenate chunk data
-  const encryptedData = new Uint8Array(parsedChunks.reduce((acc, chunk) => {
-    return acc.concat(chunk.chunkData);
-  }, []));
+  const encryptedData = parsedChunks.reduce((acc, chunk) => {
+    return acc + chunk.chunkData;
+  }, '');
   
   // Decrypt the data
-  return await decryptData(encryptedData.buffer, encryptionKey);
+  return await decryptData(encryptedData, encryptionKey);
 };
 
 // Check if file needs chunking based on size

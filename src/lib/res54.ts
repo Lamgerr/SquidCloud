@@ -99,7 +99,7 @@ export const determineChunkingStrategy = (fileSize: number): number => {
 
 // Add data validation helper
 const validateChunkData = (chunk: ArrayBuffer): boolean => {
-  return chunk && chunk.byteLength > 0;
+  return chunk instanceof ArrayBuffer && chunk.byteLength > 0;
 };
 
 // Create file chunks with Res54 system
@@ -144,7 +144,7 @@ export const createFileChunks = async (
       totalChunks: Math.ceil(file.size / chunkSize),
       size: chunkBuffer.byteLength,
       offset: offset,
-      sha256: await calculateSHA256(chunkBuffer)
+      sha256: await calculateSHA256(new Uint8Array(chunkBuffer))
     });
     
     offset += chunkSize;
@@ -169,10 +169,15 @@ export const createFileChunks = async (
 };
 
 // Calculate SHA256 hash for chunk integrity verification
-async function calculateSHA256(buffer: ArrayBuffer): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+async function calculateSHA256(data: Uint8Array): Promise<string> {
+  try {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (error) {
+    console.error('Hash calculation error:', error);
+    throw new Error('Failed to calculate hash');
+  }
 }
 
 // Utility function for delay
@@ -295,7 +300,16 @@ export const uploadFileWithRes54 = async (
   // Update chunk upload validation
   const uploadChunk = async (chunk: ArrayBuffer, index: number, attempt = 0): Promise<any> => {
     try {
+      // Convert chunk to base64 string for transport
       const base64Data = arrayBufferToBase64(chunk);
+      const checksum = await calculateSHA256(new Uint8Array(chunk));
+      
+      const repoIndex = index % repos.length;
+      const repo = repos[repoIndex].repo_name;
+      
+      const chunkId = `res54_${Date.now()}_${index}`;
+      const path = `${user.id}/${chunkId}.json`;
+      
       const chunkMetadata = {
         chunkIndex: index,
         totalChunks: chunks.length,
@@ -304,27 +318,15 @@ export const uploadFileWithRes54 = async (
         fileSize: file.size,
         chunkData: base64Data,
         chunkSize: chunk.byteLength,
-        checksum: await calculateSHA256(chunk)
+        checksum
       };
 
-      const repoIndex = index % repos.length;
-      const repo = repos[repoIndex].repo_name;
-      
-      const chunkId = `res54_${Date.now()}_${index}`;
-      const path = `${user.id}/${chunkId}.json`;
-      
-      // Compress chunk data with error handling
-      const compressedChunk = compressData(new TextDecoder().decode(chunk));
-      
-      const chunkData = JSON.stringify(chunkMetadata);
-
-      // Upload with timeout and validation
-      const uploadPromise = supabase.functions.invoke('github-storage', {
+      const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
         body: {
           action: 'upload',
           fileName: `${chunkId}.json`,
           fileType: 'application/json',
-          data: chunkData,
+          data: JSON.stringify(chunkMetadata),
           userId: user.id,
           path: null,
           createRepo: false,
@@ -333,25 +335,19 @@ export const uploadFileWithRes54 = async (
         }
       });
 
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Upload timeout')), 30000);
-      });
-
-      const { data: uploadData, error: uploadError } = await Promise.race([
-        uploadPromise,
-        timeoutPromise
-      ]) as any;
-
       if (uploadError) throw uploadError;
       if (!uploadData) throw new Error('No upload data received');
 
-      metadata.chunks[index].repo = repo;
-      metadata.chunks[index].path = path;
-      
-      return { index, repo, path, sha: uploadData.sha };
-    } catch (error: any) {
+      return { 
+        index,
+        repo,
+        path,
+        sha: uploadData.sha,
+        size: chunk.byteLength
+      };
+    } catch (error) {
       console.error(`Upload error for chunk ${index}:`, error);
-      throw new Error(`Failed to upload chunk ${index}: ${error.message}`);
+      throw error;
     }
   };
 
@@ -571,7 +567,7 @@ export const downloadFileWithRes54 = async (
         throw new Error('Chunk size mismatch');
       }
 
-      const checksum = await calculateSHA256(chunkBuffer);
+      const checksum = await calculateSHA256(new Uint8Array(chunkBuffer));
       if (checksum !== parsedChunk.checksum) {
         throw new Error('Chunk checksum verification failed');
       }
