@@ -11,74 +11,64 @@ export const generateEncryptionKey = (): string => {
 // Encrypt file data with AES-256-GCM and return as base64 string
 export const encryptData = async (data: ArrayBuffer, key: string): Promise<string> => {
   try {
-    // Convert key to proper format for crypto operations
-    const keyBytes = new TextEncoder().encode(key);
+    const keyBytes = new TextEncoder().encode(key.slice(0, 32)); // Ensure 32-byte key
     const iv = crypto.getRandomValues(new Uint8Array(12));
     
     const keyBuffer = await crypto.subtle.importKey(
       'raw',
       keyBytes,
-      { name: 'AES-GCM' },
+      { name: 'AES-GCM', length: 256 },
       false,
       ['encrypt']
     );
 
     const encryptedContent = await crypto.subtle.encrypt(
-      {
-        name: 'AES-GCM',
-        iv: iv
-      },
+      { name: 'AES-GCM', iv },
       keyBuffer,
       data
     );
 
     // Combine IV and encrypted content
-    const encryptedArray = new Uint8Array(iv.length + encryptedContent.byteLength);
-    encryptedArray.set(iv, 0);
-    encryptedArray.set(new Uint8Array(encryptedContent), iv.length);
-
-    // Convert to base64 for safe transmission
-    return btoa(String.fromCharCode.apply(null, Array.from(encryptedArray)));
+    const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encryptedContent), iv.length);
+    
+    return btoa(String.fromCharCode(...new Uint8Array(combined)));
   } catch (error) {
     console.error('Encryption error:', error);
-    throw new Error('Encryption failed');
+    throw new Error(`Encryption failed: ${error.message}`);
   }
 };
 
 // Decrypt file data from base64 string
 export const decryptData = async (data: string, key: string): Promise<ArrayBuffer> => {
   try {
-    // Convert base64 back to array
-    const encryptedArray = new Uint8Array(
-      atob(data)
-        .split('')
-        .map(char => char.charCodeAt(0))
-    );
+    const binaryStr = atob(data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
 
-    // Extract IV and encrypted content
-    const iv = encryptedArray.slice(0, 12);
-    const encryptedContent = encryptedArray.slice(12);
+    const iv = bytes.slice(0, 12);
+    const encryptedContent = bytes.slice(12);
 
-    const keyBytes = new TextEncoder().encode(key);
+    const keyBytes = new TextEncoder().encode(key.slice(0, 32));
     const keyBuffer = await crypto.subtle.importKey(
       'raw',
       keyBytes,
-      { name: 'AES-GCM' },
+      { name: 'AES-GCM', length: 256 },
       false,
       ['decrypt']
     );
 
     return await crypto.subtle.decrypt(
-      {
-        name: 'AES-GCM',
-        iv: iv
-      },
+      { name: 'AES-GCM', iv },
       keyBuffer,
       encryptedContent
     );
   } catch (error) {
     console.error('Decryption error:', error);
-    throw new Error('Decryption failed');
+    throw new Error(`Decryption failed: ${error.message}`);
   }
 };
 
