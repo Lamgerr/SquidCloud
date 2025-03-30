@@ -8,65 +8,48 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-// Add new utility function for repo creation
+// Create repos using Supabase Functions to avoid CORS
 const createReposWithRetry = async (
   session: any,
   count: number,
   password?: string | null
 ): Promise<any[]> => {
-  // List of endpoints to try in order
-  const endpoints = [
-    'https://api.cloudbliss.storage/api/v1/repositories/create',
-    'https://cloudbliss.inflate.live/api/v1/repos',
-    'https://api-fallback.cloudbliss.storage/repositories'
-  ];
-
+  const maxRetries = 3;
   let lastError = null;
 
-  // Try each endpoint
-  for (const endpoint of endpoints) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'X-User-Id': session.user.id
-        },
-        body: JSON.stringify({
+      // Use Supabase Function instead of direct API calls
+      const { data, error } = await supabase.functions.invoke('github-storage', {
+        body: {
+          action: 'create-repos',
           count,
           password,
           userId: session.user.id
-        })
+        }
       });
 
-      // Check if response is ok before trying to parse JSON
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
+      if (error) throw error;
+      if (!data) throw new Error('No response from server');
+
+      // Validate response
+      if (!Array.isArray(data.repos)) {
+        throw new Error('Invalid response format - expected array of repos');
       }
 
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Invalid JSON response: ${text}`);
-      }
-
-      if (!Array.isArray(data)) {
-        throw new Error('Invalid response format - expected array');
-      }
-
-      return data;
+      return data.repos;
     } catch (error) {
-      console.error(`Failed to create repos using ${endpoint}:`, error);
+      console.error(`Repository creation attempt ${attempt + 1} failed:`, error);
       lastError = error;
-      // Continue to next endpoint
+      
+      // Wait before retrying
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(2, attempt)));
+      }
     }
   }
 
-  // If we get here, all endpoints failed
-  throw new Error(lastError?.message || 'All repository creation endpoints failed');
+  throw new Error(lastError?.message || 'Failed to create repositories after multiple attempts');
 };
 
 const RepoCreation = () => {
@@ -102,7 +85,7 @@ const RepoCreation = () => {
 
         setProgress(30);
 
-        // Try to create repos with retry mechanism
+        // Create repositories using Supabase Function
         const createdRepos = await createReposWithRetry(
           sessionData.session,
           validCount,
@@ -111,33 +94,30 @@ const RepoCreation = () => {
 
         setProgress(60);
 
-        // Store repos in Supabase with retry
-        const storeRepos = async (retries = 3) => {
+        // Store in Supabase with simplified retry
+        for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const { error: dbError } = await supabase
               .from('repositories')
               .insert(
                 createdRepos.map(repo => ({
-                  repo_name: repo.name,
+                  repo_name: repo.name || repo.repo_name,
                   user_id: sessionData.session.user.id,
                   status: 'active',
                   created_at: new Date().toISOString()
                 }))
               );
 
-            if (dbError) throw dbError;
+            if (!dbError) break; // Success
+            throw dbError;
           } catch (error) {
-            if (retries > 0) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              return storeRepos(retries - 1);
-            }
-            throw error;
+            if (attempt === 2) throw error; // Last attempt failed
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
           }
-        };
+        }
 
-        await storeRepos();
         setProgress(90);
-        setVaults(createdRepos.map(repo => repo.name));
+        setVaults(createdRepos.map(repo => repo.name || repo.repo_name));
 
         toast({
           title: "Setup complete",
@@ -150,11 +130,12 @@ const RepoCreation = () => {
         
       } catch (err: any) {
         console.error("Vault creation error:", err);
-        setError(err.message || "Failed to create secure vaults");
+        const errorMessage = err.message || "Failed to create secure vaults";
+        setError(errorMessage);
         
         toast({
           title: "Setup failed",
-          description: err.message || "There was a problem creating your secure vaults",
+          description: errorMessage,
           variant: "destructive",
         });
       } finally {
