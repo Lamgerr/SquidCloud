@@ -39,6 +39,25 @@ interface FileMetadata {
   processor?: string; // Adding optional processor property
 }
 
+// Add these utility functions at the top
+const compressData = (data: string): string => {
+  try {
+    return btoa(unescape(encodeURIComponent(data)));
+  } catch (error) {
+    console.error('Compression error:', error);
+    throw new Error('Failed to compress data');
+  }
+};
+
+const decompressData = (data: string): string => {
+  try {
+    return decodeURIComponent(escape(atob(data)));
+  } catch (error) {
+    console.error('Decompression error:', error);
+    throw new Error('Failed to decompress data');
+  }
+}
+
 // Modify the determineChunkingStrategy function to create smaller chunks
 export const determineChunkingStrategy = (fileSize: number): number => {
   // Limit maximum chunk size to 2MB to prevent timeouts
@@ -238,21 +257,20 @@ export const uploadFileWithRes54 = async (
   const uploadChunk = async (chunk: string, index: number, attempt = 0): Promise<any> => {
     try {
       // Validate chunk size
-      if (chunk.length > 2 * 1024 * 1024) { // 2MB limit
+      if (chunk.length > 2 * 1024 * 1024) {
         throw new Error('Chunk size too large');
       }
 
-      // Select repository with round-robin approach instead of random
       const repoIndex = index % reposData.length;
       const repo = reposData[repoIndex].repo_name;
       
       const chunkId = `res54_${Date.now()}_${index}`;
       const path = `${userData.user.id}/${chunkId}.json`;
       
-      // Compress chunk data before sending
-      const compressedChunk = btoa(encodeURIComponent(chunk));
+      // Compress chunk data with error handling
+      const compressedChunk = compressData(chunk);
       
-      const chunkData = JSON.stringify({
+      const chunkMetadata = {
         chunkIndex: index,
         totalChunks: chunks.length,
         fileName: file.name,
@@ -261,10 +279,12 @@ export const uploadFileWithRes54 = async (
         chunkData: compressedChunk,
         timestamp: new Date().toISOString(),
         checksum: await calculateSHA256(new TextEncoder().encode(chunk)),
-        version: "2.0" // Add version for future compatibility
-      });
+        version: "2.0"
+      };
 
-      // Upload with timeout
+      const chunkData = JSON.stringify(chunkMetadata);
+
+      // Upload with timeout and validation
       const uploadPromise = supabase.functions.invoke('github-storage', {
         body: {
           action: 'upload',
@@ -296,6 +316,7 @@ export const uploadFileWithRes54 = async (
       
       return { index, repo, path, sha: uploadData.sha };
     } catch (error: any) {
+      console.error(`Upload error for chunk ${index}:`, error);
       throw new Error(`Failed to upload chunk ${index}: ${error.message}`);
     }
   };
@@ -498,9 +519,8 @@ export const downloadFileWithRes54 = async (
         }
       });
 
-      if (chunkError) {
-        throw new Error(`Failed to download chunk: ${chunkError.message}`);
-      }
+      if (chunkError) throw chunkError;
+      if (!chunkData?.content) throw new Error('No content in chunk data');
 
       // Update progress
       completedDownloads++;
@@ -511,18 +531,31 @@ export const downloadFileWithRes54 = async (
           { current: completedDownloads, total: metadata.chunks.length }
         );
       }
-      
-      const content = atob(chunkData.content);
-      // Parse the JSON to get the encrypted chunk data
-      const parsedChunk = JSON.parse(content);
-      return { index: chunk.index, data: parsedChunk.chunkData };
+
+      try {
+        const content = atob(chunkData.content);
+        const parsedChunk = JSON.parse(content);
+        
+        if (!parsedChunk.chunkData) {
+          throw new Error('Invalid chunk format');
+        }
+
+        // Decompress the chunk data
+        const decompressedData = decompressData(parsedChunk.chunkData);
+        
+        return { 
+          index: chunk.index, 
+          data: decompressedData,
+          checksum: parsedChunk.checksum
+        };
+      } catch (parseError) {
+        console.error('Chunk parsing error:', parseError);
+        throw new Error(`Failed to parse chunk data: ${parseError.message}`);
+      }
     } catch (error: any) {
       console.error(`Error downloading chunk at ${chunk.path} (attempt ${attempt + 1}):`, error);
       
-      // Retry logic
       if (attempt < maxRetries) {
-        console.log(`Retrying download for chunk ${chunk.index}, attempt ${attempt + 2}...`);
-        // Exponential backoff
         const delay = Math.pow(2, attempt) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
         return downloadChunk(chunk, attempt + 1);
