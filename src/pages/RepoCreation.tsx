@@ -19,22 +19,21 @@ const createReposWithRetry = async (
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Use Supabase Function instead of direct API calls
       const { data, error } = await supabase.functions.invoke('github-storage', {
         body: {
           action: 'create-repos',
           count,
-          password,
           userId: session.user.id
         }
       });
 
-      if (error) throw error;
-      if (!data) throw new Error('No response from server');
+      if (error) {
+        console.error('Function error:', error);
+        throw error;
+      }
 
-      // Validate response
-      if (!Array.isArray(data.repos)) {
-        throw new Error('Invalid response format - expected array of repos');
+      if (!data?.repos || !Array.isArray(data.repos)) {
+        throw new Error('Invalid response format from server');
       }
 
       return data.repos;
@@ -42,14 +41,13 @@ const createReposWithRetry = async (
       console.error(`Repository creation attempt ${attempt + 1} failed:`, error);
       lastError = error;
       
-      // Wait before retrying
       if (attempt < maxRetries - 1) {
         await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(2, attempt)));
       }
     }
   }
 
-  throw new Error(lastError?.message || 'Failed to create repositories after multiple attempts');
+  throw lastError || new Error('Failed to create repositories after multiple attempts');
 };
 
 const RepoCreation = () => {

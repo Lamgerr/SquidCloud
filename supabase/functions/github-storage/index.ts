@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 // Define proper CORS headers to allow requests from any origin
@@ -9,7 +8,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests properly
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
       status: 204,
@@ -20,6 +18,7 @@ serve(async (req) => {
   try {
     const GITHUB_TOKEN = Deno.env.get('GITHUB_TOKEN');
     const GITHUB_USERNAME = Deno.env.get('GITHUB_USERNAME');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     
     if (!GITHUB_TOKEN || !GITHUB_USERNAME) {
       return new Response(
@@ -28,19 +27,72 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
-    let requestBody;
-    try {
-      requestBody = await req.json();
-    } catch (error) {
-      console.error("Error parsing request body:", error);
+    const { action, ...body } = await req.json();
+
+    // Add create-repos action handler
+    if (action === 'create-repos') {
+      const { count, userId } = body;
+      
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: 'User ID is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const validCount = Math.min(Math.max(1, count || 5), 5);
+      const createdRepos = [];
+
+      // Generate creative names using Gemini API
+      const repoNames = await generateCreativeRepoNames(validCount, GEMINI_API_KEY);
+
+      for (let i = 0; i < validCount; i++) {
+        const baseName = repoNames[i] || `nexus_${Math.random().toString(36).substring(2, 7)}`;
+        const uniqueSuffix = `${Date.now().toString(36)}_${i}`;
+        const repoName = `${baseName}_${uniqueSuffix}`;
+
+        // Create repository
+        const createResponse = await fetch(
+          'https://api.github.com/user/repos',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'CloudVault-Edge-Function',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              name: repoName,
+              description: "Secure data vault",
+              private: true,
+              auto_init: true
+            })
+          }
+        );
+
+        if (!createResponse.ok) {
+          console.error(`Failed to create repo ${repoName}:`, await createResponse.text());
+          continue;
+        }
+
+        const repoData = await createResponse.json();
+        createdRepos.push({
+          name: repoName,
+          html_url: repoData.html_url
+        });
+      }
+
       return new Response(
-        JSON.stringify({ error: 'Failed to parse request body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          repos: createdRepos 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    const { action, fileName, fileType, data, userId, path, createRepo, repo } = requestBody;
+
+    // Existing code for other actions
+    const { fileName, fileType, data, userId, path, createRepo, repo } = body;
     
     if (!action) {
       return new Response(
@@ -526,5 +578,30 @@ async function deleteFromGitHub(
   
   if (!response.ok) {
     throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+  }
+}
+
+// Helper function to generate creative repository names using Gemini API
+async function generateCreativeRepoNames(count: number, apiKey: string): Promise<string[]> {
+  try {
+    const response = await fetch(
+      `https://api.gemini.com/v1/generate-names?count=${count}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.names || [];
+  } catch (error) {
+    console.error('Error generating creative repo names:', error);
+    return [];
   }
 }
