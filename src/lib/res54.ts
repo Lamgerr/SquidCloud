@@ -260,7 +260,8 @@ export const uploadFileWithRes54 = async (
         fileSize: file.size,
         chunkData: compressedChunk,
         timestamp: new Date().toISOString(),
-        checksum: await calculateSHA256(new TextEncoder().encode(chunk))
+        checksum: await calculateSHA256(new TextEncoder().encode(chunk)),
+        version: "2.0" // Add version for future compatibility
       });
 
       // Upload with timeout
@@ -387,6 +388,17 @@ export const uploadFileWithRes54 = async (
   };
 };
 
+// Add this helper function to validate metadata structure
+const validateMetadata = (data: any): boolean => {
+  return (
+    data &&
+    Array.isArray(data.chunks) &&
+    data.fileName &&
+    data.fileType &&
+    data.fileSize
+  );
+};
+
 // Download file using Res54 system
 export const downloadFileWithRes54 = async (
   fileId: string,
@@ -413,14 +425,31 @@ export const downloadFileWithRes54 = async (
   try {
     // Parse metadata from tags
     const processorValue = (file as any).processor || "unknown";
+    let parsedMetadata;
     
-    if (processorValue === "res54" && Array.isArray(file.tags) && file.tags.length > 0) {
-      metadata = JSON.parse(file.tags[0]);
+    try {
+      // First try to parse the first tag
+      parsedMetadata = Array.isArray(file.tags) && file.tags.length > 0 
+        ? JSON.parse(file.tags[0])
+        : null;
+    } catch (e) {
+      console.warn("Failed to parse first tag:", e);
+      parsedMetadata = null;
+    }
+
+    // Validate parsed metadata
+    if (parsedMetadata && validateMetadata(parsedMetadata)) {
+      metadata = parsedMetadata;
     } else {
-      // Legacy format
+      // Legacy format or invalid metadata
       const chunkLocations = Array.isArray(file.tags) && file.tags.length > 0 
-        ? JSON.parse(file.tags[0]) 
+        ? (typeof file.tags[0] === 'string' ? JSON.parse(file.tags[0]) : file.tags[0])
         : [];
+
+      if (!Array.isArray(chunkLocations)) {
+        console.error("Invalid chunk locations format:", chunkLocations);
+        throw new Error("Invalid chunk locations format");
+      }
         
       // Convert legacy format to Res54 format
       metadata = {
@@ -428,21 +457,28 @@ export const downloadFileWithRes54 = async (
         fileType: file.type,
         fileSize: file.size,
         chunks: chunkLocations.map((loc: any, index: number) => ({
-          index: loc.index || index,
+          index: typeof loc.index === 'number' ? loc.index : index,
           totalChunks: chunkLocations.length,
           size: Math.ceil(file.size / chunkLocations.length),
           offset: index * Math.ceil(file.size / chunkLocations.length),
           sha256: loc.sha || "",
-          repo: loc.repo,
-          path: loc.path
+          repo: loc.repo || "",
+          path: loc.path || ""
         })),
         encryptionKey: file.encryption_key,
         created: file.created_at,
         previewAvailable: false
       };
     }
+
+    // Final validation of metadata structure
+    if (!metadata.chunks || !Array.isArray(metadata.chunks)) {
+      throw new Error("Invalid metadata structure");
+    }
+
   } catch (e) {
     console.error("Error parsing chunk locations:", e);
+    console.debug("File data:", file);
     throw new Error("Failed to parse chunk locations");
   }
   
