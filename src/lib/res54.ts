@@ -598,7 +598,7 @@ export const downloadFileWithRes54 = async (
     throw new Error("File download failed. Please try again later.");
   }
 };
-
+//
 // Mock preview generation function - would be more complex in a real implementation
 async function generatePreview(fileId: string, fileType: string): Promise<void> {
   // This would generate thumbnails, video transcoding, etc.
