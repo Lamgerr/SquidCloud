@@ -340,7 +340,7 @@ export const uploadFileWithRes54 = async (
     .eq("user_id", userData.user.id);
 
   if (!repos || repos.length === 0) {
-    throw new Error("No storage vaults found. Please create a storage vault first.");
+    throw new Error("Please create a Storage Vault first before uploading files.");
   }
 
   // Continue with existing upload logic
