@@ -23,30 +23,6 @@ import {
 const Index = () => {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="w-full backdrop-blur-lg bg-white/75 dark:bg-slate-900/75 border-b border-slate-200/50 dark:border-slate-800/50 transition-all duration-200">
-        <div className="container mx-auto py-4 px-6 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center">
-              <div className="w-4 h-4 bg-white rounded-sm" />
-            </div>
-            <span className="font-semibold text-xl">InflateStorage</span>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <Link 
-              to="/auth" 
-              className="text-sm font-medium hover:text-primary transition-colors"
-            >
-              Login
-            </Link>
-            <Link to="/auth">
-              <Button>Get Started</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-      
       {/* Hero Section */}
       <section className="relative py-24 md:py-32 overflow-hidden">
         <div className="container mx-auto px-6">
@@ -230,7 +206,7 @@ const Index = () => {
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">Trusted by Thousands</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              See what our users have to say about their experience with InflateStorage.
+              See what our users have to say about their experience with CloudBliss.
             </p>
           </div>
           
@@ -247,7 +223,7 @@ const Index = () => {
                 </div>
               </div>
               <p className="italic text-muted-foreground">
-                "InflateStorage has completely transformed how I work with client files. The security features give me peace of mind, and the unlimited storage means I never have to worry about space again."
+                "CloudBliss has completely transformed how I work with client files. The security features give me peace of mind, and the unlimited storage means I never have to worry about space again."
               </p>
             </div>
             
@@ -263,7 +239,7 @@ const Index = () => {
                 </div>
               </div>
               <p className="italic text-muted-foreground">
-                "As a developer handling sensitive code repositories, security is my top priority. InflateStorage's end-to-end encryption and version control are exactly what I needed."
+                "As a developer handling sensitive code repositories, security is my top priority. CloudBliss's end-to-end encryption and version control are exactly what I needed."
               </p>
             </div>
             
@@ -292,7 +268,7 @@ const Index = () => {
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4">Ready to Secure Your Digital Future?</h2>
             <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-              Join thousands of individuals and businesses who trust InflateStorage for their most important data.
+              Join thousands of individuals and businesses who trust CloudBliss for their most important data.
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center gap-4">
@@ -325,7 +301,7 @@ const Index = () => {
                 <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center">
                   <div className="w-4 h-4 bg-white rounded-sm" />
                 </div>
-                <span className="font-semibold">InflateStorage</span>
+                <span className="font-semibold">CloudBliss</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 Secure, unlimited cloud storage with end-to-end encryption and advanced AI organization.
@@ -365,7 +341,7 @@ const Index = () => {
           
           <div className="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center">
             <span className="text-sm text-muted-foreground mb-4 md:mb-0">
-              &copy; {new Date().getFullYear()} InflateStorage. All rights reserved.
+              &copy; {new Date().getFullYear()} CloudBliss. All rights reserved.
             </span>
             <div className="flex space-x-6">
               <Link to="#" className="text-muted-foreground hover:text-foreground">
