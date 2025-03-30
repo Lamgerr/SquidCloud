@@ -50,7 +50,7 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12 animate-slide-down animation-delay-200">
               <Link to="/auth">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Start Free Trial
+                  Get Started
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -103,7 +103,7 @@ const Index = () => {
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center mb-4">
                 <Lock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">End-to-End Encryption</h3>
+              <h3 className="text-xl font-semibold mb-2">C2C Encryption</h3>
               <p className="text-muted-foreground">
                 Client-side encryption ensures your data is protected before it leaves your device, with only you holding the keys.
               </p>
@@ -163,39 +163,6 @@ const Index = () => {
                 Upload files of any size with resumable transfers, delta syncing, and automatic content deduplication.
               </p>
             </div>
-            
-            {/* NEW Feature 7 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-600">
-              <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900/50 rounded-lg flex items-center justify-center mb-4">
-                <History className="h-6 w-6 text-teal-600 dark:text-teal-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Version History</h3>
-              <p className="text-muted-foreground">
-                Access and restore previous versions of any file with our comprehensive version control system.
-              </p>
-            </div>
-            
-            {/* NEW Feature 8 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-700">
-              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/50 rounded-lg flex items-center justify-center mb-4">
-                <UserPlus className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Team Collaboration</h3>
-              <p className="text-muted-foreground">
-                Collaborate effortlessly with team workspaces, real-time editing, and granular permission controls.
-              </p>
-            </div>
-            
-            {/* NEW Feature 9 */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in animation-delay-800">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center mb-4">
-                <Server className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Enterprise Controls</h3>
-              <p className="text-muted-foreground">
-                Enterprise-grade security features including SSO, audit logs, compliance tools, and admin controls.
-              </p>
-            </div>
           </div>
         </div>
       </section>
@@ -204,9 +171,9 @@ const Index = () => {
       <section className="py-20 bg-white dark:bg-slate-800/30">
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Trusted by Thousands</h2>
+            <h2 className="text-3xl font-bold mb-4">From Founders</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              See what our users have to say about their experience with CloudBliss.
+              See what founders think about CloudBliss.
             </p>
           </div>
           
@@ -215,15 +182,15 @@ const Index = () => {
             <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-6 shadow-sm">
               <div className="flex items-center mb-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-                  <span className="text-blue-600 font-bold">JD</span>
+                  <span className="text-blue-600 font-bold">LM</span>
                 </div>
                 <div>
-                  <h4 className="font-semibold">Jane Doe</h4>
-                  <p className="text-sm text-muted-foreground">Product Designer</p>
+                  <h4 className="font-semibold">Lamger</h4>
+                  <p className="text-sm text-muted-foreground">CEO / Developer / Founder</p>
                 </div>
               </div>
               <p className="italic text-muted-foreground">
-                "CloudBliss has completely transformed how I work with client files. The security features give me peace of mind, and the unlimited storage means I never have to worry about space again."
+                "We built CloudBliss to give you truly unlimited, secure, and fast cloud storage—no limits, no compromises. With Res54-powered speed and C2C encryption, your files are always safe and accessible."
               </p>
             </div>
             
@@ -231,31 +198,15 @@ const Index = () => {
             <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-6 shadow-sm">
               <div className="flex items-center mb-4">
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                  <span className="text-green-600 font-bold">MS</span>
+                  <span className="text-green-600 font-bold">AB</span>
                 </div>
                 <div>
-                  <h4 className="font-semibold">Michael Smith</h4>
-                  <p className="text-sm text-muted-foreground">Developer</p>
+                  <h4 className="font-semibold">Abhinav</h4>
+                  <p className="text-sm text-muted-foreground">CEO / Founder</p>
                 </div>
               </div>
               <p className="italic text-muted-foreground">
-                "As a developer handling sensitive code repositories, security is my top priority. CloudBliss's end-to-end encryption and version control are exactly what I needed."
-              </p>
-            </div>
-            
-            {/* Testimonial 3 */}
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-6 shadow-sm">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
-                  <span className="text-purple-600 font-bold">AJ</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold">Alex Johnson</h4>
-                  <p className="text-sm text-muted-foreground">Marketing Director</p>
-                </div>
-              </div>
-              <p className="italic text-muted-foreground">
-                "The team collaboration features have made our marketing campaigns so much more efficient. Being able to securely share and collaborate on files has been a game-changer."
+                "No limits. No hidden restrictions. Just pure, seamless, and secure storage designed for speed and privacy. Whether it’s work, memories, or anything in between—CloudBliss keeps it safe and accessible, anytime, anywhere."
               </p>
             </div>
           </div>
@@ -268,13 +219,13 @@ const Index = () => {
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4">Ready to Secure Your Digital Future?</h2>
             <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-              Join thousands of individuals and businesses who trust CloudBliss for their most important data.
+              Join hundreds of individuals and businesses who trust CloudBliss for their most important data.
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Link to="/auth">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Start Your Free Trial
+                  Start Your Experience
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
