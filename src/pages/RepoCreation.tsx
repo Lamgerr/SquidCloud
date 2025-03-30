@@ -8,6 +8,67 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+// Add new utility function for repo creation
+const createReposWithRetry = async (
+  session: any,
+  count: number,
+  password?: string | null
+): Promise<any[]> => {
+  // List of endpoints to try in order
+  const endpoints = [
+    'https://api.cloudbliss.storage/api/v1/repositories/create',
+    'https://cloudbliss.inflate.live/api/v1/repos',
+    'https://api-fallback.cloudbliss.storage/repositories'
+  ];
+
+  let lastError = null;
+
+  // Try each endpoint
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'X-User-Id': session.user.id
+        },
+        body: JSON.stringify({
+          count,
+          password,
+          userId: session.user.id
+        })
+      });
+
+      // Check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text}`);
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid response format - expected array');
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`Failed to create repos using ${endpoint}:`, error);
+      lastError = error;
+      // Continue to next endpoint
+    }
+  }
+
+  // If we get here, all endpoints failed
+  throw new Error(lastError?.message || 'All repository creation endpoints failed');
+};
+
 const RepoCreation = () => {
   const { count } = useParams<{ count: string }>();
   const location = useLocation();
@@ -34,107 +95,53 @@ const RepoCreation = () => {
         setProgress(20);
 
         // Get auth session
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) {
-          throw new Error("Authentication required");
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !sessionData?.session) {
+          throw new Error(sessionError?.message || "Authentication required");
         }
 
         setProgress(30);
 
-        // Try primary endpoint first
-        try {
-          const response = await fetch('https://cloudbliss.inflate.live/api/create-repos', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${sessionData.session.access_token}`
-            },
-            body: JSON.stringify({
-              count: validCount,
-              password: password || undefined
-            })
-          });
+        // Try to create repos with retry mechanism
+        const createdRepos = await createReposWithRetry(
+          sessionData.session,
+          validCount,
+          password
+        );
 
-          if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-          }
+        setProgress(60);
 
-          const text = await response.text();
-          let data;
+        // Store repos in Supabase with retry
+        const storeRepos = async (retries = 3) => {
           try {
-            data = JSON.parse(text);
-          } catch (e) {
-            console.error('Invalid JSON response:', text);
-            throw new Error('Invalid server response');
+            const { error: dbError } = await supabase
+              .from('repositories')
+              .insert(
+                createdRepos.map(repo => ({
+                  repo_name: repo.name,
+                  user_id: sessionData.session.user.id,
+                  status: 'active',
+                  created_at: new Date().toISOString()
+                }))
+              );
+
+            if (dbError) throw dbError;
+          } catch (error) {
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              return storeRepos(retries - 1);
+            }
+            throw error;
           }
+        };
 
-          if (!Array.isArray(data)) {
-            throw new Error('Invalid response format');
-          }
+        await storeRepos();
+        setProgress(90);
+        setVaults(createdRepos.map(repo => repo.name));
 
-          setProgress(60);
-
-          // Store repos in Supabase
-          const { error: dbError } = await supabase
-            .from('repositories')
-            .insert(
-              data.map(repo => ({
-                repo_name: repo.name,
-                user_id: sessionData.session.user.id,
-                status: 'active'
-              }))
-            );
-
-          if (dbError) throw dbError;
-
-          setProgress(90);
-          setVaults(data.map(repo => repo.name));
-
-        } catch (primaryError) {
-          console.error("Primary endpoint failed:", primaryError);
-
-          // Fallback to backup endpoint
-          const fallbackResponse = await fetch('https://api.cloudbliss.storage/v1/repos/create', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${sessionData.session.access_token}`
-            },
-            body: JSON.stringify({
-              count: validCount,
-              password: password || undefined
-            })
-          });
-
-          if (!fallbackResponse.ok) {
-            throw new Error('Repository creation failed');
-          }
-
-          const fallbackData = await fallbackResponse.json();
-          
-          if (!Array.isArray(fallbackData)) {
-            throw new Error('Invalid fallback response format');
-          }
-
-          // Store fallback repos in Supabase
-          await supabase
-            .from('repositories')
-            .insert(
-              fallbackData.map(repo => ({
-                repo_name: repo.name,
-                user_id: sessionData.session.user.id,
-                status: 'active'
-              }))
-            );
-
-          setVaults(fallbackData.map(repo => repo.name));
-        }
-
-        setProgress(100);
-        
         toast({
           title: "Setup complete",
-          description: `Successfully created ${validCount} secure vaults for your encrypted data`,
+          description: `Successfully created ${createdRepos.length} secure vaults`,
         });
         
         setTimeout(() => {
@@ -151,6 +158,7 @@ const RepoCreation = () => {
           variant: "destructive",
         });
       } finally {
+        setProgress(100);
         setCreating(false);
       }
     };
