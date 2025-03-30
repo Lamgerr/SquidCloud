@@ -79,6 +79,18 @@ const validateChunkFormat = (chunk: any): boolean => {
   );
 };
 
+// Update the string conversion function
+const uint8ArrayToString = (array: Uint8Array): string => {
+  let string = '';
+  // Process in chunks to avoid stack overflow
+  const chunkSize = 0x8000;
+  for (let i = 0; i < array.length; i += chunkSize) {
+    const chunk = array.subarray(i, i + chunkSize);
+    string += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  return string;
+};
+
 // Encrypt file data with AES-256-GCM and return as base64 string
 export const encryptData = async (data: ArrayBuffer, key: string): Promise<string> => {
   try {
@@ -104,8 +116,8 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
     combined.set(iv);
     combined.set(new Uint8Array(encryptedContent), iv.length);
     
-    // Use standard base64 encoding
-    return btoa(String.fromCharCode.apply(null, Array.from(combined)));
+    // Use chunked conversion to avoid stack overflow
+    return btoa(uint8ArrayToString(combined));
   } catch (error) {
     console.error('Encryption error:', error);
     throw new Error(`Encryption failed: ${error.message}`);
