@@ -468,6 +468,32 @@ const validateMetadata = (data: any): boolean => {
 const MAX_RETRIES = 5;
 const CHUNK_VERSION = '2.0';
 
+// Add ChunkFormat interface and validation function
+export interface ChunkFormat {
+  chunkIndex: number;
+  totalChunks: number;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  chunkData: string;
+  checksum?: string;
+  version?: string;
+  repo?: string;
+  path?: string;
+}
+
+export const validateChunkFormat = (chunk: any): chunk is ChunkFormat => {
+  return (
+    chunk &&
+    typeof chunk.chunkIndex === 'number' &&
+    typeof chunk.totalChunks === 'number' &&
+    typeof chunk.fileName === 'string' &&
+    typeof chunk.fileType === 'string' &&
+    typeof chunk.fileSize === 'number' &&
+    typeof chunk.chunkData === 'string'
+  );
+};
+
 // Update downloadChunk function
 const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> => {
   if (!chunk.repo || !chunk.path) {
@@ -489,13 +515,14 @@ const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> =>
       const parsedChunk = JSON.parse(decodedContent);
 
       if (!validateChunkFormat(parsedChunk)) {
-        throw new Error('Invalid chunk format');
+        console.error('Invalid chunk format:', parsedChunk);
+        throw new Error('Invalid chunk format - missing required fields');
       }
 
       return {
         index: parsedChunk.chunkIndex,
         data: parsedChunk.chunkData,
-        size: parsedChunk.chunkSize,
+        size: parsedChunk.fileSize,
         version: parsedChunk.version || '1.0'
       };
     } catch (parseError) {
