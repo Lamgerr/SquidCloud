@@ -69,10 +69,19 @@ const binaryUtils = {
   }
 };
 
+// Add chunk format validation
+const validateChunkFormat = (chunk: any): boolean => {
+  return (
+    chunk &&
+    typeof chunk.chunkData === 'string' &&
+    typeof chunk.chunkIndex === 'number' &&
+    typeof chunk.totalChunks === 'number'
+  );
+};
+
 // Encrypt file data with AES-256-GCM and return as base64 string
 export const encryptData = async (data: ArrayBuffer, key: string): Promise<string> => {
   try {
-    // Normalize key to exactly 32 bytes
     const keyBytes = new TextEncoder().encode(key.slice(0, 32).padEnd(32, '0'));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     
@@ -95,7 +104,8 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
     combined.set(iv);
     combined.set(new Uint8Array(encryptedContent), iv.length);
     
-    return base64Utils.encode(combined.buffer);
+    // Use standard base64 encoding
+    return btoa(String.fromCharCode.apply(null, Array.from(combined)));
   } catch (error) {
     console.error('Encryption error:', error);
     throw new Error(`Encryption failed: ${error.message}`);
@@ -103,29 +113,41 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
 };
 
 // Decrypt file data from base64 string
-export const decryptData = async (data: string, key: string): Promise<ArrayBuffer> => {
+export const decryptData = async (encodedData: string, key: string): Promise<ArrayBuffer> => {
   try {
-    if (!data || typeof data !== 'string') {
-      throw new Error('Invalid input: data must be a string');
+    // Input validation
+    if (!encodedData || typeof encodedData !== 'string') {
+      throw new Error('Invalid input: expected base64 string');
     }
 
-    // Decode and validate the encrypted data
-    let bytes: Uint8Array;
+    // Clean the base64 string
+    const cleanedData = encodedData.trim().replace(/\s/g, '');
+    
+    // Decode base64
+    let binary: string;
     try {
-      bytes = base64Utils.decode(data);
-    } catch (decodeError) {
-      console.error('Base64 decode error:', decodeError);
-      throw new Error('Invalid encrypted data format');
+      binary = atob(cleanedData);
+    } catch (error) {
+      console.error('Base64 decode error:', error);
+      throw new Error('Invalid base64 format');
     }
 
+    // Convert to Uint8Array
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    // Validate length
     if (bytes.length < 12) {
-      throw new Error('Invalid encrypted data: content too short');
+      throw new Error('Invalid data: too short');
     }
 
+    // Extract IV and encrypted content
     const iv = bytes.slice(0, 12);
     const encryptedContent = bytes.slice(12);
 
-    // Normalize key
+    // Import key
     const keyBytes = new TextEncoder().encode(key.slice(0, 32).padEnd(32, '0'));
     const keyBuffer = await crypto.subtle.importKey(
       'raw',
@@ -135,16 +157,16 @@ export const decryptData = async (data: string, key: string): Promise<ArrayBuffe
       ['decrypt']
     );
 
-    // Decrypt with additional error context
+    // Decrypt
     try {
       return await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv },
         keyBuffer,
         encryptedContent
       );
-    } catch (decryptError) {
-      console.error('Decryption operation failed:', decryptError);
-      throw new Error('Failed to decrypt data: invalid key or corrupted content');
+    } catch (error) {
+      console.error('Decryption operation failed:', error);
+      throw new Error('Failed to decrypt: invalid key or corrupted data');
     }
   } catch (error) {
     console.error('Decryption error:', error);
@@ -237,6 +259,9 @@ export const reassembleJsonChunks = async (chunks: string[], encryptionKey: stri
   
   // Concatenate chunk data
   const encryptedData = parsedChunks.reduce((acc, chunk) => {
+    if (!validateChunkFormat(chunk)) {
+      throw new Error('Invalid chunk format');
+    }
     return acc + chunk.chunkData;
   }, '');
   

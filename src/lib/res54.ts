@@ -483,27 +483,26 @@ const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> =>
     if (!data?.content) throw new Error('No content in response');
 
     try {
-      // Decode GitHub base64 content
-      const decodedContent = atob(data.content.replace(/\s/g, ''));
+      // Clean and decode GitHub base64 content
+      const cleanContent = data.content.replace(/\s/g, '');
+      const decodedContent = atob(cleanContent);
       const parsedChunk = JSON.parse(decodedContent);
 
-      if (!parsedChunk.chunkData || !parsedChunk.version) {
-        throw new Error('Invalid chunk format - missing required fields');
+      if (!validateChunkFormat(parsedChunk)) {
+        throw new Error('Invalid chunk format');
       }
 
-      // Return the raw chunk data for decryption
       return {
         index: parsedChunk.chunkIndex,
         data: parsedChunk.chunkData,
         size: parsedChunk.chunkSize,
-        version: parsedChunk.version
+        version: parsedChunk.version || '1.0'
       };
     } catch (parseError) {
       console.error('Chunk parsing error:', parseError);
       throw new Error(`Failed to parse chunk data: ${parseError.message}`);
     }
   } catch (error: any) {
-    console.error(`Download error for chunk ${chunk.index}:`, error);
     if (attempt < MAX_RETRIES) {
       await delay(Math.pow(2, attempt) * 1000);
       return downloadChunk(chunk, attempt + 1);
