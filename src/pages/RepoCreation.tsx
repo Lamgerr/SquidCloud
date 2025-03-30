@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,6 @@ const RepoCreation = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-  // Extract password from query string
   const queryParams = new URLSearchParams(location.search);
   const password = queryParams.get('password');
 
@@ -30,13 +28,11 @@ const RepoCreation = () => {
       setProgress(10);
       
       try {
-        // Parse the count parameter, default to 5 if not provided or invalid
         const vaultCount = count ? parseInt(count, 10) : 5;
         const validCount = isNaN(vaultCount) ? 5 : Math.min(Math.max(1, vaultCount), 5);
         
         setProgress(30);
         
-        // Create the secure vaults with password if provided
         const createdVaults = await initializeRepos(validCount, password || undefined);
         
         setProgress(90);
@@ -47,7 +43,6 @@ const RepoCreation = () => {
           description: `Successfully created ${createdVaults.length} secure vaults for your encrypted data`,
         });
         
-        // Redirect back to dashboard after a short delay
         setTimeout(() => {
           navigate('/dashboard');
         }, 2000);

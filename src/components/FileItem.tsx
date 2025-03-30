@@ -64,7 +64,7 @@ const FileItem: React.FC<FileItemProps> = ({
     return <File className="h-10 w-10 text-gray-500" />;
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -135,7 +135,7 @@ const FileItem: React.FC<FileItemProps> = ({
           <span>{formatBytes(file.size)}</span>
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            {formatDate(file.lastModified)}
+            {formatDate(file.updated_at || file.created_at)}
           </span>
         </div>
       </div>

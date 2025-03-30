@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileWithRes54, downloadFileWithRes54 } from "./res54";
 
@@ -18,6 +19,19 @@ export interface FileItem {
   preview_available?: boolean;
   preview_type?: string;
   processor?: string;
+}
+
+// Utility function to format bytes to human-readable format
+export function formatBytes(bytes: number, decimals = 2): string {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 export async function getFiles(): Promise<FileItem[]> {
@@ -79,7 +93,7 @@ export async function uploadFile(file: File, onProgress?: (progress: number, sta
     
     // Add processor info if not present in database response
     const fileItem = data as FileItem;
-    if (!fileItem.processor && fileItem.storage_path === "res54_distributed") {
+    if (!fileItem.processor && fileItem.storage_path === "github_distributed") {
       (fileItem as any).processor = "res54";
     }
     
@@ -139,7 +153,7 @@ export async function updateFile(id: string, updates: Partial<FileItem>): Promis
   }
 }
 
-export async function shareFile(id: string, shared: boolean): Promise<FileItem | null> {
+export async function shareFile(id: string, shared: boolean = true): Promise<string> {
   try {
     const { data, error } = await supabase
       .from('files')
@@ -150,12 +164,38 @@ export async function shareFile(id: string, shared: boolean): Promise<FileItem |
 
     if (error) {
       console.error("Error sharing file:", error);
-      return null;
+      throw error;
     }
 
-    return data as FileItem;
+    // Generate a shareable link
+    const shareLink = `${window.location.origin}/share/${id}`;
+    return shareLink;
   } catch (error) {
     console.error("Error sharing file:", error);
-    return null;
+    throw new Error("Failed to generate share link");
+  }
+}
+
+// Added the missing initializeRepos function
+export async function initializeRepos(count: number, password?: string): Promise<string[]> {
+  try {
+    const response = await fetch('/api/create-repos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ count, password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create repositories');
+    }
+
+    const data = await response.json();
+    return data.repos || [];
+  } catch (error: any) {
+    console.error('Error initializing repos:', error);
+    throw new Error(error.message || 'Failed to initialize secure repositories');
   }
 }

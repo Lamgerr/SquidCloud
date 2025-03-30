@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import UploadButton from '@/components/UploadButton';
 import FileItem from '@/components/FileItem';
 import FilePreview from '@/components/FilePreview';
-import { FileItem as FileItemType, getFiles, formatBytes, deleteFile, downloadFile, shareFile } from '@/lib/api';
+import { FileItem as FileItemType, getFiles, deleteFile, downloadFile, shareFile, formatBytes } from '@/lib/api';
 import { Loader2, Plus, FileText, Info, Settings, FolderOpen, HardDrive, BarChart3, Share2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -155,7 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
       const file = files.find(f => f.id === fileId);
       if (!file) return;
       
-      const shareLink = await shareFile(fileId);
+      const shareLink = await shareFile(fileId, true);
       
       setFiles((prev) => 
         prev.map((f) => 
@@ -426,8 +426,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
                           type: selectedFile.type,
                           encrypted: selectedFile.encrypted,
                           processor: selectedFile.processor || "legacy",
-                          preview_available: selectedFile.preview_available,
-                          previewUrl: selectedFile.preview_available ? `/api/preview/${selectedFile.id}` : undefined
+                          preview_available: selectedFile.preview_available || false
                         }} 
                         onClose={() => setSelectedFile(null)} 
                       />

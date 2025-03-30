@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Download, ExternalLink, File, FileText, Image, Video, Music, FileSpreadsheet, FileCode, Lock } from 'lucide-react';
+import { Eye, Download, File, FileText, Image, Video, Music, FileSpreadsheet, FileCode, Lock } from 'lucide-react';
 import { downloadFile } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
