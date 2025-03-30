@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { initializeRepos } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Check, AlertCircle, KeyRound, Lock, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -31,16 +31,110 @@ const RepoCreation = () => {
         const vaultCount = count ? parseInt(count, 10) : 5;
         const validCount = isNaN(vaultCount) ? 5 : Math.min(Math.max(1, vaultCount), 5);
         
+        setProgress(20);
+
+        // Get auth session
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData?.session) {
+          throw new Error("Authentication required");
+        }
+
         setProgress(30);
-        
-        const createdVaults = await initializeRepos(validCount, password || undefined);
-        
-        setProgress(90);
-        setVaults(createdVaults);
+
+        // Try primary endpoint first
+        try {
+          const response = await fetch('https://cloudbliss.inflate.live/api/create-repos', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionData.session.access_token}`
+            },
+            body: JSON.stringify({
+              count: validCount,
+              password: password || undefined
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+          }
+
+          const text = await response.text();
+          let data;
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            console.error('Invalid JSON response:', text);
+            throw new Error('Invalid server response');
+          }
+
+          if (!Array.isArray(data)) {
+            throw new Error('Invalid response format');
+          }
+
+          setProgress(60);
+
+          // Store repos in Supabase
+          const { error: dbError } = await supabase
+            .from('repositories')
+            .insert(
+              data.map(repo => ({
+                repo_name: repo.name,
+                user_id: sessionData.session.user.id,
+                status: 'active'
+              }))
+            );
+
+          if (dbError) throw dbError;
+
+          setProgress(90);
+          setVaults(data.map(repo => repo.name));
+
+        } catch (primaryError) {
+          console.error("Primary endpoint failed:", primaryError);
+
+          // Fallback to backup endpoint
+          const fallbackResponse = await fetch('https://api.cloudbliss.storage/v1/repos/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionData.session.access_token}`
+            },
+            body: JSON.stringify({
+              count: validCount,
+              password: password || undefined
+            })
+          });
+
+          if (!fallbackResponse.ok) {
+            throw new Error('Repository creation failed');
+          }
+
+          const fallbackData = await fallbackResponse.json();
+          
+          if (!Array.isArray(fallbackData)) {
+            throw new Error('Invalid fallback response format');
+          }
+
+          // Store fallback repos in Supabase
+          await supabase
+            .from('repositories')
+            .insert(
+              fallbackData.map(repo => ({
+                repo_name: repo.name,
+                user_id: sessionData.session.user.id,
+                status: 'active'
+              }))
+            );
+
+          setVaults(fallbackData.map(repo => repo.name));
+        }
+
+        setProgress(100);
         
         toast({
           title: "Setup complete",
-          description: `Successfully created ${createdVaults.length} secure vaults for your encrypted data`,
+          description: `Successfully created ${validCount} secure vaults for your encrypted data`,
         });
         
         setTimeout(() => {
@@ -57,7 +151,6 @@ const RepoCreation = () => {
           variant: "destructive",
         });
       } finally {
-        setProgress(100);
         setCreating(false);
       }
     };
