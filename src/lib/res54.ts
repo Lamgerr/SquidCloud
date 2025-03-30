@@ -305,7 +305,7 @@ export const uploadFileWithRes54 = async (
   
   const encryptedChunks: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
-    const encryptedChunk = encryptData(chunks[i], metadata.encryptionKey);
+    const encryptedChunk = await encryptData(chunks[i], metadata.encryptionKey);
     encryptedChunks.push(encryptedChunk);
     
     if (progressCallback) {
