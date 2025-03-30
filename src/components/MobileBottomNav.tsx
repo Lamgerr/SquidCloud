@@ -58,12 +58,12 @@ const MobileBottomNav: React.FC = () => {
           <div className="flex flex-col items-center justify-center w-16 h-full text-muted-foreground">
             <DropdownMenu>
               <DropdownMenuTrigger className="flex flex-col items-center focus:outline-none">
-                <div className="bg-background/80 backdrop-blur-lg p-1 rounded-md">
+                <div className="bg-background/90 backdrop-blur-lg p-1.5 rounded-md border border-border/30 shadow-sm">
                   <Menu className="h-5 w-5" />
                 </div>
                 <span className="text-xs mt-1">Menu</span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-background/90 backdrop-blur-lg">
+              <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur-xl border border-border/50">
                 <DropdownMenuItem asChild>
                   <NavLink to="/settings" className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />

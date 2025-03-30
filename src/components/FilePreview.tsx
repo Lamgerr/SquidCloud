@@ -26,6 +26,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,6 +45,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
     if (!file.id) return;
     
     setLoading(true);
+    setError(null);
     
     try {
       if (file.encrypted && !file.previewUrl) {
@@ -54,8 +56,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
       else if (file.previewUrl) {
         setPreviewContent(file.previewUrl);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Preview error:", error);
+      setError(error.message || "Failed to load preview");
       toast({
         title: "Preview failed",
         description: "There was a problem loading the file preview",
@@ -85,11 +88,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
         title: "Download complete",
         description: `${file.name} has been successfully downloaded`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Download error:", error);
       toast({
         title: "Download failed",
-        description: "There was a problem downloading your file",
+        description: error.message || "There was a problem downloading your file",
         variant: "destructive",
       });
     } finally {
@@ -118,6 +121,24 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
       );
     }
 
+    if (error) {
+      return (
+        <div className="flex flex-col justify-center items-center h-64">
+          <div className="p-4 rounded-full bg-red-100 dark:bg-red-900 mb-4">
+            <FileText className="h-6 w-6 text-red-500" />
+          </div>
+          <p className="text-muted-foreground">{error}</p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={loadPreview}
+          >
+            Retry loading preview
+          </Button>
+        </div>
+      );
+    }
+
     if (!previewContent) {
       return (
         <div className="flex flex-col justify-center items-center h-64">
@@ -137,7 +158,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
       );
     }
 
-    if (file.processor === "res54" && file.preview_available) {
+    // Check if file has processor and preview is available
+    const hasProcessor = !!file.processor;
+    const hasPreview = file.preview_available === true;
+    
+    if (hasProcessor && hasPreview) {
       if (file.type.startsWith('image/')) {
         return (
           <div className="flex justify-center">
@@ -145,6 +170,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
               src={`/api/preview/${file.id}`} 
               alt={file.name} 
               className="max-w-full max-h-[500px] object-contain rounded-md" 
+              onError={(e) => {
+                console.error("Image preview error, falling back to direct preview");
+                const target = e.target as HTMLImageElement;
+                target.src = previewContent;
+              }}
             />
           </div>
         );
@@ -154,8 +184,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
             <video 
               controls 
               className="max-w-full max-h-[500px] rounded-md"
+              onError={(e) => {
+                console.error("Video preview error, falling back to download option");
+                setError("Video preview failed to load");
+              }}
             >
               <source src={`/api/preview/${file.id}`} type={file.type} />
+              <source src={previewContent} type={file.type} />
               Your browser does not support the video tag.
             </video>
           </div>
@@ -167,12 +202,18 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
               src={`/api/preview/${file.id}`} 
               className="w-full h-[500px] rounded-md border"
               title={file.name}
+              onError={(e) => {
+                console.error("PDF/text preview error, falling back to direct preview");
+                const target = e.target as HTMLIFrameElement;
+                target.src = previewContent;
+              }}
             ></iframe>
           </div>
         );
       }
     }
 
+    // Fallback previews for common file types
     if (file.type.startsWith('image/')) {
       return <img src={previewContent} alt={file.name} className="max-w-full h-auto max-h-[70vh] object-contain rounded-md" />;
     }

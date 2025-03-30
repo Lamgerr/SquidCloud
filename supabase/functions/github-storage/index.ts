@@ -180,7 +180,7 @@ serve(async (req) => {
         let base64Content = data;
         if (fileType && fileType.startsWith('application/json')) {
           // For JSON data, we need to encode it to base64
-          base64Content = btoa(data);
+          base64Content = btoa(unescape(encodeURIComponent(data)));
         }
         
         // Upload file to GitHub
@@ -262,228 +262,138 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-  
-  // Check if repository exists
-  async function checkRepoExists(repo: string, username: string, token: string): Promise<boolean> {
-    try {
-      const response = await fetch(
-        `https://api.github.com/repos/${username}/${repo}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'CloudBliss-Storage-App'
-          }
-        }
-      );
-      
-      return response.status === 200;
-    } catch (error) {
-      console.error('Error checking repository:', error);
-      return false;
-    }
-  }
-  
-  // Create a new private GitHub repository
-  async function createRepository(repo: string, username: string, token: string): Promise<void> {
+});
+
+// Check if repository exists
+async function checkRepoExists(repo: string, username: string, token: string): Promise<boolean> {
+  try {
     const response = await fetch(
-      'https://api.github.com/user/repos',
+      `https://api.github.com/repos/${username}/${repo}`,
       {
-        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'CloudBliss-Storage-App',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: repo,
-          description: 'CloudBliss secure storage vault',
-          private: true,
-          auto_init: true
-        })
+          'User-Agent': 'CloudBliss-Storage-App'
+        }
       }
     );
     
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Failed to create repository: ${response.status} ${response.statusText} - ${errorData}`);
-    }
+    return response.status === 200;
+  } catch (error) {
+    console.error('Error checking repository:', error);
+    return false;
   }
+}
+
+// Create a new private GitHub repository
+async function createRepository(repo: string, username: string, token: string): Promise<void> {
+  const response = await fetch(
+    'https://api.github.com/user/repos',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'CloudBliss-Storage-App',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: repo,
+        description: 'CloudBliss secure storage vault',
+        private: true,
+        auto_init: true
+      })
+    }
+  );
   
-  // Check if a path exists in the repository
-  async function checkPathExists(path: string, repo: string, username: string, token: string): Promise<boolean> {
-    try {
-      const response = await fetch(
-        `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'CloudBliss-Storage-App'
-          }
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(`Failed to create repository: ${response.status} ${response.statusText} - ${errorData}`);
+  }
+}
+
+// Check if a path exists in the repository
+async function checkPathExists(path: string, repo: string, username: string, token: string): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'CloudBliss-Storage-App'
         }
-      );
-      
-      return response.status === 200;
-    } catch (error) {
-      console.error('Error checking path:', error);
-      return false;
-    }
-  }
-  
-  // Create a directory by adding a README.md file
-  async function createDirectory(dirPath: string, repo: string, username: string, token: string): Promise<void> {
-    const readmePath = `${dirPath}/README.md`;
-    const readmeContent = 'This directory contains encrypted storage chunks.';
-    
-    await uploadToGitHub(
-      readmePath,
-      btoa(readmeContent),
-      'text/markdown',
-      repo,
-      username,
-      token
+      }
     );
+    
+    return response.status === 200;
+  } catch (error) {
+    console.error('Error checking path:', error);
+    return false;
   }
+}
+
+// Create a directory by adding a README.md file
+async function createDirectory(dirPath: string, repo: string, username: string, token: string): Promise<void> {
+  const readmePath = `${dirPath}/README.md`;
+  const readmeContent = 'This directory contains encrypted storage chunks.';
   
-  // List files for a specific user
-  async function listUserFiles(userId: string, repo: string, username: string, token: string): Promise<any[]> {
-    try {
-      const response = await fetch(
-        `https://api.github.com/repos/${username}/${repo}/contents/${userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'CloudBliss-Storage-App'
-          }
+  await uploadToGitHub(
+    readmePath,
+    btoa(readmeContent),
+    'text/markdown',
+    repo,
+    username,
+    token
+  );
+}
+
+// List files for a specific user
+async function listUserFiles(userId: string, repo: string, username: string, token: string): Promise<any[]> {
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${username}/${repo}/contents/${userId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'CloudBliss-Storage-App'
         }
-      );
-      
-      if (response.status === 404) {
-        // Directory doesn't exist yet, which is fine
-        return [];
       }
-      
-      if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error listing files:', error);
-      // Return empty array to avoid breaking the client
+    );
+    
+    if (response.status === 404) {
+      // Directory doesn't exist yet, which is fine
       return [];
     }
-  }
-  
-  // Helper function to upload a file to GitHub
-  async function uploadToGitHub(
-    path: string, 
-    content: string, 
-    contentType: string, 
-    repo: string,
-    username: string,
-    token: string
-  ): Promise<any> {
-    console.log(`Uploading to GitHub: ${path} in repo ${repo}`);
-    
-    // First, check if the file already exists to get the SHA if it does
-    let existingSha;
-    try {
-      const fileResponse = await fetch(
-        `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'CloudBliss-Storage-App',
-          },
-        }
-      );
-      
-      if (fileResponse.status === 200) {
-        const fileData = await fileResponse.json();
-        existingSha = fileData.sha;
-      }
-    } catch (error) {
-      console.log('File does not exist yet, will create new file');
-      // File doesn't exist, which is fine for creation
-    }
-    
-    // Now upload/update the file
-    const response = await fetch(
-      `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'CloudBliss-Storage-App',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: `Upload file ${path}`,
-          content: content, // Base64 encoded content
-          sha: existingSha, // Include SHA if file exists
-        }),
-      }
-    );
-    
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('GitHub API error:', errorData);
-      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    return { 
-      url: data.content.download_url, 
-      sha: data.content.sha,
-      html_url: data.content.html_url 
-    };
-  }
-  
-  // Helper function to download a file from GitHub
-  async function downloadFromGitHub(
-    path: string,
-    repo: string,
-    username: string,
-    token: string
-  ): Promise<string> {
-    console.log(`Downloading from GitHub: ${path} from repo ${repo}`);
-    
-    const response = await fetch(
-      `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'CloudBliss-Storage-App',
-        },
-      }
-    );
     
     if (!response.ok) {
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
-    return data.content; // Base64 encoded content
+    return data;
+  } catch (error) {
+    console.error('Error listing files:', error);
+    // Return empty array to avoid breaking the client
+    return [];
   }
+}
+
+// Helper function to upload a file to GitHub
+async function uploadToGitHub(
+  path: string, 
+  content: string, 
+  contentType: string, 
+  repo: string,
+  username: string,
+  token: string
+): Promise<any> {
+  console.log(`Uploading to GitHub: ${path} in repo ${repo}`);
   
-  // Helper function to delete a file from GitHub
-  async function deleteFromGitHub(
-    path: string,
-    repo: string,
-    username: string,
-    token: string
-  ): Promise<void> {
-    console.log(`Deleting from GitHub: ${path} from repo ${repo}`);
-    
-    // First, get the current SHA
+  // First, check if the file already exists to get the SHA if it does
+  let existingSha;
+  try {
     const fileResponse = await fetch(
       `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
       {
@@ -495,36 +405,126 @@ serve(async (req) => {
       }
     );
     
-    if (!fileResponse.ok) {
-      if (fileResponse.status === 404) {
-        console.log(`File ${path} not found, already deleted`);
-        return;
-      }
-      throw new Error(`GitHub API error: ${fileResponse.status} ${fileResponse.statusText}`);
+    if (fileResponse.status === 200) {
+      const fileData = await fileResponse.json();
+      existingSha = fileData.sha;
     }
-    
-    const fileData = await fileResponse.json();
-    
-    // Now delete the file
-    const response = await fetch(
-      `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
-      {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'CloudBliss-Storage-App',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: `Delete file ${path}`,
-          sha: fileData.sha,
-        }),
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-    }
+  } catch (error) {
+    console.log('File does not exist yet, will create new file');
+    // File doesn't exist, which is fine for creation
   }
-});
+  
+  // Now upload/update the file
+  const response = await fetch(
+    `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'CloudBliss-Storage-App',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: `Upload file ${path}`,
+        content: content, // Base64 encoded content
+        sha: existingSha, // Include SHA if file exists
+      }),
+    }
+  );
+  
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error('GitHub API error:', errorData);
+    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return { 
+    url: data.content.download_url, 
+    sha: data.content.sha,
+    html_url: data.content.html_url 
+  };
+}
+
+// Helper function to download a file from GitHub
+async function downloadFromGitHub(
+  path: string,
+  repo: string,
+  username: string,
+  token: string
+): Promise<string> {
+  console.log(`Downloading from GitHub: ${path} from repo ${repo}`);
+  
+  const response = await fetch(
+    `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'CloudBliss-Storage-App',
+      },
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return data.content; // Base64 encoded content
+}
+
+// Helper function to delete a file from GitHub
+async function deleteFromGitHub(
+  path: string,
+  repo: string,
+  username: string,
+  token: string
+): Promise<void> {
+  console.log(`Deleting from GitHub: ${path} from repo ${repo}`);
+  
+  // First, get the current SHA
+  const fileResponse = await fetch(
+    `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'CloudBliss-Storage-App',
+      },
+    }
+  );
+  
+  if (!fileResponse.ok) {
+    if (fileResponse.status === 404) {
+      console.log(`File ${path} not found, already deleted`);
+      return;
+    }
+    throw new Error(`GitHub API error: ${fileResponse.status} ${fileResponse.statusText}`);
+  }
+  
+  const fileData = await fileResponse.json();
+  
+  // Now delete the file
+  const response = await fetch(
+    `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'CloudBliss-Storage-App',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: `Delete file ${path}`,
+        sha: fileData.sha,
+      }),
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+  }
+}

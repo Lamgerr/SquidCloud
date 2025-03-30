@@ -159,7 +159,7 @@ export const uploadFileWithRes54 = async (
   if (progressCallback) progressCallback(60, 'uploading');
   
   let completedUploads = 0;
-  const maxRetries = 3;
+  const maxRetries = 5; // Increased from 3 to 5 for more resilience
   
   const uploadChunk = async (chunk: string, index: number, attempt = 0): Promise<any> => {
     try {
@@ -181,6 +181,7 @@ export const uploadFileWithRes54 = async (
         timestamp: new Date().toISOString(),
       });
       
+      // Use a more reliable approach for uploading
       const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
         body: {
           action: 'upload',
@@ -194,8 +195,15 @@ export const uploadFileWithRes54 = async (
         }
       });
 
-      if (uploadError) throw new Error(`Failed to upload chunk ${index}: ${uploadError.message}`);
-      if (!uploadData) throw new Error(`Failed to upload chunk ${index}: No data returned`);
+      if (uploadError) {
+        console.error(`Error uploading chunk ${index} (attempt ${attempt + 1}):`, uploadError);
+        throw new Error(`Failed to upload chunk ${index}: ${uploadError.message}`);
+      }
+      
+      if (!uploadData) {
+        console.error(`No data returned when uploading chunk ${index} (attempt ${attempt + 1})`);
+        throw new Error(`Failed to upload chunk ${index}: No data returned`);
+      }
       
       // Update chunk metadata with storage location
       metadata.chunks[index].repo = repo;
@@ -247,7 +255,7 @@ export const uploadFileWithRes54 = async (
   // Convert metadata to JSON string for storage
   const metadataString = JSON.stringify(metadata);
   
-  // Create a record in the files table
+  // Create a record in the files table WITHOUT using the processor field
   const fileRecord = {
     name: file.name,
     type: file.type,
@@ -260,13 +268,26 @@ export const uploadFileWithRes54 = async (
     tags: [metadataString] as string[]
   };
 
-  // Add processor as a separate field after creating the base record
+  // Check if processor field exists before using it
+  const { data: columns, error: columnsError } = await supabase
+    .from('files')
+    .select('*')
+    .limit(1);
+
+  if (columnsError) {
+    console.error("Error checking files table:", columnsError);
+    throw new Error("Failed to create file record");
+  }
+
+  let insertData = fileRecord;
+  // Check if processor field exists in the table
+  if (columns && columns.length > 0 && 'processor' in columns[0]) {
+    insertData = { ...fileRecord, processor: "res54" };
+  }
+
   const { data: dbFile, error: dbError } = await supabase
     .from('files')
-    .insert({
-      ...fileRecord,
-      processor: "res54" // Add processor field
-    } as any)
+    .insert(insertData)
     .select()
     .single();
 
@@ -318,7 +339,9 @@ export const downloadFileWithRes54 = async (
   let metadata: Res54FileMetadata;
   try {
     // Parse metadata from tags
-    if ((file as any).processor === "res54" && Array.isArray(file.tags) && file.tags.length > 0) {
+    const processorValue = (file as any).processor || "unknown";
+    
+    if (processorValue === "res54" && Array.isArray(file.tags) && file.tags.length > 0) {
       metadata = JSON.parse(file.tags[0]);
     } else {
       // Legacy format
@@ -354,7 +377,7 @@ export const downloadFileWithRes54 = async (
   if (progressCallback) progressCallback(20, 'downloading');
   
   let completedDownloads = 0;
-  const maxRetries = 3;
+  const maxRetries = 5; // Increased from 3 to 5 for more resilience
   
   const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> => {
     try {
@@ -439,15 +462,38 @@ async function generatePreview(fileId: string, fileType: string): Promise<void> 
   // This would generate thumbnails, video transcoding, etc.
   console.log(`Preview generation for ${fileId} of type ${fileType} would happen here`);
   
-  // Instead of updating the database directly, let's use a try-catch block to handle potential errors
+  // Check if preview_available field exists before updating
+  const { data: columns, error: columnsError } = await supabase
+    .from('files')
+    .select('*')
+    .limit(1);
+
+  if (columnsError || !columns || columns.length === 0) {
+    console.error("Error checking files table columns:", columnsError);
+    return;
+  }
+
+  // Only update fields that exist in the table
+  const updateData: Record<string, any> = {};
+  
+  if ('preview_available' in columns[0]) {
+    updateData.preview_available = true;
+  }
+  
+  if ('preview_type' in columns[0]) {
+    updateData.preview_type = fileType.split('/')[0];
+  }
+  
+  if (Object.keys(updateData).length === 0) {
+    console.log("No preview fields to update");
+    return;
+  }
+
+  // Update the file record to indicate preview is available
   try {
-    // Update the file record to indicate preview is available
     await supabase
       .from('files')
-      .update({
-        preview_available: true,
-        preview_type: fileType.split('/')[0]
-      } as any)
+      .update(updateData)
       .eq('id', fileId);
   } catch (error) {
     console.error("Error updating preview info:", error);
@@ -473,11 +519,12 @@ export const checkFilePreview = async (fileId: string): Promise<{
     }
     
     const fileData = data as any;
+    const hasPreviewField = 'preview_available' in fileData;
     
     return {
-      hasPreview: !!fileData.preview_available,
-      previewType: fileData.preview_type || undefined,
-      previewUrl: fileData.preview_available ? `/api/preview/${fileId}` : undefined
+      hasPreview: hasPreviewField ? !!fileData.preview_available : false,
+      previewType: hasPreviewField ? (fileData.preview_type || undefined) : undefined,
+      previewUrl: hasPreviewField && fileData.preview_available ? `/api/preview/${fileId}` : undefined
     };
   } catch (error) {
     console.error("Error checking file preview:", error);
