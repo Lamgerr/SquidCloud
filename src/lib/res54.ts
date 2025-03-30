@@ -126,6 +126,9 @@ async function calculateSHA256(buffer: ArrayBuffer): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Utility function for delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Encrypt and upload chunks in parallel using GitHub repos
 export const uploadFileWithRes54 = async (
   file: File,
@@ -175,6 +178,14 @@ export const uploadFileWithRes54 = async (
   
   const uploadChunk = async (chunk: string, index: number, attempt = 0): Promise<any> => {
     try {
+      // Add rate limiting delay between chunks
+      await delay(1000); // 1 second delay between chunks
+      
+      // Validate chunk size
+      if (chunk.length > 1024 * 1024 * 50) { // 50MB limit
+        throw new Error('Chunk size too large');
+      }
+
       // For each chunk, select a random repository
       const randomRepoIndex = Math.floor(Math.random() * reposData.length);
       const repo = reposData[randomRepoIndex].repo_name;
@@ -182,7 +193,7 @@ export const uploadFileWithRes54 = async (
       const chunkId = `res54_${Date.now()}_${index}`;
       const path = `${userData.user.id}/${chunkId}.json`;
       
-      // Prepare chunk data with metadata for storage
+      // Validate and prepare chunk data
       const chunkData = JSON.stringify({
         chunkIndex: index,
         totalChunks: chunks.length,
@@ -191,9 +202,15 @@ export const uploadFileWithRes54 = async (
         fileSize: file.size,
         chunkData: chunk,
         timestamp: new Date().toISOString(),
+        checksum: await calculateSHA256(new TextEncoder().encode(chunk))
       });
-      
-      // Use a more reliable approach for uploading
+
+      // Add validation check
+      if (!chunkData) {
+        throw new Error('Invalid chunk data');
+      }
+
+      // Use a more reliable approach for uploading with validation
       const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
         body: {
           action: 'upload',
@@ -203,7 +220,8 @@ export const uploadFileWithRes54 = async (
           userId: userData.user.id,
           path: null,
           createRepo: false,
-          repo: repo
+          repo: repo,
+          retryCount: attempt
         }
       });
 
@@ -213,8 +231,7 @@ export const uploadFileWithRes54 = async (
       }
       
       if (!uploadData) {
-        console.error(`No data returned when uploading chunk ${index} (attempt ${attempt + 1})`);
-        throw new Error(`Failed to upload chunk ${index}: No data returned`);
+        throw new Error(`No data returned when uploading chunk ${index}`);
       }
       
       // Update chunk metadata with storage location
@@ -235,27 +252,38 @@ export const uploadFileWithRes54 = async (
     } catch (error: any) {
       console.error(`Error uploading chunk ${index} (attempt ${attempt + 1}):`, error);
       
-      // Retry logic
+      // Enhanced retry logic with exponential backoff
       if (attempt < maxRetries) {
-        console.log(`Retrying chunk ${index}, attempt ${attempt + 2}...`);
-        // Exponential backoff
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
+        const backoffTime = Math.min(1000 * Math.pow(2, attempt), 30000); // Max 30 second delay
+        const jitter = Math.random() * 1000; // Add random jitter
+        console.log(`Retrying chunk ${index}, attempt ${attempt + 2} after ${backoffTime}ms delay...`);
+        await delay(backoffTime + jitter);
         return uploadChunk(chunk, index, attempt + 1);
       }
       
-      throw error;
+      throw new Error(`Failed to upload chunk ${index} after ${maxRetries} attempts: ${error.message}`);
     }
   };
   
   try {
-    // Upload chunks with retry logic
-    const uploadPromises = encryptedChunks.map((chunk, index) => 
-      uploadChunk(chunk, index)
-    );
-    
-    // Wait for all uploads to complete
-    await Promise.all(uploadPromises);
+    // Upload chunks in smaller batches to prevent overwhelming the server
+    const batchSize = 3; // Process 3 chunks at a time
+    const chunks = encryptedChunks.map((chunk, index) => ({ chunk, index }));
+    const results = [];
+
+    for (let i = 0; i < chunks.length; i += batchSize) {
+      const batch = chunks.slice(i, i + batchSize);
+      const batchPromises = batch.map(({ chunk, index }) => uploadChunk(chunk, index));
+      
+      // Wait for current batch to complete before starting next batch
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+      
+      // Add delay between batches
+      if (i + batchSize < chunks.length) {
+        await delay(2000); // 2 second delay between batches
+      }
+    }
   } catch (error) {
     console.error("Failed to upload all chunks:", error);
     throw new Error("File upload failed. Please try again later.");
