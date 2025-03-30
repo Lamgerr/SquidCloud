@@ -1,5 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { 
@@ -8,12 +7,12 @@ import {
   Zap, HardDrive, Network, Share2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { uploadFile, FileItem, getFiles, formatBytes } from '@/lib/api';
+import { uploadFile } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UploadButtonProps {
-  onUploadComplete?: (file: FileItem) => void;
+  onUploadComplete?: (file: any) => void;
   onFileUploaded?: (file: any) => void;
   className?: string;
 }
@@ -25,50 +24,9 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
   const [processingStage, setProcessingStage] = useState<string>('initializing');
   const [currentChunk, setCurrentChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
-  const [isFirstUpload, setIsFirstUpload] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Check if user has uploaded files before
-    const checkPreviousUploads = async () => {
-      try {
-        const files = await getFiles();
-        setIsFirstUpload(files.length === 0);
-      } catch (error) {
-        console.error("Error checking previous uploads:", error);
-      }
-    };
-
-    checkPreviousUploads();
-  }, []);
-
-  const handleUploadError = (error: Error) => {
-    if (error.message.includes("Storage Vault")) {
-      toast({
-        title: "Storage Vault Required",
-        description: "Please create a Storage Vault first",
-        variant: "destructive",
-        action: (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => navigate('/r/c/1')}
-          >
-            Create Vault
-          </Button>
-        )
-      });
-    } else {
-      toast({
-        title: "Upload Failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -76,138 +34,49 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
     
     const file = files[0];
     setCurrentFile(file);
-    
-    // If this is the first upload, redirect to repository creation
-    if (isFirstUpload) {
-      // Reset the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      
-      toast({
-        title: "First upload detected",
-        description: "Please set up your repository before uploading files"
-      });
-      
-      // Redirect to repository creation
-      navigate('/r/c/1');
-      return;
-    }
-    
     setIsUploading(true);
     setUploadProgress(0);
     setProcessingStage('preparing');
     
-    // Estimate number of chunks based on file size
-    const estimatedChunks = Math.ceil(file.size < 512 * 1024 * 1024 
-      ? 10  // Less than 512MB - 10 chunks
-      : (file.size < 1024 * 1024 * 1024 
-        ? 20  // Between 512MB and 1GB - 20 chunks
-        : 30  // More than 1GB - 30 chunks
-      ));
-    setTotalChunks(estimatedChunks);
-    
     try {
-      // Notify user about upload process
-      toast({
-        title: "Preparing file with Res54",
-        description: "Your file is being analyzed and optimally chunked",
-      });
-      
-      // Animate the upload progress for visual feedback
-      // The actual progress will be tracked in the background
-      const animateProgress = () => {
-        const stageProgression = {
-          preparing: { start: 0, end: 10, next: 'analyzing' },
-          analyzing: { start: 10, end: 20, next: 'encrypting' },
-          encrypting: { start: 20, end: 35, next: 'chunking' },
-          chunking: { start: 35, end: 50, next: 'uploading' },
-          uploading: { start: 50, end: 85, next: 'distributing' },
-          distributing: { start: 85, end: 95, next: 'finalizing' },
-          finalizing: { start: 95, end: 99, next: 'completed' },
-          completed: { start: 100, end: 100, next: null }
-        };
-        
-        const startAnimation = (stage: string) => {
-          const currentStage = stageProgression[stage as keyof typeof stageProgression];
-          if (!currentStage) return;
-          
-          setProcessingStage(stage);
-          
-          let currentProgress = currentStage.start;
-          const targetProgress = currentStage.end;
-          const step = (targetProgress - currentProgress) / 20;
-          
-          const interval = setInterval(() => {
-            currentProgress += step;
-            setUploadProgress(Math.min(currentProgress, targetProgress));
-            
-            if (currentProgress >= targetProgress) {
-              clearInterval(interval);
-              if (currentStage.next) {
-                setTimeout(() => startAnimation(currentStage.next as string), 500);
-              }
-            }
-            
-            // Update current chunk count for visual feedback
-            if (stage === 'chunking' || stage === 'uploading') {
-              const progress = (currentProgress - currentStage.start) / (targetProgress - currentStage.start);
-              setCurrentChunk(Math.floor(progress * estimatedChunks));
-            }
-          }, 200);
-        };
-        
-        startAnimation('preparing');
-      };
-      
-      // Start progress animation
-      animateProgress();
-      
-      // Perform the actual upload using Res54 in the background
+      // Start the upload process
       const uploadedFile = await uploadFile(file, (progress, stage, details) => {
-        // Real upload progress from the API
-        if (stage === 'uploading' && details) {
+        setUploadProgress(progress);
+        setProcessingStage(stage);
+        if (details?.current && details?.total) {
           setCurrentChunk(details.current);
           setTotalChunks(details.total);
         }
       });
-      
-      // Set the final progress to 100% and stage to completed
+
+      // Handle successful upload
       setProcessingStage('completed');
       setUploadProgress(100);
       
-      // Update first upload status
-      setIsFirstUpload(false);
-      
-      // Finish up
       setTimeout(() => {
         setIsUploading(false);
         setCurrentFile(null);
         setUploadProgress(0);
-        setCurrentChunk(0);
-        setTotalChunks(0);
-        setProcessingStage('initializing');
-        
-        // Notify the parent component using the appropriate callback
         if (onUploadComplete) {
           onUploadComplete(uploadedFile);
-        } else if (onFileUploaded) {
-          onFileUploaded(uploadedFile);
         }
-        
         toast({
           title: "Upload complete",
-          description: `${file.name} has been securely uploaded with Res54 technology`,
+          description: `${file.name} has been securely uploaded`,
         });
       }, 1000);
+      
     } catch (error: any) {
       setIsUploading(false);
-      handleUploadError(error);
-    }
-    
-    // Reset the file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 

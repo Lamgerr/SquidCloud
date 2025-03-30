@@ -228,11 +228,11 @@ export const uploadFileWithRes54 = async (
   metadata: Res54FileMetadata,
   encryptionKey: string
 }> => {
-  // Check authentication and repos
+  // Check authentication
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Authentication required");
 
-  // Check if user has any repos
+  // Check for repos
   const { data: repos } = await supabase
     .from('repositories')
     .select('repo_name')
