@@ -14,52 +14,39 @@ const createReposWithRetry = async (
   count: number,
   password?: string | null
 ): Promise<any[]> => {
-  // First check if user already has repos
-  const { data: existingRepos } = await supabase
-    .from('repositories')
-    .select('*')
-    .eq('user_id', session.user.id);
+  // First check existing repos
+  try {
+    const { data: existingRepos, error: existingError } = await supabase
+      .from('repositories')
+      .select('*')
+      .eq('user_id', session.user.id);
 
-  if (existingRepos && existingRepos.length > 0) {
-    console.log('User already has repositories:', existingRepos);
-    return existingRepos;
-  }
+    if (existingError) throw existingError;
 
-  const maxRetries = 3;
-  let lastError = null;
-
-  // Continue with repo creation only if no existing repos
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const { data, error } = await supabase.functions.invoke('github-storage', {
-        body: {
-          action: 'create-repos',
-          count,
-          userId: session.user.id
-        }
-      });
-
-      if (error) {
-        console.error('Function error:', error);
-        throw error;
-      }
-
-      if (!data?.repos || !Array.isArray(data.repos)) {
-        throw new Error('Invalid response format from server');
-      }
-
-      return data.repos;
-    } catch (error) {
-      console.error(`Repository creation attempt ${attempt + 1} failed:`, error);
-      lastError = error;
-      
-      if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(2, attempt)));
-      }
+    if (existingRepos && existingRepos.length > 0) {
+      console.log('Using existing repositories:', existingRepos.length);
+      return existingRepos;
     }
-  }
 
-  throw lastError || new Error('Failed to create repositories after multiple attempts');
+    // Only proceed with creation if no repos exist
+    console.log('No existing repos found, creating new ones...');
+    const { data, error } = await supabase.functions.invoke('github-storage', {
+      body: {
+        action: 'create-repos',
+        count,
+        userId: session.user.id
+      }
+    });
+
+    if (error) throw error;
+    if (!data?.repos) throw new Error('Invalid response format');
+
+    // No need to insert into database as the Edge Function handles that
+    return data.repos;
+  } catch (error) {
+    console.error('Repository creation/fetch error:', error);
+    throw error;
+  }
 };
 
 const RepoCreation = () => {

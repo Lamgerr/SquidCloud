@@ -40,80 +40,88 @@ serve(async (req) => {
         );
       }
 
-      // Check for existing repos first
-      const dbResponse = await fetch(
-        `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories?user_id=eq.${userId}&select=*`,
-        {
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            'Content-Type': 'application/json'
+      try {
+        // First check for existing repos
+        const dbResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories?user_id=eq.${userId}&select=*`,
+          {
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
 
-      if (dbResponse.ok) {
         const existingRepos = await dbResponse.json();
+        
+        // If user already has repos, return them
         if (existingRepos && existingRepos.length > 0) {
+          console.log(`Found ${existingRepos.length} existing repos for user ${userId}`);
           return new Response(
             JSON.stringify({ 
-              repos: existingRepos,
-              message: 'Using existing repositories'
+              repos: existingRepos.map(repo => ({
+                name: repo.repo_name,
+                html_url: `https://github.com/${GITHUB_USERNAME}/${repo.repo_name}`
+              }))
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-      }
 
-      // Continue with repo creation only if no existing repos
-      const validCount = Math.min(Math.max(1, count || 5), 5);
-      const createdRepos = [];
+        // Continue with creating new repos only if none exist
+        const validCount = Math.min(Math.max(1, count || 5), 5);
+        const createdRepos = [];
 
-      // Generate creative names using Gemini API
-      const repoNames = await generateCreativeRepoNames(validCount, GEMINI_API_KEY);
+        // Generate creative names using Gemini API
+        const repoNames = await generateCreativeRepoNames(validCount, GEMINI_API_KEY);
 
-      for (let i = 0; i < validCount; i++) {
-        const baseName = repoNames[i] || `nexus_${Math.random().toString(36).substring(2, 7)}`;
-        const uniqueSuffix = `${Date.now().toString(36)}_${i}`;
-        const repoName = `${baseName}_${uniqueSuffix}`;
+        for (let i = 0; i < validCount; i++) {
+          const baseName = repoNames[i] || `nexus_${Math.random().toString(36).substring(2, 7)}`;
+          const uniqueSuffix = `${Date.now().toString(36)}_${i}`;
+          const repoName = `${baseName}_${uniqueSuffix}`;
 
-        // Create repository
-        const createResponse = await fetch(
-          'https://api.github.com/user/repos',
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `token ${GITHUB_TOKEN}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'User-Agent': 'CloudVault-Edge-Function',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              name: repoName,
-              description: "Secure data vault",
-              private: true,
-              auto_init: true
-            })
+          // Create repository
+          const createResponse = await fetch(
+            'https://api.github.com/user/repos',
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'CloudVault-Edge-Function',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                name: repoName,
+                description: "Secure data vault",
+                private: true,
+                auto_init: true
+              })
+            }
+          );
+
+          if (!createResponse.ok) {
+            console.error(`Failed to create repo ${repoName}:`, await createResponse.text());
+            continue;
           }
-        );
 
-        if (!createResponse.ok) {
-          console.error(`Failed to create repo ${repoName}:`, await createResponse.text());
-          continue;
+          const repoData = await createResponse.json();
+          createdRepos.push({
+            name: repoName,
+            html_url: repoData.html_url
+          });
         }
 
-        const repoData = await createResponse.json();
-        createdRepos.push({
-          name: repoName,
-          html_url: repoData.html_url
-        });
+        return new Response(
+          JSON.stringify({ 
+            repos: createdRepos 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('Error in create-repos:', error);
+        throw error;
       }
-
-      return new Response(
-        JSON.stringify({ 
-          repos: createdRepos 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     // Existing code for other actions
