@@ -65,107 +65,6 @@ const validateRepoResponse = (response: any): boolean => {
          'repo_name' in response;
 };
 
-const ensureValidRepos = async (userData: any): Promise<{repo_name: string}[]> => {
-  try {
-    // First check existing repos
-    const { data: existingRepos, error: reposError } = await supabase
-      .from("repositories")
-      .select("repo_name")
-      .eq("user_id", userData.user.id);
-      
-    if (existingRepos && existingRepos.length > 0) {
-      return existingRepos;
-    }
-
-    // If no repos exist, create new ones
-    console.log("No existing repos found, creating new ones...");
-    
-    // Try the primary endpoint first
-    try {
-      const response = await fetch('https://cloudbliss.inflate.live/api/create-repos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userData.token}`
-        },
-        body: JSON.stringify({
-          userId: userData.user.id,
-          count: 3 // Request 3 repos
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create repos: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      if (!Array.isArray(result)) {
-        throw new Error('Invalid response format');
-      }
-
-      // Insert the new repos into Supabase
-      const { data: newRepos, error: insertError } = await supabase
-        .from("repositories")
-        .insert(result.map(repo => ({
-          repo_name: repo.name,
-          user_id: userData.user.id,
-          status: 'active'
-        })))
-        .select();
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      return newRepos;
-
-    } catch (primaryError) {
-      console.error("Primary endpoint failed:", primaryError);
-      
-      // Fallback to backup endpoint
-      const fallbackResponse = await fetch('https://api.cloudbliss.storage/v1/repos/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userData.token}`
-        },
-        body: JSON.stringify({
-          userId: userData.user.id,
-          count: 3
-        })
-      });
-
-      if (!fallbackResponse.ok) {
-        throw new Error('Both primary and fallback endpoints failed');
-      }
-
-      const fallbackResult = await fallbackResponse.json();
-      if (!Array.isArray(fallbackResult)) {
-        throw new Error('Invalid fallback response format');
-      }
-
-      // Insert the new repos from fallback
-      const { data: fallbackRepos, error: fallbackError } = await supabase
-        .from("repositories")
-        .insert(fallbackResult.map(repo => ({
-          repo_name: repo.name,
-          user_id: userData.user.id,
-          status: 'active'
-        })))
-        .select();
-
-      if (fallbackError) {
-        throw fallbackError;
-      }
-
-      return fallbackRepos;
-    }
-  } catch (error) {
-    console.error("Failed to ensure valid repos:", error);
-    throw new Error("Could not create or verify repositories");
-  }
-};
-
 // Modify the determineChunkingStrategy function to create smaller chunks
 export const determineChunkingStrategy = (fileSize: number): number => {
   // Limit maximum chunk size to 2MB to prevent timeouts
@@ -329,23 +228,23 @@ export const uploadFileWithRes54 = async (
   metadata: Res54FileMetadata,
   encryptionKey: string
 }> => {
-  // Get user data and check for repos
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user) throw new Error("User not authenticated");
+  // Check authentication and repos
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Authentication required");
 
-  // Check for existing repos
+  // Check if user has any repos
   const { data: repos } = await supabase
-    .from("repositories")
-    .select("*")
-    .eq("user_id", userData.user.id);
+    .from('repositories')
+    .select('repo_name')
+    .eq('user_id', user.id);
 
-  if (!repos || repos.length === 0) {
-    throw new Error("Please create a Storage Vault first before uploading files.");
+  if (!repos?.length) {
+    throw new Error("Please create a Storage Vault before uploading files");
   }
 
-  // Continue with existing upload logic
+  // Start upload process
   if (progressCallback) progressCallback(0, 'preparing');
-  
+
   const { chunks, metadata } = await createFileChunks(file, 
     (progress) => progressCallback && progressCallback(progress, 'chunking'));
   
@@ -374,7 +273,7 @@ export const uploadFileWithRes54 = async (
       const repo = repos[repoIndex].repo_name;
       
       const chunkId = `res54_${Date.now()}_${index}`;
-      const path = `${userData.user.id}/${chunkId}.json`;
+      const path = `${user.id}/${chunkId}.json`;
       
       // Compress chunk data with error handling
       const compressedChunk = compressData(chunk);
@@ -400,7 +299,7 @@ export const uploadFileWithRes54 = async (
           fileName: `${chunkId}.json`,
           fileType: 'application/json',
           data: chunkData,
-          userId: userData.user.id,
+          userId: user.id,
           path: null,
           createRepo: false,
           repo: repo,
@@ -465,7 +364,7 @@ export const uploadFileWithRes54 = async (
     type: file.type,
     size: file.size,
     storage_path: "res54_distributed",
-    user_id: userData.user.id,
+    user_id: user.id,
     encrypted: true,
     shared: false,
     encryption_key: metadata.encryptionKey,

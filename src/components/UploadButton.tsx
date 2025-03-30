@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -45,6 +44,31 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
 
     checkPreviousUploads();
   }, []);
+
+  const handleUploadError = (error: Error) => {
+    if (error.message.includes("Storage Vault")) {
+      toast({
+        title: "Storage Vault Required",
+        description: "Please create a Storage Vault first",
+        variant: "destructive",
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate('/r/c/1')}
+          >
+            Create Vault
+          </Button>
+        )
+      });
+    } else {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -178,14 +202,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
       }, 1000);
     } catch (error: any) {
       setIsUploading(false);
-      
-      toast({
-        title: "Upload failed",
-        description: error.message || "There was a problem uploading your file",
-        variant: "destructive",
-      });
-      
-      console.error("Upload error:", error);
+      handleUploadError(error);
     }
     
     // Reset the file input
