@@ -37,7 +37,7 @@ const Index = () => {
             </div>
             
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 animate-slide-down">
-              Next-Generation Cloud Storage
+              Next-Unlimited Cloud Storage
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-blue-700">
                 {" "}with Zero-Knowledge Privacy
               </span>
