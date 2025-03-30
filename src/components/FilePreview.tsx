@@ -213,20 +213,17 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
         <div className="flex gap-2 mt-4">
           <Button 
             variant="outline" 
+            onClick={() => setOpen(false)}
+          >
+            Close
+          </Button>
+          <Button 
             onClick={handleDownload}
+            disabled={loading}
           >
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
-          {file.htmlUrl && (
-            <Button 
-              variant="outline" 
-              onClick={() => window.open(file.htmlUrl, '_blank')}
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              View on GitHub
-            </Button>
-          )}
         </div>
       </div>
     );

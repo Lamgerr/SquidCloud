@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { encryptData, decryptData, generateEncryptionKey } from "./encryption";
 
@@ -113,7 +114,7 @@ async function calculateSHA256(buffer: ArrayBuffer): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Encrypt and upload chunks in parallel
+// Encrypt and upload chunks in parallel using GitHub repos
 export const uploadFileWithRes54 = async (
   file: File,
   progressCallback?: (progress: number, stage: string, details?: any) => void
@@ -224,6 +225,7 @@ export const uploadFileWithRes54 = async (
   // Convert metadata to JSON string for storage
   const metadataString = JSON.stringify(metadata);
   
+  // Create a record in the files table
   const fileRecord = {
     name: file.name,
     type: file.type,
@@ -233,13 +235,16 @@ export const uploadFileWithRes54 = async (
     encrypted: true,
     shared: false,
     encryption_key: metadata.encryptionKey,
-    tags: [metadataString], // Store metadata in tags
-    processor: "res54" // Indicate this file was processed with Res54
-  } as const;
+    tags: [metadataString] as string[]
+  };
 
+  // Add processor as a separate field after creating the base record
   const { data: dbFile, error: dbError } = await supabase
     .from('files')
-    .insert(fileRecord)
+    .insert({
+      ...fileRecord,
+      processor: "res54" // Add processor field
+    } as any)
     .select()
     .single();
 
@@ -399,7 +404,6 @@ async function generatePreview(fileId: string, fileType: string): Promise<void> 
     await supabase
       .from('files')
       .update({
-        // Use any assertion here since we know our app will handle these fields even if DB doesn't have them yet
         preview_available: true,
         preview_type: fileType.split('/')[0]
       } as any)
@@ -427,10 +431,12 @@ export const checkFilePreview = async (fileId: string): Promise<{
       return { hasPreview: false };
     }
     
+    const fileData = data as any;
+    
     return {
-      hasPreview: !!(data as any).preview_available,
-      previewType: (data as any).preview_type || undefined,
-      previewUrl: (data as any).preview_available ? `/api/preview/${fileId}` : undefined
+      hasPreview: !!fileData.preview_available,
+      previewType: fileData.preview_type || undefined,
+      previewUrl: fileData.preview_available ? `/api/preview/${fileId}` : undefined
     };
   } catch (error) {
     console.error("Error checking file preview:", error);
