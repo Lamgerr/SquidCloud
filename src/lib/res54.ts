@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { encryptData, decryptData, generateEncryptionKey } from "./encryption";
 
@@ -25,6 +24,19 @@ interface Res54FileMetadata {
   previewAvailable: boolean;
   previewType?: string;
   previewPath?: string;
+}
+
+interface FileMetadata {
+  name: string;
+  type: string;
+  size: number;
+  storage_path: string;
+  user_id: string;
+  encrypted: boolean;
+  shared: boolean;
+  encryption_key: string;
+  tags: string[];
+  processor?: string; // Adding optional processor property
 }
 
 // Analyzes file size to determine optimal chunking strategy
@@ -282,7 +294,7 @@ export const uploadFileWithRes54 = async (
   let insertData = fileRecord;
   // Check if processor field exists in the table
   if (columns && columns.length > 0 && 'processor' in columns[0]) {
-    insertData = { ...fileRecord, processor: "res54" };
+    insertData = { ...(fileRecord as any), processor: "res54" };
   }
 
   const { data: dbFile, error: dbError } = await supabase
@@ -468,7 +480,7 @@ async function generatePreview(fileId: string, fileType: string): Promise<void> 
     .select('*')
     .limit(1);
 
-  if (columnsError || !columns || columns.length === 0) {
+  if (columnsError || columns.length === 0) {
     console.error("Error checking files table columns:", columnsError);
     return;
   }
