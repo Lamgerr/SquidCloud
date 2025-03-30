@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   splitFileIntoJsonChunks, 
@@ -77,8 +78,8 @@ export const getFiles = async (): Promise<FileItem[]> => {
     encryptionKey: file.encryption_key,
     chunks: file.tags?.length || 0,
     processor: file.processor || "legacy",
-    preview_available: file.preview_available,
-    preview_type: file.preview_type
+    preview_available: !!file.preview_available,
+    preview_type: file.preview_type || undefined
   }));
 };
 

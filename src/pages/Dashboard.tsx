@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,14 +33,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   const [uploadButtonRef, setUploadButtonRef] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // Set active tab when defaultTab changes
     if (defaultTab) {
       setActiveTab(defaultTab);
     }
   }, [defaultTab]);
 
   useEffect(() => {
-    // If openUpload is true, trigger the upload button
     if (openUpload && uploadButtonRef) {
       const uploadBtn = uploadButtonRef.querySelector('button');
       if (uploadBtn) {
@@ -51,7 +48,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   }, [openUpload, uploadButtonRef]);
 
   useEffect(() => {
-    // Fetch files
     const fetchFiles = async () => {
       try {
         setLoading(true);
@@ -60,7 +56,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
         const fetchedFiles = await getFiles();
         setFiles(fetchedFiles);
         
-        // Calculate total size
         const totalBytes = fetchedFiles.reduce((acc, file) => acc + file.size, 0);
         setTotalSize(totalBytes);
       } catch (err: any) {
@@ -92,7 +87,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
     try {
       await deleteFile(fileId);
       
-      // Update state
       const deletedFile = files.find(f => f.id === fileId);
       setFiles((prev) => prev.filter((file) => file.id !== fileId));
       
@@ -130,7 +124,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
       
       const fileBlob = await downloadFile(fileId);
       
-      // Create download link
       const url = URL.createObjectURL(fileBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -138,7 +131,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
       document.body.appendChild(a);
       a.click();
       
-      // Clean up
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -165,14 +157,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
       
       const shareLink = await shareFile(fileId);
       
-      // Update file in state
       setFiles((prev) => 
         prev.map((f) => 
           f.id === fileId ? { ...f, shared: true } : f
         )
       );
       
-      // Copy link to clipboard
       navigator.clipboard.writeText(shareLink);
       
       toast({
@@ -429,7 +419,18 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
                   
                   {selectedFile && (
                     <div className="mt-6">
-                      <FilePreview file={selectedFile} onClose={() => setSelectedFile(null)} />
+                      <FilePreview 
+                        file={{
+                          id: selectedFile.id,
+                          name: selectedFile.name,
+                          type: selectedFile.type,
+                          encrypted: selectedFile.encrypted,
+                          processor: selectedFile.processor || "legacy",
+                          preview_available: selectedFile.preview_available,
+                          previewUrl: selectedFile.preview_available ? `/api/preview/${selectedFile.id}` : undefined
+                        }} 
+                        onClose={() => setSelectedFile(null)} 
+                      />
                     </div>
                   )}
                 </>

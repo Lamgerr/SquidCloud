@@ -14,8 +14,8 @@ interface FilePreviewProps {
     previewUrl?: string;
     htmlUrl?: string;
     encrypted: boolean;
-    processor: string;
-    preview_available: boolean;
+    processor?: string;
+    preview_available?: boolean;
   };
   onClose?: () => void;
 }
