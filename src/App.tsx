@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
@@ -61,6 +62,11 @@ const AppLayout = ({ children, showMobileNav = true }: { children: React.ReactNo
 };
 
 const AppWithAuth = () => {
+  // Set document title to reflect the new app name
+  useEffect(() => {
+    document.title = "CloudBliss by Inflate";
+  }, []);
+
   return (
     <Router>
       <Routes>

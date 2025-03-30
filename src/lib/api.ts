@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   splitFileIntoJsonChunks, 
@@ -7,6 +6,10 @@ import {
   encryptData,
   decryptData
 } from "./encryption";
+import {
+  uploadFileWithRes54,
+  downloadFileWithRes54
+} from "./res54";
 
 export interface FileItem {
   id: string;
@@ -19,6 +22,9 @@ export interface FileItem {
   shared: boolean;
   encryptionKey?: string;
   chunks?: number;
+  processor?: string;
+  preview_available?: boolean;
+  preview_type?: string;
 }
 
 export interface ChunkLocation {
@@ -70,117 +76,30 @@ export const getFiles = async (): Promise<FileItem[]> => {
     shared: file.shared,
     encryptionKey: file.encryption_key,
     chunks: file.tags?.length || 0,
+    processor: file.processor || "legacy",
+    preview_available: file.preview_available,
+    preview_type: file.preview_type
   }));
 };
 
 export const uploadFile = async (file: File): Promise<FileItem> => {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
+  // Always use Res54 for uploads
+  const result = await uploadFileWithRes54(file, (progress, stage, details) => {
+    console.log(`Upload progress: ${progress}% - Stage: ${stage}`, details);
+  });
   
-  if (userError || !userData.user) {
-    console.error("User not authenticated:", userError);
-    throw new Error("User not authenticated");
-  }
-
-  const user = userData.user;
-
-  const { data: reposData, error: reposError } = await supabase
-    .from("repositories")
-    .select("repo_name")
-    .eq("user_id", user.id);
-
-  if (reposError || !reposData || reposData.length === 0) {
-    console.error("Error fetching repositories or no repositories found:", reposError);
-    throw new Error("No secure vaults available for storage. Please create vaults first.");
-  }
-
-  console.log("Available repositories:", reposData);
-
-  const { chunks, encryptionKey, totalChunks } = await splitFileIntoJsonChunks(file);
-  
-  const chunkLocations: ChunkLocation[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const randomRepoIndex = Math.floor(Math.random() * reposData.length);
-    const repo = reposData[randomRepoIndex].repo_name;
-    
-    console.log(`Uploading chunk ${i} to repository: ${repo}`);
-    
-    const chunkId = `chunk_${Date.now()}_${i}`;
-    try {
-      const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
-        body: {
-          action: 'upload',
-          fileName: `${chunkId}.json`,
-          fileType: 'application/json',
-          data: chunks[i],
-          userId: user.id,
-          path: null,
-          createRepo: false,
-          repo: repo
-        }
-      });
-
-      if (uploadError) {
-        console.error(`Error uploading chunk ${i}:`, uploadError);
-        throw new Error(`Failed to upload chunk ${i}: ${uploadError.message}`);
-      }
-
-      if (!uploadData) {
-        console.error(`No data returned when uploading chunk ${i}`);
-        throw new Error(`Failed to upload chunk ${i}: No data returned`);
-      }
-
-      console.log(`Successfully uploaded chunk ${i} to ${repo}:`, uploadData);
-
-      chunkLocations.push({
-        repo: repo,
-        path: `${user.id}/${chunkId}.json`,
-        index: i,
-        sha: uploadData.sha
-      });
-    } catch (error: any) {
-      console.error(`Error in upload process for chunk ${i}:`, error);
-      throw new Error(`Failed to upload chunk ${i}: ${error.message}`);
-    }
-  }
-
-  // Convert chunkLocations to JSON string and then to string array
-  const tagsJsonString = JSON.stringify(chunkLocations);
-  const tagsArray: string[] = [tagsJsonString];
-
-  const fileRecord = {
+  return {
+    id: result.id,
     name: file.name,
     type: file.type,
     size: file.size,
-    storage_path: "distributed_storage",
-    user_id: user.id,
+    path: "res54_distributed",
+    lastModified: new Date(),
     encrypted: true,
     shared: false,
-    encryption_key: encryptionKey,
-    tags: tagsArray
-  };
-
-  const { data: dbFile, error: dbError } = await supabase
-    .from('files')
-    .insert(fileRecord)
-    .select()
-    .single();
-
-  if (dbError) {
-    console.error("Error creating file record:", dbError);
-    throw new Error("Failed to create file record");
-  }
-
-  return {
-    id: dbFile.id,
-    name: dbFile.name,
-    type: dbFile.type,
-    size: dbFile.size,
-    path: dbFile.storage_path,
-    lastModified: new Date(dbFile.created_at),
-    encrypted: dbFile.encrypted,
-    shared: dbFile.shared,
-    encryptionKey: dbFile.encryption_key,
-    chunks: chunkLocations.length
+    encryptionKey: result.encryptionKey,
+    chunks: result.metadata.chunks.length,
+    processor: "res54"
   };
 };
 
@@ -203,6 +122,14 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     throw new Error("Failed to fetch file metadata");
   }
 
+  // If the file was processed with Res54, use Res54 download
+  if (file.processor === "res54" || file.storage_path === "res54_distributed") {
+    return downloadFileWithRes54(fileId, (progress, stage, details) => {
+      console.log(`Download progress: ${progress}% - Stage: ${stage}`, details);
+    });
+  }
+  
+  // Legacy download logic for backward compatibility
   if (file.storage_path === "distributed_storage" && file.tags) {
     let chunkLocations: ChunkLocation[] = [];
     try {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,6 +14,8 @@ interface FilePreviewProps {
     previewUrl?: string;
     htmlUrl?: string;
     encrypted: boolean;
+    processor: string;
+    preview_available: boolean;
   };
   onClose?: () => void;
 }
@@ -25,14 +26,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  // Load preview content when dialog opens
   useEffect(() => {
     if (open && !previewContent) {
       loadPreview();
     }
   }, [open, previewContent]);
 
-  // Handle onClose when dialog closes
   useEffect(() => {
     if (!open && onClose) {
       onClose();
@@ -45,13 +44,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
     setLoading(true);
     
     try {
-      // For files that need decryption
       if (file.encrypted && !file.previewUrl) {
         const blob = await downloadFile(file.id);
         const url = URL.createObjectURL(blob);
         setPreviewContent(url);
       } 
-      // For files with direct preview URLs
       else if (file.previewUrl) {
         setPreviewContent(file.previewUrl);
       }
@@ -72,7 +69,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
       setLoading(true);
       const blob = await downloadFile(file.id);
       
-      // Create a download link
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -80,7 +76,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
       document.body.appendChild(a);
       a.click();
       
-      // Clean up
       URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
@@ -140,6 +135,41 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
       );
     }
 
+    if (file.processor === "res54" && file.preview_available) {
+      if (file.type.startsWith('image/')) {
+        return (
+          <div className="flex justify-center">
+            <img 
+              src={`/api/preview/${file.id}`} 
+              alt={file.name} 
+              className="max-w-full max-h-[500px] object-contain rounded-md" 
+            />
+          </div>
+        );
+      } else if (file.type.startsWith('video/')) {
+        return (
+          <div className="flex justify-center">
+            <video 
+              controls 
+              className="max-w-full max-h-[500px] rounded-md"
+            >
+              <source src={`/api/preview/${file.id}`} type={file.type} />
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        );
+      } else if (file.type === 'application/pdf' || file.type.startsWith('text/')) {
+        return (
+          <div className="flex justify-center">
+            <iframe 
+              src={`/api/preview/${file.id}`} 
+              className="w-full h-[500px] rounded-md border"
+            ></iframe>
+          </div>
+        );
+      }
+    }
+
     if (file.type.startsWith('image/')) {
       return <img src={previewContent} alt={file.name} className="max-w-full h-auto max-h-[70vh] object-contain rounded-md" />;
     }
@@ -174,7 +204,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
       );
     }
 
-    // Default fallback
     return (
       <div className="flex flex-col justify-center items-center h-64">
         <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800 mb-4">
