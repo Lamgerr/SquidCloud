@@ -14,9 +14,21 @@ const createReposWithRetry = async (
   count: number,
   password?: string | null
 ): Promise<any[]> => {
+  // First check if user already has repos
+  const { data: existingRepos } = await supabase
+    .from('repositories')
+    .select('*')
+    .eq('user_id', session.user.id);
+
+  if (existingRepos && existingRepos.length > 0) {
+    console.log('User already has repositories:', existingRepos);
+    return existingRepos;
+  }
+
   const maxRetries = 3;
   let lastError = null;
 
+  // Continue with repo creation only if no existing repos
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const { data, error } = await supabase.functions.invoke('github-storage', {

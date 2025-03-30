@@ -40,6 +40,31 @@ serve(async (req) => {
         );
       }
 
+      // Check for existing repos first
+      const dbResponse = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories?user_id=eq.${userId}&select=*`,
+        {
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (dbResponse.ok) {
+        const existingRepos = await dbResponse.json();
+        if (existingRepos && existingRepos.length > 0) {
+          return new Response(
+            JSON.stringify({ 
+              repos: existingRepos,
+              message: 'Using existing repositories'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      // Continue with repo creation only if no existing repos
       const validCount = Math.min(Math.max(1, count || 5), 5);
       const createdRepos = [];
 
