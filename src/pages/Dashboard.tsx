@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -298,7 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
                           <BarChart3 className="h-6 w-6 text-primary" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-medium">Storage Stats</h3>
+                          <h3 className="text-sm font-medium">CloudBliss</h3>
                           <p className="text-xs text-muted-foreground">Updated today</p>
                         </div>
                       </div>
@@ -426,7 +427,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
                           type: selectedFile.type,
                           encrypted: selectedFile.encrypted,
                           processor: selectedFile.processor || "legacy",
-                          preview_available: selectedFile.preview_available || false
+                          preview_available: selectedFile.preview_available || false,
+                          preview_type: selectedFile.preview_type
                         }} 
                         onClose={() => setSelectedFile(null)} 
                       />

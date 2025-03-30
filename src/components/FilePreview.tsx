@@ -17,6 +17,7 @@ interface FilePreviewProps {
     encrypted: boolean;
     processor?: string;
     preview_available?: boolean;
+    preview_type?: string;
   };
   onClose?: () => void;
 }
@@ -165,6 +166,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
             <iframe 
               src={`/api/preview/${file.id}`} 
               className="w-full h-[500px] rounded-md border"
+              title={file.name}
             ></iframe>
           </div>
         );

@@ -159,26 +159,28 @@ export const uploadFileWithRes54 = async (
   if (progressCallback) progressCallback(60, 'uploading');
   
   let completedUploads = 0;
-  const uploadPromises = encryptedChunks.map(async (chunk, index) => {
-    // For each chunk, select a random repository
-    const randomRepoIndex = Math.floor(Math.random() * reposData.length);
-    const repo = reposData[randomRepoIndex].repo_name;
-    
-    const chunkId = `res54_${Date.now()}_${index}`;
-    const path = `${userData.user.id}/${chunkId}.json`;
-    
-    // Prepare chunk data with metadata for storage
-    const chunkData = JSON.stringify({
-      chunkIndex: index,
-      totalChunks: chunks.length,
-      fileName: file.name,
-      fileType: file.type,
-      fileSize: file.size,
-      chunkData: chunk,
-      timestamp: new Date().toISOString(),
-    });
-    
+  const maxRetries = 3;
+  
+  const uploadChunk = async (chunk: string, index: number, attempt = 0): Promise<any> => {
     try {
+      // For each chunk, select a random repository
+      const randomRepoIndex = Math.floor(Math.random() * reposData.length);
+      const repo = reposData[randomRepoIndex].repo_name;
+      
+      const chunkId = `res54_${Date.now()}_${index}`;
+      const path = `${userData.user.id}/${chunkId}.json`;
+      
+      // Prepare chunk data with metadata for storage
+      const chunkData = JSON.stringify({
+        chunkIndex: index,
+        totalChunks: chunks.length,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        chunkData: chunk,
+        timestamp: new Date().toISOString(),
+      });
+      
       const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
         body: {
           action: 'upload',
@@ -211,13 +213,33 @@ export const uploadFileWithRes54 = async (
       
       return { index, repo, path, sha: uploadData.sha };
     } catch (error: any) {
-      console.error(`Error uploading chunk ${index}:`, error);
+      console.error(`Error uploading chunk ${index} (attempt ${attempt + 1}):`, error);
+      
+      // Retry logic
+      if (attempt < maxRetries) {
+        console.log(`Retrying chunk ${index}, attempt ${attempt + 2}...`);
+        // Exponential backoff
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return uploadChunk(chunk, index, attempt + 1);
+      }
+      
       throw error;
     }
-  });
+  };
   
-  // Wait for all uploads to complete
-  await Promise.all(uploadPromises);
+  try {
+    // Upload chunks with retry logic
+    const uploadPromises = encryptedChunks.map((chunk, index) => 
+      uploadChunk(chunk, index)
+    );
+    
+    // Wait for all uploads to complete
+    await Promise.all(uploadPromises);
+  } catch (error) {
+    console.error("Failed to upload all chunks:", error);
+    throw new Error("File upload failed. Please try again later.");
+  }
   
   // Step 5: Create file record in database
   if (progressCallback) progressCallback(90, 'finalizing');
@@ -332,7 +354,9 @@ export const downloadFileWithRes54 = async (
   if (progressCallback) progressCallback(20, 'downloading');
   
   let completedDownloads = 0;
-  const downloadPromises = metadata.chunks.map(async (chunk) => {
+  const maxRetries = 3;
+  
+  const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> => {
     try {
       const { data: chunkData, error: chunkError } = await supabase.functions.invoke('github-storage', {
         body: {
@@ -360,37 +384,54 @@ export const downloadFileWithRes54 = async (
       // Parse the JSON to get the encrypted chunk data
       const parsedChunk = JSON.parse(content);
       return { index: chunk.index, data: parsedChunk.chunkData };
-    } catch (error) {
-      console.error(`Error downloading chunk at ${chunk.path}:`, error);
+    } catch (error: any) {
+      console.error(`Error downloading chunk at ${chunk.path} (attempt ${attempt + 1}):`, error);
+      
+      // Retry logic
+      if (attempt < maxRetries) {
+        console.log(`Retrying download for chunk ${chunk.index}, attempt ${attempt + 2}...`);
+        // Exponential backoff
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return downloadChunk(chunk, attempt + 1);
+      }
+      
       throw error;
     }
-  });
+  };
   
-  const downloadedChunks = await Promise.all(downloadPromises);
-  
-  // Step 4: Sort chunks by index and decrypt
-  if (progressCallback) progressCallback(70, 'decrypting');
-  
-  // Sort chunks by index
-  const sortedChunks = downloadedChunks.sort((a, b) => a.index - b.index);
-  
-  // Concatenate encrypted chunks
-  let encryptedData = '';
-  for (const chunk of sortedChunks) {
-    encryptedData += chunk.data;
+  try {
+    // Download chunks with retry logic
+    const downloadPromises = metadata.chunks.map(chunk => downloadChunk(chunk));
+    const downloadedChunks = await Promise.all(downloadPromises);
+    
+    // Step 4: Sort chunks by index and decrypt
+    if (progressCallback) progressCallback(70, 'decrypting');
+    
+    // Sort chunks by index
+    const sortedChunks = downloadedChunks.sort((a, b) => a.index - b.index);
+    
+    // Concatenate encrypted chunks
+    let encryptedData = '';
+    for (const chunk of sortedChunks) {
+      encryptedData += chunk.data;
+    }
+    
+    // Decrypt data
+    const decryptedBuffer = decryptData(encryptedData, metadata.encryptionKey);
+    
+    if (progressCallback) progressCallback(95, 'assembling');
+    
+    // Create blob from decrypted data
+    const blob = new Blob([decryptedBuffer], { type: metadata.fileType });
+    
+    if (progressCallback) progressCallback(100, 'complete');
+    
+    return blob;
+  } catch (error) {
+    console.error("Failed to download file:", error);
+    throw new Error("File download failed. Please try again later.");
   }
-  
-  // Decrypt data
-  const decryptedBuffer = decryptData(encryptedData, metadata.encryptionKey);
-  
-  if (progressCallback) progressCallback(95, 'assembling');
-  
-  // Create blob from decrypted data
-  const blob = new Blob([decryptedBuffer], { type: metadata.fileType });
-  
-  if (progressCallback) progressCallback(100, 'complete');
-  
-  return blob;
 };
 
 // Mock preview generation function - would be more complex in a real implementation

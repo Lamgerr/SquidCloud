@@ -1,107 +1,84 @@
 
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, FolderOpen, Share2, Settings, Plus, Upload } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { NavLink } from 'react-router-dom';
+import { FileText, UploadCloud, Share2, Settings, Menu } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 
-const MobileBottomNav = () => {
-  const location = useLocation();
+const MobileBottomNav: React.FC = () => {
+  const { user } = useAuth();
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   
-  // Hide bottom nav on root path and auth page
-  if (!isMobile || location.pathname === '/' || location.pathname === '/auth') return null;
-  
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
-
-  const handleUploadClick = () => {
-    if (location.pathname === '/dashboard') {
-      // If already on dashboard, scroll to top and focus on the upload button
-      window.scrollTo(0, 0);
-      const uploadBtn = document.querySelector('.upload-button-container button');
-      if (uploadBtn) {
-        (uploadBtn as HTMLElement).click();
-      }
-    } else {
-      navigate('/dashboard');
-    }
-  };
+  if (!isMobile || !user) return null;
   
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg z-50 px-2 py-1 md:hidden">
-      <div className="flex items-center justify-between">
-        <NavItem 
-          to="/dashboard" 
-          icon={Home} 
-          label="Home" 
-          isActive={isActive('/dashboard')} 
-        />
-        <NavItem 
-          to="/files" 
-          icon={FolderOpen} 
-          label="Files" 
-          isActive={isActive('/files')} 
-        />
-        <div className="w-1/5 flex flex-col items-center justify-center">
-          <Button 
-            onClick={handleUploadClick} 
-            className="rounded-full bg-primary p-3 -mt-6 shadow-lg"
+    <div className="fixed bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-t border-border z-50">
+      <div className="container h-full">
+        <div className="flex items-center justify-around h-full">
+          <NavLink
+            to="/files"
+            className={({ isActive }) => cn(
+              "flex flex-col items-center justify-center w-16 h-full",
+              isActive ? "text-primary" : "text-muted-foreground"
+            )}
           >
-            <Upload className="h-5 w-5 text-primary-foreground" />
-          </Button>
-          <span className="text-[10px] text-muted-foreground mt-1">Upload</span>
+            <FileText className="h-5 w-5" />
+            <span className="text-xs mt-1">Files</span>
+          </NavLink>
+          
+          <NavLink
+            to="/upload"
+            className={({ isActive }) => cn(
+              "flex flex-col items-center justify-center w-16 h-full",
+              isActive ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            <UploadCloud className="h-5 w-5" />
+            <span className="text-xs mt-1">Upload</span>
+          </NavLink>
+          
+          <NavLink
+            to="/shared"
+            className={({ isActive }) => cn(
+              "flex flex-col items-center justify-center w-16 h-full",
+              isActive ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            <Share2 className="h-5 w-5" />
+            <span className="text-xs mt-1">Shared</span>
+          </NavLink>
+          
+          <div className="flex flex-col items-center justify-center w-16 h-full text-muted-foreground">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex flex-col items-center focus:outline-none">
+                <div className="bg-background/80 backdrop-blur-lg p-1 rounded-md">
+                  <Menu className="h-5 w-5" />
+                </div>
+                <span className="text-xs mt-1">Menu</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-background/90 backdrop-blur-lg">
+                <DropdownMenuItem asChild>
+                  <NavLink to="/settings" className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </NavLink>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-left">
+                  <div className="font-medium">CloudBliss Storage</div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-        <NavItem 
-          to="/shared" 
-          icon={Share2} 
-          label="Shared" 
-          isActive={isActive('/shared')} 
-        />
-        <NavItem 
-          to="/settings" 
-          icon={Settings} 
-          label="Settings" 
-          isActive={isActive('/settings')} 
-        />
       </div>
     </div>
-  );
-};
-
-interface NavItemProps {
-  to: string;
-  icon: React.ComponentType<any>;
-  label: string;
-  isActive: boolean;
-  isPrimary?: boolean;
-}
-
-const NavItem = ({ to, icon: Icon, label, isActive, isPrimary }: NavItemProps) => {
-  return (
-    <Link to={to} className="w-1/5 flex flex-col items-center justify-center">
-      {isPrimary ? (
-        <div className="rounded-full bg-primary p-3 -mt-6 shadow-lg">
-          <Icon className="h-5 w-5 text-primary-foreground" />
-        </div>
-      ) : (
-        <>
-          <Icon className={cn(
-            "h-5 w-5 mb-1",
-            isActive ? "text-primary" : "text-muted-foreground"
-          )} />
-          <span className={cn(
-            "text-[10px]",
-            isActive ? "text-primary font-medium" : "text-muted-foreground"
-          )}>
-            {label}
-          </span>
-        </>
-      )}
-    </Link>
   );
 };
 

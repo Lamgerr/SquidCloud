@@ -1,14 +1,20 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// Define proper CORS headers to allow requests from any origin
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight requests properly
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -22,7 +28,19 @@ serve(async (req) => {
       );
     }
 
-    const { action, fileName, fileType, data, userId, path, createRepo, repo } = await req.json();
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (error) {
+      console.error("Error parsing request body:", error);
+      return new Response(
+        JSON.stringify({ error: 'Failed to parse request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const { action, fileName, fileType, data, userId, path, createRepo, repo } = requestBody;
     
     if (!action) {
       return new Response(
@@ -254,7 +272,7 @@ serve(async (req) => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'InflateStorage-App'
+            'User-Agent': 'CloudBliss-Storage-App'
           }
         }
       );
@@ -275,12 +293,12 @@ serve(async (req) => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'InflateStorage-App',
+          'User-Agent': 'CloudBliss-Storage-App',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           name: repo,
-          description: 'InflateStorage secure nexus',
+          description: 'CloudBliss secure storage vault',
           private: true,
           auto_init: true
         })
@@ -302,7 +320,7 @@ serve(async (req) => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'InflateStorage-App'
+            'User-Agent': 'CloudBliss-Storage-App'
           }
         }
       );
@@ -338,7 +356,7 @@ serve(async (req) => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'InflateStorage-App'
+            'User-Agent': 'CloudBliss-Storage-App'
           }
         }
       );
@@ -381,7 +399,7 @@ serve(async (req) => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'InflateStorage-App',
+            'User-Agent': 'CloudBliss-Storage-App',
           },
         }
       );
@@ -403,7 +421,7 @@ serve(async (req) => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'InflateStorage-App',
+          'User-Agent': 'CloudBliss-Storage-App',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -443,7 +461,7 @@ serve(async (req) => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'InflateStorage-App',
+          'User-Agent': 'CloudBliss-Storage-App',
         },
       }
     );
@@ -472,7 +490,7 @@ serve(async (req) => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'InflateStorage-App',
+          'User-Agent': 'CloudBliss-Storage-App',
         },
       }
     );
@@ -495,7 +513,7 @@ serve(async (req) => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'InflateStorage-App',
+          'User-Agent': 'CloudBliss-Storage-App',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

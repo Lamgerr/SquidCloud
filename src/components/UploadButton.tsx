@@ -9,7 +9,7 @@ import {
   Zap, HardDrive, Network, Share2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { uploadFile, FileItem, getFiles } from '@/lib/api';
+import { uploadFile, FileItem, getFiles, formatBytes } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -140,7 +140,13 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
       animateProgress();
       
       // Perform the actual upload using Res54 in the background
-      const uploadedFile = await uploadFile(file);
+      const uploadedFile = await uploadFile(file, (progress, stage, details) => {
+        // Real upload progress from the API
+        if (stage === 'uploading' && details) {
+          setCurrentChunk(details.current);
+          setTotalChunks(details.total);
+        }
+      });
       
       // Set the final progress to 100% and stage to completed
       setProcessingStage('completed');
