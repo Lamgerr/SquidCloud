@@ -329,14 +329,18 @@ export const uploadFileWithRes54 = async (
   metadata: Res54FileMetadata,
   encryptionKey: string
 }> => {
-  // Get user data and ensure repos exist
+  // Get user data and check for repos
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) throw new Error("User not authenticated");
 
-  // Ensure valid repositories exist
-  const repos = await ensureValidRepos(userData);
+  // Check for existing repos
+  const { data: repos } = await supabase
+    .from("repositories")
+    .select("*")
+    .eq("user_id", userData.user.id);
+
   if (!repos || repos.length === 0) {
-    throw new Error("No secure vaults available. Please try again or contact support.");
+    throw new Error("No storage vaults found. Please create a storage vault first.");
   }
 
   // Continue with existing upload logic

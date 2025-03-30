@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +13,7 @@ import { Loader2, Plus, FileText, Info, Settings, FolderOpen, HardDrive, BarChar
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
+import { supabase } from '@/lib/supabase';
 
 interface DashboardProps {
   defaultTab?: string;
@@ -32,6 +32,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
   const [uploadButtonRef, setUploadButtonRef] = useState<HTMLDivElement | null>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [repoCount, setRepoCount] = useState(0);
 
   useEffect(() => {
     if (defaultTab) {
@@ -74,6 +76,49 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
 
     fetchFiles();
   }, [toast]);
+
+  useEffect(() => {
+    checkOnboardingStatus();
+  }, []);
+
+  const checkOnboardingStatus = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('onboarding_complete, id')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!profile?.onboarding_complete) {
+      setNeedsOnboarding(true);
+    }
+
+    const { data: repos } = await supabase
+      .from('repositories')
+      .select('id')
+      .eq('user_id', session.user.id);
+
+    setRepoCount(repos?.length || 0);
+  };
+
+  const handleCreateVault = () => {
+    if (repoCount >= 2) {
+      toast({
+        title: "Maximum vaults reached",
+        description: "You can only create up to 2 storage vaults.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (needsOnboarding) {
+      navigate('/onboarding');
+    } else {
+      navigate('/r/c/1');
+    }
+  };
 
   const handleFileUpload = (newFile: FileItemType) => {
     setFiles((prev) => [newFile, ...prev]);
@@ -495,6 +540,16 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
               </Card>
             </TabsContent>
           </Tabs>
+
+          <div className="flex justify-center mt-4">
+            <Button
+              onClick={handleCreateVault}
+              disabled={repoCount >= 2}
+              className="bg-primary text-white"
+            >
+              Create Storage Vault {repoCount}/2
+            </Button>
+          </div>
         </div>
       </div>
     </div>
