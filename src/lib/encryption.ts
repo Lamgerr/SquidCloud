@@ -90,8 +90,8 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
     combined.set(iv);
     combined.set(new Uint8Array(encryptedContent), iv.length);
     
-    // Convert to base64 safely
-    return binaryUtils.arrayBufferToBase64(combined.buffer);
+    // Convert to base64 in a safe way
+    return btoa(String.fromCharCode.apply(null, Array.from(combined)));
   } catch (error) {
     console.error('Encryption error:', error);
     throw new Error(`Encryption failed: ${error.message}`);
@@ -99,16 +99,19 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
 };
 
 // Decrypt file data from base64 string
-export const decryptData = async (base64Data: string, key: string): Promise<ArrayBuffer> => {
+export const decryptData = async (data: string, key: string): Promise<ArrayBuffer> => {
   try {
-    // Convert base64 to ArrayBuffer
-    const combinedBuffer = binaryUtils.base64ToArrayBuffer(base64Data);
-    const combinedArray = new Uint8Array(combinedBuffer);
-    
-    // Extract IV and encrypted content
-    const iv = combinedArray.slice(0, 12);
-    const encryptedContent = combinedArray.slice(12);
-    
+    // Decode base64 data
+    const binaryStr = atob(data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+
+    // Extract IV and content
+    const iv = bytes.slice(0, 12);
+    const encryptedContent = bytes.slice(12);
+
     // Import key
     const keyBytes = new TextEncoder().encode(key.slice(0, 32).padEnd(32, '0'));
     const keyBuffer = await crypto.subtle.importKey(
@@ -119,7 +122,7 @@ export const decryptData = async (base64Data: string, key: string): Promise<Arra
       ['decrypt']
     );
 
-    // Decrypt
+    // Decrypt data
     return await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       keyBuffer,

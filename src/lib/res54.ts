@@ -84,6 +84,22 @@ const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
   return bytes.buffer;
 };
 
+// Add new utility functions at the top
+const processChunkData = {
+  encode: (chunk: ArrayBuffer): string => {
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(chunk)));
+  },
+  
+  decode: (data: string): ArrayBuffer => {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+};
+
 // Update determineChunkingStrategy for consistent chunk sizes
 export const determineChunkingStrategy = (fileSize: number): number => {
   const maxChunkSize = 1 * 1024 * 1024; // 1MB max chunk size for better reliability
@@ -297,7 +313,7 @@ export const uploadFileWithRes54 = async (
     }
   }
   
-  // Update chunk upload validation
+  // Update uploadChunk function
   const uploadChunk = async (chunk: string, index: number, attempt = 0): Promise<any> => {
     try {
       const repoIndex = index % repos.length;
@@ -305,30 +321,25 @@ export const uploadFileWithRes54 = async (
       const chunkId = `res54_${Date.now()}_${index}`;
       const path = `${user.id}/${chunkId}.json`;
 
+      // Store raw chunk data without additional encoding
       const chunkMetadata = {
+        version: '2.1', // Add version for backward compatibility
         chunkIndex: index,
         totalChunks: chunks.length,
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
-        chunkData: chunk,
+        chunkData: chunk, // Raw encrypted chunk data
         chunkSize: chunk.length,
         checksum: await calculateSHA256(new TextEncoder().encode(chunk)),
-        repo: repo,  // Store repo name
-        path: path   // Store path
+        repo,
+        path
       };
 
+      // Upload chunk
       const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
-        body: {
-          action: 'upload',
-          fileName: `${chunkId}.json`,
-          fileType: 'application/json',
-          data: JSON.stringify(chunkMetadata),
-          userId: user.id,
-          path,
-          repo,
-          retryCount: attempt
-        }
+        body: { action: 'upload', fileName: `${chunkId}.json`, fileType: 'application/json',
+          data: JSON.stringify(chunkMetadata), userId: user.id, path, repo }
       });
 
       if (uploadError) throw uploadError;
@@ -465,31 +476,27 @@ const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> =>
 
   try {
     const { data, error } = await supabase.functions.invoke('github-storage', {
-      body: {
-        action: 'download',
-        path: chunk.path,
-        repo: chunk.repo
-      }
+      body: { action: 'download', path: chunk.path, repo: chunk.repo }
     });
 
     if (error) throw error;
     if (!data?.content) throw new Error('No content in response');
 
     try {
-      // Clean and parse the base64 content
-      const content = data.content.replace(/\s/g, '');
-      const decodedContent = atob(content);
+      // Decode GitHub base64 content
+      const decodedContent = atob(data.content.replace(/\s/g, ''));
       const parsedChunk = JSON.parse(decodedContent);
       
-      if (!parsedChunk.chunkData) {
-        throw new Error('Invalid chunk format - missing chunkData');
+      if (!parsedChunk.chunkData || !parsedChunk.version) {
+        throw new Error('Invalid chunk format - missing required fields');
       }
 
+      // Return the raw chunk data for decryption
       return {
         index: parsedChunk.chunkIndex,
         data: parsedChunk.chunkData,
         size: parsedChunk.chunkSize,
-        metadata: parsedChunk
+        version: parsedChunk.version
       };
     } catch (parseError) {
       console.error('Chunk parsing error:', parseError);
