@@ -13,34 +13,38 @@ const base64Utils = {
   encode: (buffer: ArrayBuffer): string => {
     try {
       const uint8Array = new Uint8Array(buffer);
-      const chunks: string[] = [];
-      for (let i = 0; i < uint8Array.length; i += 512) {
-        chunks.push(String.fromCharCode.apply(null, uint8Array.subarray(i, i + 512)));
-      }
-      return btoa(chunks.join(''));
+      const bytes = Array.from(uint8Array);
+      // Use small chunks to prevent call stack issues
+      const binary = bytes.map(byte => String.fromCharCode(byte)).join('');
+      return btoa(binary);
     } catch (error) {
       console.error('Base64 encode error:', error);
       throw new Error('Failed to encode data to base64');
     }
   },
   
-  decode: (base64: string): Uint8Array => {
+  decode: (input: string): Uint8Array => {
     try {
-      // Remove any whitespace and validate base64 string
-      const cleaned = base64.replace(/\s/g, '');
-      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) {
-        throw new Error('Invalid base64 format');
+      if (!input || typeof input !== 'string') {
+        throw new Error('Invalid input: expected base64 string');
       }
+
+      // Clean the input string
+      const base64 = input.trim().replace(/[^A-Za-z0-9+/=]/g, '');
       
-      const binary = atob(cleaned);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
+      try {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      } catch (e) {
+        throw new Error('Failed to decode base64 data: Invalid format');
       }
-      return bytes;
     } catch (error) {
       console.error('Base64 decode error:', error);
-      throw new Error('Failed to decode base64 data');
+      throw new Error(`Failed to decode base64 data: ${error.message}`);
     }
   }
 };
@@ -101,22 +105,27 @@ export const encryptData = async (data: ArrayBuffer, key: string): Promise<strin
 // Decrypt file data from base64 string
 export const decryptData = async (data: string, key: string): Promise<ArrayBuffer> => {
   try {
+    if (!data || typeof data !== 'string') {
+      throw new Error('Invalid input: data must be a string');
+    }
+
     // Decode and validate the encrypted data
     let bytes: Uint8Array;
     try {
       bytes = base64Utils.decode(data);
     } catch (decodeError) {
-      throw new Error(`Invalid encrypted data format: ${decodeError.message}`);
+      console.error('Base64 decode error:', decodeError);
+      throw new Error('Invalid encrypted data format');
     }
 
     if (bytes.length < 12) {
-      throw new Error('Invalid encrypted data: too short');
+      throw new Error('Invalid encrypted data: content too short');
     }
 
     const iv = bytes.slice(0, 12);
     const encryptedContent = bytes.slice(12);
 
-    // Import key
+    // Normalize key
     const keyBytes = new TextEncoder().encode(key.slice(0, 32).padEnd(32, '0'));
     const keyBuffer = await crypto.subtle.importKey(
       'raw',
@@ -126,6 +135,7 @@ export const decryptData = async (data: string, key: string): Promise<ArrayBuffe
       ['decrypt']
     );
 
+    // Decrypt with additional error context
     try {
       return await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv },
@@ -133,7 +143,8 @@ export const decryptData = async (data: string, key: string): Promise<ArrayBuffe
         encryptedContent
       );
     } catch (decryptError) {
-      throw new Error('Failed to decrypt data: invalid key or corrupted data');
+      console.error('Decryption operation failed:', decryptError);
+      throw new Error('Failed to decrypt data: invalid key or corrupted content');
     }
   } catch (error) {
     console.error('Decryption error:', error);
