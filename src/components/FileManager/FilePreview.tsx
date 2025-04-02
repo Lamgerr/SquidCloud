@@ -5,7 +5,11 @@ import { Button } from '@/components/ui/button';
 import { X, Download, Share2, Eye, FileText } from 'lucide-react';
 import { downloadFileById } from '@/lib/file-manager';
 import { supabase } from '@/integrations/supabase/client';
-import { FileSystemItem, GetFilesystemItemResult } from '@/types/file-manager';
+import { 
+  FileSystemItem, 
+  GetFilesystemItemResult, 
+  FilePreviewData 
+} from '@/types/file-manager';
 
 interface FilePreviewProps {
   fileId: string;
@@ -15,7 +19,7 @@ interface FilePreviewProps {
 
 const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [fileData, setFileData] = useState<any>(null);
+  const [fileData, setFileData] = useState<FilePreviewData | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,7 +54,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
           setFileData({
             ...fileEntry,
             ...fileData
-          });
+          } as FilePreviewData);
 
           // Generate preview URL if applicable
           if (fileData.preview_available) {
@@ -65,7 +69,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
             }
           }
         } else {
-          setFileData(fileEntry);
+          setFileData(fileEntry as unknown as FilePreviewData);
         }
       } catch (error) {
         console.error("Error in FilePreview:", error);
@@ -173,7 +177,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
           <div className="border-t pt-2 text-sm text-muted-foreground">
             <div className="flex justify-between">
               <span>Type: {fileData.type || 'Unknown'}</span>
-              <span>Last modified: {new Date(fileData.updated_at || fileData.created_at).toLocaleString()}</span>
+              <span>Last modified: {new Date(fileData.updated_at || fileData.created_at || '').toLocaleString()}</span>
             </div>
           </div>
         )}

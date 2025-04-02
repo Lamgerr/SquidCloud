@@ -121,6 +121,25 @@ export interface UserStorageStatsResult {
   folder_count: number;
 }
 
+// Define file preview types to include necessary fields from files table
+export interface FilePreviewData {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  storage_path: string;
+  encrypted: boolean;
+  shared: boolean;
+  created_at?: string;
+  updated_at?: string;
+  user_id: string;
+  preview_available?: boolean;
+  preview_type?: string;
+  tags?: string[];
+  encryption_key?: string;
+  github_repo?: string;
+}
+
 // Helper function to convert from Supabase format to our app format
 export function convertFilesystemItemToFileSystemItem(item: FilesystemItem | GetFilesystemItemResult | GetFolderContentsResult, fileDetails?: any): FileSystemItem {
   return {
