@@ -26,7 +26,7 @@ const RepoCreationPassword = () => {
       return;
     }
 
-    // Proceed to repo creation with the provided password
+    // Proceed to storage node creation with the provided password
     navigate(`/r/c/${count}?password=${password}`);
   };
 
@@ -39,7 +39,7 @@ const RepoCreationPassword = () => {
             Secure Vault Access
           </CardTitle>
           <CardDescription>
-            Enter the access password to create secure vaults
+            Enter the access password to create secure storage nodes
           </CardDescription>
         </CardHeader>
         

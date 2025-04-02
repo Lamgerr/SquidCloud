@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileWithRes54, downloadFileWithRes54 } from "./res54";
 
@@ -176,10 +175,10 @@ export async function shareFile(id: string, shared: boolean = true): Promise<str
   }
 }
 
-// Added the missing initializeRepos function
-export async function initializeRepos(count: number, password?: string): Promise<string[]> {
+// Updated the initializeRepos function to initializeStorageNodes
+export async function initializeStorageNodes(count: number, password?: string): Promise<string[]> {
   try {
-    const response = await fetch('/api/create-repos', {
+    const response = await fetch('/api/create-storage-nodes', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -188,14 +187,25 @@ export async function initializeRepos(count: number, password?: string): Promise
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create repositories');
+      const errorText = await response.text();
+      let errorMessage = 'Failed to create storage nodes';
+      
+      try {
+        // Try to parse as JSON first
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        // If not JSON, use the text directly
+        errorMessage = errorText || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    return data.repos || [];
+    return data.nodes || [];
   } catch (error: any) {
-    console.error('Error initializing repos:', error);
-    throw new Error(error.message || 'Failed to initialize secure repositories');
+    console.error('Error initializing storage nodes:', error);
+    throw new Error(error.message || 'Failed to initialize secure storage nodes');
   }
 }
