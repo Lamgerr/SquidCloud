@@ -201,7 +201,55 @@ export interface RpcResponse<T> {
   error: any;
 }
 
-// Explicit type for RPC function parameters
+// Define proper types for RPC function arguments
 export interface RpcFunctionArgs {
   [key: string]: any;
+}
+
+// Specific typed interfaces for each RPC call argument
+export interface GetFolderContentsFunctionArgs {
+  parent_id: string | null;
+}
+
+export interface GetFolderByIdFunctionArgs {
+  folder_id: string;
+}
+
+export interface CreateFolderFunctionArgs {
+  name: string;
+  parent_id: string | null;
+  user_id: string;
+}
+
+export interface CreateFileEntryFunctionArgs {
+  name: string;
+  parent_id: string | null;
+  user_id: string;
+  file_id: string;
+}
+
+export interface DeleteFilesystemItemFunctionArgs {
+  item_id: string;
+}
+
+export interface RenameFilesystemItemFunctionArgs {
+  item_id: string;
+  new_name: string;
+}
+
+export interface MoveFilesystemItemFunctionArgs {
+  item_id: string;
+  new_parent_id: string | null;
+}
+
+export interface GetFilesystemItemFunctionArgs {
+  item_id: string;
+}
+
+export interface GetUserStorageStatsFunctionArgs {
+  user_id: string;
+}
+
+export interface InitializeFileSystemFunctionArgs {
+  user_id: string;
 }

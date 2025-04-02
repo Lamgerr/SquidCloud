@@ -10,7 +10,7 @@ import {
   GetFilesystemItemResult, 
   FilePreviewData,
   RpcResponse,
-  RpcFunctionArgs
+  GetFilesystemItemFunctionArgs
 } from '@/types/file-manager';
 
 interface FilePreviewProps {
@@ -29,9 +29,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
       try {
         setIsLoading(true);
 
-        // First get the filesystem entry
+        // First get the filesystem entry with proper typing
         const { data: fsData, error: fsError } = await supabase
-          .rpc('get_filesystem_item', { item_id: fileId } as RpcFunctionArgs) as RpcResponse<GetFilesystemItemResult[]>;
+          .rpc('get_filesystem_item', { item_id: fileId } as GetFilesystemItemFunctionArgs) as RpcResponse<GetFilesystemItemResult[]>;
 
         if (fsError || !fsData || fsData.length === 0) {
           console.error("Error fetching file system item:", fsError);
