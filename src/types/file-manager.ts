@@ -1,4 +1,3 @@
-
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -193,8 +192,18 @@ export interface RpcResponse<T> {
   error: any;
 }
 
-// Define a generic type for RPC function arguments
-export type RpcFunctionArgs = Record<string, any>;
+// Update the RpcFunctionArgs type to be a union of all possible function argument types
+export type RpcFunctionArgs = 
+  | GetFolderContentsFunctionArgs
+  | GetFolderByIdFunctionArgs
+  | CreateFolderFunctionArgs
+  | CreateFileEntryFunctionArgs
+  | DeleteFilesystemItemFunctionArgs
+  | RenameFilesystemItemFunctionArgs
+  | MoveFilesystemItemFunctionArgs
+  | GetFilesystemItemFunctionArgs
+  | GetUserStorageStatsFunctionArgs
+  | InitializeFileSystemFunctionArgs;
 
 export interface GetFolderContentsFunctionArgs {
   parent_id: string | null;
