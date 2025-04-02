@@ -1,4 +1,3 @@
-
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -49,7 +48,6 @@ export interface FileManagerState {
   };
 }
 
-// Define Supabase table types for filesystem table
 export interface FilesystemItem {
   id: string;
   name: string;
@@ -61,7 +59,6 @@ export interface FilesystemItem {
   updated_at: string;
 }
 
-// RPC function return type definitions
 export interface GetFolderContentsResult {
   id: string;
   name: string;
@@ -121,7 +118,6 @@ export interface UserStorageStatsResult {
   folder_count: number;
 }
 
-// Define file preview types to include necessary fields from files table
 export interface FilePreviewData {
   id: string;
   name: string;
@@ -142,7 +138,6 @@ export interface FilePreviewData {
   github_repo?: string;
 }
 
-// Helper function to convert from Supabase format to our app format
 export function convertFilesystemItemToFileSystemItem(item: FilesystemItem | GetFilesystemItemResult | GetFolderContentsResult, fileDetails?: any): FileSystemItem {
   return {
     id: item.id,
@@ -153,7 +148,6 @@ export function convertFilesystemItemToFileSystemItem(item: FilesystemItem | Get
     created_at: item.created_at,
     updated_at: item.updated_at,
     fileId: item.file_id,
-    // Add file properties if available
     ...(fileDetails && {
       size: fileDetails.size,
       fileType: fileDetails.type,
@@ -166,7 +160,6 @@ export function convertFilesystemItemToFileSystemItem(item: FilesystemItem | Get
   };
 }
 
-// Helper function to convert to Supabase format
 export function convertToFilesystemItem(item: Partial<FileSystemItem>): Partial<FilesystemItem> {
   return {
     id: item.id,
@@ -180,7 +173,6 @@ export function convertToFilesystemItem(item: Partial<FileSystemItem>): Partial<
   };
 }
 
-// This is a type definition that can be used as a workaround
 export type SupabaseProfileType = {
   avatar_url: string | null;
   created_at: string | null;
@@ -195,18 +187,15 @@ export type SupabaseProfileType = {
   preview_type: string | null;
 };
 
-// Key addition: Define a proper RPC response type
 export interface RpcResponse<T> {
-  data: T | null;
+  data: T;
   error: any;
 }
 
-// Define the base interface for RPC function arguments
 export interface RpcFunctionArgs {
   [key: string]: any;
 }
 
-// Specific typed interfaces for each RPC call argument that extend RpcFunctionArgs
 export interface GetFolderContentsFunctionArgs extends RpcFunctionArgs {
   parent_id: string | null;
 }
