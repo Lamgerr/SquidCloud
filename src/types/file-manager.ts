@@ -126,14 +126,14 @@ export interface FilePreviewData {
   id: string;
   name: string;
   type: string;
-  size: number;
-  storage_path: string;
-  encrypted: boolean;
-  shared: boolean;
+  size?: number;
+  storage_path?: string;
+  encrypted?: boolean;
+  shared?: boolean;
   created_at?: string;
   updated_at?: string;
   user_id: string;
-  file_id?: string;  // Add file_id here
+  file_id?: string;  
   preview_available?: boolean;
   preview_type?: string;
   tags?: string[];
@@ -193,3 +193,9 @@ export type SupabaseProfileType = {
   preview_available: boolean | null;
   preview_type: string | null;
 };
+
+// Type for Supabase RPC function responses
+export interface RpcResponse<T> {
+  data: T | null;
+  error: any;
+}

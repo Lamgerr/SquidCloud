@@ -12,7 +12,8 @@ import {
   CreateFolderResult,
   CreateFileEntryResult,
   GetFilesystemItemResult,
-  UserStorageStatsResult
+  UserStorageStatsResult,
+  RpcResponse
 } from "@/types/file-manager";
 import { uploadFile, downloadFile } from "./api";
 
@@ -20,10 +21,7 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
   try {
     // Use RPC function to get folder contents
     const { data, error } = await supabase
-      .rpc('get_folder_contents', { parent_id: folderId }) as {
-        data: GetFolderContentsResult[] | null,
-        error: any
-      };
+      .rpc('get_folder_contents', { parent_id: folderId }) as RpcResponse<GetFolderContentsResult[]>;
 
     if (error) {
       console.error("Error fetching folder contents:", error);
@@ -76,10 +74,7 @@ export async function getPathToFolder(folderId: string | null): Promise<{id: str
     while (currentId && currentId !== 'root') {
       // Use RPC function to get folder details
       const { data, error } = await supabase
-        .rpc('get_folder_by_id', { folder_id: currentId }) as {
-          data: GetFolderByIdResult[] | null,
-          error: any
-        };
+        .rpc('get_folder_by_id', { folder_id: currentId }) as RpcResponse<GetFolderByIdResult[]>;
 
       if (error || !data || !Array.isArray(data) || data.length === 0) break;
       
@@ -105,10 +100,7 @@ export async function createFolder(name: string, parentId: string | null): Promi
         name: name,
         parent_id: parentId,
         user_id: user.id
-      }) as {
-        data: CreateFolderResult[] | null,
-        error: any
-      };
+      }) as RpcResponse<CreateFolderResult[]>;
 
     if (error) throw error;
     
@@ -151,10 +143,7 @@ export async function uploadFileToFolder(
         parent_id: parentId,
         user_id: user.id,
         file_id: uploadedFile.id
-      }) as {
-        data: CreateFileEntryResult[] | null,
-        error: any
-      };
+      }) as RpcResponse<CreateFileEntryResult[]>;
 
     if (error) throw error;
     
@@ -209,10 +198,7 @@ export async function deleteItem(itemId: string): Promise<void> {
   try {
     // Use RPC function to safely delete an item
     const { error } = await supabase
-      .rpc('delete_filesystem_item', { item_id: itemId }) as {
-        data: any,
-        error: any
-      };
+      .rpc('delete_filesystem_item', { item_id: itemId }) as RpcResponse<any>;
 
     if (error) throw error;
   } catch (error) {
@@ -228,10 +214,7 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
       .rpc('rename_filesystem_item', { 
         item_id: itemId, 
         new_name: newName 
-      }) as {
-        data: GetFilesystemItemResult[] | null,
-        error: any
-      };
+      }) as RpcResponse<GetFilesystemItemResult[]>;
 
     if (error) throw error;
     
@@ -254,10 +237,7 @@ export async function moveItem(itemId: string, newParentId: string | null): Prom
       .rpc('move_filesystem_item', { 
         item_id: itemId, 
         new_parent_id: newParentId 
-      }) as {
-        data: GetFilesystemItemResult[] | null,
-        error: any
-      };
+      }) as RpcResponse<GetFilesystemItemResult[]>;
 
     if (error) throw error;
     
@@ -281,10 +261,7 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
 
     // Use RPC function to get storage stats
     const { data, error } = await supabase
-      .rpc('get_user_storage_stats', { user_id: user.id }) as {
-        data: UserStorageStatsResult | null,
-        error: any
-      };
+      .rpc('get_user_storage_stats', { user_id: user.id }) as RpcResponse<UserStorageStatsResult>;
 
     if (error) throw error;
     
@@ -310,10 +287,7 @@ export async function initializeFileSystem(): Promise<void> {
 
     // Call RPC function to initialize the filesystem
     const { error } = await supabase
-      .rpc('initialize_file_system', { user_id: user.id }) as {
-        data: any,
-        error: any
-      };
+      .rpc('initialize_file_system', { user_id: user.id }) as RpcResponse<any>;
 
     if (error) throw error;
   } catch (error) {

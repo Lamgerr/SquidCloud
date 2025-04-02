@@ -8,7 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   FileSystemItem, 
   GetFilesystemItemResult, 
-  FilePreviewData 
+  FilePreviewData,
+  RpcResponse
 } from '@/types/file-manager';
 
 interface FilePreviewProps {
@@ -29,10 +30,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
 
         // First get the filesystem entry
         const { data: fsData, error: fsError } = await supabase
-          .rpc('get_filesystem_item', { item_id: fileId }) as { 
-            data: GetFilesystemItemResult[] | null, 
-            error: any 
-          };
+          .rpc('get_filesystem_item', { item_id: fileId }) as RpcResponse<GetFilesystemItemResult[]>;
 
         if (fsError || !fsData || fsData.length === 0) {
           console.error("Error fetching file system item:", fsError);
@@ -43,7 +41,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
         
         // Then get the actual file data if file_id exists
         if (fileEntry.file_id) {
-          const { data: fileData, error: fileError } = await supabase
+          const { data: fileDetails, error: fileError } = await supabase
             .from('files')
             .select('*')
             .eq('id', fileEntry.file_id)
@@ -51,19 +49,21 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
 
           if (fileError) throw fileError;
           
-          setFileData({
+          const fullFileData: FilePreviewData = {
             ...fileEntry,
-            ...fileData,
+            ...fileDetails,
             file_id: fileEntry.file_id  // Make sure file_id is included
-          } as FilePreviewData);
+          };
+          
+          setFileData(fullFileData);
 
           // Generate preview URL if applicable
-          if (fileData.preview_available) {
+          if (fullFileData.preview_available) {
             // Handle preview generation or URL
-          } else if (fileData.type?.startsWith('image/')) {
+          } else if (fullFileData.type?.startsWith('image/')) {
             const { data: urlData } = await supabase.storage
               .from('previews')
-              .createSignedUrl(`${fileData.id}/preview.jpg`, 60);
+              .createSignedUrl(`${fullFileData.id}/preview.jpg`, 60);
               
             if (urlData?.signedUrl) {
               setFileUrl(urlData.signedUrl);
