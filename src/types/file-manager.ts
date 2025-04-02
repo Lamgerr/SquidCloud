@@ -1,4 +1,3 @@
-
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -186,6 +185,8 @@ export type SupabaseProfileType = {
   storage_node_count: number | null;
   preview_available: boolean | null;
   preview_type: string | null;
+  repo_count?: number;
+  is_premium?: boolean;
 };
 
 export interface RpcResponse<T> {
@@ -193,7 +194,6 @@ export interface RpcResponse<T> {
   error: any;
 }
 
-// Updated RPC function types
 export interface RpcFunctionArgs {
   [key: string]: any;
 }
@@ -245,7 +245,6 @@ export interface InitializeFileSystemFunctionArgs extends RpcFunctionArgs {
   user_id: string;
 }
 
-// Fixed the createRpcParams function to properly handle generic types
 export function createRpcParams<T extends RpcFunctionArgs>(params: T): Record<string, any> {
-  return params as Record<string, any>;
+  return params;
 }

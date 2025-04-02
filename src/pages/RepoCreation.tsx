@@ -58,8 +58,8 @@ const RepoCreation = () => {
       }
       
       if (profileData) {
-        // Cast to SupabaseProfileType to access storage_node_count
-        const profile = profileData as SupabaseProfileType;
+        // Cast to unknown first and then to SupabaseProfileType to avoid TypeScript errors
+        const profile = profileData as unknown as SupabaseProfileType;
         const currentNodeCount = profile.storage_node_count || 0;
         
         // Update profile with the correct type
