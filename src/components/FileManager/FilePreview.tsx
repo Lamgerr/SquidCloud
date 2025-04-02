@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,8 @@ import {
   GetFilesystemItemResult, 
   FilePreviewData,
   RpcResponse,
-  GetFilesystemItemFunctionArgs
+  GetFilesystemItemFunctionArgs,
+  RpcFunctionArgs
 } from '@/types/file-manager';
 
 interface FilePreviewProps {

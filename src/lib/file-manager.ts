@@ -24,7 +24,8 @@ import {
   MoveFilesystemItemFunctionArgs,
   GetFilesystemItemFunctionArgs,
   GetUserStorageStatsFunctionArgs,
-  InitializeFileSystemFunctionArgs
+  InitializeFileSystemFunctionArgs,
+  RpcFunctionArgs
 } from "@/types/file-manager";
 import { uploadFile, downloadFile } from "./api";
 

@@ -201,55 +201,55 @@ export interface RpcResponse<T> {
   error: any;
 }
 
-// Define proper types for RPC function arguments - this is the key fix
+// Define the base interface for RPC function arguments
 export interface RpcFunctionArgs {
   [key: string]: any;
 }
 
-// Specific typed interfaces for each RPC call argument
-export interface GetFolderContentsFunctionArgs {
+// Specific typed interfaces for each RPC call argument that extend RpcFunctionArgs
+export interface GetFolderContentsFunctionArgs extends RpcFunctionArgs {
   parent_id: string | null;
 }
 
-export interface GetFolderByIdFunctionArgs {
+export interface GetFolderByIdFunctionArgs extends RpcFunctionArgs {
   folder_id: string;
 }
 
-export interface CreateFolderFunctionArgs {
+export interface CreateFolderFunctionArgs extends RpcFunctionArgs {
   name: string;
   parent_id: string | null;
   user_id: string;
 }
 
-export interface CreateFileEntryFunctionArgs {
+export interface CreateFileEntryFunctionArgs extends RpcFunctionArgs {
   name: string;
   parent_id: string | null;
   user_id: string;
   file_id: string;
 }
 
-export interface DeleteFilesystemItemFunctionArgs {
+export interface DeleteFilesystemItemFunctionArgs extends RpcFunctionArgs {
   item_id: string;
 }
 
-export interface RenameFilesystemItemFunctionArgs {
+export interface RenameFilesystemItemFunctionArgs extends RpcFunctionArgs {
   item_id: string;
   new_name: string;
 }
 
-export interface MoveFilesystemItemFunctionArgs {
+export interface MoveFilesystemItemFunctionArgs extends RpcFunctionArgs {
   item_id: string;
   new_parent_id: string | null;
 }
 
-export interface GetFilesystemItemFunctionArgs {
+export interface GetFilesystemItemFunctionArgs extends RpcFunctionArgs {
   item_id: string;
 }
 
-export interface GetUserStorageStatsFunctionArgs {
+export interface GetUserStorageStatsFunctionArgs extends RpcFunctionArgs {
   user_id: string;
 }
 
-export interface InitializeFileSystemFunctionArgs {
+export interface InitializeFileSystemFunctionArgs extends RpcFunctionArgs {
   user_id: string;
 }
