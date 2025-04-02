@@ -173,7 +173,7 @@ export function convertToFilesystemItem(item: Partial<FileSystemItem>): Partial<
   };
 }
 
-export type SupabaseProfileType = {
+export interface SupabaseProfileType {
   avatar_url: string | null;
   created_at: string | null;
   full_name: string | null;
@@ -187,7 +187,7 @@ export type SupabaseProfileType = {
   preview_type: string | null;
   repo_count?: number;
   is_premium?: boolean;
-};
+}
 
 export interface RpcResponse<T> {
   data: T;
@@ -246,5 +246,5 @@ export interface InitializeFileSystemFunctionArgs extends RpcFunctionArgs {
 }
 
 export function createRpcParams<T extends RpcFunctionArgs>(params: T): Record<string, any> {
-  return params;
+  return params as Record<string, any>;
 }
