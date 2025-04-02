@@ -31,15 +31,17 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
         setIsLoading(true);
         
         const params = createRpcParams<GetFilesystemItemFunctionArgs>({ item_id: fileId });
-        const { data: fsData, error: fsError } = await supabase
-          .rpc('get_filesystem_item', params) as unknown as RpcResponse<GetFilesystemItemResult[]>;
+        
+        // Type assertion to help TypeScript understand the response
+        const response = await supabase
+          .rpc('get_filesystem_item', params) as { data: GetFilesystemItemResult[], error: any };
 
-        if (fsError || !fsData || fsData.length === 0) {
-          console.error("Error fetching file system item:", fsError);
+        if (response.error || !response.data || response.data.length === 0) {
+          console.error("Error fetching file system item:", response.error);
           throw new Error("File not found");
         }
 
-        const fileEntry = fsData[0];
+        const fileEntry = response.data[0];
         
         if (fileEntry.file_id) {
           const { data: fileDetails, error: fileError } = await supabase

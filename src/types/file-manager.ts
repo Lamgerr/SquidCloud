@@ -136,7 +136,7 @@ export interface FilePreviewData {
   preview_type?: string;
   tags?: string[];
   encryption_key?: string;
-  github_repo?: string;
+  storage_node?: string;
 }
 
 export function convertFilesystemItemToFileSystemItem(item: FilesystemItem | GetFilesystemItemResult | GetFolderContentsResult, fileDetails?: any): FileSystemItem {
@@ -184,20 +184,20 @@ export type SupabaseProfileType = {
   storage_quota_gb: number | null;
   onboarding_complete: boolean | null;
   storage_node_count: number | null;
-  repo_count: number | null;
   preview_available: boolean | null;
   preview_type: string | null;
 };
 
+// Fixed RPC Response type to accept any type parameter
 export interface RpcResponse<T> {
   data: T;
   error: any;
 }
 
-// Define RpcFunctionArgs to accept any key-value pairs
+// Fixed RPC function args to be more flexible
 export type RpcFunctionArgs = Record<string, any>;
 
-// Function interfaces for documentation purposes
+// Function interfaces for RPC calls
 export interface GetFolderContentsFunctionArgs {
   parent_id: string | null;
 }
@@ -246,6 +246,6 @@ export interface InitializeFileSystemFunctionArgs {
 }
 
 // Helper function to create RPC parameters with proper typing
-export function createRpcParams<T>(params: T): RpcFunctionArgs {
-  return params as RpcFunctionArgs;
+export function createRpcParams<T extends Record<string, any>>(params: T): T {
+  return params;
 }
