@@ -16,7 +16,7 @@ export interface FileSystemItem {
   encryption_key?: string;
   preview_available?: boolean;
   preview_type?: string;
-  fileId?: string; // Added this property to handle files in filesystem
+  fileId?: string;
 }
 
 export interface FolderData extends FileSystemItem {
@@ -54,9 +54,9 @@ export interface FilesystemItem {
   id: string;
   name: string;
   type: 'file' | 'folder';
-  parentId: string | null;
-  userId: string;
-  fileId?: string;
+  parent_id: string | null;
+  user_id: string;
+  file_id?: string;
   created_at: string;
   updated_at: string;
 }

@@ -8,13 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-// Create repos using Supabase Functions to avoid CORS
 const createReposWithRetry = async (
   session: any,
   count: number,
   password?: string | null
 ): Promise<any[]> => {
-  // First check existing repos
   try {
     const { data: existingRepos, error: existingError } = await supabase
       .from('repositories')
@@ -28,7 +26,6 @@ const createReposWithRetry = async (
       return existingRepos;
     }
 
-    // Only proceed with creation if no repos exist
     console.log('No existing repos found, creating new ones...');
     const { data, error } = await supabase.functions.invoke('github-storage', {
       body: {
@@ -41,7 +38,6 @@ const createReposWithRetry = async (
     if (error) throw error;
     if (!data?.repos) throw new Error('Invalid response format');
 
-    // No need to insert into database as the Edge Function handles that
     return data.repos;
   } catch (error) {
     console.error('Repository creation/fetch error:', error);
@@ -74,7 +70,6 @@ const RepoCreation = () => {
         
         setProgress(20);
 
-        // Get auth session
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !sessionData?.session) {
           throw new Error(sessionError?.message || "Authentication required");
@@ -82,18 +77,18 @@ const RepoCreation = () => {
 
         setProgress(30);
 
-        // Check repo count first
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('repo_count')
           .eq('id', sessionData.session.user.id)
           .single();
 
-        if (profile && profile.repo_count >= 2) {
+        const currentRepoCount = profile && !profileError ? (profile.repo_count || 0) : 0;
+        
+        if (currentRepoCount >= 2) {
           throw new Error("Maximum number of vaults (2) reached");
         }
 
-        // Create repositories using Supabase Function
         const createdRepos = await createReposWithRetry(
           sessionData.session,
           validCount,
@@ -102,7 +97,6 @@ const RepoCreation = () => {
 
         setProgress(60);
 
-        // Store in Supabase with simplified retry
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const { error: dbError } = await supabase
@@ -124,12 +118,11 @@ const RepoCreation = () => {
           }
         }
 
-        // Update repo count and onboarding status
         await supabase
           .from('profiles')
           .update({ 
-            repo_count: (profile?.repo_count || 0) + createdRepos.length,
-            onboarding_complete: true
+            onboarding_complete: true,
+            repo_count: currentRepoCount + createdRepos.length
           })
           .eq('id', sessionData.session.user.id);
 

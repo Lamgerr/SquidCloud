@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -50,15 +49,14 @@ const AboutStats: React.FC = () => {
         
         if (user) {
           try {
-            const { data: profileData } = await supabase
+            const { data: profileData, error } = await supabase
               .from('profiles')
-              .select('*')
+              .select('storage_quota_gb')
               .eq('id', user.id)
               .single();
               
-            if (profileData) {
-              // Use the default quota if storage_quota_gb isn't available
-              userQuota = profileData.storage_quota_gb || DEFAULT_QUOTA_GB;
+            if (profileData && !error && profileData.storage_quota_gb) {
+              userQuota = Number(profileData.storage_quota_gb) || DEFAULT_QUOTA_GB;
             }
           } catch (err) {
             console.error("Error getting user quota:", err);

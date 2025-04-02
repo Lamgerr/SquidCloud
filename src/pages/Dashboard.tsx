@@ -87,14 +87,20 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('onboarding_complete, repo_count')
-      .eq('id', session.user.id)
-      .single();
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('onboarding_complete, repo_count')
+        .eq('id', session.user.id)
+        .single();
 
-    setIsOnboarding(!profile?.onboarding_complete);
-    setRepoCount(profile?.repo_count || 0);
+      if (!error && profile) {  
+        setIsOnboarding(!(profile.onboarding_complete || false));
+        setRepoCount(profile.repo_count || 0);
+      }
+    } catch (err) {
+      console.error("Error checking onboarding status:", err);
+    }
   };
 
   const handleCreateVault = () => {
