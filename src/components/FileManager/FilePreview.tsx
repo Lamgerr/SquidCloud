@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { X, Download, Share2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,15 +36,14 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType, onClose }) 
           
         if (fileError) throw fileError;
         
-        // Get file system entry to get proper name
-        const { data: fsItem, error: fsError } = await supabase
-          .from('filesystem')
-          .select('name')
-          .eq('fileId', fileId)
-          .single();
+        // Get file system entry using RPC function
+        const { data: fsData, error: fsError } = await supabase
+          .rpc('get_filesystem_entry_by_file_id', { file_id: fileId });
           
-        if (fsItem) {
-          setFileName(fsItem.name);
+        if (fsError) throw fsError;
+        
+        if (fsData && fsData.length > 0) {
+          setFileName(fsData[0].name);
         } else {
           setFileName(file.name);
         }

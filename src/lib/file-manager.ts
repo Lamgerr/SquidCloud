@@ -1,21 +1,27 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { FileSystemItem, FileData, FolderData } from "@/types/file-manager";
+import { FileSystemItem, FolderData, FileData, FilesystemItem } from "@/types/file-manager";
 import { uploadFile, downloadFile } from "./api";
 
 export async function getFolderContents(folderId: string | null): Promise<FileSystemItem[]> {
   try {
+    // Use raw SQL query to access the filesystem table
     const { data: folderItems, error: folderError } = await supabase
-      .from('filesystem')
-      .select('*')
-      .eq('parentId', folderId || null);
+      .rpc('get_folder_contents', { parent_id: folderId });
 
-    if (folderError) throw folderError;
+    if (folderError) {
+      console.error("Error fetching folder contents:", folderError);
+      throw folderError;
+    }
+
+    if (!folderItems || folderItems.length === 0) {
+      return [];
+    }
 
     // Get file details for items that are files
     const fileIds = folderItems
-      .filter(item => item.type === 'file')
-      .map(item => item.fileId)
+      .filter(item => item.type === 'file' && item.file_id)
+      .map(item => item.file_id)
       .filter(Boolean);
 
     if (fileIds.length) {
@@ -26,28 +32,47 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
 
       if (filesError) throw filesError;
 
-      // Merge file details with filesystem items
+      // Transform data to match our interface
       return folderItems.map(item => {
-        if (item.type === 'file' && item.fileId) {
-          const fileDetail = fileDetails.find(f => f.id === item.fileId);
+        const result: FileSystemItem = {
+          id: item.id,
+          name: item.name,
+          type: item.type as 'file' | 'folder',
+          parentId: item.parent_id,
+          userId: item.user_id,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          fileId: item.file_id
+        };
+
+        if (item.type === 'file' && item.file_id) {
+          const fileDetail = fileDetails?.find(f => f.id === item.file_id);
           if (fileDetail) {
-            return {
-              ...item,
-              size: fileDetail.size,
-              fileType: fileDetail.type,
-              storage_path: fileDetail.storage_path,
-              encrypted: fileDetail.encrypted,
-              shared: fileDetail.shared,
-              preview_available: fileDetail.preview_available,
-              preview_type: fileDetail.preview_type
-            };
+            result.size = fileDetail.size;
+            result.fileType = fileDetail.type;
+            result.storage_path = fileDetail.storage_path;
+            result.encrypted = fileDetail.encrypted;
+            result.shared = fileDetail.shared;
+            result.preview_available = fileDetail.preview_available;
+            result.preview_type = fileDetail.preview_type;
           }
         }
-        return item;
+        
+        return result;
       });
     }
 
-    return folderItems;
+    // Transform data to match our interface
+    return folderItems.map(item => ({
+      id: item.id,
+      name: item.name,
+      type: item.type as 'file' | 'folder',
+      parentId: item.parent_id,
+      userId: item.user_id,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+      fileId: item.file_id
+    }));
   } catch (error) {
     console.error("Error getting folder contents:", error);
     throw error;
@@ -57,45 +82,63 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
 export async function getPathToFolder(folderId: string | null): Promise<{id: string, name: string}[]> {
   if (!folderId) return [{ id: 'root', name: 'My Drive' }];
 
-  const path = [{ id: 'root', name: 'My Drive' }];
-  let currentId = folderId;
+  try {
+    const path = [{ id: 'root', name: 'My Drive' }];
+    let currentId = folderId;
 
-  while (currentId && currentId !== 'root') {
-    const { data: folder, error } = await supabase
-      .from('filesystem')
-      .select('id, name, parentId')
-      .eq('id', currentId)
-      .single();
+    while (currentId && currentId !== 'root') {
+      // Use a function to get folder details safely
+      const { data: folder, error } = await supabase
+        .rpc('get_folder_by_id', { folder_id: currentId });
 
-    if (error || !folder) break;
-    path.unshift({ id: folder.id, name: folder.name });
-    currentId = folder.parentId;
+      if (error || !folder || folder.length === 0) break;
+      
+      path.unshift({ id: folder[0].id, name: folder[0].name });
+      currentId = folder[0].parent_id;
+    }
+
+    return path;
+  } catch (error) {
+    console.error("Error getting path to folder:", error);
+    return [{ id: 'root', name: 'My Drive' }];
   }
-
-  return path;
 }
 
 export async function createFolder(name: string, parentId: string | null): Promise<FolderData> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("User not authenticated");
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
-  const newFolder = {
-    name,
-    type: 'folder' as const,
-    parentId,
-    userId: user.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
+    const newFolder = {
+      name,
+      type: 'folder',
+      parent_id: parentId,
+      user_id: user.id
+    };
 
-  const { data, error } = await supabase
-    .from('filesystem')
-    .insert(newFolder)
-    .select()
-    .single();
+    const { data, error } = await supabase
+      .rpc('create_folder', newFolder);
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      throw new Error("Failed to create folder");
+    }
+    
+    // Transform to match our interface
+    return {
+      id: data[0].id,
+      name: data[0].name,
+      type: 'folder',
+      parentId: data[0].parent_id,
+      userId: data[0].user_id,
+      created_at: data[0].created_at,
+      updated_at: data[0].updated_at
+    };
+  } catch (error) {
+    console.error("Error creating folder:", error);
+    throw error;
+  }
 }
 
 export async function uploadFileToFolder(
@@ -113,25 +156,31 @@ export async function uploadFileToFolder(
     // Then create a filesystem entry pointing to this file
     const fileSystemEntry = {
       name: file.name,
-      type: 'file' as const,
-      parentId,
-      userId: user.id,
-      fileId: uploadedFile.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      type: 'file',
+      parent_id: parentId,
+      user_id: user.id,
+      file_id: uploadedFile.id
     };
 
-    const { data: fsItem, error } = await supabase
-      .from('filesystem')
-      .insert(fileSystemEntry)
-      .select()
-      .single();
+    const { data, error } = await supabase
+      .rpc('create_file_entry', fileSystemEntry);
 
     if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      throw new Error("Failed to create file entry");
+    }
 
     // Return combined data
     return {
-      ...fsItem,
+      id: data[0].id,
+      name: data[0].name,
+      type: 'file',
+      parentId: data[0].parent_id,
+      userId: data[0].user_id,
+      fileId: data[0].file_id,
+      created_at: data[0].created_at,
+      updated_at: data[0].updated_at,
       size: uploadedFile.size,
       fileType: uploadedFile.type,
       storage_path: uploadedFile.storage_path,
@@ -167,45 +216,11 @@ export async function downloadFileById(fileId: string): Promise<Blob> {
 
 export async function deleteItem(itemId: string): Promise<void> {
   try {
-    // First check if it's a folder
-    const { data: item, error: fetchError } = await supabase
-      .from('filesystem')
-      .select('*')
-      .eq('id', itemId)
-      .single();
+    // Use a stored procedure to delete the item safely
+    const { data, error } = await supabase
+      .rpc('delete_filesystem_item', { item_id: itemId });
 
-    if (fetchError) throw fetchError;
-
-    if (item.type === 'folder') {
-      // Recursively delete all contents
-      const { data: children, error: childrenError } = await supabase
-        .from('filesystem')
-        .select('*')
-        .eq('parentId', itemId);
-
-      if (childrenError) throw childrenError;
-
-      // Delete all children recursively
-      for (const child of children) {
-        await deleteItem(child.id);
-      }
-    } else if (item.type === 'file' && item.fileId) {
-      // Delete the actual file
-      const { error: deleteFileError } = await supabase
-        .from('files')
-        .delete()
-        .eq('id', item.fileId);
-
-      if (deleteFileError) throw deleteFileError;
-    }
-
-    // Delete the filesystem entry
-    const { error: deleteError } = await supabase
-      .from('filesystem')
-      .delete()
-      .eq('id', itemId);
-
-    if (deleteError) throw deleteError;
+    if (error) throw error;
   } catch (error) {
     console.error("Error deleting item:", error);
     throw error;
@@ -215,14 +230,28 @@ export async function deleteItem(itemId: string): Promise<void> {
 export async function renameItem(itemId: string, newName: string): Promise<FileSystemItem> {
   try {
     const { data, error } = await supabase
-      .from('filesystem')
-      .update({ name: newName, updated_at: new Date().toISOString() })
-      .eq('id', itemId)
-      .select()
-      .single();
+      .rpc('rename_filesystem_item', { 
+        item_id: itemId, 
+        new_name: newName 
+      });
 
     if (error) throw error;
-    return data;
+    
+    if (!data || data.length === 0) {
+      throw new Error("Failed to rename item");
+    }
+
+    // Transform to match our interface
+    return {
+      id: data[0].id,
+      name: data[0].name,
+      type: data[0].type,
+      parentId: data[0].parent_id,
+      userId: data[0].user_id,
+      fileId: data[0].file_id,
+      created_at: data[0].created_at,
+      updated_at: data[0].updated_at
+    };
   } catch (error) {
     console.error("Error renaming item:", error);
     throw error;
@@ -232,14 +261,28 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
 export async function moveItem(itemId: string, newParentId: string | null): Promise<FileSystemItem> {
   try {
     const { data, error } = await supabase
-      .from('filesystem')
-      .update({ parentId: newParentId, updated_at: new Date().toISOString() })
-      .eq('id', itemId)
-      .select()
-      .single();
+      .rpc('move_filesystem_item', { 
+        item_id: itemId, 
+        new_parent_id: newParentId 
+      });
 
     if (error) throw error;
-    return data;
+    
+    if (!data || data.length === 0) {
+      throw new Error("Failed to move item");
+    }
+
+    // Transform to match our interface
+    return {
+      id: data[0].id,
+      name: data[0].name,
+      type: data[0].type,
+      parentId: data[0].parent_id,
+      userId: data[0].user_id,
+      fileId: data[0].file_id,
+      created_at: data[0].created_at,
+      updated_at: data[0].updated_at
+    };
   } catch (error) {
     console.error("Error moving item:", error);
     throw error;
@@ -252,34 +295,24 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    // Get file stats
-    const { data: files, error: filesError } = await supabase
-      .from('files')
-      .select('size')
-      .eq('user_id', user.id);
+    // Use a stored procedure to get storage stats
+    const { data, error } = await supabase
+      .rpc('get_user_storage_stats', { user_id: user.id });
 
-    if (filesError) throw filesError;
-
-    // Get folder stats
-    const { data: folders, error: foldersError } = await supabase
-      .from('filesystem')
-      .select('id')
-      .eq('userId', user.id)
-      .eq('type', 'folder');
-
-    if (foldersError) throw foldersError;
-
-    // Calculate total size
-    const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
-
+    if (error) throw error;
+    
+    if (!data) {
+      return { totalSize: 0, fileCount: 0, folderCount: 0 };
+    }
+    
     return {
-      totalSize,
-      fileCount: files.length,
-      folderCount: folders.length
+      totalSize: data.total_size || 0,
+      fileCount: data.file_count || 0,
+      folderCount: data.folder_count || 0
     };
   } catch (error) {
     console.error("Error getting storage stats:", error);
-    throw error;
+    return { totalSize: 0, fileCount: 0, folderCount: 0 };
   }
 }
 
@@ -289,30 +322,11 @@ export async function initializeFileSystem(): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    // Check if root exists
-    const { data: existing, error: checkError } = await supabase
-      .from('filesystem')
-      .select('id')
-      .eq('userId', user.id)
-      .eq('parentId', null)
-      .eq('type', 'folder');
+    // Call RPC function to init the filesystem
+    const { error } = await supabase
+      .rpc('initialize_file_system', { user_id: user.id });
 
-    if (checkError) throw checkError;
-
-    // If no root folder exists, create default folders
-    if (!existing || existing.length === 0) {
-      // Create default folders
-      const folders = [
-        { name: 'My Files', type: 'folder', parentId: null },
-        { name: 'Shared with me', type: 'folder', parentId: null },
-        { name: 'Documents', type: 'folder', parentId: null },
-        { name: 'Media', type: 'folder', parentId: null }
-      ];
-
-      for (const folder of folders) {
-        await createFolder(folder.name, folder.parentId);
-      }
-    }
+    if (error) throw error;
   } catch (error) {
     console.error("Error initializing file system:", error);
     throw error;

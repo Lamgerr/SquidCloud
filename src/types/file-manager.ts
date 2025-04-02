@@ -16,6 +16,7 @@ export interface FileSystemItem {
   encryption_key?: string;
   preview_available?: boolean;
   preview_type?: string;
+  fileId?: string; // Added this property to handle files in filesystem
 }
 
 export interface FolderData extends FileSystemItem {
@@ -46,4 +47,23 @@ export interface FileManagerState {
     field: 'name' | 'created_at' | 'updated_at' | 'size';
     direction: 'asc' | 'desc';
   };
+}
+
+// Define Supabase table types for filesystem table
+export interface FilesystemItem {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  parentId: string | null;
+  userId: string;
+  fileId?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Add this to the Supabase types
+// This is a placeholder method to make TypeScript aware of the filesystem table
+export function extendSupabaseTypes() {
+  // This function is just a type helper - doesn't actually do anything at runtime
+  console.log("Types extended");
 }

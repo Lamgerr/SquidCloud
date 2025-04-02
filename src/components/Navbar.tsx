@@ -1,79 +1,86 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import { Menu } from "lucide-react"
-import { Cloud as CloudIcon, LogOut } from 'lucide-react';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Navbar: React.FC = () => {
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
 
   return (
-    <nav className="bg-background border-b sticky top-0 z-50">
-      <div className="container flex items-center justify-between py-3">
-        <Link to="/" className="flex items-center gap-2">
-          <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center"><div class="w-4 h-4 bg-white rounded-sm"></div></div>
-          <span className="font-semibold md:inline-block">CloudBliss</span>
-          <span className="text-xs text-muted-foreground hidden md:inline-block">by Inflate</span>
-        </Link>
+    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex h-14 items-center px-4">
+        <div className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center">
+            <div className="hidden md:flex">
+              <img src="/logo.svg" alt="CloudBliss Logo" className="h-8 w-8 mr-2" />
+              <span className="font-semibold text-xl">CloudBliss</span>
+            </div>
+            <div className="md:hidden">
+              <img src="/logo.svg" alt="Logo" className="h-8 w-8" />
+            </div>
+          </Link>
+        </div>
         
-        {isMobile ? (
-          user ? (
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-5 w-5" />
+        <div className="flex-1" />
+        
+        <div className="flex items-center gap-1 md:gap-2">
+          {!isMobile && (
+            <>
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm">Dashboard</Button>
+              </Link>
+              <Link to="/file-manager">
+                <Button variant="ghost" size="sm">Files</Button>
+              </Link>
+            </>
+          )}
+          
+          <ThemeToggle />
+          
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.avatar_url || undefined} alt={user.email || 'User'} />
+                    <AvatarFallback>{user.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                  </Avatar>
                 </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="sm:w-80">
-                <SheetHeader>
-                  <SheetTitle>User Menu</SheetTitle>
-                  <SheetDescription>
-                    Manage your account settings and preferences.
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="px-4 py-2">
-                    <p className="text-sm font-medium leading-none">
-                      {user.email}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {user.id}
-                    </p>
-                  </div>
-                  <Button variant="destructive" onClick={signOut} className="justify-start gap-2">
-                    <LogOut className="h-4 w-4" />
-                    Logout
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/dashboard">Dashboard</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/settings">Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()}>
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Link to="/auth">
-              <Button>Login</Button>
+              <Button size="sm">Login</Button>
             </Link>
-          )
-        ) : (
-          <div className="flex items-center gap-4">
-            {user ? (
-              <Button variant="destructive" onClick={signOut}>Logout</Button>
-            ) : (
-              <Link to="/auth">
-                <Button>Login</Button>
-              </Link>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </nav>
   );

@@ -49,14 +49,20 @@ const AboutStats: React.FC = () => {
         let userQuota = DEFAULT_QUOTA_GB;
         
         if (user) {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('storage_quota_gb')
-            .eq('id', user.id)
-            .single();
-            
-          if (profileData && profileData.storage_quota_gb) {
-            userQuota = profileData.storage_quota_gb;
+          try {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+              
+            if (profileData) {
+              // Use the default quota if storage_quota_gb isn't available
+              userQuota = profileData.storage_quota_gb || DEFAULT_QUOTA_GB;
+            }
+          } catch (err) {
+            console.error("Error getting user quota:", err);
+            // Continue with default quota
           }
         }
         
