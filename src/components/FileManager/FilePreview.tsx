@@ -53,13 +53,14 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
           
           setFileData({
             ...fileEntry,
-            ...fileData
+            ...fileData,
+            file_id: fileEntry.file_id  // Make sure file_id is included
           } as FilePreviewData);
 
           // Generate preview URL if applicable
           if (fileData.preview_available) {
             // Handle preview generation or URL
-          } else if (fileData.type.startsWith('image/')) {
+          } else if (fileData.type?.startsWith('image/')) {
             const { data: urlData } = await supabase.storage
               .from('previews')
               .createSignedUrl(`${fileData.id}/preview.jpg`, 60);

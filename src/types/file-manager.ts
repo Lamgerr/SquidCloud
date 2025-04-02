@@ -133,6 +133,7 @@ export interface FilePreviewData {
   created_at?: string;
   updated_at?: string;
   user_id: string;
+  file_id?: string;  // Add file_id here
   preview_available?: boolean;
   preview_type?: string;
   tags?: string[];

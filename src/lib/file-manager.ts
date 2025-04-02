@@ -209,7 +209,10 @@ export async function deleteItem(itemId: string): Promise<void> {
   try {
     // Use RPC function to safely delete an item
     const { error } = await supabase
-      .rpc('delete_filesystem_item', { item_id: itemId });
+      .rpc('delete_filesystem_item', { item_id: itemId }) as {
+        data: any,
+        error: any
+      };
 
     if (error) throw error;
   } catch (error) {
@@ -307,7 +310,10 @@ export async function initializeFileSystem(): Promise<void> {
 
     // Call RPC function to initialize the filesystem
     const { error } = await supabase
-      .rpc('initialize_file_system', { user_id: user.id });
+      .rpc('initialize_file_system', { user_id: user.id }) as {
+        data: any,
+        error: any
+      };
 
     if (error) throw error;
   } catch (error) {
