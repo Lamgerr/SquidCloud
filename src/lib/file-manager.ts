@@ -1,13 +1,29 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { FileSystemItem, FolderData, FileData, FilesystemItem, convertFilesystemItemToFileSystemItem, convertToFilesystemItem } from "@/types/file-manager";
+import { 
+  FileSystemItem, 
+  FolderData, 
+  FileData, 
+  FilesystemItem, 
+  convertFilesystemItemToFileSystemItem, 
+  convertToFilesystemItem,
+  GetFolderContentsResult,
+  GetFolderByIdResult,
+  CreateFolderResult,
+  CreateFileEntryResult,
+  GetFilesystemItemResult,
+  UserStorageStatsResult
+} from "@/types/file-manager";
 import { uploadFile, downloadFile } from "./api";
 
 export async function getFolderContents(folderId: string | null): Promise<FileSystemItem[]> {
   try {
     // Use RPC function to get folder contents
     const { data, error } = await supabase
-      .rpc('get_folder_contents', { parent_id: folderId });
+      .rpc('get_folder_contents', { parent_id: folderId }) as {
+        data: GetFolderContentsResult[] | null,
+        error: any
+      };
 
     if (error) {
       console.error("Error fetching folder contents:", error);
@@ -39,10 +55,10 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
     return data.map(item => {
       if (item.type === 'file' && item.file_id) {
         const fileDetail = fileDetails.find((f: any) => f.id === item.file_id);
-        return convertFilesystemItemToFileSystemItem(item as FilesystemItem, fileDetail);
+        return convertFilesystemItemToFileSystemItem(item, fileDetail);
       }
       
-      return convertFilesystemItemToFileSystemItem(item as FilesystemItem);
+      return convertFilesystemItemToFileSystemItem(item);
     });
   } catch (error) {
     console.error("Error getting folder contents:", error);
@@ -60,7 +76,10 @@ export async function getPathToFolder(folderId: string | null): Promise<{id: str
     while (currentId && currentId !== 'root') {
       // Use RPC function to get folder details
       const { data, error } = await supabase
-        .rpc('get_folder_by_id', { folder_id: currentId });
+        .rpc('get_folder_by_id', { folder_id: currentId }) as {
+          data: GetFolderByIdResult[] | null,
+          error: any
+        };
 
       if (error || !data || !Array.isArray(data) || data.length === 0) break;
       
@@ -86,7 +105,10 @@ export async function createFolder(name: string, parentId: string | null): Promi
         name: name,
         parent_id: parentId,
         user_id: user.id
-      });
+      }) as {
+        data: CreateFolderResult[] | null,
+        error: any
+      };
 
     if (error) throw error;
     
@@ -129,7 +151,10 @@ export async function uploadFileToFolder(
         parent_id: parentId,
         user_id: user.id,
         file_id: uploadedFile.id
-      });
+      }) as {
+        data: CreateFileEntryResult[] | null,
+        error: any
+      };
 
     if (error) throw error;
     
@@ -200,7 +225,10 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
       .rpc('rename_filesystem_item', { 
         item_id: itemId, 
         new_name: newName 
-      });
+      }) as {
+        data: GetFilesystemItemResult[] | null,
+        error: any
+      };
 
     if (error) throw error;
     
@@ -209,7 +237,7 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
     }
 
     // Transform to match our interface
-    return convertFilesystemItemToFileSystemItem(data[0] as FilesystemItem);
+    return convertFilesystemItemToFileSystemItem(data[0]);
   } catch (error) {
     console.error("Error renaming item:", error);
     throw error;
@@ -223,7 +251,10 @@ export async function moveItem(itemId: string, newParentId: string | null): Prom
       .rpc('move_filesystem_item', { 
         item_id: itemId, 
         new_parent_id: newParentId 
-      });
+      }) as {
+        data: GetFilesystemItemResult[] | null,
+        error: any
+      };
 
     if (error) throw error;
     
@@ -232,7 +263,7 @@ export async function moveItem(itemId: string, newParentId: string | null): Prom
     }
 
     // Transform to match our interface
-    return convertFilesystemItemToFileSystemItem(data[0] as FilesystemItem);
+    return convertFilesystemItemToFileSystemItem(data[0]);
   } catch (error) {
     console.error("Error moving item:", error);
     throw error;
@@ -247,7 +278,10 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
 
     // Use RPC function to get storage stats
     const { data, error } = await supabase
-      .rpc('get_user_storage_stats', { user_id: user.id });
+      .rpc('get_user_storage_stats', { user_id: user.id }) as {
+        data: UserStorageStatsResult | null,
+        error: any
+      };
 
     if (error) throw error;
     

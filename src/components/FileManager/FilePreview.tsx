@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { X, Download, Share2, Eye, FileText } from 'lucide-react';
 import { downloadFileById } from '@/lib/file-manager';
 import { supabase } from '@/integrations/supabase/client';
-import { FileSystemItem } from '@/types/file-manager';
+import { FileSystemItem, GetFilesystemItemResult } from '@/types/file-manager';
 
 interface FilePreviewProps {
   fileId: string;
@@ -25,7 +25,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
 
         // First get the filesystem entry
         const { data: fsData, error: fsError } = await supabase
-          .rpc('get_filesystem_item', { item_id: fileId });
+          .rpc('get_filesystem_item', { item_id: fileId }) as { 
+            data: GetFilesystemItemResult[] | null, 
+            error: any 
+          };
 
         if (fsError || !fsData || fsData.length === 0) {
           console.error("Error fetching file system item:", fsError);

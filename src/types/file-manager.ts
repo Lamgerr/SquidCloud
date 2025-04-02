@@ -56,17 +56,77 @@ export interface FilesystemItem {
   type: 'file' | 'folder';
   parent_id: string | null;
   user_id: string;
-  file_id?: string;
+  file_id?: string | null;
   created_at: string;
   updated_at: string;
 }
 
+// RPC function return type definitions
+export interface GetFolderContentsResult {
+  id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+  user_id: string;
+  file_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GetFolderByIdResult {
+  id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateFolderResult {
+  id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateFileEntryResult {
+  id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+  user_id: string;
+  file_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GetFilesystemItemResult {
+  id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+  user_id: string;
+  file_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserStorageStatsResult {
+  total_size: number;
+  file_count: number;
+  folder_count: number;
+}
+
 // Helper function to convert from Supabase format to our app format
-export function convertFilesystemItemToFileSystemItem(item: FilesystemItem, fileDetails?: any): FileSystemItem {
+export function convertFilesystemItemToFileSystemItem(item: FilesystemItem | GetFilesystemItemResult | GetFolderContentsResult, fileDetails?: any): FileSystemItem {
   return {
     id: item.id,
     name: item.name,
-    type: item.type,
+    type: item.type as 'file' | 'folder',
     parentId: item.parent_id,
     userId: item.user_id,
     created_at: item.created_at,
