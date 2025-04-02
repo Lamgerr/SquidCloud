@@ -31,9 +31,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
         setIsLoading(true);
 
         // First get the filesystem entry with proper typing
-        const args: GetFilesystemItemFunctionArgs = { item_id: fileId };
+        const functionArgs: GetFilesystemItemFunctionArgs = { item_id: fileId };
         const { data: fsData, error: fsError } = await supabase
-          .rpc('get_filesystem_item', args as any) as unknown as RpcResponse<GetFilesystemItemResult[]>;
+          .rpc('get_filesystem_item', functionArgs) as unknown as RpcResponse<GetFilesystemItemResult[]>;
 
         if (fsError || !fsData || fsData.length === 0) {
           console.error("Error fetching file system item:", fsError);
