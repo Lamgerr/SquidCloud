@@ -11,6 +11,20 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
+// Define extended profile type that includes storage_node_count
+interface ExtendedProfileType {
+  avatar_url: string | null;
+  created_at: string | null;
+  full_name: string | null;
+  id: string;
+  storage_used: number | null;
+  updated_at: string | null;
+  storage_quota_gb: number | null;
+  onboarding_complete: boolean | null;
+  storage_node_count: number | null;
+  repo_count?: number | null;
+}
+
 const RepoCreation = () => {
   const [nodeName, setNodeName] = useState('');
   const [password, setPassword] = useState('');
@@ -96,7 +110,8 @@ const RepoCreation = () => {
       }
       
       if (profileData) {
-        const currentNodeCount = profileData.storage_node_count || 0;
+        const profile = profileData as ExtendedProfileType;
+        const currentNodeCount = profile.storage_node_count || 0;
         
         // Update profile with incremented node count and mark onboarding as complete
         const { error: profileError } = await supabase
@@ -104,7 +119,7 @@ const RepoCreation = () => {
           .update({ 
             storage_node_count: currentNodeCount + 1,
             onboarding_complete: true
-          })
+          } as any)
           .eq('id', user.id);
 
         if (profileError) {

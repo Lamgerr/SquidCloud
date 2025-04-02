@@ -1,4 +1,3 @@
-
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -245,7 +244,7 @@ export interface InitializeFileSystemFunctionArgs {
   user_id: string;
 }
 
-// Create a properly typed RPC parameters function
-export function createRpcParams<T extends RpcFunctionArgs>(params: T): T {
-  return params;
+// Create a properly typed RPC parameters function that handles any function arguments
+export function createRpcParams<T extends RpcFunctionArgs>(params: T): Record<string, any> {
+  return params as Record<string, any>;
 }

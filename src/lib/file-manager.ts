@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   FileSystemItem, 
@@ -33,8 +32,11 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
   try {
     const params = createRpcParams<GetFolderContentsFunctionArgs>({ parent_id: folderId });
     
-    // Use proper type handling for Supabase RPC call
-    const { data, error } = await supabase.rpc('get_folder_contents', params);
+    // Use explicit type assertion for the RPC call results
+    const { data, error } = await supabase.rpc('get_folder_contents', params) as {
+      data: GetFolderContentsResult[] | null;
+      error: any;
+    };
 
     if (error) {
       console.error("Error fetching folder contents:", error);
@@ -87,8 +89,11 @@ export async function getPathToFolder(folderId: string | null): Promise<{id: str
     while (currentId && currentId !== 'root') {
       const params = createRpcParams<GetFolderByIdFunctionArgs>({ folder_id: currentId });
       
-      // Use proper type handling for Supabase RPC call
-      const { data, error } = await supabase.rpc('get_folder_by_id', params);
+      // Use explicit type assertion for the RPC call results
+      const { data, error } = await supabase.rpc('get_folder_by_id', params) as {
+        data: GetFolderByIdResult[] | null;
+        error: any;
+      };
 
       if (error || !data || !Array.isArray(data) || data.length === 0) break;
       
@@ -116,8 +121,11 @@ export async function createFolder(name: string, parentId: string | null): Promi
       user_id: user.id
     });
     
-    // Use proper type handling for Supabase RPC call
-    const { data, error } = await supabase.rpc('create_folder', params);
+    // Use explicit type assertion for the RPC call results
+    const { data, error } = await supabase.rpc('create_folder', params) as {
+      data: CreateFolderResult[] | null;
+      error: any;
+    };
     
     if (error) throw error;
     
@@ -160,8 +168,11 @@ export async function uploadFileToFolder(
       file_id: uploadedFile.id
     });
     
-    // Use proper type handling for Supabase RPC call
-    const { data, error } = await supabase.rpc('create_file_entry', params);
+    // Use explicit type assertion for the RPC call results
+    const { data, error } = await supabase.rpc('create_file_entry', params) as {
+      data: CreateFileEntryResult[] | null;
+      error: any;
+    };
     
     if (error) throw error;
     
@@ -215,8 +226,11 @@ export async function deleteItem(itemId: string): Promise<void> {
   try {
     const params = createRpcParams<DeleteFilesystemItemFunctionArgs>({ item_id: itemId });
     
-    // Use proper type handling for Supabase RPC call
-    const { error } = await supabase.rpc('delete_filesystem_item', params);
+    // Use explicit type assertion
+    const { error } = await supabase.rpc('delete_filesystem_item', params) as {
+      data: any;
+      error: any;
+    };
 
     if (error) throw error;
   } catch (error) {
@@ -232,8 +246,11 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
       new_name: newName 
     });
     
-    // Use proper type handling for Supabase RPC call
-    const { data, error } = await supabase.rpc('rename_filesystem_item', params);
+    // Use explicit type assertion for the RPC call results
+    const { data, error } = await supabase.rpc('rename_filesystem_item', params) as {
+      data: GetFilesystemItemResult[] | null;
+      error: any;
+    };
     
     if (error) throw error;
     
@@ -257,8 +274,11 @@ export async function moveItem(itemId: string, newParentId: string | null): Prom
       new_parent_id: newParentId 
     });
     
-    // Use proper type handling for Supabase RPC call
-    const { data, error } = await supabase.rpc('move_filesystem_item', params);
+    // Use explicit type assertion for the RPC call results
+    const { data, error } = await supabase.rpc('move_filesystem_item', params) as {
+      data: GetFilesystemItemResult[] | null;
+      error: any;
+    };
     
     if (error) throw error;
     
@@ -282,8 +302,11 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
 
     const params = createRpcParams<GetUserStorageStatsFunctionArgs>({ user_id: user.id });
     
-    // Use proper type handling for Supabase RPC call
-    const { data, error } = await supabase.rpc('get_user_storage_stats', params);
+    // Use explicit type assertion for the RPC call results
+    const { data, error } = await supabase.rpc('get_user_storage_stats', params) as {
+      data: UserStorageStatsResult[] | null;
+      error: any;
+    };
     
     if (error) throw error;
     
@@ -311,8 +334,11 @@ export async function initializeFileSystem(): Promise<void> {
 
     const params = createRpcParams<InitializeFileSystemFunctionArgs>({ user_id: user.id });
     
-    // Use proper type handling for Supabase RPC call
-    const { error } = await supabase.rpc('initialize_file_system', params);
+    // Use explicit type assertion for the RPC call results
+    const { error } = await supabase.rpc('initialize_file_system', params) as {
+      data: any;
+      error: any;
+    };
 
     if (error) throw error;
   } catch (error) {
