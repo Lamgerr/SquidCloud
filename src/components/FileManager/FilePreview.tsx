@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -29,9 +30,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
         setIsLoading(true);
 
         // First get the filesystem entry with proper typing
-        const functionArgs: GetFilesystemItemFunctionArgs = { item_id: fileId };
-        const { data: fsData, error: fsError }: RpcResponse<GetFilesystemItemResult[]> = await supabase
-          .rpc('get_filesystem_item', functionArgs as any) as any;
+        const rpcArgs: GetFilesystemItemFunctionArgs = { item_id: fileId };
+        
+        // Use proper type casting to avoid TypeScript errors
+        const { data: fsData, error: fsError } = await supabase
+          .rpc('get_filesystem_item', rpcArgs) as unknown as RpcResponse<GetFilesystemItemResult[]>;
 
         if (fsError || !fsData || fsData.length === 0) {
           console.error("Error fetching file system item:", fsError);
