@@ -9,7 +9,8 @@ import {
   FileSystemItem, 
   GetFilesystemItemResult, 
   FilePreviewData,
-  RpcResponse
+  RpcResponse,
+  RpcFunctionArgs
 } from '@/types/file-manager';
 
 interface FilePreviewProps {
@@ -30,7 +31,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
 
         // First get the filesystem entry
         const { data: fsData, error: fsError } = await supabase
-          .rpc('get_filesystem_item', { item_id: fileId }) as RpcResponse<GetFilesystemItemResult[]>;
+          .rpc('get_filesystem_item', { item_id: fileId } as RpcFunctionArgs) as RpcResponse<GetFilesystemItemResult[]>;
 
         if (fsError || !fsData || fsData.length === 0) {
           console.error("Error fetching file system item:", fsError);
@@ -60,7 +61,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
           // Generate preview URL if applicable
           if (fullFileData.preview_available) {
             // Handle preview generation or URL
-          } else if (fullFileData.type?.startsWith('image/')) {
+          } else if (fileDetails.type?.startsWith('image/')) {
             const { data: urlData } = await supabase.storage
               .from('previews')
               .createSignedUrl(`${fullFileData.id}/preview.jpg`, 60);

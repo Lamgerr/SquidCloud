@@ -126,14 +126,15 @@ export interface FilePreviewData {
   id: string;
   name: string;
   type: string;
+  parent_id?: string | null;
+  user_id: string;
   size?: number;
   storage_path?: string;
   encrypted?: boolean;
   shared?: boolean;
   created_at?: string;
   updated_at?: string;
-  user_id: string;
-  file_id?: string;  
+  file_id?: string;
   preview_available?: boolean;
   preview_type?: string;
   tags?: string[];
@@ -198,4 +199,9 @@ export type SupabaseProfileType = {
 export interface RpcResponse<T> {
   data: T | null;
   error: any;
+}
+
+// Explicit type for RPC function parameters
+export interface RpcFunctionArgs {
+  [key: string]: any;
 }

@@ -13,7 +13,8 @@ import {
   CreateFileEntryResult,
   GetFilesystemItemResult,
   UserStorageStatsResult,
-  RpcResponse
+  RpcResponse,
+  RpcFunctionArgs
 } from "@/types/file-manager";
 import { uploadFile, downloadFile } from "./api";
 
@@ -21,7 +22,7 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
   try {
     // Use RPC function to get folder contents
     const { data, error } = await supabase
-      .rpc('get_folder_contents', { parent_id: folderId }) as RpcResponse<GetFolderContentsResult[]>;
+      .rpc('get_folder_contents', { parent_id: folderId } as RpcFunctionArgs) as RpcResponse<GetFolderContentsResult[]>;
 
     if (error) {
       console.error("Error fetching folder contents:", error);
@@ -74,7 +75,7 @@ export async function getPathToFolder(folderId: string | null): Promise<{id: str
     while (currentId && currentId !== 'root') {
       // Use RPC function to get folder details
       const { data, error } = await supabase
-        .rpc('get_folder_by_id', { folder_id: currentId }) as RpcResponse<GetFolderByIdResult[]>;
+        .rpc('get_folder_by_id', { folder_id: currentId } as RpcFunctionArgs) as RpcResponse<GetFolderByIdResult[]>;
 
       if (error || !data || !Array.isArray(data) || data.length === 0) break;
       
@@ -100,7 +101,7 @@ export async function createFolder(name: string, parentId: string | null): Promi
         name: name,
         parent_id: parentId,
         user_id: user.id
-      }) as RpcResponse<CreateFolderResult[]>;
+      } as RpcFunctionArgs) as RpcResponse<CreateFolderResult[]>;
 
     if (error) throw error;
     
@@ -143,7 +144,7 @@ export async function uploadFileToFolder(
         parent_id: parentId,
         user_id: user.id,
         file_id: uploadedFile.id
-      }) as RpcResponse<CreateFileEntryResult[]>;
+      } as RpcFunctionArgs) as RpcResponse<CreateFileEntryResult[]>;
 
     if (error) throw error;
     
@@ -198,7 +199,7 @@ export async function deleteItem(itemId: string): Promise<void> {
   try {
     // Use RPC function to safely delete an item
     const { error } = await supabase
-      .rpc('delete_filesystem_item', { item_id: itemId }) as RpcResponse<any>;
+      .rpc('delete_filesystem_item', { item_id: itemId } as RpcFunctionArgs) as RpcResponse<any>;
 
     if (error) throw error;
   } catch (error) {
@@ -214,7 +215,7 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
       .rpc('rename_filesystem_item', { 
         item_id: itemId, 
         new_name: newName 
-      }) as RpcResponse<GetFilesystemItemResult[]>;
+      } as RpcFunctionArgs) as RpcResponse<GetFilesystemItemResult[]>;
 
     if (error) throw error;
     
@@ -237,7 +238,7 @@ export async function moveItem(itemId: string, newParentId: string | null): Prom
       .rpc('move_filesystem_item', { 
         item_id: itemId, 
         new_parent_id: newParentId 
-      }) as RpcResponse<GetFilesystemItemResult[]>;
+      } as RpcFunctionArgs) as RpcResponse<GetFilesystemItemResult[]>;
 
     if (error) throw error;
     
@@ -261,7 +262,7 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
 
     // Use RPC function to get storage stats
     const { data, error } = await supabase
-      .rpc('get_user_storage_stats', { user_id: user.id }) as RpcResponse<UserStorageStatsResult>;
+      .rpc('get_user_storage_stats', { user_id: user.id } as RpcFunctionArgs) as RpcResponse<UserStorageStatsResult>;
 
     if (error) throw error;
     
@@ -287,7 +288,7 @@ export async function initializeFileSystem(): Promise<void> {
 
     // Call RPC function to initialize the filesystem
     const { error } = await supabase
-      .rpc('initialize_file_system', { user_id: user.id }) as RpcResponse<any>;
+      .rpc('initialize_file_system', { user_id: user.id } as RpcFunctionArgs) as RpcResponse<any>;
 
     if (error) throw error;
   } catch (error) {
