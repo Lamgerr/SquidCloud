@@ -394,7 +394,7 @@ export const uploadFileWithRes54 = async (
     }))
   });
   
-  // Create a record in the files table WITHOUT using the processor field
+  // Create a record in the files table
   const fileRecord = {
     name: file.name,
     type: file.type,
@@ -407,7 +407,7 @@ export const uploadFileWithRes54 = async (
     tags: [metadataString] as string[]
   };
 
-  // Check if processor field exists before using it
+  // Check if the columns in the files table include processor
   const { data: columns, error: columnsError } = await supabase
     .from('files')
     .select('*')
@@ -418,10 +418,14 @@ export const uploadFileWithRes54 = async (
     throw new Error("Failed to create file record");
   }
 
-  let insertData = fileRecord;
-  // Check if processor field exists in the table
-  if (columns && columns.length > 0 && 'processor' in columns[0]) {
-    insertData = { ...(fileRecord as any), processor: "res54" };
+  // Conditionally add processor field if it exists in the table schema
+  let insertData: any = fileRecord;
+  
+  if (columns && columns.length > 0) {
+    const fileColumns = Object.keys(columns[0]);
+    if (fileColumns.includes('processor')) {
+      insertData = { ...fileRecord, processor: "res54" };
+    }
   }
 
   const { data: dbFile, error: dbError } = await supabase

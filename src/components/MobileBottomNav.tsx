@@ -1,6 +1,7 @@
+
 import React, { useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Files, HardDrive, Settings, Upload } from 'lucide-react';
+import { Files, HardDrive, Settings, Upload, FolderTree } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const MobileBottomNav = () => {
@@ -27,7 +28,7 @@ const MobileBottomNav = () => {
           }
         }}
       />
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t h-16 flex items-center justify-around z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t h-16 flex items-center justify-around z-50">
         <button
           onClick={() => navigate('/files')}
           className={cn(
@@ -40,13 +41,13 @@ const MobileBottomNav = () => {
         </button>
 
         <button
-          onClick={() => navigate('/storage')}
+          onClick={() => navigate('/file-manager')}
           className={cn(
             "flex flex-col items-center justify-center w-16 h-16",
-            location.pathname === '/storage' ? "text-primary" : "text-muted-foreground"
+            location.pathname === '/file-manager' ? "text-primary" : "text-muted-foreground"
           )}
         >
-          <HardDrive className="h-5 w-5" />
+          <FolderTree className="h-5 w-5" />
           <span className="text-xs mt-1">Storage</span>
         </button>
 

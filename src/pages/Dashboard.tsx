@@ -15,6 +15,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import AboutStats from '@/components/AboutStats';
 
 interface DashboardProps {
   defaultTab?: string;
@@ -402,6 +403,40 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
     );
   };
 
+  const renderAboutTab = () => {
+    return (
+      <TabsContent value="about">
+        <div className="space-y-4">
+          <AboutStats />
+        </div>
+      </TabsContent>
+    );
+  };
+
+  const renderStorageTab = () => {
+    return (
+      <TabsContent value="storage">
+        <Card>
+          <CardHeader>
+            <CardTitle>File Manager</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              Use our advanced file manager to organize your files and folders with end-to-end encryption.
+            </p>
+            <Button 
+              onClick={() => navigate('/file-manager')}
+              className="bg-primary text-white hover:bg-primary/90 flex items-center gap-2"
+            >
+              <FolderOpen className="h-4 w-4" />
+              Open File Manager
+            </Button>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    );
+  };
+
   if (isOnboarding) {
     return (
       <div className="container mx-auto p-4">
@@ -445,6 +480,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
                   <TabsTrigger value="files">Files</TabsTrigger>
                   <TabsTrigger value="storage">Storage</TabsTrigger>
                   <TabsTrigger value="shared">Shared</TabsTrigger>
+                  <TabsTrigger value="about">About</TabsTrigger>
                   <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
               )}
@@ -529,19 +565,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
               )}
             </TabsContent>
             
-            <TabsContent value="storage">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Storage Management</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Your files are stored securely with end-to-end encryption
-                    for maximum privacy and security.
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
+            {renderStorageTab()}
+            {renderAboutTab()}
             
             <TabsContent value="shared" className="space-y-4">
               {renderSharedContent()}
