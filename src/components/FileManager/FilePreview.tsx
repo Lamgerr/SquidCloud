@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,8 @@ import {
   GetFilesystemItemResult, 
   FilePreviewData,
   RpcResponse,
-  GetFilesystemItemFunctionArgs
+  GetFilesystemItemFunctionArgs,
+  createRpcParams
 } from '@/types/file-manager';
 
 interface FilePreviewProps {
@@ -29,7 +29,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
       try {
         setIsLoading(true);
         
-        const params: GetFilesystemItemFunctionArgs = { item_id: fileId };
+        const params = createRpcParams<GetFilesystemItemFunctionArgs>({ item_id: fileId });
         const { data: fsData, error: fsError } = await supabase
           .rpc('get_filesystem_item', params) as unknown as RpcResponse<GetFilesystemItemResult[]>;
 

@@ -1,4 +1,3 @@
-
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -193,7 +192,6 @@ export interface RpcResponse<T> {
   error: any;
 }
 
-// Update the RpcFunctionArgs to be a Record type that accepts string keys and any values
 export type RpcFunctionArgs = Record<string, any>;
 
 export interface GetFolderContentsFunctionArgs {
@@ -241,4 +239,8 @@ export interface GetUserStorageStatsFunctionArgs {
 
 export interface InitializeFileSystemFunctionArgs {
   user_id: string;
+}
+
+export function createRpcParams<T extends Record<string, any>>(params: T): T {
+  return params;
 }
