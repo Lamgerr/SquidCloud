@@ -61,9 +61,55 @@ export interface FilesystemItem {
   updated_at: string;
 }
 
-// Add this to the Supabase types
-// This is a placeholder method to make TypeScript aware of the filesystem table
-export function extendSupabaseTypes() {
-  // This function is just a type helper - doesn't actually do anything at runtime
-  console.log("Types extended");
+// Helper function to convert from Supabase format to our app format
+export function convertFilesystemItemToFileSystemItem(item: FilesystemItem, fileDetails?: any): FileSystemItem {
+  return {
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    parentId: item.parent_id,
+    userId: item.user_id,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    fileId: item.file_id,
+    // Add file properties if available
+    ...(fileDetails && {
+      size: fileDetails.size,
+      fileType: fileDetails.type,
+      storage_path: fileDetails.storage_path,
+      encrypted: fileDetails.encrypted,
+      shared: fileDetails.shared,
+      preview_available: fileDetails.preview_available || false,
+      preview_type: fileDetails.preview_type || null,
+    })
+  };
 }
+
+// Helper function to convert to Supabase format
+export function convertToFilesystemItem(item: Partial<FileSystemItem>): Partial<FilesystemItem> {
+  return {
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    parent_id: item.parentId,
+    user_id: item.userId,
+    file_id: item.fileId,
+    created_at: item.created_at,
+    updated_at: item.updated_at
+  };
+}
+
+// This is a type definition that can be used as a workaround
+export type SupabaseProfileType = {
+  avatar_url: string | null;
+  created_at: string | null;
+  full_name: string | null;
+  id: string;
+  storage_used: number | null;
+  updated_at: string | null;
+  storage_quota_gb: number | null;
+  onboarding_complete: boolean | null;
+  repo_count: number | null;
+  preview_available: boolean | null;
+  preview_type: string | null;
+};

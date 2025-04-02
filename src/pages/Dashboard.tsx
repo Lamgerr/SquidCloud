@@ -16,6 +16,7 @@ import MobileBottomNav from '@/components/MobileBottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import AboutStats from '@/components/AboutStats';
+import { SupabaseProfileType } from '@/types/file-manager';
 
 interface DashboardProps {
   defaultTab?: string;
@@ -36,6 +37,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   const [uploadButtonRef, setUploadButtonRef] = useState<HTMLDivElement | null>(null);
   const [isOnboarding, setIsOnboarding] = useState(true);
   const [repoCount, setRepoCount] = useState(0);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
 
   useEffect(() => {
     if (defaultTab) {
@@ -80,28 +82,22 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   }, [toast]);
 
   useEffect(() => {
-    checkOnboardingStatus();
-  }, []);
-
-  const checkOnboardingStatus = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    try {
-      const { data: profile, error } = await supabase
+    const checkUserProfile = async () => {
+      const { data: profileData } = await supabase
         .from('profiles')
-        .select('onboarding_complete, repo_count')
-        .eq('id', session.user.id)
+        .select('*')
+        .eq('id', user.id)
         .single();
 
-      if (!error && profile) {  
-        setIsOnboarding(!(profile.onboarding_complete || false));
+      if (profileData) {
+        const profile = profileData as unknown as SupabaseProfileType;
+        setOnboardingComplete(!!profile.onboarding_complete);
         setRepoCount(profile.repo_count || 0);
       }
-    } catch (err) {
-      console.error("Error checking onboarding status:", err);
-    }
-  };
+    };
+
+    checkUserProfile();
+  }, [navigate]);
 
   const handleCreateVault = () => {
     if (repoCount >= 2) {

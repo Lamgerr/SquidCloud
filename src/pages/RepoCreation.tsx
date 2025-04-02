@@ -7,6 +7,7 @@ import { Loader2, Check, AlertCircle, KeyRound, Lock, ShieldCheck } from 'lucide
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { SupabaseProfileType } from '@/types/file-manager';
 
 const createReposWithRetry = async (
   session: any,
@@ -77,12 +78,13 @@ const RepoCreation = () => {
 
         setProgress(30);
 
-        const { data: profile, error: profileError } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('repo_count')
+          .select('*')
           .eq('id', sessionData.session.user.id)
           .single();
 
+        const profile = profileData as unknown as SupabaseProfileType;
         const currentRepoCount = profile && !profileError ? (profile.repo_count || 0) : 0;
         
         if (currentRepoCount >= 2) {

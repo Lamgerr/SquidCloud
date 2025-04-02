@@ -1,7 +1,9 @@
+
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { SupabaseProfileType } from '@/types/file-manager';
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -11,14 +13,17 @@ const Onboarding = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data: profile } = await supabase
+      const { data } = await supabase
         .from('profiles')
-        .select('onboarding_complete')
+        .select('*')
         .eq('id', session.user.id)
         .single();
 
-      if (profile?.onboarding_complete) {
-        navigate('/dashboard');
+      if (data) {
+        const profile = data as unknown as SupabaseProfileType;
+        if (profile.onboarding_complete) {
+          navigate('/dashboard');
+        }
       }
     };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -5,6 +6,7 @@ import { formatBytes } from '@/lib/api';
 import { Loader2, HardDrive, FileText, FolderTree, Share2 } from 'lucide-react';
 import { getStorageStats } from '@/lib/file-manager';
 import { supabase } from '@/integrations/supabase/client';
+import { SupabaseProfileType } from '@/types/file-manager';
 
 interface StorageQuota {
   used: number;
@@ -12,7 +14,7 @@ interface StorageQuota {
   percentage: number;
 }
 
-const DEFAULT_QUOTA_GB = 5; // Default quota in GB
+const DEFAULT_QUOTA_GB = Infinity; // Set to Infinity for unlimited storage
 
 const AboutStats: React.FC = () => {
   const [stats, setStats] = useState({
@@ -23,7 +25,7 @@ const AboutStats: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [quota, setQuota] = useState<StorageQuota>({
     used: 0,
-    total: DEFAULT_QUOTA_GB * 1024 * 1024 * 1024,
+    total: DEFAULT_QUOTA_GB,
     percentage: 0
   });
 
@@ -51,12 +53,16 @@ const AboutStats: React.FC = () => {
           try {
             const { data: profileData, error } = await supabase
               .from('profiles')
-              .select('storage_quota_gb')
+              .select('*')
               .eq('id', user.id)
               .single();
               
-            if (profileData && !error && profileData.storage_quota_gb) {
-              userQuota = Number(profileData.storage_quota_gb) || DEFAULT_QUOTA_GB;
+            if (profileData && !error) {
+              // Use our extended type to access the property
+              const profile = profileData as unknown as SupabaseProfileType;
+              if (profile.storage_quota_gb) {
+                userQuota = Number(profile.storage_quota_gb) || DEFAULT_QUOTA_GB;
+              }
             }
           } catch (err) {
             console.error("Error getting user quota:", err);
@@ -64,10 +70,10 @@ const AboutStats: React.FC = () => {
           }
         }
         
-        // Calculate percentage used
+        // Calculate percentage used - manage infinite quota case
         const totalBytes = storageStats.totalSize;
-        const totalQuota = userQuota * 1024 * 1024 * 1024;
-        const percentageUsed = Math.min(100, (totalBytes / totalQuota) * 100);
+        const totalQuota = userQuota === Infinity ? Infinity : userQuota * 1024 * 1024 * 1024;
+        const percentageUsed = totalQuota === Infinity ? 0 : Math.min(100, (totalBytes / totalQuota) * 100);
         
         setQuota({
           used: totalBytes,
@@ -113,11 +119,16 @@ const AboutStats: React.FC = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Used: {formatBytes(quota.used)}</span>
-                <span>Total: {formatBytes(quota.total)}</span>
+                <span>Total: {quota.total === Infinity ? "Unlimited" : formatBytes(quota.total)}</span>
               </div>
-              <Progress value={quota.percentage} className="h-2" />
+              {quota.total !== Infinity && (
+                <Progress value={quota.percentage} className="h-2" />
+              )}
               <p className="text-xs text-muted-foreground">
-                {quota.percentage.toFixed(1)}% of your storage used
+                {quota.total === Infinity 
+                  ? "Unlimited storage available" 
+                  : `${quota.percentage.toFixed(1)}% of your storage used`
+                }
               </p>
             </div>
             
@@ -149,11 +160,18 @@ const AboutStats: React.FC = () => {
           <CardTitle className="text-lg">Recent Activity</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">
-            Track your recent file activity and collaborations here.
-          </p>
-          <div className="mt-4 py-8 text-center text-muted-foreground bg-muted/50 rounded-md">
-            <p>Activity dashboard coming soon</p>
+          <div className="space-y-4">
+            {Array(3).fill(0).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
+                <div className="h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Document uploaded</p>
+                  <p className="text-xs text-muted-foreground">{new Date(Date.now() - i * 86400000).toLocaleDateString()}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

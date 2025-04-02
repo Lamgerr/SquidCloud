@@ -1,5 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { FileSystemItem, FolderData, FileData } from "@/types/file-manager";
+import { FileSystemItem, FolderData, FileData, FilesystemItem, convertFilesystemItemToFileSystemItem, convertToFilesystemItem } from "@/types/file-manager";
 import { uploadFile, downloadFile } from "./api";
 
 export async function getFolderContents(folderId: string | null): Promise<FileSystemItem[]> {
@@ -13,7 +14,7 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
       throw error;
     }
 
-    if (!data || !data.length) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       return [];
     }
 
@@ -36,31 +37,12 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
 
     // Transform data to match our interface
     return data.map(item => {
-      const result: FileSystemItem = {
-        id: item.id,
-        name: item.name,
-        type: item.type,
-        parentId: item.parent_id,
-        userId: item.user_id,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        fileId: item.file_id
-      };
-
       if (item.type === 'file' && item.file_id) {
-        const fileDetail = fileDetails.find(f => f.id === item.file_id);
-        if (fileDetail) {
-          result.size = fileDetail.size;
-          result.fileType = fileDetail.type;
-          result.storage_path = fileDetail.storage_path;
-          result.encrypted = fileDetail.encrypted;
-          result.shared = fileDetail.shared;
-          result.preview_available = fileDetail.preview_available || false;
-          result.preview_type = fileDetail.preview_type || null;
-        }
+        const fileDetail = fileDetails.find((f: any) => f.id === item.file_id);
+        return convertFilesystemItemToFileSystemItem(item as FilesystemItem, fileDetail);
       }
       
-      return result;
+      return convertFilesystemItemToFileSystemItem(item as FilesystemItem);
     });
   } catch (error) {
     console.error("Error getting folder contents:", error);
@@ -80,7 +62,7 @@ export async function getPathToFolder(folderId: string | null): Promise<{id: str
       const { data, error } = await supabase
         .rpc('get_folder_by_id', { folder_id: currentId });
 
-      if (error || !data || !data.length) break;
+      if (error || !data || !Array.isArray(data) || data.length === 0) break;
       
       path.unshift({ id: data[0].id, name: data[0].name });
       currentId = data[0].parent_id;
@@ -108,7 +90,7 @@ export async function createFolder(name: string, parentId: string | null): Promi
 
     if (error) throw error;
     
-    if (!data || !data.length) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       throw new Error("Failed to create folder");
     }
     
@@ -121,7 +103,7 @@ export async function createFolder(name: string, parentId: string | null): Promi
       userId: data[0].user_id,
       created_at: data[0].created_at,
       updated_at: data[0].updated_at
-    };
+    } as FolderData;
   } catch (error) {
     console.error("Error creating folder:", error);
     throw error;
@@ -151,7 +133,7 @@ export async function uploadFileToFolder(
 
     if (error) throw error;
     
-    if (!data || !data.length) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       throw new Error("Failed to create file entry");
     }
 
@@ -222,21 +204,12 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
 
     if (error) throw error;
     
-    if (!data || !data.length) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       throw new Error("Failed to rename item");
     }
 
     // Transform to match our interface
-    return {
-      id: data[0].id,
-      name: data[0].name,
-      type: data[0].type,
-      parentId: data[0].parent_id,
-      userId: data[0].user_id,
-      fileId: data[0].file_id,
-      created_at: data[0].created_at,
-      updated_at: data[0].updated_at
-    };
+    return convertFilesystemItemToFileSystemItem(data[0] as FilesystemItem);
   } catch (error) {
     console.error("Error renaming item:", error);
     throw error;
@@ -254,21 +227,12 @@ export async function moveItem(itemId: string, newParentId: string | null): Prom
 
     if (error) throw error;
     
-    if (!data || !data.length) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       throw new Error("Failed to move item");
     }
 
     // Transform to match our interface
-    return {
-      id: data[0].id,
-      name: data[0].name,
-      type: data[0].type,
-      parentId: data[0].parent_id,
-      userId: data[0].user_id,
-      fileId: data[0].file_id,
-      created_at: data[0].created_at,
-      updated_at: data[0].updated_at
-    };
+    return convertFilesystemItemToFileSystemItem(data[0] as FilesystemItem);
   } catch (error) {
     console.error("Error moving item:", error);
     throw error;
