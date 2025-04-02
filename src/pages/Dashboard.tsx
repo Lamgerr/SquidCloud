@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,7 +37,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   const isMobile = useIsMobile();
   const [uploadButtonRef, setUploadButtonRef] = useState<HTMLDivElement | null>(null);
   const [isOnboarding, setIsOnboarding] = useState(true);
-  const [repoCount, setRepoCount] = useState(0);
+  const [storageNodeCount, setStorageNodeCount] = useState(0);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
       if (profileData) {
         const profile = profileData as unknown as SupabaseProfileType;
         setOnboardingComplete(!!profile.onboarding_complete);
-        setRepoCount(profile.repo_count || 0);
+        setStorageNodeCount(profile.storage_node_count || 0);
       }
     };
 
@@ -100,7 +101,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   }, [navigate]);
 
   const handleCreateVault = () => {
-    if (repoCount >= 2) {
+    if (storageNodeCount >= 2) {
       toast({
         title: "Maximum vaults reached",
         description: "You can only create up to 2 storage vaults.",
@@ -390,14 +391,14 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
     return (
       <div className="flex items-center gap-2">
         <ThemeToggle />
-        {repoCount < 2 && (
+        {storageNodeCount < 2 && (
           <Button
             onClick={handleCreateVault}
             className="bg-primary text-white hover:bg-primary/90 flex items-center gap-2"
             size={isMobile ? "sm" : "default"}
           >
             <HardDrive className="h-4 w-4" />
-            Create Vault ({repoCount}/2)
+            Create Vault ({storageNodeCount}/2)
           </Button>
         )}
         <UploadButton onUploadComplete={handleFileUpload} />
@@ -453,7 +454,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
               size="lg"
             >
               <HardDrive className="h-5 w-5" />
-              Create Storage Vault ({repoCount}/2)
+              Create Storage Vault ({storageNodeCount}/2)
             </Button>
           </div>
           

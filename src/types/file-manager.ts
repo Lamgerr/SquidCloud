@@ -184,6 +184,7 @@ export type SupabaseProfileType = {
   storage_quota_gb: number | null;
   onboarding_complete: boolean | null;
   storage_node_count: number | null;
+  repo_count: number | null;
   preview_available: boolean | null;
   preview_type: string | null;
 };
@@ -193,10 +194,10 @@ export interface RpcResponse<T> {
   error: any;
 }
 
-// Define RpcFunctionArgs as a type alias for Record<string, any> to fix the TypeScript errors
+// Define RpcFunctionArgs to accept any key-value pairs
 export type RpcFunctionArgs = Record<string, any>;
 
-// These interfaces are kept for documentation purposes
+// Function interfaces for documentation purposes
 export interface GetFolderContentsFunctionArgs {
   parent_id: string | null;
 }
