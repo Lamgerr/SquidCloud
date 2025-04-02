@@ -1,3 +1,4 @@
+
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -192,55 +193,59 @@ export interface RpcResponse<T> {
   error: any;
 }
 
-export type RpcFunctionArgs = Record<string, any>;
+// Updated RPC function types
+export interface RpcFunctionArgs {
+  [key: string]: any;
+}
 
-export interface GetFolderContentsFunctionArgs {
+export interface GetFolderContentsFunctionArgs extends RpcFunctionArgs {
   parent_id: string | null;
 }
 
-export interface GetFolderByIdFunctionArgs {
+export interface GetFolderByIdFunctionArgs extends RpcFunctionArgs {
   folder_id: string;
 }
 
-export interface CreateFolderFunctionArgs {
+export interface CreateFolderFunctionArgs extends RpcFunctionArgs {
   name: string;
   parent_id: string | null;
   user_id: string;
 }
 
-export interface CreateFileEntryFunctionArgs {
+export interface CreateFileEntryFunctionArgs extends RpcFunctionArgs {
   name: string;
   parent_id: string | null;
   user_id: string;
   file_id: string;
 }
 
-export interface DeleteFilesystemItemFunctionArgs {
+export interface DeleteFilesystemItemFunctionArgs extends RpcFunctionArgs {
   item_id: string;
 }
 
-export interface RenameFilesystemItemFunctionArgs {
+export interface RenameFilesystemItemFunctionArgs extends RpcFunctionArgs {
   item_id: string;
   new_name: string;
 }
 
-export interface MoveFilesystemItemFunctionArgs {
+export interface MoveFilesystemItemFunctionArgs extends RpcFunctionArgs {
   item_id: string;
   new_parent_id: string | null;
 }
 
-export interface GetFilesystemItemFunctionArgs {
+export interface GetFilesystemItemFunctionArgs extends RpcFunctionArgs {
   item_id: string;
 }
 
-export interface GetUserStorageStatsFunctionArgs {
+export interface GetUserStorageStatsFunctionArgs extends RpcFunctionArgs {
   user_id: string;
 }
 
-export interface InitializeFileSystemFunctionArgs {
+export interface InitializeFileSystemFunctionArgs extends RpcFunctionArgs {
   user_id: string;
 }
 
-export function createRpcParams<T extends RpcFunctionArgs>(params: T): T {
-  return params;
+// Fixed the createRpcParams function to properly handle generic types
+export function createRpcParams<T extends RpcFunctionArgs>(params: T): Record<string, any> {
+  return params as Record<string, any>;
 }

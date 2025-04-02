@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,20 +10,7 @@ import { initializeStorageNodes } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-
-// Define extended profile type that includes storage_node_count
-interface ExtendedProfileType {
-  avatar_url: string | null;
-  created_at: string | null;
-  full_name: string | null;
-  id: string;
-  storage_used: number | null;
-  updated_at: string | null;
-  storage_quota_gb: number | null;
-  onboarding_complete: boolean | null;
-  storage_node_count: number | null;
-  repo_count?: number | null;
-}
+import { SupabaseProfileType } from '@/types/file-manager';
 
 const RepoCreation = () => {
   const [nodeName, setNodeName] = useState('');
@@ -70,17 +58,17 @@ const RepoCreation = () => {
       }
       
       if (profileData) {
-        // Cast to ExtendedProfileType to access storage_node_count
-        const profile = profileData as ExtendedProfileType;
+        // Cast to SupabaseProfileType to access storage_node_count
+        const profile = profileData as SupabaseProfileType;
         const currentNodeCount = profile.storage_node_count || 0;
         
-        // Update profile with type assertion for the storage_node_count field
+        // Update profile with the correct type
         const { error: profileError } = await supabase
           .from('profiles')
           .update({ 
             storage_node_count: currentNodeCount + 1,
             onboarding_complete: true
-          } as any)
+          })
           .eq('id', user.id);
 
         if (profileError) {

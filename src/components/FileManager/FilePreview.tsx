@@ -9,7 +9,6 @@ import {
   FileSystemItem, 
   GetFilesystemItemResult, 
   FilePreviewData,
-  RpcResponse,
   GetFilesystemItemFunctionArgs,
   createRpcParams
 } from '@/types/file-manager';

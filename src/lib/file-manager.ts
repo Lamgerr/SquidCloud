@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   FileSystemItem, 
@@ -12,9 +13,6 @@ import {
   CreateFileEntryResult,
   GetFilesystemItemResult,
   UserStorageStatsResult,
-  RpcResponse,
-  RpcFunctionArgs,
-  createRpcParams,
   GetFolderContentsFunctionArgs,
   GetFolderByIdFunctionArgs,
   CreateFolderFunctionArgs,
@@ -24,7 +22,8 @@ import {
   MoveFilesystemItemFunctionArgs,
   GetFilesystemItemFunctionArgs,
   GetUserStorageStatsFunctionArgs,
-  InitializeFileSystemFunctionArgs
+  InitializeFileSystemFunctionArgs,
+  createRpcParams
 } from "@/types/file-manager";
 import { uploadFile, downloadFile } from "./api";
 
@@ -129,16 +128,14 @@ export async function createFolder(name: string, parentId: string | null): Promi
       throw new Error("Failed to create folder");
     }
     
-    const typedData = data as CreateFolderResult[];
-    
     return {
-      id: typedData[0].id,
-      name: typedData[0].name,
+      id: data[0].id,
+      name: data[0].name,
       type: 'folder',
-      parentId: typedData[0].parent_id,
-      userId: typedData[0].user_id,
-      created_at: typedData[0].created_at,
-      updated_at: typedData[0].updated_at
+      parentId: data[0].parent_id,
+      userId: data[0].user_id,
+      created_at: data[0].created_at,
+      updated_at: data[0].updated_at
     } as FolderData;
   } catch (error) {
     console.error("Error creating folder:", error);
@@ -304,7 +301,8 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
       return { totalSize: 0, fileCount: 0, folderCount: 0 };
     }
     
-    const statsData = data[0] as UserStorageStatsResult;
+    // Properly access the first element of the array
+    const statsData = data[0];
     
     return {
       totalSize: statsData.total_size || 0,
