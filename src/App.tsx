@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
@@ -8,25 +7,23 @@ import NotFound from './pages/NotFound';
 import Index from './pages/Index';
 import RepoCreation from './pages/RepoCreation';
 import RepoCreationPassword from './pages/RepoCreationPassword';
-import FileManagerPage from './pages/FileManagerPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import MobileBottomNav from './components/MobileBottomNav';
 import { useIsMobile } from './hooks/use-mobile';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import Onboarding from './pages/Onboarding';
 
 // Component to handle new user redirection
 const NewUserRedirect = ({ children }: { children: React.ReactNode }) => {
-  const { user, profile } = useAuth();
+  const { isNewUser } = useAuth();
   const navigate = useNavigate();
   
   useEffect(() => {
-    if (user && profile && profile.onboarding_complete === false) {
-      navigate('/onboarding');
+    if (isNewUser) {
+      navigate('/r/c/1');
     }
-  }, [user, profile, navigate]);
+  }, [isNewUser, navigate]);
   
   return <>{children}</>;
 };
@@ -86,16 +83,6 @@ const AppWithAuth = () => {
           } 
         />
         <Route 
-          path="/onboarding" 
-          element={
-            <ProtectedRoute>
-              <AppLayout showMobileNav={false}>
-                <Onboarding />
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route 
           path="/dashboard" 
           element={
             <ProtectedRoute>
@@ -140,18 +127,6 @@ const AppWithAuth = () => {
           } 
         />
         <Route 
-          path="/file-manager" 
-          element={
-            <ProtectedRoute>
-              <NewUserRedirect>
-                <AppLayout>
-                  <FileManagerPage />
-                </AppLayout>
-              </NewUserRedirect>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
           path="/shared" 
           element={
             <ProtectedRoute>
@@ -170,18 +145,6 @@ const AppWithAuth = () => {
               <NewUserRedirect>
                 <AppLayout>
                   <Dashboard defaultTab="settings" />
-                </AppLayout>
-              </NewUserRedirect>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/storage" 
-          element={
-            <ProtectedRoute>
-              <NewUserRedirect>
-                <AppLayout>
-                  <Dashboard defaultTab="storage" />
                 </AppLayout>
               </NewUserRedirect>
             </ProtectedRoute>

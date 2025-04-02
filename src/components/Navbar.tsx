@@ -1,112 +1,81 @@
-import React, { useState } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Menu, User, LogOut, ChevronDown, Settings, HelpCircle } from 'lucide-react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { SupabaseProfileType } from '@/types/file-manager';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Menu } from "lucide-react"
+import { Cloud as CloudIcon, LogOut } from 'lucide-react';
 
 const Navbar: React.FC = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<SupabaseProfileType | null>(null);
-
-  React.useEffect(() => {
-    const fetchUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        setProfile(data as unknown as SupabaseProfileType);
-      }
-    };
-
-    fetchUserData();
-  }, []);
-
-  const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast({
-        title: "Error signing out",
-        description: error.message,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    navigate('/');
-  };
+  const { user, signOut } = useAuth();
+  const isMobile = useIsMobile();
 
   return (
-    <div className="border-b border-border">
-      <div className="flex h-16 items-center px-4 container mx-auto">
-        <div className="flex items-center gap-2 font-semibold">
-          <span className="text-xl font-bold text-primary">CloudBliss</span>
-        </div>
-          
-        <div className="ml-auto flex items-center space-x-4">
-          {user && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 hover:bg-accent transition-colors">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={profile?.avatar_url || undefined} alt={user.email} />
-                    <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <span className="hidden md:inline-block">{user.email}</span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+    <nav className="bg-background border-b sticky top-0 z-50">
+      <div className="container flex items-center justify-between py-3">
+        <Link to="/" className="flex items-center gap-2">
+          <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center"><div class="w-4 h-4 bg-white rounded-sm"></div></div>
+          <span className="font-semibold md:inline-block">CloudBliss</span>
+          <span className="text-xs text-muted-foreground hidden md:inline-block">by Inflate</span>
+        </Link>
+        
+        {isMobile ? (
+          user ? (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
                 </Button>
-              </DropdownMenuTrigger>
-              
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                
-                <DropdownMenuSeparator />
-                
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/settings')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/help')}>
-                    <HelpCircle className="mr-2 h-4 w-4" />
-                    <span>Help</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                
-                <DropdownMenuSeparator />
-                
-                <DropdownMenuItem onClick={handleSignOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
+              </SheetTrigger>
+              <SheetContent side="left" className="sm:w-80">
+                <SheetHeader>
+                  <SheetTitle>User Menu</SheetTitle>
+                  <SheetDescription>
+                    Manage your account settings and preferences.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="px-4 py-2">
+                    <p className="text-sm font-medium leading-none">
+                      {user.email}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {user.id}
+                    </p>
+                  </div>
+                  <Button variant="destructive" onClick={signOut} className="justify-start gap-2">
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <Link to="/auth">
+              <Button>Login</Button>
+            </Link>
+          )
+        ) : (
+          <div className="flex items-center gap-4">
+            {user ? (
+              <Button variant="destructive" onClick={signOut}>Logout</Button>
+            ) : (
+              <Link to="/auth">
+                <Button>Login</Button>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </nav>
   );
 };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,8 +15,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import AboutStats from '@/components/AboutStats';
-import { SupabaseProfileType } from '@/types/file-manager';
 
 interface DashboardProps {
   defaultTab?: string;
@@ -37,8 +34,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   const isMobile = useIsMobile();
   const [uploadButtonRef, setUploadButtonRef] = useState<HTMLDivElement | null>(null);
   const [isOnboarding, setIsOnboarding] = useState(true);
-  const [storageNodeCount, setStorageNodeCount] = useState(0);
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [repoCount, setRepoCount] = useState(0);
 
   useEffect(() => {
     if (defaultTab) {
@@ -83,25 +79,25 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
   }, [toast]);
 
   useEffect(() => {
-    const checkUserProfile = async () => {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+    checkOnboardingStatus();
+  }, []);
 
-      if (profileData) {
-        const profile = profileData as unknown as SupabaseProfileType;
-        setOnboardingComplete(!!profile.onboarding_complete);
-        setStorageNodeCount(profile.storage_node_count || 0);
-      }
-    };
+  const checkOnboardingStatus = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
-    checkUserProfile();
-  }, [navigate]);
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('onboarding_complete, repo_count')
+      .eq('id', session.user.id)
+      .single();
+
+    setIsOnboarding(!profile?.onboarding_complete);
+    setRepoCount(profile?.repo_count || 0);
+  };
 
   const handleCreateVault = () => {
-    if (storageNodeCount >= 2) {
+    if (repoCount >= 2) {
       toast({
         title: "Maximum vaults reached",
         description: "You can only create up to 2 storage vaults.",
@@ -391,52 +387,18 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
     return (
       <div className="flex items-center gap-2">
         <ThemeToggle />
-        {storageNodeCount < 2 && (
+        {repoCount < 2 && (
           <Button
             onClick={handleCreateVault}
             className="bg-primary text-white hover:bg-primary/90 flex items-center gap-2"
             size={isMobile ? "sm" : "default"}
           >
             <HardDrive className="h-4 w-4" />
-            Create Vault ({storageNodeCount}/2)
+            Create Vault ({repoCount}/2)
           </Button>
         )}
         <UploadButton onUploadComplete={handleFileUpload} />
       </div>
-    );
-  };
-
-  const renderAboutTab = () => {
-    return (
-      <TabsContent value="about">
-        <div className="space-y-4">
-          <AboutStats />
-        </div>
-      </TabsContent>
-    );
-  };
-
-  const renderStorageTab = () => {
-    return (
-      <TabsContent value="storage">
-        <Card>
-          <CardHeader>
-            <CardTitle>File Manager</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              Use our advanced file manager to organize your files and folders with end-to-end encryption.
-            </p>
-            <Button 
-              onClick={() => navigate('/file-manager')}
-              className="bg-primary text-white hover:bg-primary/90 flex items-center gap-2"
-            >
-              <FolderOpen className="h-4 w-4" />
-              Open File Manager
-            </Button>
-          </CardContent>
-        </Card>
-      </TabsContent>
     );
   };
 
@@ -454,7 +416,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
               size="lg"
             >
               <HardDrive className="h-5 w-5" />
-              Create Storage Vault ({storageNodeCount}/2)
+              Create Storage Vault ({repoCount}/2)
             </Button>
           </div>
           
@@ -483,7 +445,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
                   <TabsTrigger value="files">Files</TabsTrigger>
                   <TabsTrigger value="storage">Storage</TabsTrigger>
                   <TabsTrigger value="shared">Shared</TabsTrigger>
-                  <TabsTrigger value="about">About</TabsTrigger>
                   <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
               )}
@@ -568,8 +529,19 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
               )}
             </TabsContent>
             
-            {renderStorageTab()}
-            {renderAboutTab()}
+            <TabsContent value="storage">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Storage Management</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    Your files are stored securely with end-to-end encryption
+                    for maximum privacy and security.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
             
             <TabsContent value="shared" className="space-y-4">
               {renderSharedContent()}

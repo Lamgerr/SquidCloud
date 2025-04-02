@@ -29,8 +29,8 @@ serve(async (req) => {
 
     const { action, ...body } = await req.json();
 
-    // Updated create-repos to create-nodes
-    if (action === 'create-nodes') {
+    // Add create-repos action handler
+    if (action === 'create-repos') {
       const { count, userId } = body;
       
       if (!userId) {
@@ -41,9 +41,9 @@ serve(async (req) => {
       }
 
       try {
-        // First check for existing nodes
+        // First check for existing repos
         const dbResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/rest/v1/storage_nodes?user_id=eq.${userId}&select=*`,
+          `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories?user_id=eq.${userId}&select=*`,
           {
             headers: {
               'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
@@ -52,35 +52,35 @@ serve(async (req) => {
           }
         );
 
-        const existingNodes = await dbResponse.json();
+        const existingRepos = await dbResponse.json();
         
-        // If user already has nodes, return them
-        if (existingNodes && existingNodes.length > 0) {
-          console.log(`Found ${existingNodes.length} existing storage nodes for user ${userId}`);
+        // If user already has repos, return them
+        if (existingRepos && existingRepos.length > 0) {
+          console.log(`Found ${existingRepos.length} existing repos for user ${userId}`);
           return new Response(
             JSON.stringify({ 
-              nodes: existingNodes.map(node => ({
-                name: node.node_name,
-                html_url: `https://github.com/${GITHUB_USERNAME}/${node.node_name}`
+              repos: existingRepos.map(repo => ({
+                name: repo.repo_name,
+                html_url: `https://github.com/${GITHUB_USERNAME}/${repo.repo_name}`
               }))
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        // Continue with creating new nodes only if none exist
+        // Continue with creating new repos only if none exist
         const validCount = Math.min(Math.max(1, count || 5), 5);
-        const createdNodes = [];
+        const createdRepos = [];
 
         // Generate creative names using Gemini API
-        const nodeNames = await generateCreativeNodeNames(validCount, GEMINI_API_KEY);
+        const repoNames = await generateCreativeRepoNames(validCount, GEMINI_API_KEY);
 
         for (let i = 0; i < validCount; i++) {
-          const baseName = nodeNames[i] || `nexus_${Math.random().toString(36).substring(2, 7)}`;
+          const baseName = repoNames[i] || `nexus_${Math.random().toString(36).substring(2, 7)}`;
           const uniqueSuffix = `${Date.now().toString(36)}_${i}`;
-          const nodeName = `${baseName}_${uniqueSuffix}`;
+          const repoName = `${baseName}_${uniqueSuffix}`;
 
-          // Create storage node
+          // Create repository
           const createResponse = await fetch(
             'https://api.github.com/user/repos',
             {
@@ -92,7 +92,7 @@ serve(async (req) => {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                name: nodeName,
+                name: repoName,
                 description: "Secure data vault",
                 private: true,
                 auto_init: true
@@ -101,25 +101,25 @@ serve(async (req) => {
           );
 
           if (!createResponse.ok) {
-            console.error(`Failed to create storage node ${nodeName}:`, await createResponse.text());
+            console.error(`Failed to create repo ${repoName}:`, await createResponse.text());
             continue;
           }
 
-          const nodeData = await createResponse.json();
-          createdNodes.push({
-            name: nodeName,
-            html_url: nodeData.html_url
+          const repoData = await createResponse.json();
+          createdRepos.push({
+            name: repoName,
+            html_url: repoData.html_url
           });
         }
 
         return new Response(
           JSON.stringify({ 
-            nodes: createdNodes 
+            repos: createdRepos 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } catch (error) {
-        console.error('Error in create-nodes:', error);
+        console.error('Error in create-repos:', error);
         throw error;
       }
     }
@@ -652,7 +652,7 @@ async function deleteFromGitHub(
 }
 
 // Helper function to generate creative repository names using Gemini API
-async function generateCreativeNodeNames(count: number, apiKey: string): Promise<string[]> {
+async function generateCreativeRepoNames(count: number, apiKey: string): Promise<string[]> {
   try {
     const response = await fetch(
       `https://api.gemini.com/v1/generate-names?count=${count}`,
@@ -671,7 +671,7 @@ async function generateCreativeNodeNames(count: number, apiKey: string): Promise
     const data = await response.json();
     return data.names || [];
   } catch (error) {
-    console.error('Error generating creative storage node names:', error);
+    console.error('Error generating creative repo names:', error);
     return [];
   }
 }
