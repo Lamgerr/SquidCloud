@@ -15,17 +15,18 @@ import Navbar from './components/Navbar';
 import MobileBottomNav from './components/MobileBottomNav';
 import { useIsMobile } from './hooks/use-mobile';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import Onboarding from './pages/Onboarding';
 
 // Component to handle new user redirection
 const NewUserRedirect = ({ children }: { children: React.ReactNode }) => {
-  const { isNewUser } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   
   useEffect(() => {
-    if (isNewUser) {
-      navigate('/r/c/1');
+    if (user && profile && profile.onboarding_complete === false) {
+      navigate('/onboarding');
     }
-  }, [isNewUser, navigate]);
+  }, [user, profile, navigate]);
   
   return <>{children}</>;
 };
@@ -83,6 +84,16 @@ const AppWithAuth = () => {
               <Auth />
             </AppLayout>
           } 
+        />
+        <Route 
+          path="/onboarding" 
+          element={
+            <ProtectedRoute>
+              <AppLayout showMobileNav={false}>
+                <Onboarding />
+              </AppLayout>
+            </ProtectedRoute>
+          }
         />
         <Route 
           path="/dashboard" 

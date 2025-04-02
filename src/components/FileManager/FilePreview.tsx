@@ -9,8 +9,7 @@ import {
   FileSystemItem, 
   GetFilesystemItemResult, 
   FilePreviewData,
-  GetFilesystemItemFunctionArgs,
-  createRpcParams
+  GetFilesystemItemFunctionArgs
 } from '@/types/file-manager';
 
 interface FilePreviewProps {
@@ -29,12 +28,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
       try {
         setIsLoading(true);
         
-        // Use type assertion to specify the expected type of params
-        const params = createRpcParams<GetFilesystemItemFunctionArgs>({ 
-          item_id: fileId 
-        });
+        // Fixed parameter typing
+        const params = { item_id: fileId };
         
-        const { data, error } = await supabase.rpc('get_filesystem_item', params) as unknown as {
+        const { data, error } = await supabase.rpc('get_filesystem_item', params) as {
           data: GetFilesystemItemResult[]; 
           error: any;
         };

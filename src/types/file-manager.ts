@@ -246,6 +246,7 @@ export interface InitializeFileSystemFunctionArgs extends RpcFunctionArgs {
   user_id: string;
 }
 
-export function createRpcParams<T extends RpcFunctionArgs>(params: T): Record<string, any> {
-  return params as Record<string, any>;
+// The createRpcParams function now allows any parameter type
+export function createRpcParams<T extends RpcFunctionArgs>(params: T): any {
+  return params;
 }
