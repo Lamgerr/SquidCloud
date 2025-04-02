@@ -57,12 +57,48 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          created_by: string | null
+          duration_months: number
+          id: string
+          is_used: boolean | null
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          created_by?: string | null
+          duration_months: number
+          id?: string
+          is_used?: boolean | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          created_by?: string | null
+          duration_months?: number
+          id?: string
+          is_used?: boolean | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string | null
           full_name: string | null
           id: string
+          is_premium: boolean | null
+          onboarding_complete: boolean
+          repo_count: number
           storage_used: number | null
           updated_at: string | null
         }
@@ -71,6 +107,9 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id: string
+          is_premium?: boolean | null
+          onboarding_complete?: boolean
+          repo_count?: number
           storage_used?: number | null
           updated_at?: string | null
         }
@@ -79,6 +118,9 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id?: string
+          is_premium?: boolean | null
+          onboarding_complete?: boolean
+          repo_count?: number
           storage_used?: number | null
           updated_at?: string | null
         }
@@ -89,18 +131,21 @@ export type Database = {
           created_at: string
           id: string
           repo_name: string
+          status: Json | null
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           repo_name: string
+          status?: Json | null
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
           repo_name?: string
+          status?: Json | null
           user_id?: string
         }
         Relationships: []
@@ -136,6 +181,83 @@ export type Database = {
             columns: ["file_id"]
             isOneToOne: false
             referencedRelation: "files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          discount_active: boolean | null
+          discounted_price: number | null
+          features: string[] | null
+          id: string
+          name: string
+          original_price: number
+          storage_limit: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          discount_active?: boolean | null
+          discounted_price?: number | null
+          features?: string[] | null
+          id?: string
+          name: string
+          original_price: number
+          storage_limit?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          discount_active?: boolean | null
+          discounted_price?: number | null
+          features?: string[] | null
+          id?: string
+          name?: string
+          original_price?: number
+          storage_limit?: number | null
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          created_at: string | null
+          end_date: string | null
+          id: string
+          payment_id: string | null
+          payment_status: string | null
+          start_date: string | null
+          subscription_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          payment_id?: string | null
+          payment_status?: string | null
+          start_date?: string | null
+          subscription_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          payment_id?: string | null
+          payment_status?: string | null
+          start_date?: string | null
+          subscription_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]
