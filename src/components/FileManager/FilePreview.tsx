@@ -32,16 +32,15 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
         
         const params = createRpcParams<GetFilesystemItemFunctionArgs>({ item_id: fileId });
         
-        // Type assertion to help TypeScript understand the response
-        const response = await supabase
-          .rpc('get_filesystem_item', params) as { data: GetFilesystemItemResult[], error: any };
+        // Use proper typing for Supabase RPC call
+        const { data, error } = await supabase.rpc('get_filesystem_item', params);
 
-        if (response.error || !response.data || response.data.length === 0) {
-          console.error("Error fetching file system item:", response.error);
+        if (error || !data || !Array.isArray(data) || data.length === 0) {
+          console.error("Error fetching file system item:", error);
           throw new Error("File not found");
         }
 
-        const fileEntry = response.data[0];
+        const fileEntry = data[0] as GetFilesystemItemResult;
         
         if (fileEntry.file_id) {
           const { data: fileDetails, error: fileError } = await supabase
@@ -61,6 +60,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
           setFileData(fullFileData);
 
           if (fullFileData.preview_available) {
+            // Preview is available but we're not handling it here
           } else if (fileDetails.type?.startsWith('image/')) {
             const { data: urlData } = await supabase.storage
               .from('previews')
@@ -156,7 +156,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
   };
 
   return (
-    <Dialog open={!!fileId} onOpenChange={() => onClose()}>
+    <Dialog open={!!fileId} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between border-b pb-2">
           <h2 className="text-lg font-semibold">{fileData?.name}</h2>

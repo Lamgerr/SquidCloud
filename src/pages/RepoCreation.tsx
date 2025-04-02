@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,7 +21,17 @@ const RepoCreation = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { count } = useParams<{ count: string }>();
+  const location = useLocation();
   const nodeCount = parseInt(count || '1', 10);
+  
+  // Extract password from URL query params if present
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const passParam = queryParams.get('password');
+    if (passParam) {
+      setPassword(passParam);
+    }
+  }, [location]);
 
   useEffect(() => {
     if (!user) {
@@ -70,15 +80,23 @@ const RepoCreation = () => {
 
   const updateProfile = async (nodeName: string) => {
     try {
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
       // Get current node count
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileFetchError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
       
+      if (profileFetchError) {
+        throw profileFetchError;
+      }
+      
       if (profileData) {
-        const currentNodeCount = (profileData as any).storage_node_count || 0;
+        const currentNodeCount = profileData.storage_node_count || 0;
         
         // Update profile with incremented node count and mark onboarding as complete
         const { error: profileError } = await supabase
@@ -86,7 +104,7 @@ const RepoCreation = () => {
           .update({ 
             storage_node_count: currentNodeCount + 1,
             onboarding_complete: true
-          } as any)
+          })
           .eq('id', user.id);
 
         if (profileError) {
