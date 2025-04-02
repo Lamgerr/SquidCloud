@@ -193,6 +193,7 @@ export interface RpcResponse<T> {
   error: any;
 }
 
+// Define a generic type for RPC function arguments
 export type RpcFunctionArgs = Record<string, any>;
 
 export interface GetFolderContentsFunctionArgs {
@@ -242,6 +243,7 @@ export interface InitializeFileSystemFunctionArgs {
   user_id: string;
 }
 
-export function createRpcParams<T extends Record<string, any>>(params: T): T {
+// Helper function to create RPC parameters with proper typing
+export function createRpcParams<T extends RpcFunctionArgs>(params: T): T {
   return params;
 }
