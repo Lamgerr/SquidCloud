@@ -1,4 +1,3 @@
-
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -193,7 +192,6 @@ export interface RpcResponse<T> {
   error: any;
 }
 
-// Update the RpcFunctionArgs interface to be a proper type
 export type RpcFunctionArgs = Record<string, any>;
 
 export interface GetFolderContentsFunctionArgs {

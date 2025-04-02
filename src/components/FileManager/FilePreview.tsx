@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -29,12 +28,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
       try {
         setIsLoading(true);
 
-        // First get the filesystem entry with proper typing
-        const rpcArgs: GetFilesystemItemFunctionArgs = { item_id: fileId };
-        
-        // Use proper type casting to avoid TypeScript errors
         const { data: fsData, error: fsError } = await supabase
-          .rpc('get_filesystem_item', rpcArgs) as unknown as RpcResponse<GetFilesystemItemResult[]>;
+          .rpc('get_filesystem_item', { item_id: fileId } as any) as unknown as RpcResponse<GetFilesystemItemResult[]>;
 
         if (fsError || !fsData || fsData.length === 0) {
           console.error("Error fetching file system item:", fsError);
@@ -43,7 +38,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
 
         const fileEntry = fsData[0];
         
-        // Then get the actual file data if file_id exists
         if (fileEntry.file_id) {
           const { data: fileDetails, error: fileError } = await supabase
             .from('files')
@@ -56,14 +50,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
           const fullFileData: FilePreviewData = {
             ...fileEntry,
             ...fileDetails,
-            file_id: fileEntry.file_id  // Make sure file_id is included
+            file_id: fileEntry.file_id
           };
           
           setFileData(fullFileData);
 
-          // Generate preview URL if applicable
           if (fullFileData.preview_available) {
-            // Handle preview generation or URL
           } else if (fileDetails.type?.startsWith('image/')) {
             const { data: urlData } = await supabase.storage
               .from('previews')
@@ -88,7 +80,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
     }
 
     return () => {
-      // Clean up any resources
       if (fileUrl) {
         URL.revokeObjectURL(fileUrl);
       }
