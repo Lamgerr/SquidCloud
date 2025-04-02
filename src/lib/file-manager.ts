@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   FileSystemItem, 
@@ -28,7 +29,9 @@ import { uploadFile, downloadFile } from "./api";
 
 export async function getFolderContents(folderId: string | null): Promise<FileSystemItem[]> {
   try {
-    const params = createRpcParams<GetFolderContentsFunctionArgs>({ parent_id: folderId });
+    const params = createRpcParams<GetFolderContentsFunctionArgs>({ 
+      parent_id: folderId 
+    });
     
     const { data, error } = await supabase.rpc('get_folder_contents', params) as unknown as {
       data: GetFolderContentsResult[];
@@ -82,7 +85,9 @@ export async function getPathToFolder(folderId: string | null): Promise<{id: str
     let currentId = folderId;
 
     while (currentId && currentId !== 'root') {
-      const params = createRpcParams<GetFolderByIdFunctionArgs>({ folder_id: currentId });
+      const params = createRpcParams<GetFolderByIdFunctionArgs>({ 
+        folder_id: currentId 
+      });
       
       const { data, error } = await supabase.rpc('get_folder_by_id', params) as unknown as {
         data: GetFolderByIdResult[];
@@ -210,7 +215,9 @@ export async function downloadFileById(fileId: string): Promise<Blob> {
 
 export async function deleteItem(itemId: string): Promise<void> {
   try {
-    const params = createRpcParams<DeleteFilesystemItemFunctionArgs>({ item_id: itemId });
+    const params = createRpcParams<DeleteFilesystemItemFunctionArgs>({ 
+      item_id: itemId 
+    });
     
     const { error } = await supabase.rpc('delete_filesystem_item', params) as {
       data: any;
@@ -279,7 +286,9 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const params = createRpcParams<GetUserStorageStatsFunctionArgs>({ user_id: user.id });
+    const params = createRpcParams<GetUserStorageStatsFunctionArgs>({ 
+      user_id: user.id 
+    });
     
     const { data, error } = await supabase.rpc('get_user_storage_stats', params) as unknown as {
       data: UserStorageStatsResult[];
@@ -310,7 +319,9 @@ export async function initializeFileSystem(): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const params = createRpcParams<InitializeFileSystemFunctionArgs>({ user_id: user.id });
+    const params = createRpcParams<InitializeFileSystemFunctionArgs>({ 
+      user_id: user.id 
+    });
     
     const { error } = await supabase.rpc('initialize_file_system', params) as unknown as {
       data: any;

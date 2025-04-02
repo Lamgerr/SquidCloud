@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
       try {
         setIsLoading(true);
         
-        const params = createRpcParams<GetFilesystemItemFunctionArgs>({ item_id: fileId });
+        // Use type assertion to specify the expected type of params
+        const params = createRpcParams<GetFilesystemItemFunctionArgs>({ 
+          item_id: fileId 
+        });
         
         const { data, error } = await supabase.rpc('get_filesystem_item', params) as unknown as {
           data: GetFilesystemItemResult[]; 
