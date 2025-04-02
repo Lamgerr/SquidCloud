@@ -24,8 +24,7 @@ import {
   MoveFilesystemItemFunctionArgs,
   GetFilesystemItemFunctionArgs,
   GetUserStorageStatsFunctionArgs,
-  InitializeFileSystemFunctionArgs,
-  RpcFunctionArgs
+  InitializeFileSystemFunctionArgs
 } from "@/types/file-manager";
 import { uploadFile, downloadFile } from "./api";
 
@@ -33,8 +32,8 @@ export async function getFolderContents(folderId: string | null): Promise<FileSy
   try {
     // Use RPC function to get folder contents with correct typing
     const functionArgs: GetFolderContentsFunctionArgs = { parent_id: folderId };
-    const { data, error } = await supabase
-      .rpc('get_folder_contents', functionArgs) as unknown as RpcResponse<GetFolderContentsResult[]>;
+    const { data, error }: RpcResponse<GetFolderContentsResult[]> = await supabase
+      .rpc('get_folder_contents', functionArgs as any) as any;
 
     if (error) {
       console.error("Error fetching folder contents:", error);
@@ -87,8 +86,8 @@ export async function getPathToFolder(folderId: string | null): Promise<{id: str
     while (currentId && currentId !== 'root') {
       // Use RPC function to get folder details with correct typing
       const functionArgs: GetFolderByIdFunctionArgs = { folder_id: currentId };
-      const { data, error } = await supabase
-        .rpc('get_folder_by_id', functionArgs) as unknown as RpcResponse<GetFolderByIdResult[]>;
+      const { data, error }: RpcResponse<GetFolderByIdResult[]> = await supabase
+        .rpc('get_folder_by_id', functionArgs as any) as any;
 
       if (error || !data || !Array.isArray(data) || data.length === 0) break;
       
@@ -115,8 +114,8 @@ export async function createFolder(name: string, parentId: string | null): Promi
       user_id: user.id
     };
     
-    const { data, error } = await supabase
-      .rpc('create_folder', functionArgs) as unknown as RpcResponse<CreateFolderResult[]>;
+    const { data, error }: RpcResponse<CreateFolderResult[]> = await supabase
+      .rpc('create_folder', functionArgs as any) as any;
 
     if (error) throw error;
     
@@ -160,8 +159,8 @@ export async function uploadFileToFolder(
       file_id: uploadedFile.id
     };
     
-    const { data, error } = await supabase
-      .rpc('create_file_entry', functionArgs) as unknown as RpcResponse<CreateFileEntryResult[]>;
+    const { data, error }: RpcResponse<CreateFileEntryResult[]> = await supabase
+      .rpc('create_file_entry', functionArgs as any) as any;
 
     if (error) throw error;
     
@@ -216,8 +215,8 @@ export async function deleteItem(itemId: string): Promise<void> {
   try {
     // Use RPC function to safely delete an item with correct typing
     const functionArgs: DeleteFilesystemItemFunctionArgs = { item_id: itemId };
-    const { error } = await supabase
-      .rpc('delete_filesystem_item', functionArgs) as unknown as RpcResponse<any>;
+    const { error }: RpcResponse<any> = await supabase
+      .rpc('delete_filesystem_item', functionArgs as any) as any;
 
     if (error) throw error;
   } catch (error) {
@@ -234,8 +233,8 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
       new_name: newName 
     };
     
-    const { data, error } = await supabase
-      .rpc('rename_filesystem_item', functionArgs) as unknown as RpcResponse<GetFilesystemItemResult[]>;
+    const { data, error }: RpcResponse<GetFilesystemItemResult[]> = await supabase
+      .rpc('rename_filesystem_item', functionArgs as any) as any;
 
     if (error) throw error;
     
@@ -259,8 +258,8 @@ export async function moveItem(itemId: string, newParentId: string | null): Prom
       new_parent_id: newParentId 
     };
     
-    const { data, error } = await supabase
-      .rpc('move_filesystem_item', functionArgs) as unknown as RpcResponse<GetFilesystemItemResult[]>;
+    const { data, error }: RpcResponse<GetFilesystemItemResult[]> = await supabase
+      .rpc('move_filesystem_item', functionArgs as any) as any;
 
     if (error) throw error;
     
@@ -284,8 +283,8 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
 
     // Use RPC function to get storage stats with correct typing
     const functionArgs: GetUserStorageStatsFunctionArgs = { user_id: user.id };
-    const { data, error } = await supabase
-      .rpc('get_user_storage_stats', functionArgs) as unknown as RpcResponse<UserStorageStatsResult>;
+    const { data, error }: RpcResponse<UserStorageStatsResult> = await supabase
+      .rpc('get_user_storage_stats', functionArgs as any) as any;
 
     if (error) throw error;
     
@@ -311,8 +310,8 @@ export async function initializeFileSystem(): Promise<void> {
 
     // Call RPC function to initialize the filesystem with correct typing
     const functionArgs: InitializeFileSystemFunctionArgs = { user_id: user.id };
-    const { error } = await supabase
-      .rpc('initialize_file_system', functionArgs) as unknown as RpcResponse<any>;
+    const { error }: RpcResponse<any> = await supabase
+      .rpc('initialize_file_system', functionArgs as any) as any;
 
     if (error) throw error;
   } catch (error) {
