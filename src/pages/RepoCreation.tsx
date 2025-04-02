@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -53,6 +52,48 @@ const RepoCreation = () => {
     }
   }, [user, navigate]);
 
+  const updateProfile = async (nodeName: string) => {
+    try {
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
+      // Get current node count
+      const { data: profileData, error: profileFetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileFetchError) {
+        throw profileFetchError;
+      }
+      
+      if (profileData) {
+        // Cast to ExtendedProfileType to access storage_node_count
+        const profile = profileData as ExtendedProfileType;
+        const currentNodeCount = profile.storage_node_count || 0;
+        
+        // Update profile with type assertion for the storage_node_count field
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ 
+            storage_node_count: currentNodeCount + 1,
+            onboarding_complete: true
+          } as any)
+          .eq('id', user.id);
+
+        if (profileError) {
+          console.error("Error updating profile:", profileError);
+          throw profileError;
+        }
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -89,47 +130,6 @@ const RepoCreation = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateProfile = async (nodeName: string) => {
-    try {
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-      
-      // Get current node count
-      const { data: profileData, error: profileFetchError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (profileFetchError) {
-        throw profileFetchError;
-      }
-      
-      if (profileData) {
-        const profile = profileData as ExtendedProfileType;
-        const currentNodeCount = profile.storage_node_count || 0;
-        
-        // Update profile with incremented node count and mark onboarding as complete
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ 
-            storage_node_count: currentNodeCount + 1,
-            onboarding_complete: true
-          } as any)
-          .eq('id', user.id);
-
-        if (profileError) {
-          console.error("Error updating profile:", profileError);
-          throw profileError;
-        }
-      }
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      throw error;
     }
   };
 

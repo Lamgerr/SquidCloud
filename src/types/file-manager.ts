@@ -187,16 +187,13 @@ export type SupabaseProfileType = {
   preview_type: string | null;
 };
 
-// RPC Response type that accepts a generic type parameter
 export interface RpcResponse<T> {
   data: T;
   error: any;
 }
 
-// RPC function arguments type with proper typing
 export type RpcFunctionArgs = Record<string, any>;
 
-// Function interfaces for RPC calls with proper typing
 export interface GetFolderContentsFunctionArgs {
   parent_id: string | null;
 }
@@ -244,7 +241,6 @@ export interface InitializeFileSystemFunctionArgs {
   user_id: string;
 }
 
-// Create a properly typed RPC parameters function that handles any function arguments
-export function createRpcParams<T extends RpcFunctionArgs>(params: T): Record<string, any> {
-  return params as Record<string, any>;
+export function createRpcParams<T extends RpcFunctionArgs>(params: T): T {
+  return params;
 }

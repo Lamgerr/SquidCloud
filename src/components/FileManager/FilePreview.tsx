@@ -32,13 +32,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
         
         const params = createRpcParams<GetFilesystemItemFunctionArgs>({ item_id: fileId });
         
-        // Use proper typing for Supabase RPC call
-        const { data, error } = await supabase.rpc('get_filesystem_item', params) as { 
-          data: GetFilesystemItemResult[] | null;
+        // Explicit type casting for the Supabase RPC call
+        const { data, error } = await supabase.rpc('get_filesystem_item', params) as {
+          data: GetFilesystemItemResult[]; 
           error: any;
         };
 
-        if (error || !data || !Array.isArray(data) || data.length === 0) {
+        if (error || !data || data.length === 0) {
           console.error("Error fetching file system item:", error);
           throw new Error("File not found");
         }
