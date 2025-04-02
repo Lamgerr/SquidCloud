@@ -1,3 +1,4 @@
+
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -194,61 +195,61 @@ export type SupabaseProfileType = {
   preview_type: string | null;
 };
 
-// Type for Supabase RPC function responses
+// Key addition: Define a proper RPC response type
 export interface RpcResponse<T> {
   data: T | null;
   error: any;
 }
 
-// Define proper types for RPC function arguments
+// Define proper types for RPC function arguments - this is the key fix
 export interface RpcFunctionArgs {
   [key: string]: any;
 }
 
 // Specific typed interfaces for each RPC call argument
-export interface GetFolderContentsFunctionArgs extends RpcFunctionArgs {
+export interface GetFolderContentsFunctionArgs {
   parent_id: string | null;
 }
 
-export interface GetFolderByIdFunctionArgs extends RpcFunctionArgs {
+export interface GetFolderByIdFunctionArgs {
   folder_id: string;
 }
 
-export interface CreateFolderFunctionArgs extends RpcFunctionArgs {
+export interface CreateFolderFunctionArgs {
   name: string;
   parent_id: string | null;
   user_id: string;
 }
 
-export interface CreateFileEntryFunctionArgs extends RpcFunctionArgs {
+export interface CreateFileEntryFunctionArgs {
   name: string;
   parent_id: string | null;
   user_id: string;
   file_id: string;
 }
 
-export interface DeleteFilesystemItemFunctionArgs extends RpcFunctionArgs {
+export interface DeleteFilesystemItemFunctionArgs {
   item_id: string;
 }
 
-export interface RenameFilesystemItemFunctionArgs extends RpcFunctionArgs {
+export interface RenameFilesystemItemFunctionArgs {
   item_id: string;
   new_name: string;
 }
 
-export interface MoveFilesystemItemFunctionArgs extends RpcFunctionArgs {
+export interface MoveFilesystemItemFunctionArgs {
   item_id: string;
   new_parent_id: string | null;
 }
 
-export interface GetFilesystemItemFunctionArgs extends RpcFunctionArgs {
+export interface GetFilesystemItemFunctionArgs {
   item_id: string;
 }
 
-export interface GetUserStorageStatsFunctionArgs extends RpcFunctionArgs {
+export interface GetUserStorageStatsFunctionArgs {
   user_id: string;
 }
 
-export interface InitializeFileSystemFunctionArgs extends RpcFunctionArgs {
+export interface InitializeFileSystemFunctionArgs {
   user_id: string;
 }
