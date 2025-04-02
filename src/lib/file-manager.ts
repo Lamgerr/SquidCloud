@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   FileSystemItem, 
@@ -28,8 +29,9 @@ import { uploadFile, downloadFile } from "./api";
 
 export async function getFolderContents(folderId: string | null): Promise<FileSystemItem[]> {
   try {
+    const params: GetFolderContentsFunctionArgs = { parent_id: folderId };
     const { data, error } = await supabase
-      .rpc('get_folder_contents', { parent_id: folderId } as any) as unknown as RpcResponse<GetFolderContentsResult[]>;
+      .rpc('get_folder_contents', params) as unknown as RpcResponse<GetFolderContentsResult[]>;
 
     if (error) {
       console.error("Error fetching folder contents:", error);
@@ -78,8 +80,9 @@ export async function getPathToFolder(folderId: string | null): Promise<{id: str
     let currentId = folderId;
 
     while (currentId && currentId !== 'root') {
+      const params: GetFolderByIdFunctionArgs = { folder_id: currentId };
       const { data, error } = await supabase
-        .rpc('get_folder_by_id', { folder_id: currentId } as any) as unknown as RpcResponse<GetFolderByIdResult[]>;
+        .rpc('get_folder_by_id', params) as unknown as RpcResponse<GetFolderByIdResult[]>;
 
       if (error || !data || !Array.isArray(data) || data.length === 0) break;
       
@@ -99,12 +102,14 @@ export async function createFolder(name: string, parentId: string | null): Promi
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    const params: CreateFolderFunctionArgs = {
+      name: name,
+      parent_id: parentId,
+      user_id: user.id
+    };
+    
     const { data, error } = await supabase
-      .rpc('create_folder', {
-        name: name,
-        parent_id: parentId,
-        user_id: user.id
-      } as any) as unknown as RpcResponse<CreateFolderResult[]>;
+      .rpc('create_folder', params) as unknown as RpcResponse<CreateFolderResult[]>;
     
     if (error) throw error;
     
@@ -138,13 +143,15 @@ export async function uploadFileToFolder(
 
     const uploadedFile = await uploadFile(file, onProgress);
 
+    const params: CreateFileEntryFunctionArgs = {
+      name: file.name,
+      parent_id: parentId,
+      user_id: user.id,
+      file_id: uploadedFile.id
+    };
+    
     const { data, error } = await supabase
-      .rpc('create_file_entry', {
-        name: file.name,
-        parent_id: parentId,
-        user_id: user.id,
-        file_id: uploadedFile.id
-      } as any) as unknown as RpcResponse<CreateFileEntryResult[]>;
+      .rpc('create_file_entry', params) as unknown as RpcResponse<CreateFileEntryResult[]>;
     
     if (error) throw error;
     
@@ -194,8 +201,9 @@ export async function downloadFileById(fileId: string): Promise<Blob> {
 
 export async function deleteItem(itemId: string): Promise<void> {
   try {
+    const params: DeleteFilesystemItemFunctionArgs = { item_id: itemId };
     const { error } = await supabase
-      .rpc('delete_filesystem_item', { item_id: itemId } as any) as unknown as RpcResponse<any>;
+      .rpc('delete_filesystem_item', params) as unknown as RpcResponse<any>;
 
     if (error) throw error;
   } catch (error) {
@@ -206,11 +214,13 @@ export async function deleteItem(itemId: string): Promise<void> {
 
 export async function renameItem(itemId: string, newName: string): Promise<FileSystemItem> {
   try {
+    const params: RenameFilesystemItemFunctionArgs = { 
+      item_id: itemId, 
+      new_name: newName 
+    };
+    
     const { data, error } = await supabase
-      .rpc('rename_filesystem_item', { 
-        item_id: itemId, 
-        new_name: newName 
-      } as any) as unknown as RpcResponse<GetFilesystemItemResult[]>;
+      .rpc('rename_filesystem_item', params) as unknown as RpcResponse<GetFilesystemItemResult[]>;
     
     if (error) throw error;
     
@@ -227,11 +237,13 @@ export async function renameItem(itemId: string, newName: string): Promise<FileS
 
 export async function moveItem(itemId: string, newParentId: string | null): Promise<FileSystemItem> {
   try {
+    const params: MoveFilesystemItemFunctionArgs = { 
+      item_id: itemId, 
+      new_parent_id: newParentId 
+    };
+    
     const { data, error } = await supabase
-      .rpc('move_filesystem_item', { 
-        item_id: itemId, 
-        new_parent_id: newParentId 
-      } as any) as unknown as RpcResponse<GetFilesystemItemResult[]>;
+      .rpc('move_filesystem_item', params) as unknown as RpcResponse<GetFilesystemItemResult[]>;
     
     if (error) throw error;
     
@@ -251,8 +263,9 @@ export async function getStorageStats(): Promise<{ totalSize: number, fileCount:
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    const params: GetUserStorageStatsFunctionArgs = { user_id: user.id };
     const { data, error } = await supabase
-      .rpc('get_user_storage_stats', { user_id: user.id } as any) as unknown as RpcResponse<UserStorageStatsResult>;
+      .rpc('get_user_storage_stats', params) as unknown as RpcResponse<UserStorageStatsResult>;
     
     if (error) throw error;
     
@@ -276,8 +289,9 @@ export async function initializeFileSystem(): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    const params: InitializeFileSystemFunctionArgs = { user_id: user.id };
     const { error } = await supabase
-      .rpc('initialize_file_system', { user_id: user.id } as any) as unknown as RpcResponse<any>;
+      .rpc('initialize_file_system', params) as unknown as RpcResponse<any>;
 
     if (error) throw error;
   } catch (error) {

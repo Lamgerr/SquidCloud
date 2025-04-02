@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -27,9 +28,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileId, fileType = '', onClos
     const fetchFileData = async () => {
       try {
         setIsLoading(true);
-
+        
+        const params: GetFilesystemItemFunctionArgs = { item_id: fileId };
         const { data: fsData, error: fsError } = await supabase
-          .rpc('get_filesystem_item', { item_id: fileId } as any) as unknown as RpcResponse<GetFilesystemItemResult[]>;
+          .rpc('get_filesystem_item', params) as unknown as RpcResponse<GetFilesystemItemResult[]>;
 
         if (fsError || !fsData || fsData.length === 0) {
           console.error("Error fetching file system item:", fsError);
