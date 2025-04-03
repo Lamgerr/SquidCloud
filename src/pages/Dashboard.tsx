@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import FileItem from '@/components/FileItem';
 import FilePreview from '@/components/FilePreview';
 import FileManager from '@/components/FileManager';
 import { FileItem as FileItemType, getFiles, deleteFile, downloadFile, shareFile, formatBytes } from '@/lib/api';
-import { Loader2, Plus, FileText, Info, Settings, FolderOpen, HardDrive, BarChart3, Share2 } from 'lucide-react';
+import { Loader2, Plus, FileText, Info, Settings, FolderOpen, HardDrive, BarChart3, Share2, Monitor, Smartphone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileBottomNav from '@/components/MobileBottomNav';

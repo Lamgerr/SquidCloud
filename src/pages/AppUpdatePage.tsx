@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Monitor, Apple, Smartphone, Download, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Monitor, Smartphone, Download, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -54,7 +55,6 @@ const AppUpdatePage = () => {
   const getPlatformIcon = (platform: string) => {
     switch(platform) {
       case 'windows': return <Monitor className="h-6 w-6" />;
-      case 'macos': return <Apple className="h-6 w-6" />;
       case 'android': return <Smartphone className="h-6 w-6" />;
       default: return <Monitor className="h-6 w-6" />;
     }
@@ -63,7 +63,6 @@ const AppUpdatePage = () => {
   const getPlatformName = (platform: string) => {
     switch(platform) {
       case 'windows': return 'Windows';
-      case 'macos': return 'macOS';
       case 'android': return 'Android';
       default: return 'Unknown';
     }
@@ -99,14 +98,6 @@ const AppUpdatePage = () => {
         >
           <Monitor className="mr-1 h-4 w-4" />
           Windows
-        </Button>
-        <Button 
-          variant={platform === 'macos' ? 'default' : 'outline'} 
-          onClick={() => window.location.href = '/app/updates?platform=macos'}
-          size="sm"
-        >
-          <Apple className="mr-1 h-4 w-4" />
-          macOS
         </Button>
         <Button 
           variant={platform === 'android' ? 'default' : 'outline'} 
