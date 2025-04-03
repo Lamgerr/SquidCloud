@@ -1,179 +1,216 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, Clock, Package, Check } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Windows, Apple, Smartphone, Download, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-interface AppVersion {
+interface AppUpdate {
   id: string;
-  version: string;
   platform: string;
+  version: string;
   download_url: string;
-  changelog: string;
+  release_notes?: string;
   release_date: string;
-  size: number;
-  is_mandatory: boolean;
+  is_critical: boolean;
 }
 
 const AppUpdatePage = () => {
   const [searchParams] = useSearchParams();
   const platform = searchParams.get('platform') || 'windows';
-  const [latestVersion, setLatestVersion] = useState<AppVersion | null>(null);
+  const { toast } = useToast();
+  const [updates, setUpdates] = useState<AppUpdate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchLatestVersion = async () => {
+    const fetchUpdates = async () => {
       try {
         setLoading(true);
-        
         const { data, error } = await supabase.functions.invoke('get-app-updates', {
-          body: { platform }
+          body: { platform },
         });
         
-        if (error) {
-          throw new Error(error.message);
-        }
+        if (error) throw error;
         
-        if (data?.latestVersion) {
-          setLatestVersion(data.latestVersion);
-        } else {
-          setError("No updates available for this platform");
-        }
-      } catch (err: any) {
-        console.error("Error fetching app updates:", err);
-        setError(err.message || "Failed to fetch updates");
+        setUpdates(data || []);
+      } catch (error: any) {
+        console.error('Error fetching updates:', error);
+        toast({
+          title: "Failed to load updates",
+          description: error.message || "Please try again later",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
     };
     
-    fetchLatestVersion();
-  }, [platform]);
+    fetchUpdates();
+  }, [platform, toast]);
 
-  // Format bytes to human readable size
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  const getPlatformIcon = (platform: string) => {
+    switch(platform) {
+      case 'windows': return <Windows className="h-6 w-6" />;
+      case 'macos': return <Apple className="h-6 w-6" />;
+      case 'android': return <Smartphone className="h-6 w-6" />;
+      default: return <Windows className="h-6 w-6" />;
+    }
   };
 
-  // Format date
+  const getPlatformName = (platform: string) => {
+    switch(platform) {
+      case 'windows': return 'Windows';
+      case 'macos': return 'macOS';
+      case 'android': return 'Android';
+      default: return 'Unknown';
+    }
+  };
+
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch (e) {
+      return dateString;
+    }
   };
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">CloudBliss Desktop Downloads</h1>
+    <div className="container max-w-4xl mx-auto py-10 px-4">
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">CloudBliss Updates</h1>
+          <p className="text-muted-foreground">Download the latest desktop and mobile app updates</p>
+        </div>
+      </div>
       
       <div className="flex space-x-2 mb-6">
         <Button 
           variant={platform === 'windows' ? 'default' : 'outline'} 
-          size="sm"
           onClick={() => window.location.href = '/app/updates?platform=windows'}
+          size="sm"
         >
+          <Windows className="mr-1 h-4 w-4" />
           Windows
         </Button>
         <Button 
           variant={platform === 'macos' ? 'default' : 'outline'} 
-          size="sm"
           onClick={() => window.location.href = '/app/updates?platform=macos'}
+          size="sm"
         >
+          <Apple className="mr-1 h-4 w-4" />
           macOS
         </Button>
         <Button 
-          variant={platform === 'linux' ? 'default' : 'outline'} 
+          variant={platform === 'android' ? 'default' : 'outline'} 
+          onClick={() => window.location.href = '/app/updates?platform=android'}
           size="sm"
-          onClick={() => window.location.href = '/app/updates?platform=linux'}
         >
-          Linux
+          <Smartphone className="mr-1 h-4 w-4" />
+          Android
         </Button>
       </div>
       
-      {loading ? (
-        <Card>
-          <CardContent className="py-6">
-            <div className="flex items-center justify-center">
-              <Clock className="animate-spin h-8 w-8 text-primary mr-2" />
-              <p>Loading latest version information...</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : error ? (
-        <Card>
-          <CardContent className="py-6">
-            <div className="text-center">
-              <p className="text-destructive mb-2">{error}</p>
-              <p className="text-muted-foreground">
-                Desktop application may not be available for this platform yet.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : latestVersion ? (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>CloudBliss for {platform}</CardTitle>
-              {latestVersion.is_mandatory && (
-                <Badge variant="destructive">Mandatory Update</Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <div className="h-16 w-16 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Package className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">Version {latestVersion.version}</h3>
-                <p className="text-sm text-muted-foreground">
-                  Released on {formatDate(latestVersion.release_date)} • {formatBytes(latestVersion.size)}
-                </p>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="font-medium mb-2">What's New</h4>
-              <div className="bg-muted/50 p-4 rounded-lg">
-                <pre className="whitespace-pre-wrap text-sm">{latestVersion.changelog}</pre>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="border-t pt-4 flex justify-between">
-            <div className="text-sm text-muted-foreground flex items-center">
-              <Check className="h-4 w-4 mr-1 text-green-500" />
-              Secured download
-            </div>
-            <Button asChild>
-              <a href={latestVersion.download_url} download>
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </a>
-            </Button>
-          </CardFooter>
-        </Card>
-      ) : null}
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            {getPlatformIcon(platform)}
+            <CardTitle>{getPlatformName(platform)} Updates</CardTitle>
+          </div>
+          <CardDescription>
+            Download and install the latest version of CloudBliss for {getPlatformName(platform)}
+          </CardDescription>
+        </CardHeader>
+      </Card>
       
-      <div className="mt-8 text-center text-sm text-muted-foreground">
-        <p>
-          CloudBliss desktop applications provide native integration with your operating system,
-          including offline access to your files and enhanced security features.
-        </p>
-      </div>
+      {loading ? (
+        <div className="py-12 flex justify-center">
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">Loading updates...</p>
+          </div>
+        </div>
+      ) : updates.length > 0 ? (
+        <div className="space-y-6">
+          {updates.map((update) => (
+            <Card key={update.id} className="overflow-hidden">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between">
+                  <div>
+                    <CardTitle className="flex items-center">
+                      Version {update.version}
+                      {update.is_critical && (
+                        <Badge variant="destructive" className="ml-2">
+                          Critical Update
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      Released on {formatDate(update.release_date)}
+                    </CardDescription>
+                  </div>
+                  <Button asChild>
+                    <a href={update.download_url} target="_blank" rel="noopener noreferrer">
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </a>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {update.is_critical && (
+                  <div className="bg-destructive/10 text-destructive p-3 rounded-md mb-4 flex items-start">
+                    <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Important security update</p>
+                      <p className="text-sm">This update contains important security fixes. Please update as soon as possible.</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="text-sm">
+                  {update.release_notes ? (
+                    <div className="prose prose-sm max-w-none">
+                      {update.release_notes.split('\n').map((note, i) => (
+                        <p key={i}>{note}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No release notes available.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-10 text-center">
+            <div className="rounded-full bg-primary/10 p-3 w-12 h-12 mx-auto mb-4 flex items-center justify-center">
+              <CheckCircle2 className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">You're up to date!</h3>
+            <p className="text-muted-foreground max-w-md mx-auto mb-6">
+              There are currently no updates available for {getPlatformName(platform)} users.
+            </p>
+            <div className="flex justify-center space-x-4">
+              <Button variant="outline" asChild>
+                <a href="/dashboard">
+                  Back to Dashboard
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

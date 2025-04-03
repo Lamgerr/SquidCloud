@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -44,6 +43,7 @@ import { Progress } from '@/components/ui/progress';
 import FilePreview from '@/components/FilePreview';
 import { Loader2 } from 'lucide-react';
 import DragDropUpload from '@/components/DragDropUpload';
+import { supabase } from '@/integrations/supabase/client';
 
 interface FileManagerProps {
   onFileSelected?: (file: FileItemType) => void;
@@ -70,7 +70,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Load files for the current folder
   useEffect(() => {
     const loadFiles = async () => {
       try {
@@ -93,7 +92,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     updateBreadcrumbs();
   }, [currentFolder, toast]);
   
-  // Update breadcrumbs when current folder changes
   const updateBreadcrumbs = () => {
     const crumbs = [{ name: "Root", path: "" }];
     
@@ -115,7 +113,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     setBreadcrumbs(crumbs);
   };
   
-  // Filter files based on search and active tab
   const filteredFiles = files.filter(file => {
     const nameMatch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -145,7 +142,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     return false;
   });
   
-  // Handle file upload
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -153,26 +149,22 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     const file = files[0];
     handleFileUpload(file);
     
-    // Reset the input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
   
-  // Handle file upload (both from input and drag-drop)
   const handleFileUpload = async (file: File) => {
     setUploadingFile(file);
     setUploadProgress(0);
     setUploadStage("preparing");
     
-    // Upload the file
     try {
       const fileItem = await uploadFile(file, currentFolder, (progress, stage, details) => {
         setUploadProgress(progress);
         setUploadStage(stage);
       });
       
-      // Add the new file to the list
       setFiles(prev => [fileItem, ...prev]);
       toast({
         title: "File Uploaded",
@@ -190,7 +182,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
-  // Handle creating a new folder
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) {
       toast({
@@ -220,31 +211,26 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
-  // Handle opening a folder
   const handleOpenFolder = (folder: FolderItem) => {
     setCurrentFolder(folder.path);
   };
   
-  // Handle navigating back to parent folder
   const handleBackToParent = () => {
     if (breadcrumbs.length <= 1) {
       setCurrentFolder("");
       return;
     }
     
-    // Go back to the parent folder
     const parentIndex = breadcrumbs.length - 2;
     if (parentIndex >= 0) {
       setCurrentFolder(breadcrumbs[parentIndex].path);
     }
   };
   
-  // Handle opening a file
   const handleOpenFile = async (file: FileItemType) => {
     try {
       setFileToPreview(file);
       
-      // Mark file as recently viewed
       await markFileViewed(file.id);
     } catch (error) {
       console.error("Error opening file:", error);
@@ -256,7 +242,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
-  // Handle downloading a file
   const handleDownloadFile = async (file: FileItemType) => {
     try {
       toast({
@@ -268,7 +253,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
         console.log(`Download progress: ${progress}%, stage: ${stage}`);
       });
       
-      // Create a download link
       const url = URL.createObjectURL(fileBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -276,7 +260,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
       document.body.appendChild(a);
       a.click();
       
-      // Clean up
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -296,12 +279,10 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
-  // Handle sharing a file
   const handleShareFile = async (file: FileItemType) => {
     try {
       const shareLink = await shareFile(file.id, true);
       
-      // Update file state
       setFiles(prev => 
         prev.map(f => 
           'id' in f && f.id === file.id 
@@ -310,7 +291,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
         )
       );
       
-      // Copy link to clipboard
       navigator.clipboard.writeText(shareLink);
       
       toast({
@@ -327,13 +307,11 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
-  // Handle deleting a file or folder
   const handleDeleteConfirm = async () => {
     if (!selectedFile) return;
     
     try {
       if ('is_folder' in selectedFile && selectedFile.is_folder) {
-        // Delete folder from GitHub storage
         const { data, error } = await supabase.functions.invoke('github-storage', {
           body: { 
             action: 'delete_folder', 
@@ -345,7 +323,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
           throw new Error(error.message);
         }
         
-        // Remove folder from state
         setFiles(prev => prev.filter(f => 
           !('is_folder' in f) || f.path !== selectedFile.path
         ));
@@ -357,7 +334,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
       } else {
         await deleteFile((selectedFile as FileItemType).id);
         
-        // Remove file from state
         setFiles(prev => prev.filter(f => 
           !('id' in f) || f.id !== selectedFile.id
         ));
@@ -380,7 +356,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
-  // Render file/folder icon based on type
   const renderItemIcon = (item: FileItemType | FolderItem) => {
     if ('is_folder' in item && item.is_folder) {
       return <Folder className="h-10 w-10 text-blue-500" />;
@@ -400,7 +375,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
-  // Format date for display
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
@@ -410,7 +384,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
-  // Handle files dropped from drag and drop
   const handleFilesDropped = (droppedFiles: File[]) => {
     if (droppedFiles.length === 0) return;
     
@@ -419,15 +392,11 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
       description: `Processing ${droppedFiles.length} file(s) for upload`,
     });
     
-    // Upload each file
     droppedFiles.forEach(file => {
       handleFileUpload(file);
     });
   };
 
-  // Connect to Supabase for error handling
-  const { supabase } = require('@/integrations/supabase/client');
-  
   return (
     <DragDropUpload 
       onDragStateChange={setIsDragging}
@@ -435,7 +404,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
       currentFolder={currentFolder}
     >
       <div className={`space-y-4 ${isDragging ? 'border-2 border-dashed border-primary/50 rounded-lg p-4 bg-primary/5' : ''}`}>
-        {/* Header with breadcrumbs */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 overflow-x-auto whitespace-nowrap max-w-[60%] py-2">
             {breadcrumbs.length > 0 && (
@@ -482,7 +450,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
           </div>
         </div>
         
-        {/* Search and filters */}
         <div className="flex items-center justify-between">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -515,7 +482,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
           </div>
         )}
         
-        {/* Upload progress indicator */}
         {uploadingFile && (
           <Card className="p-4">
             <div className="flex justify-between items-center mb-2">
@@ -530,7 +496,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
           </Card>
         )}
         
-        {/* File/folder list */}
         {loading ? (
           <div className="flex flex-col items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
@@ -593,7 +558,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     {'is_folder' in item && item.is_folder ? (
-                      // Folder options
                       <>
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation();
@@ -616,7 +580,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
                         </DropdownMenuItem>
                       </>
                     ) : (
-                      // File options
                       <>
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation();
@@ -677,7 +640,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
           </div>
         )}
         
-        {/* New folder dialog */}
         <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
           <DialogContent>
             <DialogHeader>
@@ -701,7 +663,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
           </DialogContent>
         </Dialog>
         
-        {/* Delete confirmation */}
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <DialogContent>
             <DialogHeader>
@@ -721,7 +682,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
           </DialogContent>
         </Dialog>
         
-        {/* File preview */}
         {fileToPreview && (
           <FilePreview 
             file={fileToPreview} 
