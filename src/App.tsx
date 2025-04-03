@@ -11,8 +11,12 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import MobileBottomNav from './components/MobileBottomNav';
-import { useIsMobile } from './hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import Onboarding from './pages/Onboarding';
+import StoragePage from './pages/StoragePage';
+import AppUpdatePage from './pages/AppUpdatePage';
+import AdminUpdatePage from './pages/AdminUpdatePage';
 
 // Component to handle new user redirection
 const NewUserRedirect = ({ children }: { children: React.ReactNode }) => {
@@ -62,7 +66,7 @@ const AppLayout = ({ children, showMobileNav = true }: { children: React.ReactNo
 };
 
 const AppWithAuth = () => {
-  // Set document title to reflect the new app name
+  // Set document title to reflect the app name
   useEffect(() => {
     document.title = "CloudBliss by Inflate";
   }, []);
@@ -115,12 +119,34 @@ const AppWithAuth = () => {
           } 
         />
         <Route 
+          path="/onboarding" 
+          element={
+            <ProtectedRoute>
+              <AppLayout showMobileNav={false}>
+                <Onboarding />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/files" 
           element={
             <ProtectedRoute>
               <NewUserRedirect>
                 <AppLayout>
                   <Dashboard defaultTab="files" />
+                </AppLayout>
+              </NewUserRedirect>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/storage" 
+          element={
+            <ProtectedRoute>
+              <NewUserRedirect>
+                <AppLayout>
+                  <StoragePage />
                 </AppLayout>
               </NewUserRedirect>
             </ProtectedRoute>
@@ -159,6 +185,34 @@ const AppWithAuth = () => {
                   <Dashboard openUpload={true} />
                 </AppLayout>
               </NewUserRedirect>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/share/:fileId" 
+          element={
+            <AppLayout showMobileNav={false}>
+              <FileSharePage />
+            </AppLayout>
+          } 
+        />
+        <Route 
+          path="/app/updates" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <AppUpdatePage />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/up/add/:os" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <AdminUpdatePage />
+              </AppLayout>
             </ProtectedRoute>
           } 
         />

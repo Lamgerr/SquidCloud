@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -411,6 +410,66 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
     );
   };
 
+  const renderSettings = () => {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Account Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div>
+              <Label className="text-sm">Email</Label>
+              <p className="font-medium">{user?.email || 'No email available'}</p>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Theme</Label>
+              <ThemeToggle />
+            </div>
+            
+            {!isCapacitorApp() && (
+              <div>
+                <Label className="text-sm">App Download</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Button size="sm" variant="outline" asChild>
+                    <a href="/app/updates?platform=windows" target="_blank">
+                      Windows
+                    </a>
+                  </Button>
+                  <Button size="sm" variant="outline" asChild>
+                    <a href="/app/updates?platform=macos" target="_blank">
+                      macOS
+                    </a>
+                  </Button>
+                  <Button size="sm" variant="outline" asChild>
+                    <a href="/app/updates?platform=linux" target="_blank">
+                      Linux
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            <div className="pt-4">
+              <Button
+                variant="destructive"
+                onClick={() => signOut()}
+                className="w-full"
+              >
+                Logout
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const isCapacitorApp = () => {
+    return typeof (window as any)?.Capacitor !== 'undefined';
+  };
+
   if (isOnboarding) {
     return (
       <div className="container mx-auto p-4">
@@ -554,29 +613,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
             </TabsContent>
             
             <TabsContent value="settings">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account Settings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm">Email</Label>
-                      <p className="font-medium">{user?.email || 'No email available'}</p>
-                    </div>
-                    
-                    <div className="pt-4">
-                      <Button
-                        variant="destructive"
-                        onClick={() => signOut()}
-                        className="w-full"
-                      >
-                        Logout
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {renderSettings()}
             </TabsContent>
           </Tabs>
         </div>

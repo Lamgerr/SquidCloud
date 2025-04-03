@@ -1,13 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   File, Folder, Upload, Plus, 
   ArrowLeft, MoreVertical, Search,
   FileImage, FileVideo, FileText, 
   FileAudio, FilePlus, Share2,
-  Download, Trash2, Edit, Clock,
-  ChevronRight
+  Download, Trash2, Clock,
+  ChevronRight, ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -43,6 +43,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import FilePreview from '@/components/FilePreview';
 import { Loader2 } from 'lucide-react';
+import DragDropUpload from '@/components/DragDropUpload';
 
 interface FileManagerProps {
   onFileSelected?: (file: FileItemType) => void;
@@ -63,10 +64,11 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [fileToPreview, setFileToPreview] = useState<FileItemType | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   const { toast } = useToast();
   const navigate = useNavigate();
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Load files for the current folder
   useEffect(() => {
@@ -149,35 +151,42 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     if (!files || files.length === 0) return;
     
     const file = files[0];
+    handleFileUpload(file);
+    
+    // Reset the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+  
+  // Handle file upload (both from input and drag-drop)
+  const handleFileUpload = async (file: File) => {
     setUploadingFile(file);
     setUploadProgress(0);
     setUploadStage("preparing");
     
     // Upload the file
-    uploadFile(file, currentFolder, (progress, stage, details) => {
-      setUploadProgress(progress);
-      setUploadStage(stage);
-    }).then(fileItem => {
+    try {
+      const fileItem = await uploadFile(file, currentFolder, (progress, stage, details) => {
+        setUploadProgress(progress);
+        setUploadStage(stage);
+      });
+      
       // Add the new file to the list
       setFiles(prev => [fileItem, ...prev]);
-      setUploadingFile(null);
       toast({
         title: "File Uploaded",
         description: `${file.name} has been uploaded successfully`
       });
-    }).catch(error => {
+    } catch (error: any) {
       console.error("Upload error:", error);
       toast({
         title: "Upload Failed",
         description: error.message || "Failed to upload file",
         variant: "destructive"
       });
+    } finally {
       setUploadingFile(null);
-    });
-    
-    // Reset the input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
   
@@ -201,11 +210,11 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
         title: "Folder Created",
         description: `Created folder ${newFolderName}`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating folder:", error);
       toast({
         title: "Error",
-        description: "Failed to create folder",
+        description: error.message || "Failed to create folder",
         variant: "destructive"
       });
     }
@@ -256,7 +265,7 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
       });
       
       const fileBlob = await downloadFile(file.id, (progress, stage) => {
-        // Could show download progress here
+        console.log(`Download progress: ${progress}%, stage: ${stage}`);
       });
       
       // Create a download link
@@ -277,11 +286,11 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
         title: "Download Complete",
         description: `${file.name} has been downloaded.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error downloading file:", error);
       toast({
         title: "Download Failed",
-        description: "Failed to download file",
+        description: error.message || "Failed to download file",
         variant: "destructive"
       });
     }
@@ -308,11 +317,11 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
         title: "Link Copied",
         description: "Share link has been copied to clipboard",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sharing file:", error);
       toast({
         title: "Sharing Failed",
-        description: "Failed to share file",
+        description: error.message || "Failed to share file",
         variant: "destructive"
       });
     }
@@ -324,10 +333,26 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     
     try {
       if ('is_folder' in selectedFile && selectedFile.is_folder) {
-        // TODO: Implement folder deletion
+        // Delete folder from GitHub storage
+        const { data, error } = await supabase.functions.invoke('github-storage', {
+          body: { 
+            action: 'delete_folder', 
+            path: selectedFile.path 
+          }
+        });
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        // Remove folder from state
+        setFiles(prev => prev.filter(f => 
+          !('is_folder' in f) || f.path !== selectedFile.path
+        ));
+        
         toast({
-          title: "Not implemented",
-          description: "Folder deletion is not implemented yet",
+          title: "Folder Deleted",
+          description: `${selectedFile.name} has been deleted`,
         });
       } else {
         await deleteFile((selectedFile as FileItemType).id);
@@ -342,11 +367,11 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
           description: `${selectedFile.name} has been deleted`,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting:", error);
       toast({
         title: "Deletion Failed",
-        description: "Failed to delete the item",
+        description: error.message || "Failed to delete the item",
         variant: "destructive"
       });
     } finally {
@@ -385,272 +410,326 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
     }
   };
   
+  // Handle files dropped from drag and drop
+  const handleFilesDropped = (droppedFiles: File[]) => {
+    if (droppedFiles.length === 0) return;
+    
+    toast({
+      title: "Files received",
+      description: `Processing ${droppedFiles.length} file(s) for upload`,
+    });
+    
+    // Upload each file
+    droppedFiles.forEach(file => {
+      handleFileUpload(file);
+    });
+  };
+
+  // Connect to Supabase for error handling
+  const { supabase } = require('@/integrations/supabase/client');
+  
   return (
-    <div className="space-y-4">
-      {/* Header with breadcrumbs */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2 overflow-x-auto whitespace-nowrap max-w-[60%] py-2">
-          {breadcrumbs.length > 0 && (
-            <div className="flex items-center space-x-2">
-              {breadcrumbs.map((crumb, index) => (
-                <React.Fragment key={index}>
-                  {index > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  <button
-                    onClick={() => setCurrentFolder(crumb.path)}
-                    className={`text-sm ${index === breadcrumbs.length - 1 ? 'font-semibold' : 'text-muted-foreground'}`}
-                  >
-                    {crumb.name}
-                  </button>
-                </React.Fragment>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowNewFolderDialog(true)}
-          >
-            <Folder className="h-4 w-4 mr-1" />
-            New Folder
-          </Button>
-          
-          <Button
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-4 w-4 mr-1" />
-            Upload
-          </Button>
-          
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleUpload}
-            className="hidden"
-          />
-        </div>
-      </div>
-      
-      {/* Search and filters */}
-      <div className="flex items-center justify-between">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search files..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="videos">Videos</TabsTrigger>
-            <TabsTrigger value="folders">Folders</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-      
-      {/* Upload progress indicator */}
-      {uploadingFile && (
-        <Card className="p-4">
-          <div className="flex justify-between items-center mb-2">
-            <span className="font-medium">{uploadingFile.name}</span>
-            <span className="text-xs text-muted-foreground">{formatBytes(uploadingFile.size)}</span>
+    <DragDropUpload 
+      onDragStateChange={setIsDragging}
+      onFilesDropped={handleFilesDropped}
+      currentFolder={currentFolder}
+    >
+      <div className={`space-y-4 ${isDragging ? 'border-2 border-dashed border-primary/50 rounded-lg p-4 bg-primary/5' : ''}`}>
+        {/* Header with breadcrumbs */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 overflow-x-auto whitespace-nowrap max-w-[60%] py-2">
+            {breadcrumbs.length > 0 && (
+              <div className="flex items-center space-x-2">
+                {breadcrumbs.map((crumb, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    <button
+                      onClick={() => setCurrentFolder(crumb.path)}
+                      className={`text-sm ${index === breadcrumbs.length - 1 ? 'font-semibold' : 'text-muted-foreground'}`}
+                    >
+                      {crumb.name}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
           </div>
-          <Progress value={uploadProgress} className="h-2 mb-2" />
-          <div className="flex justify-between items-center text-xs text-muted-foreground">
-            <span className="capitalize">{uploadStage}</span>
-            <span>{Math.round(uploadProgress)}%</span>
-          </div>
-        </Card>
-      )}
-      
-      {/* File/folder list */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground">Loading files...</p>
-        </div>
-      ) : filteredFiles.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center h-64 border-dashed">
-          <FilePlus className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground mb-2">No files found</p>
-          <Button
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-4 w-4 mr-1" />
-            Upload Files
-          </Button>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-3">
-          {filteredFiles.map((item) => (
-            <Card 
-              key={item.id} 
-              className="p-3 flex items-center hover:bg-muted/50 transition-colors cursor-pointer"
-              onClick={() => {
-                if ('is_folder' in item && item.is_folder) {
-                  handleOpenFolder(item as FolderItem);
-                } else {
-                  handleOpenFile(item as FileItemType);
-                }
-              }}
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowNewFolderDialog(true)}
             >
-              <div className="flex-shrink-0 mr-3">
-                {renderItemIcon(item)}
-              </div>
-              
-              <div className="flex-grow min-w-0">
-                <div className="truncate font-medium">{item.name}</div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3 mr-1" />
-                  <span className="mr-3">{formatDate(item.created_at)}</span>
-                  
-                  {'size' in item && (
-                    <span>{formatBytes((item as FileItemType).size)}</span>
-                  )}
-                </div>
-              </div>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {'is_folder' in item && item.is_folder ? (
-                    // Folder options
-                    <>
-                      <DropdownMenuItem onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenFolder(item as FolderItem);
-                      }}>
-                        <Folder className="h-4 w-4 mr-2" />
-                        Open
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        className="text-destructive focus:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedFile(item);
-                          setShowDeleteConfirm(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </>
-                  ) : (
-                    // File options
-                    <>
-                      <DropdownMenuItem onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenFile(item as FileItemType);
-                      }}>
-                        <File className="h-4 w-4 mr-2" />
-                        Open
-                      </DropdownMenuItem>
-                      
-                      <DropdownMenuItem onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownloadFile(item as FileItemType);
-                      }}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </DropdownMenuItem>
-                      
-                      <DropdownMenuItem onClick={(e) => {
-                        e.stopPropagation();
-                        handleShareFile(item as FileItemType);
-                      }}>
-                        <Share2 className="h-4 w-4 mr-2" />
-                        Share
-                      </DropdownMenuItem>
-                      
-                      <DropdownMenuSeparator />
-                      
-                      <DropdownMenuItem 
-                        className="text-destructive focus:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedFile(item);
-                          setShowDeleteConfirm(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </Card>
-          ))}
+              <Folder className="h-4 w-4 mr-1" />
+              New Folder
+            </Button>
+            
+            <Button
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 mr-1" />
+              Upload
+            </Button>
+            
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleUpload}
+              className="hidden"
+            />
+          </div>
         </div>
-      )}
-      
-      {/* New folder dialog */}
-      <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Folder</DialogTitle>
-          </DialogHeader>
-          <Input
-            placeholder="Folder name"
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            className="my-4"
-            autoFocus
+        
+        {/* Search and filters */}
+        <div className="flex items-center justify-between">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search files..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="images">Images</TabsTrigger>
+              <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="videos">Videos</TabsTrigger>
+              <TabsTrigger value="folders">Folders</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+        
+        {isDragging && (
+          <div className="border-2 border-dashed border-primary rounded-lg p-8 flex items-center justify-center">
+            <div className="text-center">
+              <Upload className="h-10 w-10 text-primary mx-auto mb-4" />
+              <p className="text-lg font-medium">Drop your files here</p>
+              <p className="text-sm text-muted-foreground">Files will be uploaded to current folder</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Upload progress indicator */}
+        {uploadingFile && (
+          <Card className="p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium">{uploadingFile.name}</span>
+              <span className="text-xs text-muted-foreground">{formatBytes(uploadingFile.size)}</span>
+            </div>
+            <Progress value={uploadProgress} className="h-2 mb-2" />
+            <div className="flex justify-between items-center text-xs text-muted-foreground">
+              <span className="capitalize">{uploadStage}</span>
+              <span>{Math.round(uploadProgress)}%</span>
+            </div>
+          </Card>
+        )}
+        
+        {/* File/folder list */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Loading files...</p>
+          </div>
+        ) : filteredFiles.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center h-64 border-dashed">
+            <FilePlus className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-2">No files found</p>
+            <Button
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 mr-1" />
+              Upload Files
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            {filteredFiles.map((item) => (
+              <Card 
+                key={item.id} 
+                className="p-3 flex items-center hover:bg-muted/50 transition-colors cursor-pointer"
+                onClick={() => {
+                  if ('is_folder' in item && item.is_folder) {
+                    handleOpenFolder(item as FolderItem);
+                  } else {
+                    handleOpenFile(item as FileItemType);
+                  }
+                }}
+              >
+                <div className="flex-shrink-0 mr-3">
+                  {renderItemIcon(item)}
+                </div>
+                
+                <div className="flex-grow min-w-0">
+                  <div className="truncate font-medium">{item.name}</div>
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3 mr-1" />
+                    <span className="mr-3">{formatDate(item.created_at)}</span>
+                    
+                    {'size' in item && (
+                      <span>{formatBytes((item as FileItemType).size)}</span>
+                    )}
+                    
+                    {'shared' in item && (item as FileItemType).shared && (
+                      <span className="ml-3 flex items-center">
+                        <Share2 className="h-3 w-3 mr-1 text-primary" />
+                        <span className="text-primary">Shared</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {'is_folder' in item && item.is_folder ? (
+                      // Folder options
+                      <>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenFolder(item as FolderItem);
+                        }}>
+                          <Folder className="h-4 w-4 mr-2" />
+                          Open
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedFile(item);
+                            setShowDeleteConfirm(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      // File options
+                      <>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenFile(item as FileItemType);
+                        }}>
+                          <File className="h-4 w-4 mr-2" />
+                          Open
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadFile(item as FileItemType);
+                        }}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleShareFile(item as FileItemType);
+                        }}>
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Share
+                        </DropdownMenuItem>
+                        
+                        {(item as FileItemType).shared && (
+                          <DropdownMenuItem asChild onClick={(e) => e.stopPropagation()}>
+                            <a 
+                              href={`/share/${(item as FileItemType).id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              View Share Link
+                            </a>
+                          </DropdownMenuItem>
+                        )}
+                        
+                        <DropdownMenuSeparator />
+                        
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedFile(item);
+                            setShowDeleteConfirm(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </Card>
+            ))}
+          </div>
+        )}
+        
+        {/* New folder dialog */}
+        <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Folder</DialogTitle>
+            </DialogHeader>
+            <Input
+              placeholder="Folder name"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              className="my-4"
+              autoFocus
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowNewFolderDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateFolder}>
+                Create
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Delete confirmation */}
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Deletion</DialogTitle>
+            </DialogHeader>
+            <p className="py-4">
+              Are you sure you want to delete "{selectedFile?.name}"? This action cannot be undone.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteConfirm}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* File preview */}
+        {fileToPreview && (
+          <FilePreview 
+            file={fileToPreview} 
+            onClose={() => setFileToPreview(null)} 
           />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewFolderDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateFolder}>
-              Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Delete confirmation */}
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
-          </DialogHeader>
-          <p className="py-4">
-            Are you sure you want to delete "{selectedFile?.name}"? This action cannot be undone.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* File preview */}
-      {fileToPreview && (
-        <FilePreview 
-          file={fileToPreview} 
-          onClose={() => setFileToPreview(null)} 
-        />
-      )}
-    </div>
+        )}
+      </div>
+    </DragDropUpload>
   );
 };
 
