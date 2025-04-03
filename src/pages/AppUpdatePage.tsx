@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Windows, Apple, Smartphone, Download, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Monitor, Apple, Smartphone, Download, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -54,10 +53,10 @@ const AppUpdatePage = () => {
 
   const getPlatformIcon = (platform: string) => {
     switch(platform) {
-      case 'windows': return <Windows className="h-6 w-6" />;
+      case 'windows': return <Monitor className="h-6 w-6" />;
       case 'macos': return <Apple className="h-6 w-6" />;
       case 'android': return <Smartphone className="h-6 w-6" />;
-      default: return <Windows className="h-6 w-6" />;
+      default: return <Monitor className="h-6 w-6" />;
     }
   };
 
@@ -98,7 +97,7 @@ const AppUpdatePage = () => {
           onClick={() => window.location.href = '/app/updates?platform=windows'}
           size="sm"
         >
-          <Windows className="mr-1 h-4 w-4" />
+          <Monitor className="mr-1 h-4 w-4" />
           Windows
         </Button>
         <Button 
