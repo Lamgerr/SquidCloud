@@ -3,12 +3,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HardDrive, Shield, Lock } from 'lucide-react';
 
 const Onboarding = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [repoCount, setRepoCount] = useState(0);
 
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -23,7 +24,7 @@ const Onboarding = () => {
 
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('onboarding_complete')
+          .select('onboarding_complete, repo_count')
           .eq('id', session.user.id)
           .single();
 
@@ -33,9 +34,11 @@ const Onboarding = () => {
           return;
         }
 
-        if (profile?.onboarding_complete) {
+        // Only show onboarding for users that have onboarding_complete set to false
+        if (profile && profile.onboarding_complete) {
           navigate('/dashboard');
         } else {
+          setRepoCount(profile?.repo_count || 0);
           setLoading(false);
         }
       } catch (error) {
@@ -53,6 +56,7 @@ const Onboarding = () => {
     try {
       setLoading(true);
       
+      // Only update onboarding_complete to true
       const { error } = await supabase
         .from('profiles')
         .update({ onboarding_complete: true })
@@ -71,6 +75,10 @@ const Onboarding = () => {
     }
   };
 
+  const handleCreateVault = () => {
+    navigate('/r/c/1');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -84,26 +92,65 @@ const Onboarding = () => {
       <h1 className="text-2xl font-bold mb-4">Welcome to CloudBliss</h1>
       
       <div className="space-y-6">
-        <div className="bg-card p-4 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-2">Create Your First Storage Vault</h2>
-          <p className="text-muted-foreground mb-4">
-            To get started with CloudBliss, you'll need to:
-          </p>
-          <ul className="list-disc pl-5 space-y-2">
-            <li>Create a secure storage vault (max 2 vaults per user)</li>
-            <li>Your files will be protected with end-to-end encryption</li>
-            <li>Access dashboard features after vault creation</li>
-          </ul>
-        </div>
-
-        <Button 
-          onClick={completeOnboarding}
-          className="w-full"
-          disabled={loading}
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-          Continue to Dashboard
-        </Button>
+        {repoCount === 0 ? (
+          <>
+            <div className="bg-card p-4 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-2">Create Your Storage Vault</h2>
+              <p className="text-muted-foreground mb-4">
+                To get started with CloudBliss, you'll need to:
+              </p>
+              <ul className="list-disc pl-5 space-y-2 mb-4">
+                <li>Create a secure storage vault (max 2 vaults per user)</li>
+                <li>Your files will be protected with end-to-end encryption</li>
+                <li>Access dashboard features after vault creation</li>
+              </ul>
+              
+              <Button 
+                onClick={handleCreateVault}
+                className="w-full"
+                size="lg"
+              >
+                <HardDrive className="mr-2 h-5 w-5" />
+                Create Storage Vault
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg flex flex-col items-center text-center">
+                <Shield className="h-8 w-8 text-blue-500 mb-2" />
+                <h3 className="font-medium">End-to-End Encryption</h3>
+                <p className="text-sm text-muted-foreground">All files are securely encrypted</p>
+              </div>
+              
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg flex flex-col items-center text-center">
+                <Lock className="h-8 w-8 text-green-500 mb-2" />
+                <h3 className="font-medium">Private Storage</h3>
+                <p className="text-sm text-muted-foreground">Only you can access your files</p>
+              </div>
+              
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg flex flex-col items-center text-center">
+                <HardDrive className="h-8 w-8 text-purple-500 mb-2" />
+                <h3 className="font-medium">Multiple Vaults</h3>
+                <p className="text-sm text-muted-foreground">Create up to 2 secure vaults</p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="bg-card p-6 rounded-lg shadow text-center">
+            <h2 className="text-xl font-semibold mb-4">All Set! Let's Get Started</h2>
+            <p className="text-muted-foreground mb-6">
+              You've already created {repoCount} storage vault{repoCount > 1 ? 's' : ''}. You're ready to use CloudBliss!
+            </p>
+            
+            <Button 
+              onClick={completeOnboarding}
+              className="w-full"
+              size="lg"
+            >
+              Continue to Dashboard
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

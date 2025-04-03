@@ -1,6 +1,7 @@
+
 import React, { useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Files, HardDrive, Settings, Upload } from 'lucide-react';
+import { Files, HardDrive, Settings, Upload, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const MobileBottomNav = () => {
@@ -31,7 +32,7 @@ const MobileBottomNav = () => {
         <button
           onClick={() => navigate('/files')}
           className={cn(
-            "flex flex-col items-center justify-center w-16 h-16",
+            "flex flex-col items-center justify-center w-14 h-16",
             location.pathname === '/files' ? "text-primary" : "text-muted-foreground"
           )}
         >
@@ -42,7 +43,7 @@ const MobileBottomNav = () => {
         <button
           onClick={() => navigate('/storage')}
           className={cn(
-            "flex flex-col items-center justify-center w-16 h-16",
+            "flex flex-col items-center justify-center w-14 h-16",
             location.pathname === '/storage' ? "text-primary" : "text-muted-foreground"
           )}
         >
@@ -52,7 +53,7 @@ const MobileBottomNav = () => {
 
         <button
           onClick={handleUploadClick}
-          className="flex flex-col items-center justify-center w-16 h-16 -mt-8"
+          className="flex flex-col items-center justify-center w-14 h-16 -mt-8"
         >
           <div className="bg-primary text-primary-foreground rounded-full p-4">
             <Upload className="h-5 w-5" />
@@ -61,9 +62,20 @@ const MobileBottomNav = () => {
         </button>
 
         <button
+          onClick={() => navigate('/shared')}
+          className={cn(
+            "flex flex-col items-center justify-center w-14 h-16",
+            location.pathname === '/shared' ? "text-primary" : "text-muted-foreground"
+          )}
+        >
+          <Share2 className="h-5 w-5" />
+          <span className="text-xs mt-1">Shared</span>
+        </button>
+
+        <button
           onClick={() => navigate('/settings')}
           className={cn(
-            "flex flex-col items-center justify-center w-16 h-16",
+            "flex flex-col items-center justify-center w-14 h-16",
             location.pathname === '/settings' ? "text-primary" : "text-muted-foreground"
           )}
         >

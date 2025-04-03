@@ -41,13 +41,13 @@ interface FileMetadata {
 }
 
 // Constants for optimized processing
-const MAX_PARALLEL_OPERATIONS = 6;
-const MAX_RETRIES = 5;
+const MAX_PARALLEL_OPERATIONS = 3; // Reduced for better stability
+const MAX_RETRIES = 8; // Increased retries for better reliability
 const RETRY_DELAY_BASE = 1000; // Base retry delay in ms
 const LARGE_FILE_THRESHOLD = 128 * 1024 * 1024; // 128MB
-const CHUNK_SIZE_SMALL = 1 * 1024 * 1024; // 1MB for small files
-const CHUNK_SIZE_MEDIUM = 3 * 1024 * 1024; // 3MB for medium files
-const CHUNK_SIZE_LARGE = 5 * 1024 * 1024; // 5MB for large files
+const CHUNK_SIZE_SMALL = 512 * 1024; // 512KB for small files (was 1MB)
+const CHUNK_SIZE_MEDIUM = 1 * 1024 * 1024; // 1MB for medium files (was 3MB)
+const CHUNK_SIZE_LARGE = 2 * 1024 * 1024; // 2MB for large files (was 5MB)
 
 // Add these utility functions at the top
 const compressData = (data: string): string => {
@@ -93,7 +93,7 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
 
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
   try {
-    const binaryString = atob(base64);
+    const binaryString = atob(base64.replace(/\s/g, ''));
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
@@ -150,14 +150,12 @@ export const createFileChunks = async (
   // Generate encryption key once for the entire file
   const encryptionKey = generateEncryptionKey();
   
-  // Read file in chunks using FileReader API
-  while (offset < file.size) {
-    const end = Math.min(offset + chunkSize, file.size);
-    const chunk = file.slice(offset, end);
-    
-    // Read chunk as ArrayBuffer with verification
-    const chunkBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+  // Read file in chunks using FileReader API with better memory management
+  const readChunk = async (start: number, end: number): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+      const chunk = file.slice(start, end);
       const reader = new FileReader();
+      
       reader.onload = (e) => {
         try {
           const buffer = e.target?.result as ArrayBuffer;
@@ -170,24 +168,37 @@ export const createFileChunks = async (
           reject(err);
         }
       };
+      
       reader.onerror = reject;
       reader.readAsArrayBuffer(chunk);
     });
+  };
+  
+  // Process chunks sequentially to avoid memory issues
+  while (offset < file.size) {
+    const end = Math.min(offset + chunkSize, file.size);
     
-    chunks.push(chunkBuffer);
-    chunkMetadata.push({
-      index: chunks.length - 1,
-      totalChunks,
-      size: chunkBuffer.byteLength,
-      offset: offset,
-      sha256: await calculateSHA256(new Uint8Array(chunkBuffer))
-    });
+    try {
+      const chunkBuffer = await readChunk(offset, end);
+      
+      chunks.push(chunkBuffer);
+      chunkMetadata.push({
+        index: chunks.length - 1,
+        totalChunks,
+        size: chunkBuffer.byteLength,
+        offset: offset,
+        sha256: await calculateSHA256(new Uint8Array(chunkBuffer))
+      });
+      
+      if (progressCallback) {
+        progressCallback((offset / file.size) * 50);
+      }
+    } catch (error) {
+      console.error(`Error reading chunk at offset ${offset}:`, error);
+      throw new Error(`Failed to read file chunk: ${error.message}`);
+    }
     
     offset += chunkSize;
-    
-    if (progressCallback) {
-      progressCallback((offset / file.size) * 50);
-    }
   }
   
   // Create file metadata
@@ -218,9 +229,9 @@ async function calculateSHA256(data: Uint8Array): Promise<string> {
 
 // Utility function for delay with exponential backoff
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-const backoffDelay = (attempt: number) => Math.min(RETRY_DELAY_BASE * Math.pow(1.5, attempt), 10000);
+const backoffDelay = (attempt: number) => Math.min(RETRY_DELAY_BASE * Math.pow(2, attempt), 30000);
 
-// Parallel chunk processing with rate limiting
+// Parallel chunk processing with rate limiting and better failure handling
 async function processChunksInParallel<T>(
   chunks: any[], 
   processor: (chunk: any, index: number, attempt: number) => Promise<T>,
@@ -231,7 +242,7 @@ async function processChunksInParallel<T>(
   let completed = 0;
   let running = 0;
   let nextIndex = 0;
-  let retryQueue: {index: number, attempt: number}[] = [];
+  let retryQueue: {index: number, attempt: number, delay: number}[] = [];
   let failed: {index: number, error: any}[] = [];
   
   return new Promise((resolve, reject) => {
@@ -242,17 +253,21 @@ async function processChunksInParallel<T>(
         if (failed.length === 0) {
           resolve(results);
         } else {
-          reject(new Error(`Failed to process ${failed.length} chunks`));
+          console.error(`Failed to process ${failed.length} chunks: ${failed.map(f => `${f.index}: ${f.error.message || 'Unknown error'}`).join(', ')}`);
+          reject(new Error(`Failed to process ${failed.length} chunks. Last error: ${failed[0].error.message || 'Unknown error'}`));
         }
         return;
       }
       
-      // Process retry queue first
+      // Process retry queue first with prioritization
       if (retryQueue.length > 0) {
-        const {index, attempt} = retryQueue.shift()!;
+        // Sort retry queue by delay (process lowest delay first)
+        retryQueue.sort((a, b) => a.delay - b.delay);
+        
+        const {index, attempt, delay: waitTime} = retryQueue.shift()!;
         
         // Backoff before retry
-        await delay(backoffDelay(attempt));
+        await delay(waitTime);
         
         running++;
         try {
@@ -268,12 +283,16 @@ async function processChunksInParallel<T>(
           }
         } catch (error) {
           if (attempt < MAX_RETRIES) {
-            retryQueue.push({index, attempt: attempt + 1});
+            console.log(`Retrying chunk ${index}, attempt ${attempt + 1}`);
+            const newDelay = backoffDelay(attempt);
+            retryQueue.push({index, attempt: attempt + 1, delay: newDelay});
           } else {
+            console.error(`Failed to process chunk ${index} after ${MAX_RETRIES} attempts:`, error);
             failed.push({index, error});
           }
         } finally {
           running--;
+          // Immediately start the next one
           processNext();
         }
         return;
@@ -295,9 +314,11 @@ async function processChunksInParallel<T>(
             });
           }
         } catch (error) {
-          retryQueue.push({index, attempt: 1});
+          console.log(`Initial failure for chunk ${index}, adding to retry queue`);
+          retryQueue.push({index, attempt: 1, delay: backoffDelay(0)});
         } finally {
           running--;
+          // Continue processing
           processNext();
         }
       }
@@ -311,7 +332,7 @@ async function processChunksInParallel<T>(
   });
 }
 
-// Enhanced file upload with parallel processing
+// Enhanced file upload with parallel processing and improved reliability
 export const uploadFileWithRes54 = async (
   file: File,
   progressCallback?: (progress: number, stage: string, details?: any) => void
@@ -368,23 +389,41 @@ export const uploadFileWithRes54 = async (
     }
   };
   
-  const encryptedChunks = await processChunksInParallel(
-    chunks, 
-    encryptChunk,
-    Math.min(chunks.length, MAX_PARALLEL_OPERATIONS)
-  );
+  // Use a more memory-efficient encryption approach for large files
+  let encryptedChunks: string[];
+  if (file.size > LARGE_FILE_THRESHOLD) {
+    // Process encryption sequentially for very large files
+    encryptedChunks = [];
+    for (let i = 0; i < chunks.length; i++) {
+      try {
+        const encryptedChunk = await encryptChunk(chunks[i], i);
+        encryptedChunks.push(encryptedChunk);
+        // Free memory by removing the processed chunk
+        (chunks[i] as any) = null;
+      } catch (error) {
+        throw new Error(`Failed to encrypt chunk ${i}: ${error.message}`);
+      }
+    }
+  } else {
+    // Process encryption in parallel for smaller files
+    encryptedChunks = await processChunksInParallel(
+      chunks, 
+      encryptChunk,
+      Math.min(chunks.length, MAX_PARALLEL_OPERATIONS)
+    );
+  }
   
   // Upload chunk in parallel with rate limiting
   const uploadChunk = async (chunk: string, index: number, attempt: number): Promise<any> => {
     try {
       const repoIndex = index % repos.length;
       const repo = repos[repoIndex].repo_name;
-      const chunkId = `res54_${Date.now()}_${index}`;
+      const chunkId = `res54_${Date.now().toString(36)}_${index}`;
       const path = `${user.id}/${chunkId}.json`;
 
       // Store raw chunk data without additional encoding
       const chunkMetadata = {
-        version: '2.1', // Add version for backward compatibility
+        version: '2.2', // Update version for better tracking
         chunkIndex: index,
         totalChunks: chunks.length,
         fileName: file.name,
@@ -397,14 +436,23 @@ export const uploadFileWithRes54 = async (
         path
       };
 
-      // Upload chunk
-      const { data: uploadData, error: uploadError } = await supabase.functions.invoke('github-storage', {
-        body: { action: 'upload', fileName: `${chunkId}.json`, fileType: 'application/json',
-          data: JSON.stringify(chunkMetadata), userId: user.id, path, repo }
+      // Upload chunk with optimized retry handling built into the GitHub storage function
+      const response = await supabase.functions.invoke('github-storage', {
+        body: { 
+          action: 'upload', 
+          fileName: `${chunkId}.json`, 
+          fileType: 'application/json',
+          data: JSON.stringify(chunkMetadata), 
+          userId: user.id, 
+          path, 
+          repo,
+          attempt 
+        }
       });
 
-      if (uploadError) throw uploadError;
-      if (!uploadData) throw new Error('No upload data received');
+      if (response.error) {
+        throw new Error(`Upload error: ${response.error.message || 'Unknown error'}`);
+      }
 
       // Update metadata to include storage location
       metadata.chunks[index] = {
@@ -413,7 +461,7 @@ export const uploadFileWithRes54 = async (
         path
       };
 
-      return { index, repo, path, sha: uploadData?.sha };
+      return { index, repo, path, sha: response.data?.sha };
     } catch (error) {
       console.error(`Upload error for chunk ${index}:`, error);
       throw error;
@@ -423,13 +471,12 @@ export const uploadFileWithRes54 = async (
   try {
     progressCallback?.(60, 'uploading');
     
-    const chunksToUpload = encryptedChunks.map((chunk, index) => ({ chunk, index }));
-    const results = await processChunksInParallel(
-      chunksToUpload,
-      async (item, index, attempt) => {
-        return await uploadChunk(item.chunk, item.index, attempt);
+    const uploadResults = await processChunksInParallel(
+      encryptedChunks,
+      async (chunk, index, attempt) => {
+        return await uploadChunk(chunk, index, attempt);
       },
-      Math.min(4, chunks.length), // Limit concurrent uploads
+      2, // Limit concurrent uploads to 2 for better reliability
       (progress, stage, details) => {
         if (progressCallback) {
           progressCallback(60 + (progress * 0.3), stage, details);
@@ -437,9 +484,12 @@ export const uploadFileWithRes54 = async (
       }
     );
 
-    if (results.length !== chunks.length) {
+    if (uploadResults.length !== chunks.length) {
       throw new Error('Some chunks failed to upload');
     }
+    
+    // Free memory
+    (encryptedChunks as any) = null;
   } catch (error) {
     console.error("Failed to upload all chunks:", error);
     throw new Error("File upload failed. Please try again later.");
@@ -561,16 +611,21 @@ const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> =>
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('github-storage', {
+    const response = await supabase.functions.invoke('github-storage', {
       body: { action: 'download', path: chunk.path, repo: chunk.repo }
     });
 
-    if (error) throw error;
-    if (!data?.content) throw new Error('No content in response');
+    if (response.error) {
+      throw new Error(`Download error: ${response.error.message || 'Unknown error'}`);
+    }
+    
+    if (!response.data?.content) {
+      throw new Error('No content in response');
+    }
 
     try {
       // Clean and decode GitHub base64 content
-      const cleanContent = data.content.replace(/\s/g, '');
+      const cleanContent = response.data.content.replace(/\s/g, '');
       const decodedContent = atob(cleanContent);
       const parsedChunk = JSON.parse(decodedContent);
 
@@ -592,7 +647,8 @@ const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> =>
   } catch (error: any) {
     if (attempt < MAX_RETRIES) {
       console.log(`Retrying chunk ${chunk.index}, attempt ${attempt + 1}`);
-      await delay(backoffDelay(attempt));
+      const waitTime = backoffDelay(attempt);
+      await delay(waitTime);
       return downloadChunk(chunk, attempt + 1);
     }
     throw error;
@@ -710,7 +766,7 @@ export const downloadFileWithRes54 = async (
         });
         return result;
       },
-      Math.min(4, metadata.chunks.length) // Limit concurrent downloads
+      2 // Limit concurrent downloads to 2 for better reliability
     );
 
     progressCallback?.(60, 'decrypting');
@@ -724,26 +780,48 @@ export const downloadFileWithRes54 = async (
       throw new Error('Chunks missing after download');
     }
 
-    // Decrypt chunks in parallel for better performance
-    const decryptChunk = async (chunkData: string, index: number): Promise<ArrayBuffer> => {
-      try {
-        const decryptedData = await decryptData(chunkData, metadata.encryptionKey);
-        progressCallback?.(60 + ((index + 1) / sortedChunks.length * 30), 'decrypting', {
-          current: index + 1,
-          total: sortedChunks.length
-        });
-        return decryptedData;
-      } catch (error) {
-        console.error(`Decryption error for chunk ${index}:`, error);
-        throw error;
+    // For large files, process decryption sequentially to manage memory better
+    let decryptedChunks: ArrayBuffer[] = [];
+    if (metadata.fileSize > LARGE_FILE_THRESHOLD) {
+      for (let i = 0; i < sortedChunks.length; i++) {
+        try {
+          progressCallback?.(60 + ((i + 1) / sortedChunks.length * 30), 'decrypting', {
+            current: i + 1,
+            total: sortedChunks.length
+          });
+          
+          const decryptedData = await decryptData(sortedChunks[i], metadata.encryptionKey);
+          decryptedChunks.push(decryptedData);
+          
+          // Free memory
+          (sortedChunks[i] as any) = null;
+        } catch (error) {
+          console.error(`Decryption error for chunk ${i}:`, error);
+          throw error;
+        }
       }
-    };
-    
-    const decryptedChunks = await processChunksInParallel(
-      sortedChunks,
-      decryptChunk,
-      Math.min(sortedChunks.length, MAX_PARALLEL_OPERATIONS)
-    );
+    } else {
+      // Decrypt chunks in parallel for smaller files
+      const decryptChunk = async (chunkData: string, index: number): Promise<ArrayBuffer> => {
+        try {
+          const decryptedData = await decryptData(chunkData, metadata.encryptionKey);
+          progressCallback?.(60 + ((index + 1) / sortedChunks.length * 30), 'decrypting', {
+            current: index + 1,
+            total: sortedChunks.length
+          });
+          return decryptedData;
+        } catch (error) {
+          console.error(`Decryption error for chunk ${index}:`, error);
+          throw error;
+        }
+      };
+      
+      decryptedChunks = await processChunksInParallel(
+        sortedChunks,
+        decryptChunk,
+        Math.min(sortedChunks.length, MAX_PARALLEL_OPERATIONS)
+      );
+    }
 
     progressCallback?.(90, 'assembling');
 
@@ -843,4 +921,3 @@ export const checkFilePreview = async (fileId: string): Promise<{
 const createBlobFromChunks = (chunks: ArrayBuffer[], type: string): Blob => {
   return new Blob(chunks, { type });
 };
-

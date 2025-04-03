@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import UploadButton from '@/components/UploadButton';
 import FileItem from '@/components/FileItem';
 import FilePreview from '@/components/FilePreview';
+import FileManager from '@/components/FileManager';
 import { FileItem as FileItemType, getFiles, deleteFile, downloadFile, shareFile, formatBytes } from '@/lib/api';
 import { Loader2, Plus, FileText, Info, Settings, FolderOpen, HardDrive, BarChart3, Share2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -286,6 +288,13 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
                 <span>Storage</span>
               </button>
               <button 
+                className={`flex items-center px-4 py-2 hover:bg-muted text-left ${activeTab === 'shared' ? 'bg-muted' : ''}`}
+                onClick={() => setActiveTab('shared')}
+              >
+                <Share2 className="mr-2 h-4 w-4" />
+                <span>Shared</span>
+              </button>
+              <button 
                 className={`flex items-center px-4 py-2 hover:bg-muted text-left ${activeTab === 'about' ? 'bg-muted' : ''}`}
                 onClick={() => setActiveTab('about')}
               >
@@ -532,13 +541,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
             <TabsContent value="storage">
               <Card>
                 <CardHeader>
-                  <CardTitle>Storage Management</CardTitle>
+                  <CardTitle>Storage Manager</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">
-                    Your files are stored securely with end-to-end encryption
-                    for maximum privacy and security.
-                  </p>
+                  <FileManager />
                 </CardContent>
               </Card>
             </TabsContent>

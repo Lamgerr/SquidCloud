@@ -1,4 +1,6 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Define proper CORS headers to allow requests from any origin
 const corsHeaders = {
@@ -7,7 +9,27 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
+// Create a response with error information and CORS headers
+const createErrorResponse = (message: string, status = 500, details?: any) => {
+  console.error(`Error: ${message}`, details);
+  return new Response(
+    JSON.stringify({ 
+      error: message,
+      details: details ? JSON.stringify(details) : undefined
+    }),
+    { 
+      status: status, 
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json' 
+      } 
+    }
+  );
+};
+
+// Main serve function
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
       status: 204,
@@ -19,40 +41,50 @@ serve(async (req) => {
     const GITHUB_TOKEN = Deno.env.get('GITHUB_TOKEN');
     const GITHUB_USERNAME = Deno.env.get('GITHUB_USERNAME');
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!GITHUB_TOKEN || !GITHUB_USERNAME) {
-      return new Response(
-        JSON.stringify({ error: 'GitHub configuration not complete. GITHUB_TOKEN and GITHUB_USERNAME are required.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse('GitHub configuration not complete. GITHUB_TOKEN and GITHUB_USERNAME are required.', 500);
     }
 
-    const { action, ...body } = await req.json();
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return createErrorResponse('Supabase configuration not complete.', 500);
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (error) {
+      return createErrorResponse('Invalid JSON in request body', 400, error);
+    }
+
+    const { action, ...body } = requestData;
+
+    if (!action) {
+      return createErrorResponse('Action is required', 400);
+    }
 
     // Add create-repos action handler
     if (action === 'create-repos') {
       const { count, userId } = body;
       
       if (!userId) {
-        return new Response(
-          JSON.stringify({ error: 'User ID is required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createErrorResponse('User ID is required', 400);
       }
 
       try {
         // First check for existing repos
-        const dbResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories?user_id=eq.${userId}&select=*`,
-          {
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        const { data: existingRepos, error: repoError } = await supabase
+          .from('repositories')
+          .select('*')
+          .eq('user_id', userId);
 
-        const existingRepos = await dbResponse.json();
+        if (repoError) {
+          throw repoError;
+        }
         
         // If user already has repos, return them
         if (existingRepos && existingRepos.length > 0) {
@@ -69,70 +101,134 @@ serve(async (req) => {
         }
 
         // Continue with creating new repos only if none exist
-        const validCount = Math.min(Math.max(1, count || 5), 5);
+        const validCount = Math.min(Math.max(1, count || 2), 2); // Limit to 2 repos max
         const createdRepos = [];
 
-        // Generate creative names using Gemini API
-        const repoNames = await generateCreativeRepoNames(validCount, GEMINI_API_KEY);
+        // Generate random repo names if Gemini is not available
+        let repoNames = [];
+        for (let i = 0; i < validCount; i++) {
+          repoNames.push(`cloudbliss_${Math.random().toString(36).substring(2, 7)}`);
+        }
+
+        // Try to get creative names from Gemini if available
+        if (GEMINI_API_KEY) {
+          try {
+            const genNames = await generateCreativeRepoNames(validCount, GEMINI_API_KEY);
+            if (genNames && genNames.length === validCount) {
+              repoNames = genNames;
+            }
+          } catch (e) {
+            console.warn("Could not get creative names, using fallback names", e);
+          }
+        }
 
         for (let i = 0; i < validCount; i++) {
-          const baseName = repoNames[i] || `nexus_${Math.random().toString(36).substring(2, 7)}`;
+          const baseName = repoNames[i];
           const uniqueSuffix = `${Date.now().toString(36)}_${i}`;
           const repoName = `${baseName}_${uniqueSuffix}`;
 
-          // Create repository
-          const createResponse = await fetch(
-            'https://api.github.com/user/repos',
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `token ${GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'CloudVault-Edge-Function',
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                name: repoName,
-                description: "Secure data vault",
-                private: true,
-                auto_init: true
-              })
+          // Create repository with retry logic
+          const createRepoWithRetry = async (retries = 3): Promise<any> => {
+            try {
+              const createResponse = await fetch(
+                'https://api.github.com/user/repos',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'CloudVault-Edge-Function',
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    name: repoName,
+                    description: "Secure data vault",
+                    private: true,
+                    auto_init: true
+                  })
+                }
+              );
+
+              if (!createResponse.ok) {
+                const errorText = await createResponse.text();
+                console.error(`GitHub API error (${createResponse.status}): ${errorText}`);
+                
+                if (retries > 0 && [429, 500, 502, 503, 504].includes(createResponse.status)) {
+                  // Wait and retry for rate limits or server errors
+                  const delay = (4 - retries) * 1000; // Increasing backoff
+                  console.log(`Retrying repo creation for ${repoName} after ${delay}ms, ${retries} retries left`);
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                  return createRepoWithRetry(retries - 1);
+                }
+                
+                throw new Error(`Failed to create repo: ${createResponse.status} - ${errorText}`);
+              }
+
+              return await createResponse.json();
+            } catch (error) {
+              if (retries > 0) {
+                const delay = (4 - retries) * 1000;
+                console.log(`Error creating repo, retrying after ${delay}ms: ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return createRepoWithRetry(retries - 1);
+              }
+              throw error;
             }
-          );
+          };
 
-          if (!createResponse.ok) {
-            console.error(`Failed to create repo ${repoName}:`, await createResponse.text());
-            continue;
+          try {
+            const repoData = await createRepoWithRetry();
+            
+            // Store repo in database
+            const { error: insertError } = await supabase
+              .from('repositories')
+              .insert({
+                user_id: userId,
+                repo_name: repoName,
+                status: { created: new Date().toISOString() }
+              });
+
+            if (insertError) {
+              console.error(`Error storing repo in database: ${insertError.message}`);
+            }
+
+            createdRepos.push({
+              name: repoName,
+              html_url: repoData.html_url
+            });
+
+            // Update user's repo_count
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ repo_count: createdRepos.length })
+              .eq('id', userId);
+
+            if (updateError) {
+              console.error(`Error updating repo count: ${updateError.message}`);
+            }
+
+          } catch (createError) {
+            console.error(`Failed to create repo ${repoName}:`, createError);
+            // Continue with next repo despite error
           }
+        }
 
-          const repoData = await createResponse.json();
-          createdRepos.push({
-            name: repoName,
-            html_url: repoData.html_url
-          });
+        if (createdRepos.length === 0) {
+          return createErrorResponse('Failed to create any repositories', 500);
         }
 
         return new Response(
-          JSON.stringify({ 
-            repos: createdRepos 
-          }),
+          JSON.stringify({ repos: createdRepos }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } catch (error) {
         console.error('Error in create-repos:', error);
-        throw error;
+        return createErrorResponse('Failed to create repositories', 500, error);
       }
     }
 
-    // Existing code for other actions
+    // Validate required parameters for file operations
     const { fileName, fileType, data, userId, path, createRepo, repo } = body;
-    
-    if (!action) {
-      return new Response(
-        JSON.stringify({ error: 'Action is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
     
     // Use the specified repo if provided, otherwise try to find a repo for this user
     let storageRepo = repo;
@@ -140,116 +236,99 @@ serve(async (req) => {
     if (!storageRepo) {
       // If no repo specified, get a list of repos for this user
       if (!userId) {
-        return new Response(
-          JSON.stringify({ error: 'Either repo or userId is required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createErrorResponse('Either repo or userId is required', 400);
       }
       
       try {
-        const dbResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories?user_id=eq.${userId}&select=repo_name`,
-          {
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        const { data: repos, error: repoError } = await supabase
+          .from('repositories')
+          .select('repo_name')
+          .eq('user_id', userId);
         
-        if (dbResponse.ok) {
-          const repos = await dbResponse.json();
-          if (repos && repos.length > 0) {
-            // Pick a random repo from the list
-            const randomIndex = Math.floor(Math.random() * repos.length);
-            storageRepo = repos[randomIndex].repo_name;
-          }
+        if (repoError) {
+          throw repoError;
+        }
+        
+        if (repos && repos.length > 0) {
+          // Pick a random repo from the list for load balancing
+          const randomIndex = Math.floor(Math.random() * repos.length);
+          storageRepo = repos[randomIndex].repo_name;
         }
       } catch (dbError) {
         console.error("Error fetching repositories:", dbError);
+        return createErrorResponse('Failed to fetch repositories', 500, dbError);
       }
     }
     
     // If we still don't have a repo and createRepo flag is true, we'll create a user-specific repository
     if (!storageRepo && createRepo) {
       // Generate a repository name for this user if not provided
-      const userStorageRepo = `nexus_${userId.slice(0, 8)}_${Date.now().toString(36)}`;
+      const userStorageRepo = `cloudbliss_${userId.slice(0, 8)}_${Date.now().toString(36)}`;
       
-      // Check if the repository already exists
-      const repoExists = await checkRepoExists(userStorageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
-      
-      if (!repoExists) {
-        // Create a new private repository for this user
-        await createRepository(userStorageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
-        console.log(`Created new repository: ${userStorageRepo} for user ${userId}`);
+      // Create a new private repository for this user
+      try {
+        // Check if the repository already exists
+        const repoExists = await checkRepoExists(userStorageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
         
-        // Store in database
-        try {
-          const dbResponse = await fetch(
-            `${Deno.env.get('SUPABASE_URL')}/rest/v1/repositories`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
-              },
-              body: JSON.stringify({
-                user_id: userId,
-                repo_name: userStorageRepo
-              })
-            }
-          );
+        if (!repoExists) {
+          await createRepository(userStorageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+          console.log(`Created new repository: ${userStorageRepo} for user ${userId}`);
           
-          if (!dbResponse.ok) {
-            console.error(`Failed to store repo record for ${userStorageRepo}:`, await dbResponse.text());
+          // Store in database
+          const { error: insertError } = await supabase
+            .from('repositories')
+            .insert({
+              user_id: userId,
+              repo_name: userStorageRepo
+            });
+          
+          if (insertError) {
+            console.error(`Failed to store repo record: ${insertError.message}`);
           }
-        } catch (dbError) {
-          console.error(`Database error for ${userStorageRepo}:`, dbError);
         }
+        
+        storageRepo = userStorageRepo;
+      } catch (createError) {
+        console.error("Error creating repository:", createError);
+        return createErrorResponse('Failed to create repository', 500, createError);
       }
-      
-      storageRepo = userStorageRepo;
     }
     
     if (!storageRepo) {
-      return new Response(
-        JSON.stringify({ error: 'No storage repository specified. Either provide a repo parameter, or use createRepo flag, or ensure the user has repositories in the database.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse('No storage repository available', 400);
     }
     
     console.log(`Using repository: ${storageRepo} for action: ${action}`);
     
-    // Before performing any operation, verify the repository exists and create it if it doesn't
-    const repoExists = await checkRepoExists(storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
-    
-    if (!repoExists && createRepo) {
-      console.log(`Repository ${storageRepo} does not exist for ${GITHUB_USERNAME}, creating it now.`);
-      await createRepository(storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
-      console.log(`Successfully created repository: ${storageRepo}`);
-    } else if (!repoExists) {
-      console.error(`Repository ${storageRepo} does not exist for ${GITHUB_USERNAME}`);
-      return new Response(
-        JSON.stringify({ error: `Repository ${storageRepo} does not exist. Please check the repository name or create it first.` }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Before performing any operation, verify the repository exists
+    try {
+      const repoExists = await checkRepoExists(storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+      
+      if (!repoExists) {
+        if (createRepo) {
+          console.log(`Repository ${storageRepo} does not exist, creating it now.`);
+          await createRepository(storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+          console.log(`Successfully created repository: ${storageRepo}`);
+        } else {
+          return createErrorResponse(`Repository ${storageRepo} does not exist`, 404);
+        }
+      }
+    } catch (repoCheckError) {
+      console.error("Error checking repository:", repoCheckError);
+      return createErrorResponse('Failed to verify repository', 500, repoCheckError);
     }
     
     // Handle different file operations
     switch (action) {
       case 'upload': {
         if (!fileName || !data || !userId) {
-          return new Response(
-            JSON.stringify({ error: 'fileName, data, and userId are required for upload' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return createErrorResponse('fileName, data, and userId are required for upload', 400);
         }
         
         // Create a file path for this user
-        const filePath = `${userId}/${fileName}`;
+        const filePath = path || `${userId}/${fileName}`;
         
-        // Ensure user directory exists - always try to create the directory
+        // Ensure user directory exists - create the directory if needed
         try {
           const dirExists = await checkPathExists(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
           if (!dirExists) {
@@ -257,61 +336,107 @@ serve(async (req) => {
             console.log(`Created directory for user ${userId} in repository ${storageRepo}`);
           }
         } catch (dirError) {
-          console.log(`Creating directory for user ${userId} in repository ${storageRepo}`);
-          await createDirectory(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+          try {
+            console.log(`Creating directory for user ${userId} in repository ${storageRepo}`);
+            await createDirectory(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+          } catch (createDirError) {
+            console.error("Error creating directory:", createDirError);
+            return createErrorResponse('Failed to create directory', 500, createDirError);
+          }
         }
         
-        // Convert data to base64 if it's not already (for JSON chunks, it's already a string)
-        let base64Content = data;
-        if (fileType && fileType.startsWith('application/json')) {
-          // For JSON data, we need to encode it to base64
-          base64Content = btoa(unescape(encodeURIComponent(data)));
+        try {
+          // Convert data to base64 if it's not already (for JSON chunks, it's already a string)
+          let base64Content = data;
+          if (fileType && fileType.startsWith('application/json')) {
+            // For JSON data, we need to encode it to base64
+            try {
+              base64Content = btoa(unescape(encodeURIComponent(data)));
+            } catch (encodeError) {
+              console.error("Error encoding JSON content:", encodeError);
+              base64Content = btoa(data); // Fallback
+            }
+          }
+          
+          // Upload file to GitHub with retries
+          const uploadWithRetries = async (retries = 3) => {
+            try {
+              return await uploadToGitHub(filePath, base64Content, fileType, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+            } catch (uploadError) {
+              if (retries > 0 && uploadError.message && uploadError.message.includes('API')) {
+                const delay = (4 - retries) * 1000;
+                console.log(`Upload error, retrying after ${delay}ms: ${uploadError.message}`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return uploadWithRetries(retries - 1);
+              }
+              throw uploadError;
+            }
+          };
+          
+          const uploadResponse = await uploadWithRetries();
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              path: filePath, 
+              repo: storageRepo,
+              ...uploadResponse 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (uploadError) {
+          console.error("Error uploading file:", uploadError);
+          return createErrorResponse('Failed to upload file', 500, uploadError);
         }
-        
-        // Upload file to GitHub
-        const uploadResponse = await uploadToGitHub(filePath, base64Content, fileType, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
-        
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            path: filePath, 
-            repo: storageRepo,
-            ...uploadResponse 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
       
       case 'download': {
         try {
           if (!path || !repo) {
-            return new Response(
-              JSON.stringify({ error: 'path and repo are required for download' }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
+            return createErrorResponse('path and repo are required for download', 400);
           }
       
-          // Get file from GitHub
-          const response = await fetch(
-            `https://api.github.com/repos/${GITHUB_USERNAME}/${repo}/contents/${path}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'CloudBliss-Storage-App'
+          // Get file from GitHub with retries
+          const downloadWithRetries = async (retries = 3) => {
+            try {
+              const response = await fetch(
+                `https://api.github.com/repos/${GITHUB_USERNAME}/${repo}/contents/${path}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'CloudBliss-Storage-App'
+                  }
+                }
+              );
+          
+              if (!response.ok) {
+                if (retries > 0 && [429, 500, 502, 503, 504].includes(response.status)) {
+                  const delay = (4 - retries) * 1000;
+                  console.log(`Download error (${response.status}), retrying after ${delay}ms`);
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                  return downloadWithRetries(retries - 1);
+                }
+                throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
               }
+          
+              return await response.json();
+            } catch (error) {
+              if (retries > 0 && error.message && !error.message.includes('404')) {
+                const delay = (4 - retries) * 1000;
+                console.log(`Download error, retrying after ${delay}ms: ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return downloadWithRetries(retries - 1);
+              }
+              throw error;
             }
-          );
-      
-          if (!response.ok) {
-            throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-          }
-      
-          const data = await response.json();
+          };
+          
+          const data = await downloadWithRetries();
       
           // Validate content exists
           if (!data.content) {
-            throw new Error('No content found in GitHub response');
+            return createErrorResponse('No content found in GitHub response', 404);
           }
       
           return new Response(
@@ -325,64 +450,94 @@ serve(async (req) => {
           );
         } catch (error) {
           console.error('Download error:', error);
-          return new Response(
-            JSON.stringify({ 
-              error: `Failed to download file: ${error.message}`,
-              path,
-              repo 
-            }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return createErrorResponse('Failed to download file', 500, error);
         }
       }
       
       case 'delete': {
         if (!path || !repo) {
-          return new Response(
-            JSON.stringify({ error: 'path and repo are required for delete' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return createErrorResponse('path and repo are required for delete', 400);
         }
         
-        // Delete file from GitHub
-        await deleteFromGitHub(path, repo, GITHUB_USERNAME, GITHUB_TOKEN);
-        
-        return new Response(
-          JSON.stringify({ success: true }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        try {
+          // Delete file from GitHub with retries
+          const deleteWithRetries = async (retries = 3) => {
+            try {
+              await deleteFromGitHub(path, repo, GITHUB_USERNAME, GITHUB_TOKEN);
+              return true;
+            } catch (deleteError) {
+              if (retries > 0 && deleteError.message && deleteError.message.includes('API')) {
+                const delay = (4 - retries) * 1000;
+                console.log(`Delete error, retrying after ${delay}ms: ${deleteError.message}`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return deleteWithRetries(retries - 1);
+              }
+              throw deleteError;
+            }
+          };
+          
+          await deleteWithRetries();
+          
+          return new Response(
+            JSON.stringify({ success: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (deleteError) {
+          console.error("Error deleting file:", deleteError);
+          return createErrorResponse('Failed to delete file', 500, deleteError);
+        }
       }
       
       case 'list': {
         if (!userId) {
-          return new Response(
-            JSON.stringify({ error: 'userId is required for listing files' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return createErrorResponse('userId is required for listing files', 400);
         }
         
-        // List files for this user in the specific repo
-        const files = await listUserFiles(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+        try {
+          // List files for this user in the specific repo
+          const files = await listUserFiles(userId, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+          
+          return new Response(
+            JSON.stringify({ success: true, files }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (listError) {
+          console.error("Error listing files:", listError);
+          return createErrorResponse('Failed to list files', 500, listError);
+        }
+      }
+      
+      case 'create_folder': {
+        if (!userId || !body.folderName) {
+          return createErrorResponse('userId and folderName are required for creating a folder', 400);
+        }
         
-        return new Response(
-          JSON.stringify({ success: true, files }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        try {
+          const folderPath = path ? `${path}/${body.folderName}` : `${userId}/${body.folderName}`;
+          
+          // Create folder (directory)
+          await createDirectory(folderPath, storageRepo, GITHUB_USERNAME, GITHUB_TOKEN);
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              path: folderPath,
+              repo: storageRepo 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (folderError) {
+          console.error("Error creating folder:", folderError);
+          return createErrorResponse('Failed to create folder', 500, folderError);
+        }
       }
       
       default:
-        return new Response(
-          JSON.stringify({ error: `Unknown action: ${action}` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createErrorResponse(`Unknown action: ${action}`, 400);
     }
   } catch (error) {
     console.error('Error in GitHub storage function:', error);
-    
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createErrorResponse('Internal server error', 500, error);
   }
 });
 
@@ -569,34 +724,6 @@ async function uploadToGitHub(
   };
 }
 
-// Helper function to download a file from GitHub
-async function downloadFromGitHub(
-  path: string,
-  repo: string,
-  username: string,
-  token: string
-): Promise<string> {
-  console.log(`Downloading from GitHub: ${path} from repo ${repo}`);
-  
-  const response = await fetch(
-    `https://api.github.com/repos/${username}/${repo}/contents/${path}`,
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'CloudBliss-Storage-App',
-      },
-    }
-  );
-  
-  if (!response.ok) {
-    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-  }
-  
-  const data = await response.json();
-  return data.content; // Base64 encoded content
-}
-
 // Helper function to delete a file from GitHub
 async function deleteFromGitHub(
   path: string,
@@ -651,25 +778,18 @@ async function deleteFromGitHub(
   }
 }
 
-// Helper function to generate creative repository names using Gemini API
+// Helper function to generate creative repository names using Gemini API or fallback to defaults
 async function generateCreativeRepoNames(count: number, apiKey: string): Promise<string[]> {
   try {
-    const response = await fetch(
-      `https://api.gemini.com/v1/generate-names?count=${count}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.names || [];
+    // Simple hardcoded creative names as fallback
+    const creativeNames = [
+      "quantumVault", "cyberNexus", "dataForge", "byteHaven", "secureSphere", 
+      "cryptoKeeper", "cloudArmor", "dataMatrix", "safeHarbor", "bitVault"
+    ];
+    
+    // Use a simple trick - select random items from our predefined list
+    const shuffled = [...creativeNames].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
   } catch (error) {
     console.error('Error generating creative repo names:', error);
     return [];
