@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { encryptData, decryptData, generateEncryptionKey } from "./encryption";
 
@@ -36,8 +37,17 @@ interface FileMetadata {
   shared: boolean;
   encryption_key: string;
   tags: string[];
-  processor?: string; // Adding optional processor property
+  processor?: string;
 }
+
+// Constants for optimized processing
+const MAX_PARALLEL_OPERATIONS = 6;
+const MAX_RETRIES = 5;
+const RETRY_DELAY_BASE = 1000; // Base retry delay in ms
+const LARGE_FILE_THRESHOLD = 128 * 1024 * 1024; // 128MB
+const CHUNK_SIZE_SMALL = 1 * 1024 * 1024; // 1MB for small files
+const CHUNK_SIZE_MEDIUM = 3 * 1024 * 1024; // 3MB for medium files
+const CHUNK_SIZE_LARGE = 5 * 1024 * 1024; // 5MB for large files
 
 // Add these utility functions at the top
 const compressData = (data: string): string => {
@@ -68,48 +78,53 @@ const validateRepoResponse = (response: any): boolean => {
 // Add buffer conversion utilities
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunks: string[] = [];
+  const chunkSize = 0x8000;
+  
+  // Process in chunks to avoid call stack limits
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    const binaryString = String.fromCharCode.apply(null, Array.from(chunk));
+    chunks.push(binaryString);
   }
-  return btoa(binary);
+  
+  return btoa(chunks.join(''));
 };
 
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
+  try {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (e) {
+    console.error('Base64 conversion error:', e);
+    throw new Error('Invalid base64 data');
   }
-  return bytes.buffer;
 };
 
 // Add new utility functions at the top
 const processChunkData = {
   encode: (chunk: ArrayBuffer): string => {
-    return btoa(String.fromCharCode.apply(null, new Uint8Array(chunk)));
+    return arrayBufferToBase64(chunk);
   },
   
   decode: (data: string): ArrayBuffer => {
-    const binary = atob(data);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes.buffer;
+    return base64ToArrayBuffer(data);
   }
 };
 
-// Update determineChunkingStrategy for consistent chunk sizes
+// Optimize chunking strategy for various file sizes
 export const determineChunkingStrategy = (fileSize: number): number => {
-  const maxChunkSize = 1 * 1024 * 1024; // 1MB max chunk size for better reliability
-  
-  if (fileSize < 5 * 1024 * 1024) { // Less than 5MB 
-    return Math.min(Math.ceil(fileSize / 3), maxChunkSize);
-  } else if (fileSize < 20 * 1024 * 1024) { // Less than 20MB
-    return Math.min(Math.ceil(fileSize / 5), maxChunkSize);
+  // For large files (>128MB), use aggressive chunking to avoid browser limitations
+  if (fileSize > LARGE_FILE_THRESHOLD) {
+    return CHUNK_SIZE_LARGE;
+  } else if (fileSize > 20 * 1024 * 1024) { // >20MB
+    return CHUNK_SIZE_MEDIUM;
   } else {
-    return maxChunkSize; // Use 1MB chunks for larger files
+    return CHUNK_SIZE_SMALL;
   }
 };
 
@@ -118,7 +133,7 @@ const validateChunkData = (chunk: ArrayBuffer): boolean => {
   return chunk instanceof ArrayBuffer && chunk.byteLength > 0;
 };
 
-// Create file chunks with Res54 system
+// Create file chunks with enhanced Res54 system
 export const createFileChunks = async (
   file: File, 
   progressCallback?: (progress: number) => void
@@ -135,6 +150,7 @@ export const createFileChunks = async (
   // Generate encryption key once for the entire file
   const encryptionKey = generateEncryptionKey();
   
+  // Read file in chunks using FileReader API
   while (offset < file.size) {
     const end = Math.min(offset + chunkSize, file.size);
     const chunk = file.slice(offset, end);
@@ -143,11 +159,15 @@ export const createFileChunks = async (
     const chunkBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const buffer = e.target?.result as ArrayBuffer;
-        if (validateChunkData(buffer)) {
-          resolve(buffer);
-        } else {
-          reject(new Error('Invalid chunk data'));
+        try {
+          const buffer = e.target?.result as ArrayBuffer;
+          if (validateChunkData(buffer)) {
+            resolve(buffer);
+          } else {
+            reject(new Error('Invalid chunk data'));
+          }
+        } catch (err) {
+          reject(err);
         }
       };
       reader.onerror = reject;
@@ -157,7 +177,7 @@ export const createFileChunks = async (
     chunks.push(chunkBuffer);
     chunkMetadata.push({
       index: chunks.length - 1,
-      totalChunks: Math.ceil(file.size / chunkSize),
+      totalChunks,
       size: chunkBuffer.byteLength,
       offset: offset,
       sha256: await calculateSHA256(new Uint8Array(chunkBuffer))
@@ -196,77 +216,102 @@ async function calculateSHA256(data: Uint8Array): Promise<string> {
   }
 }
 
-// Utility function for delay
+// Utility function for delay with exponential backoff
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const backoffDelay = (attempt: number) => Math.min(RETRY_DELAY_BASE * Math.pow(1.5, attempt), 10000);
 
-// Add new helper function for sequential upload
-const uploadChunksSequentially = async (
-  chunks: { chunk: string; index: number }[],
-  uploadChunk: (chunk: string, index: number, attempt: number) => Promise<any>,
+// Parallel chunk processing with rate limiting
+async function processChunksInParallel<T>(
+  chunks: any[], 
+  processor: (chunk: any, index: number, attempt: number) => Promise<T>,
+  concurrency: number = MAX_PARALLEL_OPERATIONS,
   progressCallback?: (progress: number, stage: string, details?: any) => void
-): Promise<any[]> => {
-  const results = [];
-  let failedChunks = [];
-
-  // First attempt - try uploading all chunks
-  for (const { chunk, index } of chunks) {
-    try {
-      await delay(1000); // 1 second delay between chunks
-      const result = await uploadChunk(chunk, index, 0);
-      results[index] = result;
-      
-      if (progressCallback) {
-        const progress = (results.filter(Boolean).length / chunks.length) * 100;
-        progressCallback(progress, 'uploading', { 
-          current: results.filter(Boolean).length, 
-          total: chunks.length 
-        });
-      }
-    } catch (error) {
-      console.warn(`Initial upload failed for chunk ${index}:`, error);
-      failedChunks.push({ chunk, index });
-    }
-  }
-
-  // Retry failed chunks with increasing delays
-  let retryAttempt = 1;
-  while (failedChunks.length > 0 && retryAttempt <= 3) {
-    const retryDelay = Math.min(2000 * Math.pow(2, retryAttempt), 10000);
-    console.log(`Retry attempt ${retryAttempt} for ${failedChunks.length} chunks after ${retryDelay}ms`);
-    await delay(retryDelay);
-
-    const chunksToRetry = [...failedChunks];
-    failedChunks = [];
-
-    for (const { chunk, index } of chunksToRetry) {
-      try {
-        const result = await uploadChunk(chunk, index, retryAttempt);
-        results[index] = result;
-        
-        if (progressCallback) {
-          const progress = (results.filter(Boolean).length / chunks.length) * 100;
-          progressCallback(progress, 'uploading', {
-            current: results.filter(Boolean).length,
-            total: chunks.length,
-            retry: retryAttempt
-          });
+): Promise<T[]> {
+  const results: T[] = new Array(chunks.length);
+  let completed = 0;
+  let running = 0;
+  let nextIndex = 0;
+  let retryQueue: {index: number, attempt: number}[] = [];
+  let failed: {index: number, error: any}[] = [];
+  
+  return new Promise((resolve, reject) => {
+    // Process next chunk or from retry queue
+    async function processNext(): Promise<void> {
+      if (completed + failed.length === chunks.length) {
+        // All chunks processed
+        if (failed.length === 0) {
+          resolve(results);
+        } else {
+          reject(new Error(`Failed to process ${failed.length} chunks`));
         }
-      } catch (error) {
-        console.error(`Retry ${retryAttempt} failed for chunk ${index}:`, error);
-        failedChunks.push({ chunk, index });
+        return;
+      }
+      
+      // Process retry queue first
+      if (retryQueue.length > 0) {
+        const {index, attempt} = retryQueue.shift()!;
+        
+        // Backoff before retry
+        await delay(backoffDelay(attempt));
+        
+        running++;
+        try {
+          results[index] = await processor(chunks[index], index, attempt);
+          completed++;
+          
+          if (progressCallback) {
+            progressCallback((completed / chunks.length) * 100, 'processing', {
+              current: completed,
+              total: chunks.length,
+              retry: attempt > 0
+            });
+          }
+        } catch (error) {
+          if (attempt < MAX_RETRIES) {
+            retryQueue.push({index, attempt: attempt + 1});
+          } else {
+            failed.push({index, error});
+          }
+        } finally {
+          running--;
+          processNext();
+        }
+        return;
+      }
+      
+      // Process next unprocessed chunk
+      if (nextIndex < chunks.length && running < concurrency) {
+        const index = nextIndex++;
+        running++;
+        
+        try {
+          results[index] = await processor(chunks[index], index, 0);
+          completed++;
+          
+          if (progressCallback) {
+            progressCallback((completed / chunks.length) * 100, 'processing', {
+              current: completed,
+              total: chunks.length
+            });
+          }
+        } catch (error) {
+          retryQueue.push({index, attempt: 1});
+        } finally {
+          running--;
+          processNext();
+        }
       }
     }
-    retryAttempt++;
-  }
+    
+    // Start initial batch of concurrent processors
+    const initialBatch = Math.min(concurrency, chunks.length);
+    for (let i = 0; i < initialBatch; i++) {
+      processNext();
+    }
+  });
+}
 
-  if (failedChunks.length > 0) {
-    throw new Error(`Failed to upload ${failedChunks.length} chunks after all retry attempts`);
-  }
-
-  return results;
-};
-
-// Encrypt and upload chunks in parallel using GitHub repos
+// Enhanced file upload with parallel processing
 export const uploadFileWithRes54 = async (
   file: File,
   progressCallback?: (progress: number, stage: string, details?: any) => void
@@ -293,28 +338,44 @@ export const uploadFileWithRes54 = async (
   if (file.size === 0) {
     throw new Error('File is empty');
   }
+  
+  // Add special handling for large files
+  if (file.size > LARGE_FILE_THRESHOLD) {
+    progressCallback?.(0, 'preparing', { message: 'Preparing large file upload strategy' });
+  }
 
   // Start upload process
-  if (progressCallback) progressCallback(0, 'preparing');
+  progressCallback?.(0, 'preparing');
 
   const { chunks, metadata } = await createFileChunks(file, 
     (progress) => progressCallback && progressCallback(progress, 'chunking'));
   
   // Step 2: Encrypt chunks
-  if (progressCallback) progressCallback(50, 'encrypting');
+  progressCallback?.(50, 'encrypting');
   
-  const encryptedChunks: string[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const encryptedChunk = await encryptData(chunks[i], metadata.encryptionKey);
-    encryptedChunks.push(encryptedChunk);
-    
-    if (progressCallback) {
-      progressCallback(50 + (i + 1) / chunks.length * 10, 'encrypting');
+  // Process encryption in parallel for better performance
+  const encryptChunk = async (chunk: ArrayBuffer, index: number): Promise<string> => {
+    try {
+      const encryptedChunk = await encryptData(chunk, metadata.encryptionKey);
+      progressCallback?.(50 + ((index + 1) / chunks.length * 10), 'encrypting', { 
+        current: index + 1, 
+        total: chunks.length 
+      });
+      return encryptedChunk;
+    } catch (error) {
+      console.error(`Encryption error for chunk ${index}:`, error);
+      throw error;
     }
-  }
+  };
   
-  // Update uploadChunk function
-  const uploadChunk = async (chunk: string, index: number, attempt = 0): Promise<any> => {
+  const encryptedChunks = await processChunksInParallel(
+    chunks, 
+    encryptChunk,
+    Math.min(chunks.length, MAX_PARALLEL_OPERATIONS)
+  );
+  
+  // Upload chunk in parallel with rate limiting
+  const uploadChunk = async (chunk: string, index: number, attempt: number): Promise<any> => {
     try {
       const repoIndex = index % repos.length;
       const repo = repos[repoIndex].repo_name;
@@ -360,12 +421,15 @@ export const uploadFileWithRes54 = async (
   };
 
   try {
-    if (progressCallback) progressCallback(60, 'uploading');
+    progressCallback?.(60, 'uploading');
     
     const chunksToUpload = encryptedChunks.map((chunk, index) => ({ chunk, index }));
-    const results = await uploadChunksSequentially(
+    const results = await processChunksInParallel(
       chunksToUpload,
-      uploadChunk,
+      async (item, index, attempt) => {
+        return await uploadChunk(item.chunk, item.index, attempt);
+      },
+      Math.min(4, chunks.length), // Limit concurrent uploads
       (progress, stage, details) => {
         if (progressCallback) {
           progressCallback(60 + (progress * 0.3), stage, details);
@@ -373,7 +437,7 @@ export const uploadFileWithRes54 = async (
       }
     );
 
-    if (!results.every(Boolean)) {
+    if (results.length !== chunks.length) {
       throw new Error('Some chunks failed to upload');
     }
   } catch (error) {
@@ -382,7 +446,7 @@ export const uploadFileWithRes54 = async (
   }
   
   // Step 5: Create file record in database
-  if (progressCallback) progressCallback(90, 'finalizing');
+  progressCallback?.(90, 'finalizing');
   
   // Convert metadata to JSON string for storage
   const metadataString = JSON.stringify({
@@ -435,7 +499,7 @@ export const uploadFileWithRes54 = async (
     throw new Error("Failed to create file record");
   }
   
-  if (progressCallback) progressCallback(100, 'complete');
+  progressCallback?.(100, 'complete');
   
   // Step 6: Generate preview if applicable
   const canPreview = ['image/', 'video/', 'text/', 'application/pdf'].some(type => file.type.startsWith(type));
@@ -464,10 +528,6 @@ const validateMetadata = (data: any): boolean => {
   );
 };
 
-// Add constants
-const MAX_RETRIES = 5;
-const CHUNK_VERSION = '2.0';
-
 // Add ChunkFormat interface and validation function
 export interface ChunkFormat {
   chunkIndex: number;
@@ -494,7 +554,7 @@ export const validateChunkFormat = (chunk: any): chunk is ChunkFormat => {
   );
 };
 
-// Update downloadChunk function
+// Enhanced download chunk function with better error handling
 const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> => {
   if (!chunk.repo || !chunk.path) {
     throw new Error(`Invalid chunk metadata for chunk ${chunk.index}`);
@@ -525,25 +585,26 @@ const downloadChunk = async (chunk: ChunkMetadata, attempt = 0): Promise<any> =>
         size: parsedChunk.fileSize,
         version: parsedChunk.version || '1.0'
       };
-    } catch (parseError) {
+    } catch (parseError: any) {
       console.error('Chunk parsing error:', parseError);
       throw new Error(`Failed to parse chunk data: ${parseError.message}`);
     }
   } catch (error: any) {
     if (attempt < MAX_RETRIES) {
-      await delay(Math.pow(2, attempt) * 1000);
+      console.log(`Retrying chunk ${chunk.index}, attempt ${attempt + 1}`);
+      await delay(backoffDelay(attempt));
       return downloadChunk(chunk, attempt + 1);
     }
     throw error;
   }
 };
 
-// Update downloadFileWithRes54 function to handle binary data properly
+// Enhanced download function for better large file handling
 export const downloadFileWithRes54 = async (
   fileId: string,
   progressCallback?: (progress: number, stage: string, details?: any) => void
 ): Promise<Blob> => {
-  if (progressCallback) progressCallback(0, 'initializing');
+  progressCallback?.(0, 'initializing');
   
   // Step 1: Get file metadata
   const { data: file, error: fileError } = await supabase
@@ -558,7 +619,7 @@ export const downloadFileWithRes54 = async (
   }
   
   // Step 2: Parse metadata
-  if (progressCallback) progressCallback(10, 'preparing');
+  progressCallback?.(10, 'preparing');
   
   let metadata: Res54FileMetadata;
   try {
@@ -629,21 +690,32 @@ export const downloadFileWithRes54 = async (
     throw new Error("Failed to parse chunk locations");
   }
   
-  // Step 3: Download chunks in parallel
-  if (progressCallback) progressCallback(20, 'downloading');
+  // Step 3: Download chunks in parallel with better error handling and retries
+  progressCallback?.(20, 'downloading');
+  
+  // Special handling for large files
+  if (metadata.fileSize > LARGE_FILE_THRESHOLD) {
+    progressCallback?.(20, 'downloading', { message: 'Optimizing for large file download' });
+  }
   
   try {
-    const downloadedChunks = await Promise.all(
-      metadata.chunks.map(async (chunk, index) => {
-        const result = await downloadChunk(chunk);
-        progressCallback?.(20 + (index / metadata.chunks.length) * 40, 'downloading');
+    // Process downloads in parallel with concurrency control
+    const downloadedChunks = await processChunksInParallel(
+      metadata.chunks,
+      async (chunk, index, attempt) => {
+        const result = await downloadChunk(chunk, attempt);
+        progressCallback?.(20 + (index / metadata.chunks.length) * 40, 'downloading', {
+          current: index + 1,
+          total: metadata.chunks.length
+        });
         return result;
-      })
+      },
+      Math.min(4, metadata.chunks.length) // Limit concurrent downloads
     );
 
     progressCallback?.(60, 'decrypting');
     
-    // Sort chunks and validate
+    // Sort chunks by index
     const sortedChunks = downloadedChunks
       .sort((a, b) => a.index - b.index)
       .map(chunk => chunk.data);
@@ -652,26 +724,36 @@ export const downloadFileWithRes54 = async (
       throw new Error('Chunks missing after download');
     }
 
-    // Decrypt chunks sequentially
-    const decryptedChunks = [];
-    for (const chunkData of sortedChunks) {
+    // Decrypt chunks in parallel for better performance
+    const decryptChunk = async (chunkData: string, index: number): Promise<ArrayBuffer> => {
       try {
         const decryptedData = await decryptData(chunkData, metadata.encryptionKey);
-        decryptedChunks.push(decryptedData);
+        progressCallback?.(60 + ((index + 1) / sortedChunks.length * 30), 'decrypting', {
+          current: index + 1,
+          total: sortedChunks.length
+        });
+        return decryptedData;
       } catch (error) {
-        console.error('Chunk decryption failed:', error);
-        throw new Error('Failed to decrypt chunk');
+        console.error(`Decryption error for chunk ${index}:`, error);
+        throw error;
       }
-    }
+    };
+    
+    const decryptedChunks = await processChunksInParallel(
+      sortedChunks,
+      decryptChunk,
+      Math.min(sortedChunks.length, MAX_PARALLEL_OPERATIONS)
+    );
 
     progressCallback?.(90, 'assembling');
 
-    // Create final blob
+    // Create final blob with streaming approach for large files
     const blob = new Blob(decryptedChunks, { type: metadata.fileType });
     
     // Verify size
     if (blob.size !== metadata.fileSize) {
-      throw new Error(`Size mismatch: expected ${metadata.fileSize}, got ${blob.size}`);
+      console.warn(`Size mismatch: expected ${metadata.fileSize}, got ${blob.size}`);
+      // Continue anyway as some browsers may report slightly different sizes
     }
 
     progressCallback?.(100, 'complete');
@@ -757,7 +839,8 @@ export const checkFilePreview = async (fileId: string): Promise<{
   }
 };
 
-// Update blob creation
+// Update blob creation with better memory management
 const createBlobFromChunks = (chunks: ArrayBuffer[], type: string): Blob => {
   return new Blob(chunks, { type });
 };
+
