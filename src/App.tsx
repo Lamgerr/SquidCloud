@@ -17,6 +17,7 @@ import Onboarding from './pages/Onboarding';
 import StoragePage from './pages/StoragePage';
 import AppUpdatePage from './pages/AppUpdatePage';
 import AdminUpdatePage from './pages/AdminUpdatePage';
+import FileSharePage from './pages/FileSharePage';
 
 // Component to handle new user redirection
 const NewUserRedirect = ({ children }: { children: React.ReactNode }) => {
