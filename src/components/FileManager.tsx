@@ -135,10 +135,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
       return file.type.startsWith('video/');
     }
     
-    if (activeTab === "folders" && 'is_folder' in file) {
-      return file.is_folder;
-    }
-    
     return false;
   });
   
@@ -467,7 +463,6 @@ const FileManager: React.FC<FileManagerProps> = ({ onFileSelected }) => {
               <TabsTrigger value="images">Images</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>
               <TabsTrigger value="videos">Videos</TabsTrigger>
-              <TabsTrigger value="folders">Folders</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>

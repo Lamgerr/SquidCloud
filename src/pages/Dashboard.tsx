@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -435,17 +434,14 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files', openUpload 
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Button size="sm" variant="outline" asChild>
                     <a href="/app/updates?platform=windows" target="_blank">
+                      <Monitor className="mr-1 h-4 w-4" />
                       Windows
                     </a>
                   </Button>
                   <Button size="sm" variant="outline" asChild>
-                    <a href="/app/updates?platform=macos" target="_blank">
-                      macOS
-                    </a>
-                  </Button>
-                  <Button size="sm" variant="outline" asChild>
-                    <a href="/app/updates?platform=linux" target="_blank">
-                      Linux
+                    <a href="/app/updates?platform=android" target="_blank">
+                      <Smartphone className="mr-1 h-4 w-4" />
+                      Android
                     </a>
                   </Button>
                 </div>
