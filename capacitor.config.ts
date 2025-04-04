@@ -20,8 +20,11 @@ const config: CapacitorConfig = {
   },
   android: {
     buildOptions: {
-      keystorePath: "android.keystore",
-      keystoreAlias: "lovable",
+      keystorePath: "cloudbliss.keystore",
+      keystoreAlias: "cloudbliss",
+      keystorePassword: "YOUR_KEYSTORE_PASSWORD", // Replace with your actual keystore password
+      keyPassword: "YOUR_KEY_PASSWORD", // Replace with your actual key password
+      releaseType: "APK" // or "AAB" for Android App Bundle
     }
   }
 };
