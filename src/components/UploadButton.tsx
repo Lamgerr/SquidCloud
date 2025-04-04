@@ -1,3 +1,4 @@
+
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -40,14 +41,18 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onUploadComplete, onFileUpl
     
     try {
       // Start the upload process
-      const uploadedFile = await uploadFile(file, (progress, stage, details) => {
-        setUploadProgress(progress);
-        setProcessingStage(stage);
-        if (details?.current && details?.total) {
-          setCurrentChunk(details.current);
-          setTotalChunks(details.total);
+      const uploadedFile = await uploadFile(
+        file, 
+        "", // Empty string for parentFolder parameter
+        (progress, stage, details) => {
+          setUploadProgress(progress);
+          setProcessingStage(stage);
+          if (details?.current && details?.total) {
+            setCurrentChunk(details.current);
+            setTotalChunks(details.total);
+          }
         }
-      });
+      );
 
       // Handle successful upload
       setProcessingStage('completed');

@@ -288,13 +288,13 @@ export async function uploadFile(
     if (parentFolder) {
       const { error: updateError } = await supabase
         .from('files')
-        .update({ parent_folder: parentFolder })
+        .update({ parent_folder: parentFolder } as any)
         .eq('id', id);
         
       if (updateError) {
         console.error("Error updating parent folder:", updateError);
       } else {
-        fileItem.parent_folder = parentFolder;
+        (fileItem as any).parent_folder = parentFolder;
       }
     }
     
