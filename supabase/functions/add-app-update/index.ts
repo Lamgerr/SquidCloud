@@ -9,7 +9,7 @@ const corsHeaders = {
 
 // List of admin user IDs
 const ADMIN_USER_IDS = [
-  // Add your admin user IDs here
+  "1dee2494-0de5-481c-9d16-7000a9f2e68f"
 ];
 
 serve(async (req) => {
