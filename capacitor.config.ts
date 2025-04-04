@@ -3,7 +3,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.lovable.59166b9a282e4b28b4607aa9d6ed0864',
-  appName: 'cloudbliss-storage',
+  appName: 'CloudBliss',
   webDir: 'dist',
   server: {
     url: 'https://59166b9a-282e-4b28-b460-7aa9d6ed0864.lovableproject.com?forceHideBadge=true',
