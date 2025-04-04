@@ -25,9 +25,18 @@ const Navbar: React.FC = () => {
       if (!user) return;
       
       try {
+        // Get the current session
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        
+        if (!accessToken) {
+          console.error('No access token available');
+          return;
+        }
+        
         const { data, error } = await supabase.functions.invoke('check-admin-status', {
           headers: {
-            Authorization: `Bearer ${supabase.auth.session()?.access_token}`
+            Authorization: `Bearer ${accessToken}`
           }
         });
         
