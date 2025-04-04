@@ -19,18 +19,30 @@ serve(async (req) => {
   }
 
   try {
-    // Get the request body
-    const { userId } = await req.json();
-    
-    if (!userId) {
+    // Create a Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get the user from the authorization header
+    const authHeader = req.headers.get('authorization')?.split(' ')[1];
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: "User ID is required" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        JSON.stringify({ error: "Authorization required" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader);
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
 
     // Check if user is in admin list
-    const isAdmin = ADMIN_USER_IDS.includes(userId);
+    const isAdmin = ADMIN_USER_IDS.includes(user.id);
     
     return new Response(
       JSON.stringify({ isAdmin }),

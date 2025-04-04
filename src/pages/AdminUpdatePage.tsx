@@ -9,40 +9,57 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const AdminUpdatePage = () => {
   const { os } = useParams<{ os: string }>();
   const { toast } = useToast();
   const [version, setVersion] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
-  const [releaseNotes, setReleaseNotes] = useState('');
+  const [changelog, setChangelog] = useState('');
+  const [fileSize, setFileSize] = useState('');
+  const [isMandatory, setIsMandatory] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
-      if (!user) return;
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
       
       try {
-        const { data, error } = await supabase.functions.invoke('check-admin-status');
+        const { data, error } = await supabase.functions.invoke('check-admin-status', {
+          headers: {
+            Authorization: `Bearer ${supabase.auth.session()?.access_token}`
+          }
+        });
         
         if (error) {
-          throw error;
-        }
-        
-        if (data && data.is_admin) {
-          setIsAdmin(true);
-        } else {
+          console.error('Error checking admin status:', error);
           toast({
-            title: "Access Denied",
-            description: "You don't have permission to access this page.",
+            title: "Error",
+            description: "Failed to verify admin status",
             variant: "destructive",
           });
+          setIsLoading(false);
+          return;
         }
+        
+        setIsAdmin(data?.isAdmin || false);
       } catch (error) {
         console.error('Error checking admin status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to verify admin status",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -52,10 +69,10 @@ const AdminUpdatePage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!version || !downloadUrl) {
+    if (!version || !downloadUrl || !changelog) {
       toast({
         title: "Missing Information",
-        description: "Version and download URL are required.",
+        description: "Version, download URL, and changelog are required.",
         variant: "destructive",
       });
       return;
@@ -66,10 +83,12 @@ const AdminUpdatePage = () => {
     try {
       const { data, error } = await supabase.functions.invoke('add-app-update', {
         body: {
-          platform: os,
           version,
+          platform: os,
+          changelog,
           download_url: downloadUrl,
-          release_notes: releaseNotes,
+          size: fileSize ? parseInt(fileSize, 10) : 0,
+          is_mandatory: isMandatory
         },
       });
       
@@ -79,13 +98,15 @@ const AdminUpdatePage = () => {
       
       toast({
         title: "Update Added",
-        description: `Version ${version} added successfully for ${os}.`,
+        description: `Version ${version} added successfully for ${getOSName()}.`,
       });
       
       // Reset form
       setVersion('');
       setDownloadUrl('');
-      setReleaseNotes('');
+      setChangelog('');
+      setFileSize('');
+      setIsMandatory(false);
       
     } catch (error: any) {
       toast({
@@ -106,6 +127,19 @@ const AdminUpdatePage = () => {
       default: return 'Unknown OS';
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle>Checking permissions...</CardTitle>
+            <CardDescription>Please wait while we verify your access.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -152,14 +186,36 @@ const AdminUpdatePage = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="releaseNotes">Release Notes</Label>
+              <Label htmlFor="changelog">Changelog</Label>
               <Textarea
-                id="releaseNotes"
+                id="changelog"
                 placeholder="What's new in this version..."
-                value={releaseNotes}
-                onChange={(e) => setReleaseNotes(e.target.value)}
+                value={changelog}
+                onChange={(e) => setChangelog(e.target.value)}
                 rows={5}
+                required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fileSize">File Size (bytes)</Label>
+              <Input
+                id="fileSize"
+                type="number"
+                placeholder="File size in bytes"
+                value={fileSize}
+                onChange={(e) => setFileSize(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Optional: Enter the file size in bytes</p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="isMandatory" 
+                checked={isMandatory}
+                onCheckedChange={(checked) => setIsMandatory(checked === true)}
+              />
+              <Label htmlFor="isMandatory" className="cursor-pointer">Mandatory Update</Label>
             </div>
             
             <Button type="submit" disabled={isSubmitting} className="w-full">

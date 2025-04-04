@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -12,12 +12,38 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Menu } from "lucide-react"
-import { Cloud as CloudIcon, LogOut } from 'lucide-react';
+import { Menu, Cloud as CloudIcon, LogOut, Lock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Navbar: React.FC = () => {
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('check-admin-status', {
+          headers: {
+            Authorization: `Bearer ${supabase.auth.session()?.access_token}`
+          }
+        });
+        
+        if (error) {
+          console.error('Error checking admin status:', error);
+          return;
+        }
+        
+        setIsAdmin(data?.isAdmin || false);
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [user]);
 
   return (
     <nav className="bg-background border-b sticky top-0 z-50">
@@ -52,7 +78,28 @@ const Navbar: React.FC = () => {
                       {user.id}
                     </p>
                   </div>
-                  <Button variant="destructive" onClick={signOut} className="justify-start gap-2">
+                  
+                  {isAdmin && (
+                    <div className="px-4 py-2 border-t">
+                      <h3 className="text-sm font-medium mb-2">Admin</h3>
+                      <div className="space-y-2">
+                        <Link to="/admin/update/windows" className="flex items-center gap-2 text-sm hover:underline">
+                          <Lock className="h-4 w-4" />
+                          Windows Updates
+                        </Link>
+                        <Link to="/admin/update/macos" className="flex items-center gap-2 text-sm hover:underline">
+                          <Lock className="h-4 w-4" />
+                          macOS Updates
+                        </Link>
+                        <Link to="/admin/update/android" className="flex items-center gap-2 text-sm hover:underline">
+                          <Lock className="h-4 w-4" />
+                          Android Updates
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Button variant="destructive" onClick={signOut} className="justify-start gap-2 mx-4">
                     <LogOut className="h-4 w-4" />
                     Logout
                   </Button>
@@ -66,6 +113,20 @@ const Navbar: React.FC = () => {
           )
         ) : (
           <div className="flex items-center gap-4">
+            {user && isAdmin && (
+              <div className="flex items-center">
+                <Button variant="ghost" asChild>
+                  <Link to="/admin/update/windows" className="text-sm">Windows Updates</Link>
+                </Button>
+                <Button variant="ghost" asChild>
+                  <Link to="/admin/update/macos" className="text-sm">macOS Updates</Link>
+                </Button>
+                <Button variant="ghost" asChild>
+                  <Link to="/admin/update/android" className="text-sm">Android Updates</Link>
+                </Button>
+              </div>
+            )}
+            
             {user ? (
               <Button variant="destructive" onClick={signOut}>Logout</Button>
             ) : (
