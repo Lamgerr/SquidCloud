@@ -187,7 +187,7 @@ class BackgroundUploadService {
             const elapsed = Date.now() - task.startTime;
             const progressPerMs = progress / elapsed;
             const remainingProgress = 100 - progress;
-            task.estimatedTimeRemaining = Math.ceil(remainingProgress / progressPerMs / 1000);
+            task.estimatedTimeRemaining = Math.ceil(remainingProgress / progressPerMs);
           }
           
           this.notifyListeners();
