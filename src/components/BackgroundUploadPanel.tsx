@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { 
   Upload, CheckCircle, XCircle, Clock, X, Pause, Play,
   RotateCcw, Trash2, ChevronUp, ChevronDown, Maximize2
@@ -103,7 +104,6 @@ const BackgroundUploadPanel = () => {
                     {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
                   </Button>
                 )}
-                {/* EXPAND TO FULL SCREEN SUITE BUTTON */}
                 <Button
                   variant="ghost"
                   size="sm"
