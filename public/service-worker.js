@@ -1,8 +1,6 @@
-const CACHE_NAME = 'squidcloud-v12.0.17-1782975900953';
+const CACHE_NAME = 'squidcloud-v12.0.18-streamer';
 const API_CACHE = 'api-cache-v2';
 const STATIC_CACHE = 'static-cache-v3';
-
-const urlsToCache = ['/', '/index.html', '/manifest.json', '/favicon.ico'];
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -12,27 +10,37 @@ self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
-// Stream Request Map
 self.streamRequests = new Map();
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   
-  // 🚀 THE VIRTUAL SERVER: Intercept video range requests
+  // 🚀 VIRTUAL STREAM INTERCEPTOR: Safe HTTP 206 Partial Content handling
   if (url.pathname.startsWith('/virtual-stream/')) {
     const fileId = url.pathname.split('/').pop();
     const rangeHeader = event.request.headers.get('range') || 'bytes=0-';
 
     event.respondWith(
-      new Promise((resolve, reject) => {
-        const requestId = Date.now().toString() + Math.random().toString();
+      new Promise((resolve) => {
+        const requestId = Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
         
-        self.streamRequests.set(requestId, { resolve, reject });
+        // Timeout set to 60s for multi-megabyte chunk decryption over slow networks
+        const timeoutTimer = setTimeout(() => {
+          if (self.streamRequests.has(requestId)) {
+            self.streamRequests.delete(requestId);
+            console.warn(`[SW] Stream decryption timed out for request ${requestId}`);
+            // Resolve with HTTP 504 Gateway Timeout so <video> onError catches it gracefully
+            resolve(new Response('Stream Decryption Timeout', { status: 504 }));
+          }
+        }, 60000);
 
-        // Ask the React app to decrypt this specific byte range
+        self.streamRequests.set(requestId, { resolve, timeoutTimer });
+
         self.clients.matchAll({ type: 'window' }).then(clients => {
           if (!clients || clients.length === 0) {
-            return reject(new Error('No active window to process decryption'));
+            clearTimeout(timeoutTimer);
+            self.streamRequests.delete(requestId);
+            return resolve(new Response('No active client window found', { status: 503 }));
           }
           clients[0].postMessage({
             type: 'REQUEST_DECRYPT_STREAM',
@@ -40,42 +48,41 @@ self.addEventListener('fetch', event => {
             range: rangeHeader,
             requestId
           });
+        }).catch(err => {
+          clearTimeout(timeoutTimer);
+          self.streamRequests.delete(requestId);
+          resolve(new Response('Client IPC Error: ' + err.message, { status: 500 }));
         });
-        
-        // Timeout to prevent infinite hanging
-        setTimeout(() => {
-          if (self.streamRequests.has(requestId)) {
-            self.streamRequests.delete(requestId);
-            reject(new Error('Stream decryption timeout'));
-          }
-        }, 15000);
       })
     );
     return;
   }
 
-  // Fallback to your standard network fetch for everything else
   event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
 
-// Listen for decrypted data from the React app
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'DECRYPT_STREAM_RESPONSE') {
-    const { requestId, buffer, start, end, totalSize, contentType } = event.data;
+    const { requestId, buffer, start, end, totalSize, contentType, error } = event.data;
     
     if (self.streamRequests && self.streamRequests.has(requestId)) {
-      const { resolve } = self.streamRequests.get(requestId);
+      const { resolve, timeoutTimer } = self.streamRequests.get(requestId);
+      clearTimeout(timeoutTimer);
+      self.streamRequests.delete(requestId);
+
+      if (error || !buffer) {
+        return resolve(new Response(error || 'Decryption failed', { status: 500 }));
+      }
       
       const headers = new Headers({
         'Content-Type': contentType || 'video/mp4',
         'Accept-Ranges': 'bytes',
         'Content-Range': `bytes ${start}-${end}/${totalSize}`,
-        'Content-Length': buffer.byteLength,
+        'Content-Length': buffer.byteLength.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
       });
       
-      // Serve the partial content exactly like a real backend server!
       resolve(new Response(buffer, { status: 206, headers }));
-      self.streamRequests.delete(requestId);
     }
   }
 });
