@@ -1,11 +1,14 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'; // 🚀 Added useMemo
 import { 
   Play, Pause, Maximize, Minimize, Loader, Volume2, VolumeX, 
-  RotateCcw, RotateCw, Settings, PictureInPicture, AlertCircle, RefreshCw 
+  RotateCcw, RotateCw, Settings, PictureInPicture, AlertCircle, RefreshCw, Cpu, FileVideo 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { StreamDecryptorService } from '@/lib/videoStreamer';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 interface CBVideoPlayerProps {
   file: { id: string; name: string; type: string; size: number };
@@ -22,6 +25,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<NodeJS.Timeout>();
+  const ffmpegRef = useRef<FFmpeg>(new FFmpeg());
 
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -43,9 +47,97 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const [hoverPosition, setHoverPosition] = useState(0);
   const [seekAnimation, setSeekAnimation] = useState<'left' | 'right' | null>(null);
 
+  // WASM Transcoding State
+  const isUnsupportedContainer = useMemo(() => {
+    return /\.(avi|mkv|wmv|flv|mov)$/i.test(file.name);
+  }, [file.name]);
+
+  const [transcodeState, setTranscodeState] = useState<'idle' | 'loading_engine' | 'transcoding' | 'ready'>('idle');
+  const [transcodeProgress, setTranscodeProgress] = useState(0);
+  const [transcodeMessage, setTranscodeMessage] = useState('Initializing WebAssembly Engine...');
+  const [transcodedUrl, setTranscodedUrl] = useState<string | null>(null);
+
   useEffect(() => {
     StreamDecryptorService.initListener(shareId);
   }, [shareId]);
+
+  // Clean up Blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (transcodedUrl) URL.revokeObjectURL(transcodedUrl);
+    };
+  }, [transcodedUrl]);
+
+  // WASM Transcoding Pipeline
+  const startLocalTranscoding = async () => {
+    try {
+      setHasError(false);
+      setTranscodeState('loading_engine');
+      setTranscodeMessage('Loading FFmpeg WebAssembly Core...');
+      
+      const ffmpeg = ffmpegRef.current;
+
+      // Attach progress listener
+      ffmpeg.on('progress', ({ progress }) => {
+        const pct = Math.min(100, Math.max(0, Math.round(progress * 100)));
+        setTranscodeProgress(pct);
+        setTranscodeMessage(`Transcoding to MP4... ${pct}%`);
+      });
+
+      // Load FFmpeg core scripts from CDN
+      if (!ffmpeg.loaded) {
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+      }
+
+      setTranscodeState('transcoding');
+      setTranscodeMessage('Reading decrypted stream into local memory...');
+      setTranscodeProgress(5);
+
+      const virtualStreamUrl = `/virtual-stream/${file.id}`;
+      const inputExtension = file.name.split('.').pop() || 'avi';
+      const inputName = `input.${inputExtension}`;
+      const outputName = 'output.mp4';
+
+      // 1. Fetch decrypted payload from Service Worker into FFmpeg virtual filesystem
+      await ffmpeg.writeFile(inputName, await fetchFile(virtualStreamUrl));
+
+      setTranscodeMessage('Running ultrafast local video conversion...');
+      setTranscodeProgress(15);
+
+      // 2. Execute fast remux/transcode command
+      // -c:v libx264 with ultrafast preset ensures maximum speed in client CPU
+      await ffmpeg.exec([
+        '-i', inputName,
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-c:a', 'aac',
+        outputName
+      ]);
+
+      // 3. Read output MP4 file and create playable Object URL
+      const fileData = await ffmpeg.readFile(outputName);
+      const dataArray = new Uint8Array(fileData as ArrayBuffer);
+      const videoBlob = new Blob([dataArray.buffer], { type: 'video/mp4' });
+      const createdUrl = URL.createObjectURL(videoBlob);
+
+      // Clean up virtual filesystem memory
+      await ffmpeg.deleteFile(inputName);
+      await ffmpeg.deleteFile(outputName);
+
+      setTranscodedUrl(createdUrl);
+      setTranscodeState('ready');
+      setBuffering(false);
+    } catch (err: any) {
+      console.error('[WASM Transcoder Error]:', err);
+      setHasError(true);
+      setTranscodeState('idle');
+    }
+  };
 
   const wakeControls = useCallback(() => {
     setControlsVisible(true);
@@ -65,7 +157,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!videoRef.current) return;
+      if (!videoRef.current || transcodeState !== 'ready' && isUnsupportedContainer) return;
       wakeControls();
       switch (e.key.toLowerCase()) {
         case ' ':
@@ -91,7 +183,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [duration, wakeControls]);
+  }, [duration, wakeControls, transcodeState, isUnsupportedContainer]);
 
   const togglePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -193,15 +285,19 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
-  const virtualUrl = `/virtual-stream/${file.id}?retry=${retryCount}`;
+  // Determine active video source URL
+  const activeVideoSource = isUnsupportedContainer 
+    ? transcodedUrl 
+    : `/virtual-stream/${file.id}?retry=${retryCount}`;
 
+  // Error State Overlay
   if (hasError) {
     return (
-      <div className="flex flex-col items-center justify-center w-full h-full bg-[#0a0a0f] p-6 text-center border border-neutral-800 rounded-2xl space-y-4">
+      <div className="flex flex-col items-center justify-center w-full h-full bg-[#0a0a0f] p-6 text-center border border-neutral-800 rounded-2xl space-y-4 select-none">
         <AlertCircle className="w-10 h-10 text-red-400 animate-pulse" />
         <div className="space-y-1 max-w-md">
-          <p className="text-sm font-semibold text-white">Stream Interrupted</p>
-          <p className="text-xs text-neutral-400">The encrypted video chunk timed out or encountered a network error.</p>
+          <p className="text-sm font-semibold text-white">Playback Interrupted</p>
+          <p className="text-xs text-neutral-400">The video stream timed out or encountered an unreadable codec format.</p>
         </div>
         <Button 
           onClick={() => { setHasError(false); setBuffering(true); setRetryCount(r => r + 1); }} 
@@ -210,6 +306,44 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
         >
           <RefreshCw className="w-4 h-4" /> Reload Stream
         </Button>
+      </div>
+    );
+  }
+
+  // WASM Transcoding Prompt / Active State Overlay
+  if (isUnsupportedContainer && transcodeState !== 'ready') {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full bg-[#0a0a0f] p-8 text-center border border-neutral-800 rounded-2xl space-y-6 select-none">
+        <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <Cpu className="w-8 h-8 animate-pulse" />
+        </div>
+        
+        <div className="space-y-2 max-w-md">
+          <h3 className="text-base font-bold text-white flex items-center justify-center gap-2">
+            <FileVideo className="w-4 h-4 text-neutral-400" />
+            Client-Side Video Transcoding
+          </h3>
+          <p className="text-xs text-neutral-400 leading-relaxed font-sans">
+            Web browsers do not natively support <span className="text-white font-mono font-medium">{file.name.split('.').pop()?.toUpperCase()}</span> files. Squidcloud can safely convert this video inside your local device memory using zero-knowledge WebAssembly.
+          </p>
+        </div>
+
+        {transcodeState === 'idle' ? (
+          <Button 
+            onClick={startLocalTranscoding}
+            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 h-11 rounded-xl shadow-lg shadow-blue-600/20 gap-2"
+          >
+            <Cpu className="w-4 h-4" /> Transcode & Stream Locally
+          </Button>
+        ) : (
+          <div className="w-full max-w-sm space-y-3 bg-neutral-900/80 p-5 rounded-2xl border border-neutral-800">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-neutral-300 truncate pr-4">{transcodeMessage}</span>
+              <span className="text-blue-400 font-bold">{transcodeProgress}%</span>
+            </div>
+            <Progress value={transcodeProgress} className="h-2 bg-neutral-950" />
+          </div>
+        )}
       </div>
     );
   }
@@ -227,27 +361,29 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
       onDoubleClick={handleDoubleClick}
       onClick={togglePlay}
     >
-      <video
-        key={virtualUrl}
-        ref={videoRef}
-        src={virtualUrl}
-        className="absolute inset-0 w-full h-full object-contain"
-        poster={poster}
-        playsInline
-        autoPlay={autoPlay}
-        onError={(e) => {
-          console.error("Video element playback error:", e);
-          setHasError(true);
-        }}
-        onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
-        onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
-        onPlay={() => setPlaying(true)}
-        onPause={() => { setPlaying(false); setControlsVisible(true); }}
-        onWaiting={() => setBuffering(true)}
-        onCanPlay={() => setBuffering(false)}
-        onSeeking={() => setBuffering(true)}
-        onSeeked={() => setBuffering(false)}
-      />
+      {activeVideoSource && (
+        <video
+          key={activeVideoSource}
+          ref={videoRef}
+          src={activeVideoSource}
+          className="absolute inset-0 w-full h-full object-contain"
+          poster={poster}
+          playsInline
+          autoPlay={autoPlay}
+          onError={(e) => {
+            console.error("Video playback error:", e);
+            setHasError(true);
+          }}
+          onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+          onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => { setPlaying(false); setControlsVisible(true); }}
+          onWaiting={() => setBuffering(true)}
+          onCanPlay={() => setBuffering(false)}
+          onSeeking={() => setBuffering(true)}
+          onSeeked={() => setBuffering(false)}
+        />
+      )}
 
       {/* Double Tap Seek Animations */}
       {seekAnimation === 'left' && (
