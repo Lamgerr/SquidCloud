@@ -1,0 +1,19 @@
+
+{
+  "name": "squidcloud",
+  "version": "1.0.0",
+  "description": "Cloud storage and file management application",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^35.1.4"
+  },
+  "devDependencies": {
+  },
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "postinstall": "npm rebuild --prefer-offline"
+  }
+}

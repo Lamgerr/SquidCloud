@@ -1,0 +1,16 @@
+{
+  "name": "squidcloudctl",
+  "version": "1.0.0",
+  "description": "SquidCloud CLI - zero-exposure secrets management",
+  "main": "squidlink.mjs",
+  "bin": {
+    "squidcloudctl": "squidlink.mjs"
+  },
+  "type": "module",
+  "files": ["squidlink.mjs", "README.md"],
+  "scripts": {
+    "test": "node squidlink.mjs --help"
+  },
+  "keywords": ["squidcloud", "squidveil", "secrets", "cli"],
+  "license": "MIT"
+}

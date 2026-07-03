@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SquidCloud</string>
+    <string name="title_activity_main">SquidCloud</string>
+    <string name="package_name">live.squidcloud.app</string>
+    <string name="custom_url_scheme">live.squidcloud.app</string>
+</resources>

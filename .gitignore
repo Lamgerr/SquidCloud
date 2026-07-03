@@ -1,0 +1,13 @@
+node_modules
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+!.env.example
+*.env
+squidveil/target/
+.DS_Store
+*.log
+.vercel

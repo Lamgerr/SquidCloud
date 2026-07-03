@@ -1,0 +1,167 @@
+
+project_id = "aouqcwbdoyrccjcrhzzi"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[functions.api-key-management]
+verify_jwt = false
+
+[functions.api-file-upload]
+verify_jwt = false
+
+[functions.api-file-delete]
+verify_jwt = false
+
+[functions.api-file-metadata]
+verify_jwt = false
+
+[functions.api-file-upload-tebi]
+verify_jwt = true
+
+[functions.get-app-updates]
+verify_jwt = false
+
+[functions.admin-auth]
+verify_jwt = false
+
+[functions.admin-data-access]
+verify_jwt = false
+
+[functions.verify-admin]
+verify_jwt = true
+
+[functions.store-provider]
+verify_jwt = true
+
+[functions.secure-file-metadata]
+verify_jwt = true
+
+[functions.file-key]
+verify_jwt = true
+
+
+[functions.cloudbliss-api]
+verify_jwt = false
+
+[functions.github-storage]
+verify_jwt = false
+
+[functions.ink-ai]
+verify_jwt = true
+
+[functions.squid-ai-chat]
+verify_jwt = true
+
+[functions.media-manifest]
+verify_jwt = true
+
+[functions.hls-generation]
+verify_jwt = false
+
+[functions.media-master-manifest]
+verify_jwt = false
+
+[functions.media-playlist]
+verify_jwt = false
+
+[functions.media-segment]
+verify_jwt = false
+
+[functions.kza-prel]
+verify_jwt = false
+
+[functions.add-app-update]
+verify_jwt = true
+
+[functions.check-admin-status]
+verify_jwt = true
+
+[functions.cli-operations]
+verify_jwt = true
+
+[functions.cloud-file-browser]
+verify_jwt = false
+
+[functions.create-repos]
+verify_jwt = true
+
+[functions.download-manager]
+verify_jwt = true
+
+[functions.download-shared-file]
+verify_jwt = false
+
+[functions.gemini-api]
+verify_jwt = true
+
+[functions.generate-pdf-url]
+verify_jwt = false
+
+[functions.github-api]
+verify_jwt = false
+
+[functions.github-cluster]
+verify_jwt = false
+
+[functions.kza-oracle]
+verify_jwt = false
+
+[functions.kza-phantom]
+verify_jwt = false
+
+[functions.kza-sentinel]
+verify_jwt = false
+
+[functions.kza-verdict]
+verify_jwt = false
+
+[functions.migration-oauth]
+verify_jwt = true
+
+[functions.migration-oauth-callback]
+verify_jwt = true
+
+[functions.send-workspace-invite]
+verify_jwt = true
+
+[functions.serve-pdf]
+verify_jwt = false
+
+[functions.serve-pdf-secure]
+verify_jwt = false
+
+[functions.start-cloud-import]
+verify_jwt = true
+
+[functions.start-migration]
+verify_jwt = true
+
+[functions.trash-operations]
+verify_jwt = true
+
+[functions.validate-share]
+verify_jwt = true
+
+[functions.verify-provider]
+verify_jwt = false
+
+[functions.video-stream-proxy]
+verify_jwt = false
+
+[functions.storage-backend]
+verify_jwt = false
+
+[functions.video-stream-url]
+verify_jwt = false

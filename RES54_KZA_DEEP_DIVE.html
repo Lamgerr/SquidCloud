@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>RES54 &amp; KZA Deep Dive</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">RES54 &amp; KZA Deep Dive</h1>
+</header>
+<h1
+id="res54-full-technical-deep-dive-encryption-kza-and-the-complete-squidcloud-protection-architecture">RES54:
+Full Technical Deep Dive — Encryption, KZA, and the Complete SquidCloud
+Protection Architecture</h1>
+<p><strong>Author:</strong> Internal Security &amp; Architecture
+Analysis<br />
+<strong>Version:</strong> 1.0<br />
+<strong>Classification:</strong> CONFIDENTIAL<br />
+<strong>Scope:</strong> Full codebase audit of
+<code>src/lib/res54.ts</code> (1711 lines),
+<code>src/lib/encryption.ts</code> (583 lines),
+<code>src/lib/key-derivation.ts</code> (314 lines),
+<code>src/services/secure-key-manager.ts</code> (321 lines),
+<code>supabase/functions/cloudbliss-api/index.ts</code> (982 lines),
+<code>supabase/functions/kza-sentinel/index.ts</code> (754 lines),
+<code>kza-oracle</code>, <code>kza-verdict</code>,
+<code>kza-phantom</code>, <code>SQUIDCLOUD_SECURITY_AUDIT.md</code>,
+<code>SQUIDCLOUD_BYOS_ENCRYPTION_PIPELINE.md</code></p>
+<hr />
+<h1 id="part-i-first-principles-encryption-demystified">PART I: FIRST
+PRINCIPLES — Encryption Demystified</h1>
+<p>Before we touch a single line of SquidCloud code, we need to
+understand what encryption actually <em>is</em> at the physical
+level.</p>
+<h2 id="what-is-encryption-really">1.1 What Is Encryption, Really?</h2>
+<p>Imagine you have a diary. You write your deepest secrets in it. Then
+you lock it with a padlock and give the key to your friend.</p>
+<ul>
+<li><strong>Plaintext:</strong> The diary contents (your data)</li>
+<li><strong>Ciphertext:</strong> What the padlock produces — scrambled
+nonsense that looks like garbage</li>
+<li><strong>Key:</strong> The thing that locks and unlocks the
+padlock</li>
+<li><strong>Encryption:</strong> The act of locking</li>
+<li><strong>Decryption:</strong> The act of unlocking</li>
+</ul>
+<p>AES-256-GCM (the algorithm SquidCloud uses) is not just <em>a</em>
+padlock. It is a very specific, NIST-certified, military-grade padlock
+that has been publicly scrutinized by the world’s best cryptographers
+for over 20 years and is considered unbreakable with current
+technology.</p>
+<h3 id="the-properties-of-a-good-encryption-system">The Properties of a
+Good Encryption System</h3>
+<p>A good encryption scheme provides three guarantees:</p>
+<ol type="1">
+<li><strong>Confidentiality:</strong> The bad guy cannot read your data
+even if they have the ciphertext</li>
+<li><strong>Integrity:</strong> The bad guy cannot modify your
+ciphertext without detection</li>
+<li><strong>Authentication:</strong> You know the ciphertext came from
+someone who had the key</li>
+</ol>
+<p>AES-256-GCM provides all three. This is called <strong>authenticated
+encryption</strong>. The “GCM” part (Galois/Counter Mode) adds a
+cryptographic checksum (the “tag”) that proves the data has not been
+tampered with.</p>
+<h2 id="the-key-problem">1.2 The Key Problem</h2>
+<p>Here is the hardest problem in all of cryptography: <strong>how do
+you protect the key itself?</strong></p>
+<p>You can have the strongest encryption in the world — AES-4096,
+quantum-resistant lattice cryptography, whatever — but if the key is
+stored in plaintext next to the encrypted data, you have accomplished
+<strong>nothing</strong>. The padlock is pointless if the key is taped
+to the side of the box.</p>
+<p>This is not an exaggeration. This is the single most common flaw in
+real-world encryption systems, and it is the central vulnerability that
+the original SquidCloud security audit identified.</p>
+<h2 id="zero-knowledge-architecture">1.3 Zero-Knowledge
+Architecture</h2>
+<p>The phrase “zero-knowledge” has been so badly abused in marketing
+that it barely means anything anymore. Let me define it precisely:</p>
+<blockquote>
+<p><strong>Zero-knowledge encryption</strong> means the service provider
+<em>cannot</em> decrypt your data even if compelled to do so. The
+provider’s servers never see the encryption key in plaintext.</p>
+</blockquote>
+<p>The gold standard works like this:</p>
+<ol type="1">
+<li>Your <strong>password</strong> goes through a <strong>Key Derivation
+Function</strong> (KDF) like PBKDF2 or Argon2</li>
+<li>The KDF produces a <strong>Master Key</strong></li>
+<li>The Master Key is used to <strong>wrap</strong> (encrypt) individual
+file encryption keys</li>
+<li>Only the <strong>wrapped</strong> (encrypted) keys are stored on the
+server</li>
+<li>To decrypt a file, the client:
+<ol type="a">
+<li>Enters password → re-derives Master Key</li>
+<li>Downloads wrapped file key → unwraps it using Master Key</li>
+<li>Uses file key to decrypt file data</li>
+</ol></li>
+<li>The server <strong>never</strong> sees the Master Key or the
+unwrapped file key</li>
+</ol>
+<p>This is what SquidCloud’s <code>secure-key-manager.ts</code>
+implements. It is <em>conceptually</em> correct. But the critical
+question — which we will answer in Part II — is whether this
+architecture is <em>actually used</em> for all file operations.</p>
+<hr />
+<h1
+id="part-ii-the-res54-encryption-pipeline-complete-end-to-end-analysis">PART
+II: THE RES54 ENCRYPTION PIPELINE — Complete End-to-End Analysis</h1>
+<h2 id="system-overview">2.1 System Overview</h2>
+<p>SquidCloud has three separate (but similar) RES54 pipelines. This
+redundancy itself is a maintenance and security concern:</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 14%" />
+<col style="width: 16%" />
+<col style="width: 23%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr>
+<th>Pipeline</th>
+<th>File</th>
+<th>Lines</th>
+<th>Location</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RES54 v3 (primary)</td>
+<td><code>src/lib/res54.ts</code></td>
+<td>1711</td>
+<td>Browser (client)</td>
+<td>Main file upload/download</td>
+</tr>
+<tr>
+<td>RES54 R2</td>
+<td><code>src/lib/res54-r2.ts</code></td>
+<td>1681</td>
+<td>Browser (client)</td>
+<td>Redundant implementation</td>
+</tr>
+<tr>
+<td>RES54 R2 Pipeline</td>
+<td><code>src/lib/res54-r2-pipeline.ts</code></td>
+<td>1408</td>
+<td>Browser (client)</td>
+<td>Streaming variant</td>
+</tr>
+<tr>
+<td>CloudBliss API v3</td>
+<td><code>supabase/functions/cloudbliss-api/index.ts</code></td>
+<td>982</td>
+<td>Supabase Edge</td>
+<td>Server-side API</td>
+</tr>
+<tr>
+<td>Legacy encryption</td>
+<td><code>src/lib/encryption.ts</code></td>
+<td>583</td>
+<td>Browser (client)</td>
+<td>Core encrypt/decrypt primitives</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-distribution-topology">The Distribution Topology</h3>
+<pre><code>User&#39;s Browser
+     │
+     ├─► Web Crypto API (AES-256-GCM)
+     │     │
+     │     ├─► Chunk: 1.5-2.5 MB each
+     │     ├─► Each chunk encrypted separately
+     │     └─► Same key for all chunks (!)
+     │
+     ├─► Web Workers (pool of 4)
+     │     └─► Non-blocking parallel encryption
+     │
+     └─► Load Balancer
+           └─► Rate-limits &amp; prioritizes operations
+     │
+     ▼
+Supabase Edge Functions
+     │
+     ├─► github-storage (upload/download chunks)
+     ├─► github-cluster (node selection)
+     │
+     ▼
+GitHub Repositories (3-12 repos per user)
+     │
+     ├─► Repo 1: chunks[0, 3, 6, ...]
+     ├─► Repo 2: chunks[1, 4, 7, ...]
+     └─► Repo 3: chunks[2, 5, 8, ...]
+     │
+     ▼
+Supabase Database (files table)
+     ├─► Metadata in tags[] (JSON)
+     ├─► encryption_key column → PLAINTEXT
+     └─► Chunk locations (repo + path per chunk)</code></pre>
+<h2 id="upload-flow-res54.ts541-1097">2.2 Upload Flow
+(res54.ts:541-1097)</h2>
+<p>This is the upload function <code>uploadFileWithRes54</code>. Here is
+exactly what happens, step by step:</p>
+<h3 id="step-1-authentication-cluster-check-lines-549-567">Step 1:
+Authentication &amp; Cluster Check (lines 549-567)</h3>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> { data<span class="op">:</span> { user } } <span class="op">=</span> <span class="cf">await</span> supabase<span class="op">.</span><span class="at">auth</span><span class="op">.</span><span class="fu">getUser</span>()<span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co">// ... checks cluster health via github-cluster edge function</span></span></code></pre></div>
+<p>The system verifies the user is authenticated (Supabase Auth JWT) and
+that storage nodes (GitHub repos) are available. If no repos exist, the
+upload fails with “Please create a Storage Vault.”</p>
+<h3 id="step-2-key-generation-lines-591-607">Step 2: Key Generation
+(lines 591-607)</h3>
+<p>There are two paths:</p>
+<p><strong>Default path:</strong></p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>encryptionKey <span class="op">=</span> <span class="fu">generateEncryptionKey</span>()<span class="op">;</span> <span class="co">// CryptoJS.lib.WordArray.random(32)</span></span></code></pre></div>
+<p>This generates a 256-bit (32-byte) random key using CryptoJS. The key
+is a hex string like <code>"a1b2c3d4e5f6..."</code>.</p>
+<p><strong>BYOK path:</strong></p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> key <span class="op">=</span> <span class="cf">await</span> <span class="fu">requestEphemeralBYOKKey</span>({ reason<span class="op">:</span> <span class="st">&#39;encrypt&#39;</span><span class="op">,</span> fileName<span class="op">:</span> file<span class="op">.</span><span class="at">name</span><span class="op">,</span> <span class="op">...</span> })<span class="op">;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>encryptionKey <span class="op">=</span> key<span class="op">.</span><span class="fu">trim</span>()<span class="op">;</span></span></code></pre></div>
+<p>The user provides their own key via a prompt dialog. The key is
+<strong>never stored on the server</strong> — only
+<code>'byok_protected'</code> is stored in the database (line 989).</p>
+<h3 id="step-3-chunking-strategy-lines-292-302">Step 3: Chunking
+Strategy (lines 292-302)</h3>
+<pre><code>File Size                Chunk Size
+0-10MB                   1.5 MB
+10-100MB                 2.0 MB
+100-500MB                2.5 MB
+&gt;500MB                   2.0 MB</code></pre>
+<p>For files over 100MB, streaming upload is used (lines 644-778). For
+smaller files, all chunks are read into memory first (lines
+787-982).</p>
+<h3 id="step-4-encryption-per-chunk-lines-127-169">Step 4: Encryption
+Per Chunk (lines 127-169)</h3>
+<p>Each chunk is encrypted by a Web Worker using
+<code>encryptChunkWithWorker</code>:</p>
+<ol type="1">
+<li>The chunk data (<code>ArrayBuffer</code>) and encryption key
+(<code>string</code>) are sent to a Web Worker</li>
+<li>The worker calls <code>encryptData()</code> from
+<code>encryption.ts</code></li>
+<li>The worker returns the encrypted chunk as a <em>base64
+string</em></li>
+<li>This string is then uploaded to GitHub storage</li>
+</ol>
+<h3 id="step-5-node-assignment-lines-672-712">Step 5: Node Assignment
+(lines 672-712)</h3>
+<p>For each chunk, the system asks <code>github-cluster</code> which
+repository to store it in (round-robin across available repos). The
+chunk path is:</p>
+<pre><code>{userId}/{workspaceId?}/res54_{timestamp}_{random}_{index}.json</code></pre>
+<h3 id="step-6-upload-to-github-lines-726-768">Step 6: Upload to GitHub
+(lines 726-768)</h3>
+<p>Chunks are uploaded as raw binary via <code>github-storage</code>
+edge function with headers identifying the repo, path, node, user, and
+chunk index.</p>
+<h3 id="step-7-database-record-lines-985-1079">Step 7: Database Record
+(lines 985-1079)</h3>
+<p>The critical moment. Line 989:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> dbEncryptionKey <span class="op">=</span> isBYOKActive <span class="op">?</span> <span class="st">&#39;byok_protected&#39;</span> <span class="op">:</span> metadata<span class="op">.</span><span class="at">encryptionKey</span><span class="op">;</span></span></code></pre></div>
+<p>For BYOK files: the DB stores <code>'byok_protected'</code> — the
+real key exists only in the user’s memory. For non-BYOK files: the DB
+stores the <strong>plaintext encryption key</strong>.</p>
+<p>This is then inserted into the <code>files</code> table (line
+1013):</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>encryption_key<span class="op">:</span> dbEncryptionKey<span class="op">,</span> <span class="co">// Will be hashed by DB trigger if not BYOK</span></span></code></pre></div>
+<p>The comment says “hashed by DB trigger” — we must verify this trigger
+exists and functions correctly.</p>
+<h2 id="download-flow-res54.ts1221-1530">2.3 Download Flow
+(res54.ts:1221-1530)</h2>
+<h3 id="step-1-fetch-metadata-lines-1241-1255">Step 1: Fetch Metadata
+(lines 1241-1255)</h3>
+<p>File record is fetched from the <code>files</code> table, including
+<code>encryption_key</code> and the <code>tags[0]</code> JSON that
+contains chunk locations.</p>
+<h3 id="step-2-parse-chunks-lines-1260-1322">Step 2: Parse Chunks (lines
+1260-1322)</h3>
+<p>The tags JSON is parsed into a <code>Res54FileMetadata</code>
+structure. Two formats are supported: - Modern format:
+<code>{ chunks: [...], encryptionKey, fileName, ... }</code> - Legacy
+format: flat array of chunk locations (converted on the fly)</p>
+<h3 id="step-3-download-all-chunks-lines-1340-1357">Step 3: Download All
+Chunks (lines 1340-1357)</h3>
+<p>Chunks are downloaded in parallel using
+<code>processChunksInParallel</code> with adaptive concurrency: -
+&gt;500MB: 6 parallel downloads - &gt;50MB: 12 parallel downloads -
+Small files: 16 parallel downloads</p>
+<h3 id="step-4-decrypt-all-chunks-lines-1372-1437">Step 4: Decrypt All
+Chunks (lines 1372-1437)</h3>
+<p>The decryption key is obtained through a priority cascade (lines
+1474-1511):</p>
+<pre><code>1. Try embedded key (metadata.encryptionKey)
+2. If that fails and BYOK is enabled:
+   a. Prompt user for BYOK key
+   b. Try decrypting with provided key
+   c. If fails, prompt again (one retry)
+3. If BYOK strict mode and no key works → BLOCK
+4. If not BYOK → use default key (may be plaintext from DB)</code></pre>
+<h3 id="step-5-assemble-blob-line-1516">Step 5: Assemble Blob (line
+1516)</h3>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> blob <span class="op">=</span> <span class="kw">new</span> <span class="bu">Blob</span>(decryptedChunks<span class="op">,</span> { type<span class="op">:</span> metadata<span class="op">.</span><span class="at">fileType</span> })<span class="op">;</span></span></code></pre></div>
+<p>Size verification is performed but non-fatal on mismatch (lines
+1519-1522).</p>
+<h2 id="the-encryption-core-encryption.ts">2.4 The Encryption Core
+(encryption.ts)</h2>
+<h3 id="encryptdata-lines-132-194"><code>encryptData()</code> (lines
+132-194)</h3>
+<p>The actual AES-256-GCM encryption:</p>
+<pre><code>Input: data (ArrayBuffer), key (string)
+1. Derive key bytes: key.slice(0, 32).padEnd(32, &#39;0&#39;) — TRUNCATE/PAD to 32 bytes
+2. Generate random 12-byte IV
+3. Create AEAD: utf8(&quot;res54-v2-{timestamp}&quot;)
+4. Encrypt: AES-GCM with IV + additionalData
+5. Assemble: [4B dataLength][additionalData][12B IV][encrypted content]
+6. Return: base64 of assembled buffer</code></pre>
+<p>Output format:</p>
+<pre><code>┌──────────┬──────────────────┬────────────┬─────────────────────┐
+│ 4 bytes  │ additionalData   │ 12 bytes   │ encrypted content   │
+│ (length) │ (variable)       │ (IV)       │ (variable)          │
+└──────────┴──────────────────┴────────────┴─────────────────────┘</code></pre>
+<h3 id="decryptdata-lines-298-422"><code>decryptData()</code> (lines
+298-422)</h3>
+<p>The reverse process with format detection:</p>
+<ol type="1">
+<li>Decode base64</li>
+<li>Try to detect format:
+<ol type="a">
+<li>Check if header looks like multi-chunk format (first 4 bytes &lt;
+1000)</li>
+<li>If so, parse JSON header and use
+<code>decryptLargeData()</code></li>
+<li>Otherwise, parse as standard AES-GCM with AEAD</li>
+</ol></li>
+<li>If AEAD format fails, fall back to legacy format:
+<ul>
+<li>Assume first 12 bytes are IV, rest is ciphertext</li>
+<li>No authentication tag verification</li>
+</ul></li>
+</ol>
+<h3 id="large-file-encryption-encryptlargedata-lines-197-295">Large File
+Encryption (<code>encryptLargeData</code>, lines 197-295)</h3>
+<p>For data &gt;10MB:</p>
+<pre><code>1. Split plaintext into 10MB chunks
+2. Each chunk gets its own: IV (random) + additionalData (&quot;chunk-{i}-{n}-{timestamp}&quot;)
+3. Store header: { version: 2, chunks: n, totalSize, ivs: [...] }
+4. Format: [4B headerLen][header JSON][chunk1: 4B adLen + ad + 4B dataLen + data][chunk2...]
+5. Encode entire output as base64</code></pre>
+<h2 id="server-side-pipeline-cloudbliss-apiindex.ts">2.5 Server-Side
+Pipeline (cloudbliss-api/index.ts)</h2>
+<p>The CloudBliss API replicates almost the same encryption logic:</p>
+<ul>
+<li>Same AES-256-GCM with AEAD</li>
+<li>Same key derivation:
+<code>key.slice(0, 32).padEnd(32, '0')</code></li>
+<li>Same chunk format and distribution</li>
+<li>Same <strong>plaintext encryption key storage</strong> in
+<code>files.encryption_key</code> (line 791)</li>
+</ul>
+<p>The server-side API stores encryption keys in
+<strong>plaintext</strong> when the API is used for uploads (as opposed
+to the browser client which can be BYOK). This is a critical gap: if an
+API key is compromised, the attacker can upload files via the API and
+the server stores the encryption key in plaintext.</p>
+<hr />
+<h1
+id="part-iii-every-vulnerability-catalogued-explained-with-exploit-scenarios">PART
+III: EVERY VULNERABILITY — Catalogued, Explained, With Exploit
+Scenarios</h1>
+<h2 id="vuln-01-encryption-key-in-plaintext-database-column">VULN-01:
+Encryption Key in Plaintext Database Column</h2>
+<p><strong>Severity:</strong> CRITICAL (CVSS 9.5/10)<br />
+<strong>Status:</strong> Partial fix implemented (see VULN-01a)<br />
+<strong>Files:</strong> <code>res54.ts:1013</code>,
+<code>cloudbliss-api/index.ts:791</code>, <code>encryption.ts</code>
+(all paths)</p>
+<h3 id="description">Description</h3>
+<p>The <code>files.encryption_key</code> column stores encryption keys
+in plaintext for non-BYOK files. Any user or process with database read
+access can retrieve all encryption keys.</p>
+<h3 id="exploit-scenario">Exploit Scenario</h3>
+<ol type="1">
+<li>Attacker obtains database read access (SQL injection, stolen
+service_role key, compromised Supabase dashboard)</li>
+<li>Runs:
+<code>SELECT name, encryption_key FROM files WHERE user_id = 'victim-uuid';</code></li>
+<li>Gets 32-byte hex key (64 chars) for every file</li>
+<li>Downloads file chunks from GitHub repos (chunk locations are also in
+the DB, in <code>tags[]</code>)</li>
+<li>Decrypts: <code>AES-GCM.decrypt(key, iv, ciphertext)</code> —
+standard Web Crypto API, trivial</li>
+<li><strong>Outcome:</strong> Attacker has all victim files in
+plaintext</li>
+</ol>
+<h3 id="why-this-happened">Why This Happened</h3>
+<p>The system was designed to allow server-side decryption (for PDF
+serving, preview generation, API downloads). The encryption key needs to
+be accessible to the server, and the simplest approach was storing it
+directly in the file record.</p>
+<h3 id="fix-status">Fix Status</h3>
+<p>The <code>secure-key-manager.ts</code> service implements proper key
+wrapping: - User password → PBKDF2 → Master Key - Master Key →
+AES-GCM-wraps → File Key - Stored in <code>encrypted_keys</code> table
+(not <code>files.encryption_key</code>)</p>
+<p><strong>However</strong>, the upload/download flow in
+<code>res54.ts</code> does NOT use <code>secure-key-manager.ts</code>.
+The file upload flow stores the key directly. The key manager is only
+used by the BYOK path and by the <code>secure-upload.ts</code> service,
+which wraps keys <em>after</em> the fact.</p>
+<p><strong>Root cause:</strong> Two parallel key management systems
+coexist, and the main RES54 pipeline bypasses the secure one.</p>
+<hr />
+<h2
+id="vuln-02-key-derivation-weakness-sha-256-only-no-pbkdf2argon2-for-api-keys">VULN-02:
+Key Derivation Weakness — SHA-256 Only, No PBKDF2/Argon2 for API
+Keys</h2>
+<p><strong>Severity:</strong> HIGH (CVSS 7.5/10)<br />
+<strong>Status:</strong> Partially fixed<br />
+<strong>Files:</strong> <code>cloudbliss-api/index.ts:272-295</code>,
+<code>lib/key-derivation.ts</code></p>
+<h3 id="description-1">Description</h3>
+<p>API key verification uses a single SHA-256 hash with salt (not a KDF
+like PBKDF2/Argon2/bcrypt/ scrypt). SHA-256 is designed to be
+<em>fast</em>, which makes it vulnerable to brute-force attacks once the
+hash database is compromised.</p>
+<h3 id="exploit-scenario-1">Exploit Scenario</h3>
+<ol type="1">
+<li>Attacker dumps the <code>api_keys</code> table (SQL injection,
+service_role leak)</li>
+<li>Table contains: <code>key_prefix</code>, <code>key_hash</code>,
+<code>key_salt</code></li>
+<li>Attacker knows the key prefix format (<code>cb_</code> followed by
+hex) and key format (8-char prefix + 48 char hex)</li>
+<li>Attacker offline brute-forces SHA-256(salt + candidate_key) at ~1
+billion hashes/second (GPU)</li>
+<li>With the limited keyspace of the <code>cb_</code> prefix pattern,
+recovery takes hours to days</li>
+<li><strong>Outcome:</strong> Att recovers the API key, can make
+authenticated API calls as the victim</li>
+</ol>
+<h3 id="why-pbkdf2argon2-matters">Why PBKDF2/Argon2 Matters</h3>
+<p>PBKDF2 with 100,000 iterations slows the same attack to ~10,000
+hashes/second — a 100,000x slowdown. Argon2id with memory hardness makes
+it even slower by requiring large memory allocations per attempt.</p>
+<h3 id="current-mitigation">Current Mitigation</h3>
+<p>The <code>key-derivation.ts</code> file <em>has</em> PBKDF2 with
+100,000 iterations (for master key derivation), but the API key
+verification in <code>cloudbliss-api/index.ts</code> uses raw SHA-256
+instead of importing from <code>key-derivation.ts</code>.</p>
+<hr />
+<h2
+id="vuln-03-encryption-key-derivation-uses-truncationpadding">VULN-03:
+Encryption Key Derivation Uses Truncation/Padding</h2>
+<p><strong>Severity:</strong> MEDIUM (CVSS 6.0/10)<br />
+<strong>Status:</strong> Present in all encryption paths<br />
+<strong>Files:</strong> <code>encryption.ts:143</code>,
+<code>cloudbliss-api/index.ts:52</code></p>
+<h3 id="description-2">Description</h3>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> keyBytes <span class="op">=</span> <span class="kw">new</span> <span class="fu">TextEncoder</span>()<span class="op">.</span><span class="fu">encode</span>(key<span class="op">.</span><span class="fu">slice</span>(<span class="dv">0</span><span class="op">,</span> <span class="dv">32</span>)<span class="op">.</span><span class="fu">padEnd</span>(<span class="dv">32</span><span class="op">,</span> <span class="st">&#39;0&#39;</span>))<span class="op">;</span></span></code></pre></div>
+<p>This takes the hex key string and: 1. Slices to first 32 characters
+2. Pads to 32 characters with ‘0’ if shorter 3. UTF-8 encodes to bytes
+(32 bytes)</p>
+<p><strong>Problem:</strong> A hex string of 64 characters represents 32
+bytes of entropy. By slicing to 32 characters, we get 16 bytes (128
+bits) of actual entropy. The remaining 16 bytes are padding characters
+from <code>.padEnd(32, '0')</code>.</p>
+<p><strong>Wait — this is worse than it looks.</strong> Let me trace
+through more carefully:</p>
+<ul>
+<li><code>generateEncryptionKey()</code> returns
+<code>CryptoJS.lib.WordArray.random(32).toString()</code> which is a
+64-character hex string</li>
+<li><code>key.slice(0, 32)</code> keeps only the first 32 hex chars = 16
+bytes of entropy</li>
+<li><code>.padEnd(32, '0')</code> pads to 32 chars (no-op if 32
+already)</li>
+<li><code>TextEncoder.encode()</code> converts UTF-8 string to bytes —
+each hex char becomes 1 byte</li>
+<li>So the CryptoKey is derived from a 32-byte UTF-8 string where only
+the first 16 bytes have real entropy</li>
+</ul>
+<p><strong>Effective key strength:</strong> 128 bits (not 256 bits)</p>
+<p>This is functionally equivalent to AES-128, which is still
+computationally secure but represents a design flaw that reduces the
+stated security margin by half.</p>
+<p><strong>Note:</strong> The key slice <em>before</em>
+<code>padEnd(32, '0')</code> keeps the first 32 chars of the hex string,
+which represents 16 bytes of actual random data. Since AES-256-GCM is
+used with a 256-bit key, the remaining 128 bits are effectively
+zero-padded in the UTF-8 representation. The actual
+<code>crypto.subtle.importKey</code> with <code>{ length: 256 }</code>
+still imports a 256-bit key, but only 128 bits are from the RNG.</p>
+<hr />
+<h2 id="vuln-04-all-file-chunks-use-the-same-encryption-key">VULN-04:
+All File Chunks Use the Same Encryption Key</h2>
+<p><strong>Severity:</strong> MEDIUM (CVSS 5.0/10)<br />
+<strong>Status:</strong> Present in all pipelines<br />
+<strong>Files:</strong> <code>res54.ts</code>,
+<code>cloudbliss-api/index.ts</code></p>
+<h3 id="description-3">Description</h3>
+<p>A single file encryption key is generated per file and used to
+encrypt ALL chunks. This means: - If one chunk’s encryption is broken,
+all chunks are broken - No chunk-level key rotation - No per-chunk
+authentication binding (except AEAD which uses the same key) -
+Chunk-level deduplication is impossible (different chunks encrypted with
+same key → different ciphertexts due to different IVs, so this is a
+minor concern)</p>
+<h3 id="the-better-approach">The Better Approach</h3>
+<p>Per-chunk keys derived from a master file key:</p>
+<pre><code>File Key → KDF(chunk_index) → Chunk Key 0
+File Key → KDF(chunk_index) → Chunk Key 1
+...</code></pre>
+<p>This way, breaking chunk 0’s key does not compromise chunks 1..N.</p>
+<hr />
+<h2
+id="vuln-05-aead-additionaldata-uses-timestamp-not-deterministic">VULN-05:
+AEAD additionalData Uses Timestamp — Not Deterministic</h2>
+<p><strong>Severity:</strong> MEDIUM (CVSS 4.5/10)<br />
+<strong>Status:</strong> Present in all encryption paths<br />
+<strong>Files:</strong> <code>encryption.ts:155</code></p>
+<h3 id="description-4">Description</h3>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> additionalData <span class="op">=</span> <span class="kw">new</span> <span class="fu">TextEncoder</span>()<span class="op">.</span><span class="fu">encode</span>(<span class="vs">`res54-v2-</span><span class="sc">${</span><span class="bu">Date</span><span class="op">.</span><span class="fu">now</span>()<span class="sc">}</span><span class="vs">`</span>)<span class="op">;</span></span></code></pre></div>
+<p>The AEAD <code>additionalData</code> (Authenticated Encryption with
+Associated Data) uses a timestamp. This means:</p>
+<ol type="1">
+<li><strong>Verification impossible on server:</strong> The server
+cannot reconstruct the AEAD tag without knowing the exact timestamp used
+during encryption</li>
+<li><strong>No binding to file context:</strong> The additionalData
+should include <code>fileId</code>, <code>chunkIndex</code>,
+<code>userId</code> — data that ties the ciphertext to a specific
+context</li>
+<li><strong>No replay protection:</strong> If the format is ever
+changed, old timestamps would be accepted if decryption succeeds</li>
+</ol>
+<h3 id="the-correct-approach">The Correct Approach</h3>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> additionalData <span class="op">=</span> <span class="kw">new</span> <span class="fu">TextEncoder</span>()<span class="op">.</span><span class="fu">encode</span>(</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="vs">`res54-v3|userId=</span><span class="sc">${</span>userId<span class="sc">}</span><span class="vs">|fileId=</span><span class="sc">${</span>fileId<span class="sc">}</span><span class="vs">|chunkIndex=</span><span class="sc">${</span>chunkIndex<span class="sc">}</span><span class="vs">`</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>)<span class="op">;</span></span></code></pre></div>
+<p>This binds each ciphertext to a specific user, file, and chunk,
+preventing cross-file or cross-user ciphertext substitution attacks.</p>
+<hr />
+<h2
+id="vuln-06-legacy-decryption-fallback-loses-authentication">VULN-06:
+Legacy Decryption Fallback Loses Authentication</h2>
+<p><strong>Severity:</strong> MEDIUM (CVSS 4.0/10)<br />
+<strong>Status:</strong> Present in
+<code>encryption.ts:379-401</code></p>
+<h3 id="description-5">Description</h3>
+<p>In <code>decryptData()</code> (lines 378-401), if the standard AEAD
+format decryption fails, there is a fallback to a “legacy format” that
+simply extracts the first 12 bytes as IV and decrypts the rest:</p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> legacyIv <span class="op">=</span> binaryData<span class="op">.</span><span class="fu">slice</span>(<span class="dv">0</span><span class="op">,</span> <span class="dv">12</span>)<span class="op">;</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> legacyEncryptedContent <span class="op">=</span> binaryData<span class="op">.</span><span class="fu">slice</span>(<span class="dv">12</span>)<span class="op">;</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="co">// ... decrypt with AES-GCM (NO AEAD!)</span></span></code></pre></div>
+<p>This fallback means: 1. <strong>Ciphertexts without authentication
+tags are accepted</strong> — an attacker could strip the AEAD tag and
+upload a modified ciphertext 2. <strong>Format downgrade:</strong> An
+attacker could replace a properly encrypted file with a legacy-format
+ciphertext 3. <strong>No integrity check:</strong> Legacy format does
+not include additionalData, so integrity is not verified</p>
+<hr />
+<h2 id="vuln-07-cryptojs-for-key-generation-not-web-crypto">VULN-07:
+CryptoJS for Key Generation (Not Web Crypto)</h2>
+<p><strong>Severity:</strong> LOW (CVSS 3.0/10)<br />
+<strong>Status:</strong> Present in <code>encryption.ts:13</code></p>
+<h3 id="description-6">Description</h3>
+<div class="sourceCode" id="cb19"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">export</span> <span class="kw">const</span> generateEncryptionKey <span class="op">=</span> ()<span class="op">:</span> <span class="dt">string</span> <span class="kw">=&gt;</span> {</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> CryptoJS<span class="op">.</span><span class="at">lib</span><span class="op">.</span><span class="at">WordArray</span><span class="op">.</span><span class="fu">random</span>(<span class="dv">32</span>)<span class="op">.</span><span class="fu">toString</span>()<span class="op">;</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>}<span class="op">;</span></span></code></pre></div>
+<p>CryptoJS uses its own PRNG, not the browser’s
+<code>crypto.getRandomValues()</code>. While CryptoJS’s PRNG is
+generally considered secure, it is not backed by platform-specific
+hardware entropy sources like the Web Crypto API.</p>
+<h3 id="risk">Risk</h3>
+<ul>
+<li>In older browsers, CryptoJS may fall back to a weaker PRNG</li>
+<li>CryptoJS is a third-party library — supply chain risk</li>
+<li>Inconsistent entropy sources between key generation (CryptoJS) and
+IV generation (Web Crypto <code>crypto.getRandomValues()</code>)</li>
+</ul>
+<h3 id="fix">Fix</h3>
+<div class="sourceCode" id="cb20"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="im">export</span> <span class="kw">const</span> generateEncryptionKey <span class="op">=</span> <span class="kw">async</span> ()<span class="op">:</span> <span class="bu">Promise</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">&gt;</span> <span class="kw">=&gt;</span> {</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> key <span class="op">=</span> <span class="cf">await</span> crypto<span class="op">.</span><span class="at">subtle</span><span class="op">.</span><span class="fu">generateKey</span>(</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    { name<span class="op">:</span> <span class="st">&#39;AES-GCM&#39;</span><span class="op">,</span> length<span class="op">:</span> <span class="dv">256</span> }<span class="op">,</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">true</span><span class="op">,</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    [<span class="st">&#39;encrypt&#39;</span><span class="op">,</span> <span class="st">&#39;decrypt&#39;</span>]</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  )<span class="op">;</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> exported <span class="op">=</span> <span class="cf">await</span> crypto<span class="op">.</span><span class="at">subtle</span><span class="op">.</span><span class="fu">exportKey</span>(<span class="st">&#39;raw&#39;</span><span class="op">,</span> key)<span class="op">;</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> <span class="bu">Array</span><span class="op">.</span><span class="fu">from</span>(<span class="kw">new</span> <span class="bu">Uint8Array</span>(exported))</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">.</span><span class="fu">map</span>(b <span class="kw">=&gt;</span> b<span class="op">.</span><span class="fu">toString</span>(<span class="dv">16</span>)<span class="op">.</span><span class="fu">padStart</span>(<span class="dv">2</span><span class="op">,</span> <span class="st">&#39;0&#39;</span>))</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">.</span><span class="fu">join</span>(<span class="st">&#39;&#39;</span>)<span class="op">;</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>}<span class="op">;</span></span></code></pre></div>
+<p>(Note: This is actually what the server-side
+<code>cloudbliss-api/index.ts</code> does already — lines 38-48.)</p>
+<hr />
+<h2
+id="vuln-08-sha-256-hash-calculation-skipped-for-large-files">VULN-08:
+SHA-256 Hash Calculation Skipped for Large Files</h2>
+<p><strong>Severity:</strong> LOW (CVSS 2.5/10)<br />
+<strong>Status:</strong> Present in <code>res54.ts:392-394</code></p>
+<h3 id="description-7">Description</h3>
+<div class="sourceCode" id="cb21"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>sha256<span class="op">:</span> file<span class="op">.</span><span class="at">size</span> <span class="op">&gt;</span> LARGE_FILE_THRESHOLD</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="op">?</span> <span class="st">&#39;&#39;</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="op">:</span> <span class="cf">await</span> <span class="fu">calculateSHA256</span>(<span class="kw">new</span> <span class="bu">Uint8Array</span>(chunkBuffer))</span></code></pre></div>
+<p>For files over 100MB, chunk integrity hashes are <strong>empty
+strings</strong>. This means: - Chunk integrity cannot be verified for
+large files - Tampering with a large file chunk would go undetected -
+The empty SHA-256 might cause issues in legacy metadata parsing</p>
+<hr />
+<h2
+id="vuln-09-three-redundant-encryption-pipelines-increase-attack-surface">VULN-09:
+Three Redundant Encryption Pipelines Increase Attack Surface</h2>
+<p><strong>Severity:</strong> MEDIUM (CVSS 4.0/10)<br />
+<strong>Status:</strong> Architectural issue</p>
+<h3 id="description-8">Description</h3>
+<p>There are three separate RES54 implementations in the client code: -
+<code>src/lib/res54.ts</code> (1711 lines) -
+<code>src/lib/res54-r2.ts</code> (1681 lines) -
+<code>src/lib/res54-r2-pipeline.ts</code> (1408 lines)</p>
+<p>Plus the server-side: -
+<code>supabase/functions/cloudbliss-api/index.ts</code> (982 lines with
+RES54)</p>
+<p>And the legacy: - <code>src/lib/encryption.ts</code> (583 lines)</p>
+<h3 id="risk-1">Risk</h3>
+<ol type="1">
+<li><strong>Bug inconsistency:</strong> A fix applied to one pipeline
+may not be applied to others</li>
+<li><strong>Format drift:</strong> Different pipelines could produce
+incompatible ciphertexts</li>
+<li><strong>Maintenance burden:</strong> 4,800+ lines of encryption code
+across 5 files</li>
+<li><strong>Harder to audit:</strong> Each file must be independently
+reviewed</li>
+</ol>
+<hr />
+<h2
+id="vuln-10-memory-exposure-encryption-keys-in-plaintext-variables">VULN-10:
+Memory Exposure — Encryption Keys in Plaintext Variables</h2>
+<p><strong>Severity:</strong> MEDIUM (CVSS 5.5/10)<br />
+<strong>Status:</strong> Present in all pipelines</p>
+<h3 id="description-9">Description</h3>
+<p>The encryption key exists as a JavaScript string variable throughout
+the encryption/decryption lifecycle. In V8 (Chrome/Node.js), strings
+are: - Garbage-collected (not immediately freed) - May persist in memory
+snapshots - Exposed via <code>JSON.stringify()</code> (e.g., metadata is
+stringified for storage)</p>
+<h3 id="exploit-scenario-2">Exploit Scenario</h3>
+<ol type="1">
+<li>Attacker gains access to the browser process memory (Spectre,
+rowhammer, debugger attachment)</li>
+<li>Searches memory for a 64-character hex string pattern</li>
+<li>Finds the encryption key</li>
+<li>Can decrypt all files in the current session</li>
+</ol>
+<hr />
+<h2 id="vuln-11-no-key-rotation-mechanism">VULN-11: No Key Rotation
+Mechanism</h2>
+<p><strong>Severity:</strong> MEDIUM (CVSS 5.0/10)<br />
+<strong>Status:</strong> <code>rotateMasterKey</code> exists in
+<code>secure-key-manager.ts</code> but is not wired to the UI</p>
+<h3 id="description-10">Description</h3>
+<p>The <code>secure-key-manager.ts</code> has a
+<code>rotateMasterKey()</code> function (lines 268-321) that: 1. Derives
+current Master Key from current password 2. Generates a new Master Key
+3. Derives new wrapping key from new password 4. Re-wraps all file keys
+with the new Master Key</p>
+<p>However, this function is not exposed in the UI and the main RES54
+pipeline does not use the Master Key at all. There is no automatic key
+rotation policy (e.g., “rotate encryption keys every 90 days”).</p>
+<hr />
+<h1 id="part-iv-kza-karmic-zero-knowledge-architecture">PART IV: KZA —
+KARMIC ZERO-KNOWLEDGE ARCHITECTURE</h1>
+<h2 id="what-is-kza">4.1 What Is KZA?</h2>
+<p>KZA (Karmic Zero-knowledge Architecture) is SquidCloud’s
+<strong>threat detection and response system</strong>. It is NOT an
+encryption algorithm — it is a security monitoring system that:</p>
+<ol type="1">
+<li><strong>Profiles user behavior</strong> (endpoints, countries,
+request timing, devices)</li>
+<li><strong>Detects anomalies</strong> (geographic changes, device
+changes, unusual timing)</li>
+<li><strong>Scores threats</strong> (4 tiers: YELLOW, ORANGE, RED,
+BLACK)</li>
+<li><strong>Responds automatically</strong> (rate limiting, temporary
+bans, permanent bans)</li>
+<li><strong>Broadcasts intelligence</strong> (Oracle for threat intel
+sharing)</li>
+<li><strong>Generates incident reports</strong> (Verdict for post-mortem
+analysis)</li>
+<li><strong>Deploys honeypots</strong> (Phantom for attacker
+engagement)</li>
+</ol>
+<h2 id="kza-sentinel-the-core-754-lines">4.2 KZA Sentinel — The Core
+(754 lines)</h2>
+<p>The Sentinel is the primary threat detection engine. It runs as a
+Supabase Edge Function and is invoked by the CloudBliss API on every
+request.</p>
+<h3 id="architecture">Architecture</h3>
+<pre><code>Request → CloudBliss API → KZA Sentinel
+                               │
+                    ┌──────────┼──────────┐
+                    ▼          ▼          ▼
+              Profile DB   Threat DB   Ban DB
+              (kza_user_  (kza_threat_ (kza_banned_
+               profiles)   events)      entities)
+                    │          │          │
+                    └──────────┴──────────┘
+                               │
+                               ▼
+                         Scoring Engine
+                               │
+                    ┌──────────┼──────────┐
+                    ▼          ▼          ▼
+                 YELLOW    ORANGE     RED/BLACK
+                (watch)   (rate      (ban +
+                           limit)    session
+                                      kill)</code></pre>
+<h3 id="threat-scoring-system">Threat Scoring System</h3>
+<p>The Sentinel computes a cumulative threat score. Each signal adds
+points:</p>
+<h4 id="behavioral-anomalies-when-user-profile-exists">Behavioral
+Anomalies (when user profile exists)</h4>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Points</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Geo anomaly</td>
+<td>+25</td>
+<td>IP country never seen before</td>
+</tr>
+<tr>
+<td>Device anomaly</td>
+<td>+15</td>
+<td>User-Agent never seen before</td>
+</tr>
+<tr>
+<td>Velocity anomaly</td>
+<td>+20</td>
+<td>Request interval &lt; 33% of average</td>
+</tr>
+<tr>
+<td>Endpoint anomaly</td>
+<td>+10</td>
+<td>Hitting endpoints never hit before</td>
+</tr>
+<tr>
+<td>Time anomaly</td>
+<td>+10</td>
+<td>Request hour never seen before</td>
+</tr>
+</tbody>
+</table>
+<h4 id="technical-attack-signals">Technical Attack Signals</h4>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 29%" />
+<col style="width: 40%" />
+</colgroup>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Points</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SQL injection</td>
+<td>+60</td>
+<td>SQL patterns in payload</td>
+</tr>
+<tr>
+<td>Privilege field injection</td>
+<td>+60</td>
+<td>Auth fields in body (is_admin, etc.)</td>
+</tr>
+<tr>
+<td>Path traversal</td>
+<td>+70</td>
+<td>../ patterns</td>
+</tr>
+<tr>
+<td>Namespace escape</td>
+<td>+70</td>
+<td>Accessing other users’ resources</td>
+</tr>
+<tr>
+<td>Enumeration pattern</td>
+<td>+40</td>
+<td>Scanning IDs</td>
+</tr>
+<tr>
+<td>Enumeration volume</td>
+<td>+40</td>
+<td>&gt;20 unique IDs in 60 seconds</td>
+</tr>
+<tr>
+<td>Reconnaissance</td>
+<td>+30</td>
+<td>Probing /.env, /admin, /config, etc.</td>
+</tr>
+<tr>
+<td>OPTIONS/HEAD sweep</td>
+<td>+30</td>
+<td>&gt;5 OPTIONS probes in 60 sec</td>
+</tr>
+<tr>
+<td>Bot (no Accept-Language)</td>
+<td>+35</td>
+<td>Missing Accept-Language header</td>
+</tr>
+<tr>
+<td>Bot (no Accept-Encoding)</td>
+<td>+35</td>
+<td>Missing Accept-Encoding header</td>
+</tr>
+<tr>
+<td>Bot (headless UA)</td>
+<td>+35</td>
+<td>HeadlessChrome, PhantomJS, curl, etc.</td>
+</tr>
+<tr>
+<td>Bot (precise intervals)</td>
+<td>+35</td>
+<td>All intervals within 5ms of each other</td>
+</tr>
+<tr>
+<td>Token replay</td>
+<td>+80</td>
+<td>Revoked token detected</td>
+</tr>
+<tr>
+<td>Auth brute force</td>
+<td>+80</td>
+<td>&gt;5 failures in 5 minutes</td>
+</tr>
+<tr>
+<td>Credential stuffing</td>
+<td>+80</td>
+<td>&gt;10 unique accounts in 10 minutes</td>
+</tr>
+<tr>
+<td>MFA brute force</td>
+<td>+80</td>
+<td>&gt;3 MFA failures in 2 minutes</td>
+</tr>
+<tr>
+<td>Privilege escalation</td>
+<td>+100</td>
+<td>is_admin: true in body</td>
+</tr>
+<tr>
+<td>Admin route access</td>
+<td>+100</td>
+<td>Non-admin accessing /admin</td>
+</tr>
+<tr>
+<td>Cross-user modification</td>
+<td>+100</td>
+<td>Modifying another user’s resources</td>
+</tr>
+</tbody>
+</table>
+<h4 id="tier-thresholds">Tier Thresholds</h4>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Score</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>YELLOW</td>
+<td>10+</td>
+<td>Watchlisted, profile flagged</td>
+</tr>
+<tr>
+<td>ORANGE</td>
+<td>40+</td>
+<td>Rate limited (5 req/min before 429)</td>
+</tr>
+<tr>
+<td>RED</td>
+<td>70+</td>
+<td>Temp ban (24h), session killed</td>
+</tr>
+<tr>
+<td>BLACK</td>
+<td>100+</td>
+<td>Permanent ban, session killed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="kza-oracle-209-lines">4.3 KZA Oracle (209 lines)</h3>
+<p>The Oracle is a threat intelligence broadcasting system. When a RED
+or BLACK event is detected:</p>
+<ol type="1">
+<li>Sentinel calls Oracle with event details</li>
+<li>Oracle enriches the data (e.g., IP reputation lookup, threat feed
+correlation)</li>
+<li>Oracle broadcasts to a shared threat intelligence pool (future
+multi-tenant capability)</li>
+</ol>
+<p>Currently, the Oracle implementation is minimal — it mostly logs and
+acknowledges events rather than performing active intelligence
+gathering.</p>
+<h3 id="kza-verdict-189-lines">4.4 KZA Verdict (189 lines)</h3>
+<p>Verdict is the incident response post-processor. When called: 1.
+Loads the threat event details 2. Creates a structured incident report
+3. Stores it in <code>kza_admin_incidents</code> table 4. (Future)
+Triggers automated countermeasures like: - Alerting admins - Blocking IP
+ranges - Updating WAF rules</p>
+<p>Current implementation: creates incident record, logs the tier and
+event ID.</p>
+<h3 id="kza-phantom-204-lines">4.5 KZA Phantom (204 lines)</h3>
+<p>Phantom is the honeypot deployment system. When invoked: 1. Deploys
+decoy files/resources to attract attackers 2. Monitors access to
+honeypots 3. Feeds attacker behavior data back to Sentinel</p>
+<p>Current implementation: conceptual framework — defines honeypot
+structure but does not actively deploy decoys.</p>
+<h2 id="is-kza-actually-secure">4.6 Is KZA Actually Secure?</h2>
+<p>Let me give you an honest assessment.</p>
+<h3 id="what-kza-does-well">What KZA Does Well</h3>
+<ol type="1">
+<li><p><strong>Progressive profiling</strong> (lines 260-305): The
+system builds behavioral baselines over time — average request
+intervals, typical endpoints, active hours, countries, devices. This is
+sophisticated.</p></li>
+<li><p><strong>Tiered response</strong> (lines 602-751): Rather than a
+binary allow/block, KZA uses four tiers with graduated responses. This
+reduces false positive impact.</p></li>
+<li><p><strong>Session tracking:</strong> The <code>X-KZA-Session</code>
+header correlates requests within a session, even for unauthenticated
+users.</p></li>
+<li><p><strong>Authenticated timing safe comparison</strong> (lines
+103-113): The internal token verification uses XOR-based constant-time
+comparison to prevent timing attacks.</p></li>
+<li><p><strong>Comprehensive bot detection:</strong> Multiple signals
+checked — headers, user agent, interval precision, bot
+frameworks.</p></li>
+</ol>
+<h3 id="what-kza-does-not-do-well">What KZA Does NOT Do Well</h3>
+<ol type="1">
+<li><p><strong>It only protects the API, not the client.</strong> All
+KZA checks happen server-side in the CloudBliss API. The client-side
+RES54 pipeline does not use KZA at all. If an attacker is exfiltrating
+data directly from the browser (XSS, malicious extension), KZA is
+invisible.</p></li>
+<li><p><strong>No encryption-layer protection.</strong> KZA protects
+access patterns, not the data itself. Even with perfect KZA operation,
+the vulnerability of plaintext encryption keys in the database (VULN-01)
+is unaffected.</p></li>
+<li><p><strong>Limited Oracle implementation.</strong> The current
+Oracle is a logging relay, not a true threat intelligence platform.
+There is no IP reputation scoring, no external threat feed integration,
+no automated IoC sharing.</p></li>
+<li><p><strong>Phantom is unfinished.</strong> The honeypot system
+exists as a class definition but does not deploy actual decoys.</p></li>
+<li><p><strong>No storage-level monitoring.</strong> KZA monitors API
+access but does not monitor the GitHub storage repositories for
+unauthorized access patterns.</p></li>
+<li><p><strong>Profile database could be manipulated.</strong> If an
+attacker can inject false data into <code>kza_user_profiles</code>
+(e.g., by making requests from the victim’s country with a legitimate
+token), they can train the system to accept their behavior as normal
+(adversarial machine learning).</p></li>
+<li><p><strong>No encryption of KZA data.</strong> The
+<code>kza_user_profiles</code>, <code>kza_threat_events</code>, and
+<code>kza_banned_entities</code> tables are not encrypted at rest. An
+attacker with database access could:</p>
+<ul>
+<li>Read behavioral profiles of all users</li>
+<li>Clear their own ban records</li>
+<li>Plant false threat events</li>
+</ul></li>
+<li><p><strong>Internal authentication is weak.</strong> The
+<code>x-kza-internal</code> token is an HMAC-SHA256 of the service role
+key with a static string. If the service role key is compromised, anyone
+can forge internal KZA calls.</p></li>
+</ol>
+<h3 id="kza-security-score-7.010">KZA Security Score: 7.0/10</h3>
+<p>KZA is well-architected for what it does — behavioral threat
+detection. However: - It has several implementation gaps (Oracle,
+Phantom) - It operates at the wrong layer (API only, not
+storage/encryption) - It assumes the database is trusted (no encryption
+of KZA tables)</p>
+<hr />
+<h1 id="part-v-rethinking-res54-a-hardened-architecture">PART V:
+RETHINKING RES54 — A Hardened Architecture</h1>
+<h2 id="design-principles-for-res54-v4">5.1 Design Principles for RES54
+v4</h2>
+<ol type="1">
+<li><strong>Zero-knowledge by default</strong> — No plaintext keys
+anywhere, ever</li>
+<li><strong>Layered key hierarchy</strong> — Compromise of one layer
+does not compromise data</li>
+<li><strong>HSM-backed root of trust</strong> — Hardware security module
+for master key operations</li>
+<li><strong>Quantum-resistant hybrid encryption</strong> — AES-256-GCM +
+CRYSTALS-Kyber</li>
+<li><strong>No shared keys</strong> — Per-chunk derived keys</li>
+<li><strong>Deterministic AEAD</strong> — AdditionalData bound to user,
+file, chunk identity</li>
+<li><strong>Key separation</strong> — Storage keys ≠ file keys ≠ session
+keys</li>
+<li><strong>Audit every key access</strong> — KZA-level logging for all
+encryption operations</li>
+<li><strong>Forward secrecy</strong> — Compromise of today’s key does
+not expose yesterday’s files</li>
+<li><strong>Black-box encryption</strong> — The encryption module is a
+single audited unit, not 5 redundant implementations</li>
+</ol>
+<h2 id="proposed-key-hierarchy">5.2 Proposed Key Hierarchy</h2>
+<pre><code>User Password
+     │
+     ├─► PBKDF2 (Argon2id recommended) ──► Auth Key (for login)
+     │
+     ├─► PBKDF2 ──► Master Key
+     │              │
+     │              ├──► (HSM wrap) ──► HSM-Wrapped Master Key (stored in DB)
+     │              │
+     │              └──► KDF(userId, fileId) ──► File Master Key
+     │                                            │
+     │                                            ├──► KDF(chunkIndex) ──► Chunk Key 0
+     │                                            ├──► KDF(chunkIndex) ──► Chunk Key 1
+     │                                            └──► KDF(chunkIndex) ──► Chunk Key N
+     │
+     └──► (session) ──► Session Key (ephemeral, 15-min TTL, in-memory only)</code></pre>
+<h3 id="layer-1-auth-factor">Layer 1: Auth Factor</h3>
+<ul>
+<li>User password → Argon2id → Auth hash (for Supabase Auth)</li>
+<li>Separate from encryption key derivation</li>
+</ul>
+<h3 id="layer-2-master-key">Layer 2: Master Key</h3>
+<ul>
+<li>User password → PBKDF2 (600,000 iterations, NIST 2024
+recommendation) → Master Key</li>
+<li>Master Key is <strong>NEVER</strong> stored in plaintext</li>
+<li>Stored as: <code>HSM-AES-GCM-Wrap(Master Key, HSM Key)</code> =
+wrapped blob in <code>master_keys</code> table</li>
+<li>HSM performs the wrap/unwrap operations via remote attestation</li>
+</ul>
+<h3 id="layer-3-file-master-key">Layer 3: File Master Key</h3>
+<ul>
+<li><code>HKDF(Master Key, context="squid-file-master", salt=random_per_file)</code>
+→ File Master Key</li>
+<li>One per file, stored as:
+<code>AES-GCM-Wrap(File Master Key, Master Key)</code> in
+<code>encrypted_keys</code> table</li>
+</ul>
+<h3 id="layer-4-per-chunk-keys">Layer 4: Per-Chunk Keys</h3>
+<ul>
+<li><code>HKDF(File Master Key, context="squid-chunk", info=chunkIndex)</code>
+→ Chunk Key</li>
+<li>Never stored — derived on-the-fly during encryption/decryption</li>
+<li>If chunk key is recovered by an attacker, only that chunk is
+compromised</li>
+</ul>
+<h2 id="aes-256-gcm-is-not-enough-what-more-do-we-need">5.3 AES-256-GCM
+Is Not Enough — What More Do We Need?</h2>
+<h3 id="problem-aes-256-gcm-has-no-forward-secrecy">Problem: AES-256-GCM
+has no forward secrecy</h3>
+<p>If an attacker records all encrypted traffic today and obtains the
+key tomorrow, they can decrypt all recorded traffic.</p>
+<h3 id="solution-1-noise-protocol-framework">Solution 1: Noise Protocol
+Framework</h3>
+<p>Noise Protocol is a framework for building secure communication
+protocols (used by Signal, WhatsApp, WireGuard). It provides:</p>
+<ul>
+<li><strong>Elliptic-curve Diffie-Hellman</strong> for key
+agreement</li>
+<li><strong>Perfect forward secrecy</strong> via ephemeral key
+exchange</li>
+<li><strong>Double ratchet</strong> for continuous key rotation</li>
+<li><strong>Identity hiding</strong> (optional)</li>
+</ul>
+<p>Integration with RES54:</p>
+<pre><code>Upload Session:
+  1. Client ephemeral keypair → Server ephemeral keypair → Shared secret
+  2. Shared secret → HKDF → Session Key (forward secret)
+  3. File Key encrypted with Session Key
+  4. Session key discarded after upload
+
+Download Session:
+  1. New key exchange → New shared secret (different from upload!)
+  2. Session Key derived again
+  3. File Key unwrapped with new Session Key</code></pre>
+<p>This is a <strong>major</strong> architectural change but provides
+true forward secrecy.</p>
+<h3 id="solution-2-post-quantum-hybrid">Solution 2: Post-Quantum
+Hybrid</h3>
+<p>NIST standardized CRYSTALS-Kyber (now ML-KEM) in 2024 as the first
+post-quantum key encapsulation mechanism.</p>
+<p>RES54 should implement <strong>hybrid key exchange</strong>:</p>
+<pre><code>Traditional:   X25519 ECDH
+Quantum-safe:  ML-KEM-768 (Kyber-768)
+Combined:      KDF(ECDH_shared || Kyber_shared)</code></pre>
+<p>This protects against: - “Harvest now, decrypt later” attacks
+(adversary records encrypted data today, decrypts with quantum computer
+tomorrow) - CRYSTALS-Kyber implementation flaws (traditional ECDH
+provides backup)</p>
+<h3 id="solution-3-hsm-integration">Solution 3: HSM Integration</h3>
+<p>A Hardware Security Module is a dedicated processor that: - Stores
+cryptographic keys in tamper-resistant hardware - Performs
+encryption/decryption inside the chip - Never exports private keys in
+plaintext - Provides physical tamper evidence</p>
+<p>For RES54 v4:</p>
+<pre><code>Cloud HSM (AWS CloudHSM / Azure Dedicated HSM / Google Cloud HSM)
+     │
+     ├── HSM Root Key (generated inside HSM, never exported)
+     │
+     ├── (HSM generate) → Tenant Master Key
+     │     ├── Stored as: HSM-wrapped blob (can only be unwrapped by HSM)
+     │     └── Usage: HSM.unwrap(tmekBlob) → TMK in HSM memory → wrap/unwrap file keys
+     │
+     └── (HSM attestation) → Proof that keys are HSM-backed
+           └── Included in audit log for compliance</code></pre>
+<h3 id="solution-4-key-commitment">Solution 4: Key Commitment</h3>
+<p>A key-committing AEAD scheme prevents key-search attacks. Standard
+AES-GCM is NOT key-committing — an attacker who has two different keys
+can create a ciphertext that decrypts successfully under both keys.</p>
+<p>RES54 should use <strong>AES-GCM-SIV</strong> (RFC 8452) or
+<strong>AES-GCM with key commitment</strong>:</p>
+<pre><code>enckey = HKDF(master_key, context=&quot;encryption&quot;, salt)
+authkey = HKDF(master_key, context=&quot;authentication&quot;, salt)
+ciphertext = AES-GCM(enckey, plaintext, nonce)
+commitment = HMAC(authkey, ciphertext || nonce)</code></pre>
+<p>The commitment proves which key was used, preventing key-confusion
+attacks.</p>
+<h2 id="the-complete-res54-v4-protocol">5.4 The Complete RES54 v4
+Protocol</h2>
+<h3 id="file-upload">File Upload</h3>
+<pre><code>Client                              Server/HSM
+  │                                      │
+  │ 1. POST /v4/session/init             │
+  │ ─────────────────────────────────►   │
+  │                                      ├── Generate ephemeral keypair (X25519 + Kyber-768)
+  │ ◄─────────────────────────────────   │
+  │     { server_ephemeral_pub,          │
+  │       hsm_attestation }              │
+  │                                      │
+  │ 2. Generate client ephemeral keypair │
+  │    Compute shared secret:            │
+  │      KDF(ECDH || Kyber)             │
+  │    Derive session key:               │
+  │      HKDF(shared, &quot;res54-v4-session&quot;)│
+  │                                      │
+  │ 3. For each chunk:                   │
+  │    chunkKey = HKDF(session_key,      │
+  │      &quot;chunk&quot;, chunkIndex)            │
+  │    iv = random(12)                   │
+  │    aad = &quot;res54-v4|userId|fileId|    │
+  │           chunkIndex&quot;                │
+  │    ciphertext = AES-GCM-SIV(         │
+  │      chunkKey, chunk, iv, aad)       │
+  │                                      │
+  │ 4. POST /v4/files/{id}/chunks        │
+  │ ─────────────────────────────────►   │
+  │     { ciphertext, iv, aad,           │
+  │       proof }                        │
+  │                                      │
+  │ 5. File Master Key:                  │
+  │    fmk = HKDF(session_key,           │
+  │      &quot;file-master&quot;, fileId)          │
+  │    wrapped_fmk = HSM.wrap(fmk)       │
+  │                                      │
+  │ 6. POST /v4/files/{id}/key           │
+  │ ─────────────────────────────────►   │
+  │     { wrapped_fmk }                  │
+  │    ◄───────────────────────────────  │
+  │     { success }                      │
+  │                                      │
+  │ 7. Destroy session key               │
+  │    Destroy ephemeral keypair         │</code></pre>
+<h3 id="file-download">File Download</h3>
+<pre><code>Client                              Server/HSM
+  │                                      │
+  │ 1. POST /v4/files/{id}/key           │
+  │ ─────────────────────────────────►   │
+  │                                      ├── HSM.unwrap(wrapped_fmk) → FMK
+  │                                      ├── Encrypt FMK with session key
+  │    ◄───────────────────────────────  │
+  │     { encrypted_fmk }               │
+  │                                      │
+  │ 2. Decrypt FMK with session key      │
+  │    Derive per-chunk keys             │
+  │    Download &amp; decrypt chunks         │
+  │                                      │
+  │ 3. Destroy FMK from memory           │
+  │    Destroy session key               │</code></pre>
+<h2 id="security-comparison">5.5 Security Comparison</h2>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 38%" />
+<col style="width: 42%" />
+</colgroup>
+<thead>
+<tr>
+<th>Property</th>
+<th>RES54 v3 (current)</th>
+<th>RES54 v4 (proposed)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Encryption algorithm</td>
+<td>AES-256-GCM</td>
+<td>AES-256-GCM-SIV + hybrid KEM</td>
+</tr>
+<tr>
+<td>Key storage</td>
+<td>Plaintext in DB (or BYOK)</td>
+<td>HSM-wrapped, key hierarchy</td>
+</tr>
+<tr>
+<td>Key derivation</td>
+<td>SHA-256 (fast hash)</td>
+<td>HKDF with per-context salts</td>
+</tr>
+<tr>
+<td>Chunk keys</td>
+<td>Same key for all chunks</td>
+<td>Per-chunk derived keys</td>
+</tr>
+<tr>
+<td>Forward secrecy</td>
+<td>None</td>
+<td>Ephemeral X25519 + Kyber</td>
+</tr>
+<tr>
+<td>Post-quantum</td>
+<td>None</td>
+<td>ML-KEM-768</td>
+</tr>
+<tr>
+<td>HSM support</td>
+<td>None</td>
+<td>Cloud HSM (attested)</td>
+</tr>
+<tr>
+<td>AEAD binding</td>
+<td>Timestamp (non-deterministic)</td>
+<td>user-id + file-id + chunk-index</td>
+</tr>
+<tr>
+<td>Key commitment</td>
+<td>None</td>
+<td>Commitment proof</td>
+</tr>
+<tr>
+<td>Zero-knowledge</td>
+<td>Partial (BYOK only)</td>
+<td>Default for all files</td>
+</tr>
+<tr>
+<td>Audit trail</td>
+<td>None at encryption layer</td>
+<td>Every key operation logged</td>
+</tr>
+<tr>
+<td>Memory protection</td>
+<td>Keys in JS strings</td>
+<td>Keys in ArrayBuffer + explicit zeroing</td>
+</tr>
+<tr>
+<td>Redundancy</td>
+<td>5 files, 3 pipelines</td>
+<td>Single audited module</td>
+</tr>
+<tr>
+<td>KZA integration</td>
+<td>API access only</td>
+<td>Full encryption-layer monitoring</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="part-vi-the-path-forward-implementation-roadmap">PART VI: THE
+PATH FORWARD — Implementation Roadmap</h1>
+<h2 id="phase-1-quick-wins-1-2-weeks">Phase 1: Quick Wins (1-2
+weeks)</h2>
+<ol type="1">
+<li><p><strong>Eliminate VULN-01 in the primary RES54 path:</strong>
+Wrap file keys via <code>secure-key-manager.ts</code> before storing to
+<code>files.encryption_key</code>. The unwrapped key is held in-memory
+(session key manager) during the upload session only.</p></li>
+<li><p><strong>Fix VULN-05:</strong> Change AEAD additionalData to
+deterministic values:</p>
+<div class="sourceCode" id="cb30"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> aad <span class="op">=</span> <span class="kw">new</span> <span class="fu">TextEncoder</span>()<span class="op">.</span><span class="fu">encode</span>(<span class="vs">`res54-v3|userId=</span><span class="sc">${</span>userId<span class="sc">}</span><span class="vs">|fileId=</span><span class="sc">${</span>fileId<span class="sc">}</span><span class="vs">|chunkIndex=</span><span class="sc">${</span>chunkIndex<span class="sc">}</span><span class="vs">`</span>)<span class="op">;</span></span></code></pre></div></li>
+<li><p><strong>Fix VULN-07:</strong> Replace
+<code>CryptoJS.lib.WordArray.random(32)</code> with
+<code>crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, ...)</code>.</p></li>
+<li><p><strong>Fix VULN-08:</strong> Implement streaming SHA-256 for
+large files using Web Crypto’s <code>SubtleCrypto.digest()</code> on
+streamed chunks.</p></li>
+<li><p><strong>Add API key KDF:</strong> Replace SHA-256 API key
+verification with PBKDF2 (already implemented in
+<code>key-derivation.ts</code> — just import it).</p></li>
+</ol>
+<h2 id="phase-2-architectural-consolidation-2-4-weeks">Phase 2:
+Architectural Consolidation (2-4 weeks)</h2>
+<ol start="6" type="1">
+<li><p><strong>Consolidate 3 pipelines into 1:</strong> Remove
+<code>res54-r2.ts</code> and <code>res54-r2-pipeline.ts</code>. Keep
+<code>res54.ts</code> as the single source of truth.</p></li>
+<li><p><strong>Wire Master Key into upload/download flow:</strong> The
+<code>res54.ts</code> upload flow should use <code>storeFileKey()</code>
+from <code>secure-key-manager.ts</code> rather than directly inserting
+into <code>files.encryption_key</code>.</p></li>
+<li><p><strong>Key rotation UI:</strong> Expose
+<code>rotateMasterKey()</code> in settings. Add automatic 90-day
+rotation reminder.</p></li>
+<li><p><strong>KZA Oracle enhancement:</strong> Add IP reputation
+scoring (AbuseIPDB, VirusTotal). Implement threat feed
+consumption.</p></li>
+</ol>
+<h2 id="phase-3-hardened-architecture-2-3-months">Phase 3: Hardened
+Architecture (2-3 months)</h2>
+<ol start="10" type="1">
+<li><p><strong>Noise Protocol integration:</strong> Implement ephemeral
+key exchange for all file operations.</p></li>
+<li><p><strong>Post-quantum hybrid:</strong> Add ML-KEM-768
+(CRYSTALS-Kyber) alongside X25519 ECDH.</p></li>
+<li><p><strong>HSM integration:</strong> AWS CloudHSM or Azure Dedicated
+HSM for master key operations.</p></li>
+<li><p><strong>AES-GCM-SIV:</strong> Migrate from AES-GCM to AES-GCM-SIV
+for key commitment properties.</p></li>
+<li><p><strong>Memory-safe key handling:</strong> Use
+<code>ArrayBuffer</code> with explicit zeroing
+(<code>new Uint8Array(buffer).fill(0)</code>) instead of string
+variables.</p></li>
+</ol>
+<h2 id="phase-4-platform-migration-3-6-months">Phase 4: Platform
+Migration (3-6 months)</h2>
+<ol start="15" type="1">
+<li><strong>squidctl (CLI replacement):</strong> Replace
+<code>cloudbliss-api</code> Edge Function with a Go binary
+embedding:</li>
+</ol>
+<ul>
+<li>gRPC for API (replacing HTTP REST Edge Functions)</li>
+<li>BadgerDB/SQLite for metadata (replacing Supabase PostgreSQL)</li>
+<li>Embedded Noise Protocol + ML-KEM for all encryption</li>
+<li>Ed25519 for identity (replacing JWT)</li>
+<li>Usage credits ledger (replacing Stripe/Paddle)</li>
+<li>P2P mesh for BYOS storage routing</li>
+</ul>
+<ol start="16" type="1">
+<li><strong>Full KZA in squidctl:</strong> Port KZA Sentinel logic into
+the Go daemon:</li>
+</ol>
+<ul>
+<li>Behavioral profiling with embedded ML (TinyGo / onnx runtime)</li>
+<li>Honeypot deployment (Phantom) with actual decoy files</li>
+<li>Incident response automation (Verdict) with webhook/email
+alerts</li>
+<li>Storage-layer monitoring (scanning BYOS repos for unauthorized
+access)</li>
+</ul>
+<hr />
+<h1 id="part-vii-final-verdict">PART VII: FINAL VERDICT</h1>
+<h2 id="what-squidcloud-gets-right">What SquidCloud Gets Right</h2>
+<ol type="1">
+<li><strong>AES-256-GCM is the right algorithm</strong> — NIST-approved,
+hardware-accelerated, authenticated</li>
+<li><strong>Web Workers + Load Balancer</strong> — Non-blocking,
+rate-limited, production-grade concurrency</li>
+<li><strong>BYOK support</strong> — True zero-knowledge when the user
+provides their own key</li>
+<li><strong>KZA Sentinel</strong> — Sophisticated behavioral profiling
+with tiered response (ahead of most startups)</li>
+<li><strong>Distributed storage</strong> — Chunking across multiple
+GitHub repos adds a layer of obscurity (though not real security)</li>
+<li><strong>Master Key + key wrapping</strong> exists in the codebase —
+just not wired to the main pipeline</li>
+</ol>
+<h2 id="what-must-be-fixed">What Must Be Fixed</h2>
+<ol type="1">
+<li><strong>Plaintext keys in database</strong> — The #1 vulnerability.
+This makes all other encryption moot.</li>
+<li><strong>No KDF for API keys</strong> — SHA-256 alone is insufficient
+for credential storage.</li>
+<li><strong>Effective key strength is 128-bit, not 256-bit</strong> —
+Key truncation in derivation pipeline.</li>
+<li><strong>Non-deterministic AEAD</strong> — Timestamp-based
+additionalData prevents integrity verification.</li>
+<li><strong>5 redundant encryption files</strong> — 4,800+ lines of
+duplicate logic = 4,800+ lines of potential bugs.</li>
+<li><strong>KZA at the wrong layer</strong> — Protects API access but
+not the data itself.</li>
+<li><strong>No forward secrecy</strong> — Any key compromise decrypts
+all past and future files encrypted with that key.</li>
+<li><strong>No quantum resistance</strong> — “Harvest now, decrypt
+later” risk for long-lived encrypted files.</li>
+<li><strong>No HSM</strong> — Master key is software-only, stored as a
+wrapped blob in PostgreSQL.</li>
+<li><strong>KZA internal token uses static HMAC</strong> — Service role
+key exposure = KZA bypass.</li>
+</ol>
+<h2 id="the-professors-summary">The Professor’s Summary</h2>
+<p>In twenty years of teaching cryptography, I have seen a thousand
+systems that “use AES-256-GCM” and declare themselves secure. RES54 is
+NOT the worst of them. It has real architectural sophistication — the
+KZA Sentinel, the distributed storage topology, the BYOK path, the key
+wrapping — that puts it ahead of 90% of what I review.</p>
+<p>But it has a fatal flaw that is common to nearly every system built
+by engineers who learned cryptography from Stack Overflow: <strong>the
+keys are stored next to the locks.</strong></p>
+<p>The <code>files.encryption_key</code> column is a ticking time bomb.
+Everything else — the AES, the KZA, the distributed storage, the Web
+Workers, the load balancer — is fighting a war that has already been
+lost if that column is compromised.</p>
+<p>The good news is that the fix already exists in the codebase.
+<code>secure-key-manager.ts</code> has the right architecture. It just
+needs to be wired into the main pipeline. That, plus the Noise Protocol
+layer for forward secrecy, and you have a genuinely secure system.</p>
+<p>The bad news is that the KZA system, while sophisticated, is
+defending the wrong castle. It guards the API gate while leaving the
+treasury (the <code>files</code> table) unlocked. A proper KZA v2 would
+monitor database access patterns, storage node access, and encryption
+key usage, not just API request patterns.</p>
+<p><strong>RES54 v3 Security Score: 7.1/10</strong> — Above average but
+vulnerable in critical areas <strong>RES54 v4 (proposed) Security Score
+Target: 9.5/10</strong> — With HSM, PQ hybrid, Noise protocol
+<strong>KZA v1 Security Score: 7.0/10</strong> — Well-designed but
+incomplete and at the wrong layer <strong>KZA v2 (proposed) Security
+Score Target: 9.0/10</strong> — With storage monitoring, encryption
+audit, ML-powered Oracle</p>
+<hr />
+<p><em>End of Deep Dive Analysis. Next step: implementation of Phase 1
+quick wins.</em></p>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "squidveil-wasm",
+  "version": "1.0.0",
+  "description": "SquidVeil secrets management - TypeScript SDK for browser and Node.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "squidveil",
+    "secrets",
+    "security",
+    "encryption",
+    "squidcloud"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.0.1"
+  }
+}

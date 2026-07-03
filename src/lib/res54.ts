@@ -1,0 +1,1036 @@
+import { supabase } from "@/integrations/supabase/client";
+import { decryptData, generateEncryptionKey, detectEncryptionVersion } from "./encryption";
+import { getLoadBalancer } from "@/services/load-balancer";
+import { generateSalt, arrayBufferToBase64 as arrayToBase64 } from "@/lib/key-derivation";
+import { base64ToArrayBuffer } from '@/services/byok-encryption';
+import { requestEphemeralBYOKKey, requestKeySelection, requestMandatoryBYOKSetup, type BYOKPromptReason } from '@/services/ephemeral-byok-prompt';
+import { deriveFileKey, deriveChunkKey, generatePerFileKey, encryptChunkV3, decryptChunkV3 } from '@/lib/encryption-v3';
+import type { FileKeyMaterial } from '@/lib/encryption-v3';
+
+const isProductionBuild = import.meta.env.PROD;
+const ACTIVE_WORKSPACE_STORAGE_KEY = 'squid_active_workspace_id';
+
+const devLog = (...args: unknown[]) => {
+  if (!isProductionBuild) console.log(...args);
+};
+
+const devWarn = (...args: unknown[]) => {
+  if (!isProductionBuild) console.warn(...args);
+};
+
+const getActiveWorkspaceId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(ACTIVE_WORKSPACE_STORAGE_KEY);
+};
+
+const getChunkStoragePath = (userId: string, chunkId: string): string => {
+  const workspaceId = getActiveWorkspaceId();
+  if (!workspaceId) {
+    return `${userId}/${chunkId}.bin`;
+  }
+  return `${userId}/${workspaceId}/${chunkId}.bin`;
+};
+
+type Res54ProgressCallback = (progress: number, stage: string, details?: any) => void;
+
+export interface Res54DownloadOptions {
+  reason?: BYOKPromptReason;
+  fileName?: string;
+  decryptionKey?: string;
+  fileRecord?: Record<string, any>;
+  shareId?: string;
+}
+
+interface BYOKRuntimePolicy {
+  enabled: boolean;
+  strictMode: boolean;
+  allowDefaultFallback: boolean;
+  promptEveryDecrypt: boolean;
+  hasAccountKey: boolean;
+}
+
+const getBYOKRuntimePolicy = async (userId: string): Promise<BYOKRuntimePolicy> => {
+  try {
+    const { data, error } = await supabase
+      .from('user_encryption_settings')
+      .select('settings')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return { enabled: false, strictMode: true, allowDefaultFallback: true, promptEveryDecrypt: true, hasAccountKey: false };
+    }
+
+    const settings = (data.settings || {}) as Record<string, any>;
+
+    return {
+      enabled: Boolean(settings.byok_enabled),
+      strictMode: settings.strict_mode ?? true,
+      allowDefaultFallback: settings.allow_default_fallback ?? true,
+      promptEveryDecrypt: settings.prompt_every_decrypt ?? true,
+      hasAccountKey: Boolean(settings.account_key_hash),
+    };
+  } catch (error) {
+    devWarn('Failed to load BYOK runtime policy');
+    return { enabled: false, strictMode: true, allowDefaultFallback: true, promptEveryDecrypt: true, hasAccountKey: false };
+  }
+};
+
+// Web Worker pool for non-blocking encryption
+const WORKER_POOL_SIZE = 4;
+let encryptionWorkers: Worker[] | null = null;
+
+const getEncryptionWorker = (chunkIndex: number): Worker => {
+  if (!encryptionWorkers) {
+    encryptionWorkers = [];
+    for (let i = 0; i < WORKER_POOL_SIZE; i++) {
+      try {
+        const worker = new Worker(new URL('../workers/upload-worker.ts', import.meta.url), { type: 'module' });
+        encryptionWorkers.push(worker);
+      } catch (error) {
+        devWarn('Web Worker not available:', error);
+      }
+    }
+    if (encryptionWorkers.length === 0) throw new Error('No Web Workers available for encryption');
+  }
+  return encryptionWorkers[chunkIndex % encryptionWorkers.length];
+};
+
+const terminateAllWorkers = () => {
+  if (encryptionWorkers) {
+    encryptionWorkers.forEach(w => w.terminate());
+    encryptionWorkers = null;
+  }
+};
+
+let v3FileKeyState: { userId: string; fileId: string; fileKeyRaw: ArrayBuffer; totalChunks: number } | null = null;
+
+export function clearV3KeyState() {
+  v3FileKeyState = null;
+}
+
+async function resolveUploadEncryptionKey(file: File, userId: string, isBYOKActive: boolean, totalChunks: number): Promise<{ encryptionKey: string }> {
+  if (!isBYOKActive) return { encryptionKey: generateEncryptionKey() };
+
+  const selection = await requestKeySelection({ fileName: file.name, fileSize: file.size });
+  if (!selection) throw new Error("Encryption key selection was cancelled.");
+
+  if (selection.mode === 'saved') {
+    const sessionKey = await getV3SessionKey();
+    if (!sessionKey) throw new Error("Please unlock your encryption key first.");
+    const fileId = crypto.randomUUID();
+    const fm = await deriveFileKey(sessionKey, fileId);
+    v3FileKeyState = { userId, fileId, fileKeyRaw: fm.fileKeyRaw, totalChunks };
+    return { encryptionKey: `v3_byok_${fileId}` };
+  }
+
+  if (selection.mode === 'custom' && selection.customKey) return { encryptionKey: selection.customKey };
+
+  if (selection.mode === 'unique') {
+    const { keyRaw } = await generatePerFileKey();
+    const fileId = `unique_${crypto.randomUUID()}`;
+    const fm = await deriveFileKey(keyRaw, fileId);
+    v3FileKeyState = { userId, fileId, fileKeyRaw: fm.fileKeyRaw, totalChunks };
+    return { encryptionKey: `v3_unique_${fileId}` };
+  }
+
+  return { encryptionKey: generateEncryptionKey() };
+}
+
+async function getV3SessionKey(): Promise<ArrayBuffer | null> {
+  try {
+    const { sessionKeyManager } = await import('@/services/session-key-manager');
+    const sessionKey = sessionKeyManager.getAccountKey();
+    if (!sessionKey?.key) return null;
+    return await crypto.subtle.exportKey('raw', sessionKey.key);
+  } catch {
+    return null;
+  }
+}
+
+async function encryptChunkWithWorkerV3(chunkData: ArrayBuffer, index: number): Promise<ArrayBuffer> {
+  if (!v3FileKeyState) throw new Error("V3 key state not initialized");
+  const { fileKeyRaw, userId, fileId, totalChunks } = v3FileKeyState;
+  const { chunkKeyRaw, iv } = await deriveChunkKey(fileKeyRaw, index);
+  const encoder = new TextEncoder();
+  const aad = encoder.encode(`res54-v3|${userId}|${fileId}|${index}|${totalChunks}`);
+  const loadBalancer = getLoadBalancer();
+  
+  return loadBalancer.execute(
+    () => new Promise<ArrayBuffer>((resolve, reject) => {
+      const worker = getEncryptionWorker(index);
+      const timeout = setTimeout(() => {
+        worker.removeEventListener('message', handler);
+        reject(new Error(`V3 encryption timeout for chunk ${index}`));
+      }, 60000);
+
+      const handler = (event: MessageEvent) => {
+        if (event.data.index === index) {
+          clearTimeout(timeout);
+          worker.removeEventListener('message', handler);
+          if (event.data.type === 'chunk-encrypted') resolve(event.data.data);
+          else if (event.data.type === 'error') reject(new Error(event.data.error));
+        }
+      };
+
+      worker.addEventListener('message', handler);
+      worker.postMessage({ type: 'encrypt-chunk-v3', chunkData, chunkKey: chunkKeyRaw, iv, aad, index }, [chunkData]);
+    }),
+    { priority: 3, poolType: 'encryption', tags: ['encryption', 'v3'], timeout: 120000, maxRetries: 3 }
+  );
+}
+
+async function resolveV3DecryptKey(encKey: string, userId: string, fileId: string): Promise<ArrayBuffer | null> {
+  try {
+    if (encKey.startsWith('v3_byok_')) {
+      const fileKeyId = encKey.replace('v3_byok_', '');
+      const sessionKey = await getV3SessionKey();
+      if (!sessionKey) {
+        const { requestEphemeralBYOKKey: promptKey } = await import('@/services/ephemeral-byok-prompt');
+        const keyStr = await promptKey({ title: 'Unlock encryption key', description: 'Enter your BYOK key to decrypt this file' });
+        if (!keyStr) return null;
+        const encoder = new TextEncoder();
+        const raw = encoder.encode(keyStr).buffer;
+        const fm = await deriveFileKey(raw, fileKeyId);
+        return fm.fileKeyRaw;
+      }
+      const fm = await deriveFileKey(sessionKey, fileKeyId);
+      return fm.fileKeyRaw;
+    }
+    if (encKey.startsWith('v3_custom_')) {
+      const fileKeyId = encKey.replace('v3_custom_', '');
+      const { requestEphemeralBYOKKey: promptKey } = await import('@/services/ephemeral-byok-prompt');
+      const keyStr = await promptKey({ title: 'Enter custom key', description: 'Enter the custom key used to encrypt this file' });
+      if (!keyStr) return null;
+      const encoder = new TextEncoder();
+      const raw = encoder.encode(keyStr.padEnd(32)).buffer;
+      const fm = await deriveFileKey(raw, fileKeyId);
+      return fm.fileKeyRaw;
+    }
+    if (encKey.startsWith('v3_unique_')) {
+      const fileKeyId = encKey.replace('v3_unique_', '');
+      const { sessionKeyManager } = await import('@/services/session-key-manager');
+      const sessionCryptoKey = sessionKeyManager.getAccountKey()?.key;
+      if (!sessionCryptoKey) return null;
+      const { unwrapPerFileKey } = await import('@/lib/encryption-v3');
+      const { data } = await supabase.from('encrypted_keys').select('wrapped_key, key_iv').eq('file_id', fileKeyId).maybeSingle();
+      if (!data) return null;
+      const raw = await unwrapPerFileKey(data.wrapped_key, data.key_iv, sessionCryptoKey);
+      const fm = await deriveFileKey(raw, fileKeyId);
+      return fm.fileKeyRaw;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function decryptAllV3Chunks(sortedChunks: string[], fileKeyRaw: ArrayBuffer | null, userId: string, fileId: string, progressCallback?: Res54ProgressCallback): Promise<ArrayBuffer[]> {
+  if (!fileKeyRaw) throw new Error('V3 key material not available');
+  const decrypted: ArrayBuffer[] = [];
+  const totalChunks = sortedChunks.length;
+
+  for (let i = 0; i < totalChunks; i++) {
+    progressCallback?.(60 + ((i + 1) / totalChunks * 30), 'decrypting', { current: i + 1, total: totalChunks });
+    const chunkBuffer = base64ToArrayBuffer(sortedChunks[i]);
+    const decryptedChunk = await decryptChunkV3(chunkBuffer.buffer, fileKeyRaw, userId, fileId, i, totalChunks);
+    decrypted.push(decryptedChunk);
+  }
+  return decrypted;
+}
+
+async function encryptChunkDispatch(chunkData: ArrayBuffer, encryptionKey: string, index: number): Promise<ArrayBuffer> {
+  if (v3FileKeyState && (encryptionKey.startsWith('v3_byok_') || encryptionKey.startsWith('v3_unique_') || encryptionKey.startsWith('v3_custom_'))) {
+    return encryptChunkWithWorkerV3(chunkData, index);
+  }
+  return encryptChunkWithWorker(chunkData, encryptionKey, index);
+}
+
+const encryptChunkWithWorker = async (chunkData: ArrayBuffer, encryptionKey: string, index: number): Promise<ArrayBuffer> => {
+  const loadBalancer = getLoadBalancer();
+  return loadBalancer.execute(
+    () => new Promise<ArrayBuffer>((resolve, reject) => {
+      const worker = getEncryptionWorker(index);
+      const timeout = setTimeout(() => {
+        worker.removeEventListener('message', handler);
+        reject(new Error(`Encryption timeout for chunk ${index}`));
+      }, 60000);
+
+      const handler = (event: MessageEvent) => {
+        if (event.data.index === index) {
+          clearTimeout(timeout);
+          worker.removeEventListener('message', handler);
+          if (event.data.type === 'chunk-encrypted') resolve(event.data.data);
+          else if (event.data.type === 'error') reject(new Error(event.data.error));
+        }
+      };
+
+      worker.addEventListener('message', handler);
+      worker.postMessage({ type: 'encrypt-chunk', chunkData, encryptionKey, index }, [chunkData]);
+    }),
+    { priority: 3, poolType: 'encryption', tags: ['encryption', 'chunk', `chunk-${index}`], timeout: 65000 }
+  );
+};
+
+export interface ChunkMetadata {
+  index: number;
+  totalChunks: number;
+  size: number;
+  offset: number;
+  sha256: string;
+  repo?: string;
+  path?: string;
+  accountId?: number;
+}
+
+interface Res54FileMetadata {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  chunks: ChunkMetadata[];
+  encryptionKey: string;
+  created: string;
+  previewAvailable: boolean;
+  previewType?: string;
+  previewPath?: string;
+}
+
+const MAX_PARALLEL_OPERATIONS = 16;
+const MAX_RETRIES = 5;
+const RETRY_DELAY_BASE = 500;
+const LARGE_FILE_THRESHOLD = 100 * 1024 * 1024;
+const VERY_LARGE_FILE_THRESHOLD = 500 * 1024 * 1024;
+
+const CHUNK_SIZE_SMALL = 2 * 1024 * 1024;
+const CHUNK_SIZE_MEDIUM = 8 * 1024 * 1024;
+const CHUNK_SIZE_LARGE = 8 * 1024 * 1024;
+const CHUNK_SIZE_XLARGE = 4 * 1024 * 1024;
+
+const BATCH_SIZE = 12;
+const BATCH_SIZE_LARGE_FILE = 8;
+const STREAMING_BATCH_SIZE = 6;
+
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    for (let j = 0; j < chunk.length; j++) binary += String.fromCharCode(chunk[j]);
+  }
+  return btoa(binary);
+};
+
+export const determineChunkingStrategy = (fileSize: number): number => {
+  if (fileSize > VERY_LARGE_FILE_THRESHOLD) return CHUNK_SIZE_XLARGE;
+  if (fileSize > LARGE_FILE_THRESHOLD) return CHUNK_SIZE_LARGE;
+  if (fileSize > 10 * 1024 * 1024) return CHUNK_SIZE_MEDIUM;
+  return CHUNK_SIZE_SMALL;
+};
+
+const getBatchSize = (fileSize: number): number => {
+  if (fileSize > VERY_LARGE_FILE_THRESHOLD) return BATCH_SIZE_LARGE_FILE;
+  return BATCH_SIZE;
+};
+
+const readFileChunk = async (file: File, start: number, end: number): Promise<ArrayBuffer> => {
+  return new Promise((resolve, reject) => {
+    const chunk = file.slice(start, end);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const buffer = e.target?.result as ArrayBuffer;
+      if (buffer instanceof ArrayBuffer && buffer.byteLength > 0) resolve(buffer);
+      else reject(new Error('Invalid chunk data'));
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(chunk);
+  });
+};
+
+export const createFileChunks = async (file: File, progressCallback?: (progress: number) => void, encryptionKey?: string): Promise<{ chunks: ArrayBuffer[], metadata: Res54FileMetadata }> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Authentication required");
+
+  if (!encryptionKey) encryptionKey = generateEncryptionKey();
+
+  const chunkSize = determineChunkingStrategy(file.size);
+  const totalChunks = Math.ceil(file.size / chunkSize);
+  const chunks: ArrayBuffer[] = [];
+  const chunkMetadata: ChunkMetadata[] = [];
+  let offset = 0;
+  
+  while (offset < file.size) {
+    const end = Math.min(offset + chunkSize, file.size);
+    const chunkBuffer = await readFileChunk(file, offset, end);
+    chunks.push(chunkBuffer);
+    chunkMetadata.push({
+      index: chunks.length - 1,
+      totalChunks,
+      size: chunkBuffer.byteLength,
+      offset: offset,
+      sha256: '' // Integrity hash skipped to save UI freezing
+    });
+    if (progressCallback) progressCallback((offset / file.size) * 50);
+    offset += chunkSize;
+  }
+  
+  const metadata: Res54FileMetadata = {
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+    chunks: chunkMetadata,
+    encryptionKey,
+    created: new Date().toISOString(),
+    previewAvailable: false
+  };
+  
+  return { chunks, metadata };
+};
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const backoffDelay = (attempt: number) => Math.min(RETRY_DELAY_BASE * Math.pow(2, attempt), 30000);
+
+async function processChunksInParallel<T>(
+  chunks: any[], 
+  processor: (chunk: any, index: number, attempt: number) => Promise<T>,
+  concurrency: number = MAX_PARALLEL_OPERATIONS,
+  progressCallback?: (progress: number, stage: string, details?: any) => void
+): Promise<T[]> {
+  const results: T[] = new Array(chunks.length);
+  let completed = 0;
+  let nextIndex = 0;
+  const retryQueue: {index: number, attempt: number}[] = [];
+  const failed: {index: number, error: any}[] = [];
+  const failLog = new Map<number, number>();
+  
+  const total = chunks.length;
+  let done = false;
+  let resolvePromise: (val: T[]) => void;
+  let rejectPromise: (err: Error) => void;
+  
+  const tryComplete = () => {
+    if (done) return;
+    if (completed + failed.length < total) return;
+    done = true;
+    if (failed.length === 0) resolvePromise(results);
+    else rejectPromise(new Error(`Failed to process ${failed.length} chunks. Last error: ${failed[0].error?.message || 'Unknown error'}`));
+  };
+  
+  const workerLoop = async () => {
+    while (!done) {
+      let index: number | null = null;
+      let attempt = 0;
+      
+      if (retryQueue.length > 0) {
+        const item = retryQueue.shift()!;
+        index = item.index;
+        attempt = item.attempt;
+        await delay(backoffDelay(attempt - 1));
+      } else if (nextIndex < total) {
+        index = nextIndex++;
+        attempt = 0;
+      } else {
+        return;
+      }
+      
+      try {
+        results[index] = await processor(chunks[index], index, attempt);
+        completed++;
+        progressCallback?.((completed / total) * 100, 'processing', { current: completed, total, retry: attempt > 0 });
+      } catch (error: any) {
+        const prevFails = failLog.get(index) || 0;
+        if (prevFails < MAX_RETRIES) {
+          failLog.set(index, prevFails + 1);
+          retryQueue.push({index, attempt: prevFails + 1});
+        } else {
+          failed.push({index, error});
+        }
+      }
+      tryComplete();
+    }
+  };
+  
+  const workers: Promise<void>[] = [];
+  const workerCount = Math.min(concurrency, total);
+  for (let i = 0; i < workerCount; i++) workers.push(workerLoop());
+  
+  return new Promise<T[]>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  }).finally(() => { done = true; });
+}
+
+export const uploadFileWithRes54 = async (
+  file: File,
+  progressCallback?: (progress: number, stage: string, details?: any) => void
+): Promise<{ id: string, metadata: Res54FileMetadata, encryptionKey: string }> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Authentication required");
+  const { data: { session } } = await supabase.auth.getSession();
+  const accessToken = session?.access_token;
+  if (!accessToken) throw new Error('Authentication required');
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+  if (file.size === 0) throw new Error('File is empty');
+  if (file.size > LARGE_FILE_THRESHOLD) progressCallback?.(0, 'preparing', { message: 'Preparing large file upload strategy' });
+
+  progressCallback?.(0, 'preparing');
+
+  const useStreamingUpload = file.size > LARGE_FILE_THRESHOLD;
+  const chunkSize = determineChunkingStrategy(file.size);
+  const totalChunks = Math.ceil(file.size / chunkSize);
+
+  let chunks: ArrayBuffer[] = [];
+  let metadata: Res54FileMetadata;
+
+  const byokPolicy = await getBYOKRuntimePolicy(user.id);
+  const { encryptionKey } = await resolveUploadEncryptionKey(file, user.id, byokPolicy.enabled, totalChunks);
+
+  if (useStreamingUpload) {
+    const chunkMetadata: ChunkMetadata[] = [];
+    for (let index = 0; index < totalChunks; index++) {
+      const offset = index * chunkSize;
+      chunkMetadata.push({ index, totalChunks, size: Math.min(offset + chunkSize, file.size) - offset, offset, sha256: '' });
+      if (progressCallback && index % 10 === 0) progressCallback((index / Math.max(totalChunks, 1)) * 40, 'chunking');
+    }
+    metadata = { fileName: file.name, fileType: file.type, fileSize: file.size, chunks: chunkMetadata, encryptionKey, created: new Date().toISOString(), previewAvailable: false };
+  } else {
+    const preloaded = await createFileChunks(file, (progress) => progressCallback && progressCallback(progress, 'chunking'), encryptionKey);
+    chunks = preloaded.chunks;
+    metadata = preloaded.metadata;
+  }
+  
+  if (useStreamingUpload) {
+    progressCallback?.(50, 'uploading', { message: 'Using memory-optimized streaming upload' });
+    let uploadedCount = 0;
+    
+    for (let i = 0; i < totalChunks; i += STREAMING_BATCH_SIZE) {
+      const batchEnd = Math.min(i + STREAMING_BATCH_SIZE, totalChunks);
+      const batchIndexes = Array.from({ length: batchEnd - i }, (_, idx) => i + idx);
+      
+      const encryptedBatch = await Promise.all(
+        batchIndexes.map(async (chunkIndex) => {
+          const start = chunkIndex * chunkSize;
+          const end = Math.min(start + chunkSize, file.size);
+          const chunk = await readFileChunk(file, start, end);
+          const encrypted = await encryptChunkDispatch(chunk, metadata.encryptionKey, chunkIndex);
+          return { encrypted, index: chunkIndex };
+        })
+      );
+      
+      const urlPaths = encryptedBatch.map((chunk) => {
+        const chunkId = `res54_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}_${chunk.index}`;
+        return { path: getChunkStoragePath(user.id, chunkId), index: chunk.index };
+      });
+
+      // --- ROBUST ERROR HANDLING FOR STREAMING UPLOAD ---
+      const urlResponse = await fetch(`${supabaseUrl}/functions/v1/github-storage`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, chunks: urlPaths })
+      });
+      
+      const responseData = await urlResponse.json();
+      
+      if (!urlResponse.ok || responseData.error) {
+        throw new Error(`Storage Error: ${responseData.error || 'Failed to get upload URLs'}`);
+      }
+      
+      const { urls } = responseData;
+      if (!urls || !Array.isArray(urls)) {
+        throw new Error('Storage Error: Server did not return valid upload URLs.');
+      }
+      // ------------------------------------------------
+
+      urls.forEach((u: any) => {
+        metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0 };
+      });
+
+      await Promise.all(encryptedBatch.map(async (chunk) => {
+        const targetUrl = urls.find((u: any) => u.index === chunk.index).uploadUrl;
+        let attempts = 0;
+        while (attempts < MAX_RETRIES) {
+          try {
+            const response = await fetch(targetUrl, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/octet-stream' },
+              body: chunk.encrypted
+            });
+            if (!response.ok) throw new Error(`B2 Upload failed`);
+            return;
+          } catch (error: any) {
+            attempts++;
+            if (attempts >= MAX_RETRIES) throw error;
+            await delay(backoffDelay(attempts));
+          }
+        }
+      }));
+      
+      uploadedCount += encryptedBatch.length;
+      encryptedBatch.length = 0;
+    }
+    
+    if (encryptionWorkers) terminateAllWorkers();
+    progressCallback?.(95, 'finalizing');
+    
+  } else {
+    progressCallback?.(50, 'encrypting');
+    
+    const encryptChunk = async (chunk: ArrayBuffer, index: number): Promise<ArrayBuffer> => {
+      const encryptedChunk = await encryptChunkDispatch(chunk, metadata.encryptionKey, index);
+      progressCallback?.(50 + ((index + 1) / chunks.length * 10), 'encrypting', { current: index + 1, total: chunks.length });
+      return encryptedChunk;
+    };
+    
+    let encryptedChunks = await processChunksInParallel(chunks, encryptChunk, Math.min(chunks.length, MAX_PARALLEL_OPERATIONS));
+    progressCallback?.(60, 'preparing upload');
+
+    const urlPaths = encryptedChunks.map((_, index) => {
+      const chunkId = `res54_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}_${index}`;
+      return { path: getChunkStoragePath(user.id, chunkId), index };
+    });
+
+    // --- ROBUST ERROR HANDLING FOR STANDARD UPLOAD ---
+    const urlResponse = await fetch(`${supabaseUrl}/functions/v1/github-storage`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, chunks: urlPaths })
+    });
+    
+    const responseData = await urlResponse.json();
+    
+    if (!urlResponse.ok || responseData.error) {
+      throw new Error(`Storage Error: ${responseData.error || 'Failed to get upload URLs'}`);
+    }
+    
+    const { urls } = responseData;
+    if (!urls || !Array.isArray(urls)) {
+      throw new Error('Storage Error: Server did not return valid upload URLs.');
+    }
+    // ------------------------------------------------
+
+    urls.forEach((u: any) => {
+      metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0 };
+    });
+
+    const uploadChunkBinary = async (chunkWrap: any): Promise<any> => {
+      const targetUrl = urls.find((u: any) => u.index === chunkWrap.index).uploadUrl;
+      let attempt = 0;
+      while (attempt < MAX_RETRIES) {
+        try {
+          const response = await fetch(targetUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body: chunkWrap.data
+          });
+          if (!response.ok) throw new Error(`B2 Upload failed: ${response.statusText}`);
+          return { index: chunkWrap.index, path: chunkWrap.path, repo: 'b2', verified: true };
+        } catch (error: any) {
+          attempt++;
+          if (attempt >= MAX_RETRIES) throw error;
+          await delay(backoffDelay(attempt));
+        }
+      }
+    };
+
+    const preparedChunks = encryptedChunks.map((data, index) => ({ data, index, path: urls.find((u: any) => u.index === index)?.path }));
+    
+    await processChunksInParallel(
+      preparedChunks,
+      uploadChunkBinary,
+      getBatchSize(file.size),
+      (progress) => progressCallback?.(60 + (progress * 0.3), 'uploading')
+    );
+      
+    (encryptedChunks as any) = null;
+    terminateAllWorkers();
+  }
+  
+  progressCallback?.(90, 'finalizing');
+  
+  const dbEncryptionKey = byokPolicy.enabled ? 'sha256:byok_encrypted' : metadata.encryptionKey;
+  const metadataString = JSON.stringify({
+    ...metadata,
+    encryptionKey: dbEncryptionKey,
+    chunks: metadata.chunks.map(chunk => ({ ...chunk, repo: chunk.repo, path: chunk.path }))
+  });
+
+  const activeWorkspaceId = getActiveWorkspaceId();
+  const fileRecord = {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    storage_path: "res54_distributed",
+    user_id: user.id,
+    encrypted: true,
+    shared: false,
+    encryption_key: dbEncryptionKey,
+    tags: [metadataString] as string[],
+    processor: "res54",
+    ...(activeWorkspaceId ? { workspace_id: activeWorkspaceId } : {})
+  };
+
+  const { data: dbFile, error: dbError } = await supabase.from('files').insert(fileRecord).select().single();
+  let createdFile: any = dbFile;
+
+  if (dbError) {
+    const rpcArgs: Record<string, unknown> = {
+      p_name: file.name,
+      p_type: file.type || 'application/octet-stream',
+      p_size: file.size,
+      p_storage_path: 'res54_distributed',
+      p_user_id: user.id,
+      p_encrypted: true,
+      p_encryption_key: dbEncryptionKey,
+      p_metadata: metadataString,
+      ...(activeWorkspaceId ? { p_workspace_id: activeWorkspaceId } : {})
+    };
+
+    let { data: rpcData, error: rpcError } = await supabase.rpc('create_file_record', rpcArgs as any);
+    if (rpcError || !rpcData) throw new Error("Failed to create file record");
+    createdFile = rpcData as any;
+  }
+  
+  progressCallback?.(100, 'complete');
+  clearV3KeyState();
+  return { id: createdFile.id, metadata, encryptionKey: dbEncryptionKey };
+};
+
+export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?: string): Promise<any> => {
+  if (!chunk.repo || !chunk.path) throw new Error(`Invalid chunk metadata for chunk ${chunk.index}`);
+
+  let lastError: Error | null = null;
+  for (let attempt = _attempt; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await supabase.functions.invoke('github-storage', {
+        body: { 
+          action: 'download', 
+          path: chunk.path, 
+          repo: chunk.repo,
+          ...(shareId ? { shareId } : { userId: session?.user?.id }),
+          nodeId: chunk.accountId ? (chunk.accountId - 1) : undefined
+        }
+      });
+
+      if (response.error) throw new Error(`Download error: ${response.error.message}`);
+      const responseData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+
+      // Legacy GitHub Base64 JSON Decoder
+      if (responseData.legacy) {
+        const decodedContent = atob(responseData.content.replace(/\s/g, ''));
+        const parsedChunk = JSON.parse(decodedContent);
+        
+        if (parsedChunk.v === '2.3') return { index: parsedChunk.i, data: parsedChunk.d };
+        return { index: parsedChunk.chunkIndex, data: parsedChunk.chunkData };
+      }
+
+      // New Backblaze Direct CDN Download
+      if (!responseData.legacy && responseData.downloadUrl) {
+        const b2Response = await fetch(responseData.downloadUrl);
+        if (!b2Response.ok) throw new Error('Failed to fetch from B2 CDN');
+        
+        // Convert to Base64 to maintain compatibility with your existing decryption system
+        const arrayBuffer = await b2Response.arrayBuffer();
+        return { index: chunk.index, data: arrayBufferToBase64(arrayBuffer) };
+      }
+      
+    } catch (error: any) {
+      lastError = error;
+      if (attempt < MAX_RETRIES) await delay(backoffDelay(attempt));
+    }
+  }
+  
+  throw new Error(`Failed to download chunk ${chunk.index}: ${lastError?.message}`);
+};
+
+export const downloadFileWithRes54 = async (
+  fileId: string,
+  progressOrOptions?: Res54ProgressCallback | Res54DownloadOptions | string,
+  maybeOptions?: Res54DownloadOptions
+): Promise<Blob> => {
+  const progressCallback: Res54ProgressCallback | undefined = typeof progressOrOptions === 'function' ? progressOrOptions : undefined;
+  const options: Res54DownloadOptions = typeof progressOrOptions === 'function' ? (maybeOptions || {}) : typeof progressOrOptions === 'string' ? { fileName: progressOrOptions } : (progressOrOptions || {});
+
+  progressCallback?.(0, 'initializing');
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  const file = options.fileRecord || await (async () => {
+    const { data, error } = await supabase.from('files').select('*').eq('id', fileId).single();
+    if (error) {
+      if (options.shareId) {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_file_for_share', { share_id_param: options.shareId });
+        if (!rpcError && rpcData) return rpcData;
+      }
+      throw new Error("Failed to fetch file metadata");
+    }
+    return data;
+  })();
+
+  if ((file as any)?.storage_path?.startsWith('tebi_external')) {
+    const { downloadFile } = await import('./api');
+    return await downloadFile(fileId, progressCallback);
+  }
+  
+  progressCallback?.(10, 'preparing');
+  let metadata: Res54FileMetadata;
+  
+  try {
+    const parsedMetadata = Array.isArray(file.tags) && file.tags.length > 0 ? JSON.parse(file.tags[0]) : null;
+    if (parsedMetadata && parsedMetadata.chunks && Array.isArray(parsedMetadata.chunks)) {
+      metadata = parsedMetadata;
+    } else if (parsedMetadata && Array.isArray(parsedMetadata)) {
+      const chunkLocations = parsedMetadata;
+      metadata = {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        chunks: chunkLocations.map((loc: any, index: number) => ({
+          index: typeof loc.index === 'number' ? loc.index : index,
+          totalChunks: chunkLocations.length,
+          size: Math.ceil(file.size / chunkLocations.length),
+          offset: index * Math.ceil(file.size / chunkLocations.length),
+          sha256: loc.sha || "",
+          repo: loc.repo || "",
+          path: loc.path || ""
+        })),
+        encryptionKey: file.encryption_key,
+        created: file.created_at,
+        previewAvailable: false
+      };
+    } else {
+      throw new Error("Invalid metadata structure");
+    }
+  } catch (e) {
+    throw new Error("Failed to parse chunk locations");
+  }
+  
+  progressCallback?.(20, 'downloading');
+  const downloadConcurrency = metadata.fileSize > 500 * 1024 * 1024 ? 6 : metadata.fileSize > 50 * 1024 * 1024 ? 12 : 16;
+  
+  try {
+    const downloadedChunks = await processChunksInParallel(
+      metadata.chunks,
+      async (chunk, index, attempt) => {
+        const result = await downloadChunk(chunk, attempt, options.shareId);
+        progressCallback?.(20 + (index / metadata.chunks.length) * 40, 'downloading', { current: index + 1, total: metadata.chunks.length });
+        return result;
+      },
+      downloadConcurrency
+    );
+
+    const sortedChunks = downloadedChunks.sort((a, b) => a.index - b.index).map(chunk => chunk.data);
+    if (sortedChunks.length !== metadata.chunks.length) throw new Error(`Download incomplete`);
+
+    const byokPolicy = session?.user ? await getBYOKRuntimePolicy(session.user.id) : { enabled: false, strictMode: false, allowDefaultFallback: true, promptEveryDecrypt: false, hasAccountKey: false };
+    const downloadReason = options.reason || 'decrypt';
+    const promptFileName = options.fileName || metadata.fileName || file.name;
+    const attemptedKeys = new Set<string>();
+
+    const isV3 = sortedChunks.length > 0 && detectEncryptionVersion(sortedChunks[0]!) === 3;
+    let v3FileKeyForDecrypt: ArrayBuffer | null = null;
+
+    const encKey = metadata.encryptionKey;
+    let v3FileId = fileId;
+    if (encKey.startsWith('v3_byok_')) v3FileId = encKey.replace('v3_byok_', '');
+    else if (encKey.startsWith('v3_custom_')) v3FileId = encKey.replace('v3_custom_', '');
+    else if (encKey.startsWith('v3_unique_')) v3FileId = encKey.replace('v3_unique_', '');
+
+    if (isV3 && (encKey.startsWith('v3_byok_') || encKey.startsWith('v3_unique_') || encKey.startsWith('v3_custom_'))) {
+      v3FileKeyForDecrypt = await resolveV3DecryptKey(encKey, session?.user?.id || '', v3FileId);
+    }
+
+    const decryptChunksWithKey = async (decryptionKey: string, strategy: 'byok' | 'default'): Promise<ArrayBuffer[]> => {
+      progressCallback?.(60, 'decrypting', { strategy, mode: strategy === 'byok' ? 'BYOK' : 'SquidCloud default' });
+
+      if (isV3) {
+        let fileKeyRaw = v3FileKeyForDecrypt;
+        if (!fileKeyRaw && strategy === 'byok' && decryptionKey && encKey.startsWith('v3_custom_')) {
+          const fileKeyId = encKey.replace('v3_custom_', '');
+          const encoder = new TextEncoder();
+          const raw = encoder.encode(decryptionKey.padEnd(32)).buffer;
+          const fm = await deriveFileKey(raw, fileKeyId);
+          fileKeyRaw = fm.fileKeyRaw;
+        }
+        if (!fileKeyRaw) throw new Error('V3 key not resolved');
+        return await decryptAllV3Chunks(sortedChunks, fileKeyRaw, session?.user?.id || '', v3FileId, progressCallback);
+      }
+
+      if (metadata.fileSize > LARGE_FILE_THRESHOLD) {
+        const decryptedSequentialChunks: ArrayBuffer[] = [];
+        for (let i = 0; i < sortedChunks.length; i++) {
+          progressCallback?.(60 + ((i + 1) / sortedChunks.length * 30), 'decrypting', { current: i + 1, total: sortedChunks.length });
+          decryptedSequentialChunks.push(await decryptData(sortedChunks[i], decryptionKey));
+        }
+        return decryptedSequentialChunks;
+      }
+
+      return processChunksInParallel(
+        sortedChunks,
+        async (chunkData, index) => {
+          const decryptedData = await decryptData(chunkData, decryptionKey);
+          progressCallback?.(60 + ((index + 1) / sortedChunks.length * 30), 'decrypting', { current: index + 1, total: sortedChunks.length });
+          return decryptedData;
+        },
+        Math.min(sortedChunks.length, MAX_PARALLEL_OPERATIONS)
+      );
+    };
+
+    const tryCandidateKey = async (candidateKey: string | null | undefined, strategy: 'byok' | 'default'): Promise<ArrayBuffer[] | null> => {
+      if (!candidateKey) return null;
+      const normalizedKey = candidateKey.trim();
+      if (!normalizedKey || attemptedKeys.has(normalizedKey)) return null;
+      attemptedKeys.add(normalizedKey);
+      try {
+        return await decryptChunksWithKey(normalizedKey, strategy);
+      } catch {
+        return null;
+      }
+    };
+
+    const promptBYOKKey = async (retry = false): Promise<string | null> => {
+      try {
+        const key = await requestEphemeralBYOKKey({
+          reason: downloadReason,
+          fileName: promptFileName,
+          title: retry ? 'Key mismatch, try again' : 'BYOK key required',
+          description: retry ? 'The previous key could not decrypt this file. Re-enter your BYOK key.' : 'This file is protected with Bring Your Own Key. Enter the decryption key to unlock it.',
+        });
+        return key?.trim() || null;
+      } catch {
+        return null;
+      }
+    };
+
+    const defaultKey = options.decryptionKey || metadata.encryptionKey;
+    const isExplicitBYOK = defaultKey === 'sha256:byok_encrypted' || defaultKey === 'byok_encrypted' || defaultKey === 'byok_protected' || !defaultKey;
+    let decryptedChunks: ArrayBuffer[] | null = null;
+
+    if (isExplicitBYOK) {
+      let byok = await promptBYOKKey(false);
+      decryptedChunks = await tryCandidateKey(byok, 'byok');
+      if (!decryptedChunks) {
+        byok = await promptBYOKKey(true);
+        decryptedChunks = await tryCandidateKey(byok, 'byok');
+      }
+    } else if (byokPolicy.enabled) {
+      decryptedChunks = await tryCandidateKey(defaultKey, 'default');
+      if (!decryptedChunks) {
+        const byok = await promptBYOKKey(false);
+        decryptedChunks = await tryCandidateKey(byok, 'byok');
+      }
+      if (!decryptedChunks) {
+        const retryByok = await promptBYOKKey(true);
+        decryptedChunks = await tryCandidateKey(retryByok, 'byok');
+      }
+      if (!decryptedChunks && byokPolicy.strictMode && !byokPolicy.allowDefaultFallback) throw new Error('BYOK strict mode is enabled and no valid BYOK key was provided.');
+    } else {
+      decryptedChunks = await tryCandidateKey(defaultKey, 'default');
+    }
+
+    if (!decryptedChunks) throw new Error('Decryption failed due to key mismatch.');
+
+    progressCallback?.(90, 'assembling');
+    const blob = new Blob(decryptedChunks, { type: metadata.fileType });
+    progressCallback?.(100, 'complete');
+    return blob;
+  } catch (error: any) {
+    throw new Error(`Download failed: ${error.message}`);
+  }
+};
+
+export const checkFilePreview = async (fileId: string): Promise<{ hasPreview: boolean, previewType?: string, previewUrl?: string }> => {
+  try {
+    const { data, error } = await supabase.from('files').select('id, preview_available, preview_type').eq('id', fileId).single();
+    if (error || !data) return { hasPreview: false };
+    const fileData = data as any;
+    const hasPreviewField = 'preview_available' in fileData;
+    return {
+      hasPreview: hasPreviewField ? !!fileData.preview_available : false,
+      previewType: hasPreviewField ? (fileData.preview_type || undefined) : undefined,
+      previewUrl: hasPreviewField && fileData.preview_available ? `/api/preview/${fileId}` : undefined
+    };
+  } catch {
+    return { hasPreview: false };
+  }
+};
+
+export interface FilePreviewResult {
+  blob: Blob;
+  totalChunks: number;
+  downloadedChunks: number;
+  isPartial: boolean;
+}
+
+export const downloadFilePreview = async (fileId: string, maxChunks: number = 3, options?: { fileRecord?: Record<string, any>; shareId?: string }): Promise<FilePreviewResult> => {
+  const file = options?.fileRecord || await (async () => {
+    const { data: d, error } = await supabase.from('files').select('*').eq('id', fileId).single();
+    if (error) {
+      if (options?.shareId) {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_file_for_share', { share_id_param: options.shareId });
+        if (!rpcError && rpcData) return rpcData;
+      }
+      throw new Error('Failed to fetch file metadata');
+    }
+    return d;
+  })();
+
+  if ((file as any)?.storage_path?.startsWith('tebi_external')) {
+    const { downloadFile } = await import('./api');
+    const blob = await downloadFile(fileId);
+    return { blob, totalChunks: 1, downloadedChunks: 1, isPartial: false };
+  }
+
+  let metadata: Res54FileMetadata;
+  try {
+    const parsedMetadata = Array.isArray(file.tags) && file.tags.length > 0 ? JSON.parse(file.tags[0]) : null;
+    if (parsedMetadata && parsedMetadata.chunks) {
+      metadata = parsedMetadata;
+    } else if (parsedMetadata && Array.isArray(parsedMetadata)) {
+      metadata = {
+        fileName: file.name, fileType: file.type, fileSize: file.size,
+        chunks: parsedMetadata.map((loc: any, index: number) => ({
+          index: typeof loc.index === 'number' ? loc.index : index,
+          totalChunks: parsedMetadata.length,
+          size: Math.ceil(file.size / parsedMetadata.length),
+          offset: index * Math.ceil(file.size / parsedMetadata.length),
+          sha256: loc.sha || '', repo: loc.repo || '', path: loc.path || '',
+        })),
+        encryptionKey: file.encryption_key, created: file.created_at, previewAvailable: false,
+      };
+    } else {
+      throw new Error('Invalid metadata structure');
+    }
+  } catch {
+    throw new Error('Failed to parse chunk metadata');
+  }
+
+  const isPartial = metadata.chunks.length > maxChunks;
+  const targetChunks = isPartial ? metadata.chunks.slice(0, maxChunks) : metadata.chunks;
+
+  const downloaded = await processChunksInParallel(targetChunks, async (chunk, index, attempt) => await downloadChunk(chunk, attempt, options?.shareId), 6);
+  const sortedChunks = downloaded.sort((a: any, b: any) => a.index - b.index).map((c: any) => c.data);
+
+  if (!metadata.encryptionKey) throw new Error('No encryption key available for preview');
+
+  const decrypted: ArrayBuffer[] = [];
+  for (const chunkData of sortedChunks) decrypted.push(await decryptData(chunkData, metadata.encryptionKey));
+
+  return { blob: new Blob(decrypted, { type: metadata.fileType }), totalChunks: metadata.chunks.length, downloadedChunks: targetChunks.length, isPartial };
+};
+
+export async function resolveFileKeyForShare(fileId: string, encryptionKey: string | null): Promise<string | null> {
+  if (!encryptionKey) return null;
+  if (encryptionKey.startsWith('v3_')) {
+    const session = await supabase.auth.getSession();
+    const userId = session?.data?.session?.user?.id || '';
+    const fileKeyId = encryptionKey.replace(/^v3_(byok|custom|unique)_/, '');
+    const keyRaw = await resolveV3DecryptKey(encryptionKey, userId, fileKeyId);
+    if (!keyRaw) return null;
+    const hash = await crypto.subtle.digest('SHA-256', keyRaw);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  if (encryptionKey === 'sha256:byok_encrypted' || encryptionKey === 'byok_encrypted') return null;
+  return encryptionKey;
+}
