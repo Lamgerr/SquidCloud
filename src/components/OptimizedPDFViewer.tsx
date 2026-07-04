@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import {
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, LayoutGrid,
@@ -200,7 +200,8 @@ export default function OptimizedPDFViewer({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState('1');
   const [totalPages, setTotalPages] = useState(0);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(0);
+  const [containerReady, setContainerReady] = useState(false);
   const [zoomMode, setZoomMode] = useState<ZoomMode>('auto');
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -598,90 +599,78 @@ export default function OptimizedPDFViewer({
     setPageInput(String(target));
   };
 
-  const computeAutoScale = useCallback(() => {
-    if (!containerRef.current) return scale;
-    const padding = layout === 'dual' ? 160 : 100;
-    const vPadding = 140;
-    const w = containerRef.current.clientWidth - padding;
-    const h = containerRef.current.clientHeight - vPadding;
-    const pageAspect = 0.707;
-    const pageWidth = 800;
-    const pageHeight = pageWidth / pageAspect;
-    const scaleW = w / pageWidth;
-    const scaleH = h / pageHeight;
-    return Math.min(Math.max(Math.min(scaleW, scaleH), 0.3), 2.5);
-  }, [layout, scale]);
-
-  const applyZoomMode = useCallback((mode: ZoomMode) => {
-    if (!containerRef.current) return;
-    const padding = 100;
-    const w = containerRef.current.clientWidth - padding;
-    let newScale: number;
+  const fitToContainer = useCallback((mode: ZoomMode) => {
+    const el = containerRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    const padX = layout === 'dual' ? 160 : 80;
+    const padY = 130;
+    const w = rect.width - padX;
+    const h = rect.height - padY;
+    if (w <= 0 || h <= 0) return null;
+    const pageW = 800;
+    const pageH = 800 / 0.707;
+    let s: number;
     switch (mode) {
-      case 'page-fit': {
-        const vPadding = 140;
-        const h = containerRef.current.clientHeight - vPadding;
-        const pageAspect = 0.707;
-        newScale = Math.min(w / 800, h / (800 * pageAspect));
+      case 'page-fit':
+        s = Math.min(w / pageW, h / pageH);
         break;
-      }
       case 'page-width':
-        newScale = w / 800;
+        s = w / pageW;
         break;
       case 'actual-size':
-        newScale = 1;
+        s = 1;
         break;
       default:
-        newScale = computeAutoScale();
+        s = Math.min(w / pageW, h / pageH);
     }
-    setScale(Math.min(Math.max(newScale, 0.3), 3.5));
-  }, [computeAutoScale]);
+    return Math.min(Math.max(s, 0.25), 3);
+  }, [layout]);
+
+  const applyZoomMode = useCallback((mode: ZoomMode) => {
+    const s = fitToContainer(mode);
+    if (s !== null) setScale(s);
+  }, [fitToContainer]);
 
   const setZoomModeAndApply = useCallback((mode: ZoomMode) => {
     setZoomMode(mode);
-    if (mode !== 'custom') {
-      applyZoomMode(mode);
-    }
+    if (mode !== 'custom') applyZoomMode(mode);
   }, [applyZoomMode]);
 
   const adjustZoom = (delta: number) => {
     setZoomMode('custom');
-    setScale(prev => Math.min(Math.max(0.3, prev + delta), 3.5));
+    setScale(prev => Math.min(Math.max(0.25, prev + delta), 3));
   };
 
   const zoomTo = (val: number) => {
     setZoomMode('custom');
-    setScale(Math.min(Math.max(0.3, val), 3.5));
+    setScale(Math.min(Math.max(0.25, val), 3));
   };
 
-  const cycleZoomMode = useCallback(() => {
-    const modes: ZoomMode[] = ['auto', 'page-fit', 'page-width', 'actual-size', 'custom'];
-    const idx = modes.indexOf(zoomMode);
-    const next = modes[(idx + 1) % modes.length];
-    setZoomModeAndApply(next);
-  }, [zoomMode, setZoomModeAndApply]);
+  // Measure container and set initial scale before first paint
+  useLayoutEffect(() => {
+    if (containerReady) return;
+    const s = fitToContainer('auto');
+    if (s !== null) {
+      setScale(s);
+      setContainerReady(true);
+    }
+  }, [fitToContainer, containerReady]);
 
-  // ResizeObserver for auto-fit
+  // ResizeObserver — recalculate scale when container resizes
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
       if (zoomMode === 'auto') {
-        const newScale = computeAutoScale();
-        setScale(Math.min(Math.max(newScale, 0.3), 3.5));
+        const s = fitToContainer('auto');
+        if (s !== null) setScale(s);
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [zoomMode, computeAutoScale]);
-
-  // Apply auto-fit on mount when zoomMode is auto
-  useEffect(() => {
-    if (zoomMode === 'auto') {
-      const newScale = computeAutoScale();
-      setScale(Math.min(Math.max(newScale, 0.3), 3.5));
-    }
-  }, [zoomMode, computeAutoScale, totalPages]);
+  }, [zoomMode, fitToContainer]);
 
   const handleOutlineJump = async (dest: any) => {
     if (!pdfDoc || !dest) return;
@@ -1183,7 +1172,7 @@ export default function OptimizedPDFViewer({
           </div>
           <div className="h-5 w-px bg-border/60 mx-0.5" />
           <Button variant="ghost" size="icon" onClick={() => setLayout(l => l === 'single' ? 'scroll' : l === 'scroll' ? 'dual' : 'single')} className={cn("h-8 w-8 transition-transform active:scale-90", layout !== 'single' ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground")} title="Toggle Layout (S)">
-            {layout === 'scroll' ? <ScrollText className="w-4 h-4" /> : layout === 'dual' ? <Columns className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+            {layout === 'scroll' ? <ScrollText className="w-4 h-4" /> : layout === 'dual' ? <Columns2 className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
           </Button>
           <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-8 w-8 text-muted-foreground hover:text-foreground transition-transform active:scale-90" title="Fullscreen (F)">
             {isFullscreen ? <Minimize className="w-4 h-4 text-primary" /> : <Maximize className="w-4 h-4" />}
@@ -1581,9 +1570,9 @@ export default function OptimizedPDFViewer({
                 transition: 'transform 0.3s ease-out'
               }}
             >
-              <canvas ref={activeCanvasRef} className="block rounded-sm bg-white max-w-full max-h-full" style={{ filter: canvasFilter }} />
-              <canvas ref={annotationCanvasRef} className="absolute inset-0 pointer-events-none rounded-sm max-w-full max-h-full" />
-              <div ref={activeTextLayerRef} className="absolute inset-0 overflow-hidden select-text text-transparent pointer-events-auto max-w-full max-h-full" />
+              <canvas ref={activeCanvasRef} className="block rounded-sm bg-white" style={{ filter: canvasFilter }} />
+              <canvas ref={annotationCanvasRef} className="absolute inset-0 pointer-events-none rounded-sm" />
+              <div ref={activeTextLayerRef} className="absolute inset-0 overflow-hidden select-text text-transparent pointer-events-auto" />
             </div>
           )}
         </main>
