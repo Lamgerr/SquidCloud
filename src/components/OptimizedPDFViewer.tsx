@@ -5,19 +5,9 @@ import {
   Loader2, FileText, Download, Maximize, Minimize, Search, Moon,
   BookOpen, X, ListTree, Layers, Sun, Eye, Settings, Bookmark,
   BookmarkPlus, Highlighter, Pen, StickyNote, Type, Underline,
-  Italic, Sigma, Quote, Printer, Share2, Globe, Columns,
-  PanelRight, PanelRightOpen, ScrollText, Repeat, Play,
-  Pause, Sparkles, SlidersHorizontal, Palette, Accessibility,
-  AlignCenter, AlignLeft, AlignRight, Bold, Eraser, Image,
-  Stamp, Signature, TextQuote, MessageSquare, Volume2,
-  ScanLine, SplitSquareVertical, Square, Circle, Triangle,
-  Minus, Plus, Undo2, Redo2, FileJson, FileSpreadsheet,
-  FileImage, ClipboardCopy, BookmarkCheck, BookmarkX,
-  BookmarkMinus, Lightbulb, EyeOff, Sunset, Thermometer,
-  Contrast, Frame, PanelBottom, PanelBottomClose, Hash,
-  ArrowLeftToLine, ArrowRightToLine, FileDown, FileUp,
-  Magnetic, Combine, Expand, Shrink, Atom, Brain,
-  GripVertical, GripHorizontal, ArrowUpToLine, ArrowDownToLine,
+  Italic, Sigma, Eraser, Signature, ClipboardCopy, BookmarkX,
+  ScrollText, Play, Undo2, Redo2, Hash, Thermometer,
+  Columns2, Focus, ScanEye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +31,24 @@ const CACHE_MAX = 60;
 const STORAGE_KEY = 'pdf-viewer-prefs';
 const HISTORY_KEY = 'pdf-viewer-history';
 const SESSION_KEY = 'pdf-viewer-session';
+
+type ZoomMode = 'auto' | 'page-fit' | 'page-width' | 'actual-size' | 'custom';
+
+const ZOOM_MODE_LABELS: Record<ZoomMode, string> = {
+  auto: 'Auto Fit',
+  'page-fit': 'Page Fit',
+  'page-width': 'Page Width',
+  'actual-size': 'Actual Size',
+  custom: 'Custom',
+};
+
+const ZOOM_MODE_ICONS: Record<ZoomMode, React.ReactNode> = {
+  auto: <ScanEye className="w-3.5 h-3.5" />,
+  'page-fit': <Focus className="w-3.5 h-3.5" />,
+  'page-width': <Columns2 className="w-3.5 h-3.5" />,
+  'actual-size': <FileText className="w-3.5 h-3.5" />,
+  custom: <ZoomIn className="w-3.5 h-3.5" />,
+};
 
 interface OptimizedPDFViewerProps {
   file: { id?: string; name: string; size?: number };
@@ -192,7 +200,8 @@ export default function OptimizedPDFViewer({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState('1');
   const [totalPages, setTotalPages] = useState(0);
-  const [scale, setScale] = useState(isMobile ? 1.0 : 1.35);
+  const [scale, setScale] = useState(1);
+  const [zoomMode, setZoomMode] = useState<ZoomMode>('auto');
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
   const [pageRendering, setPageRendering] = useState(false);
@@ -589,26 +598,90 @@ export default function OptimizedPDFViewer({
     setPageInput(String(target));
   };
 
-  const adjustZoom = (delta: number) => {
-    setScale(prev => Math.min(Math.max(0.6, prev + delta), 3.5));
-  };
-
-  const zoomTo = (val: number) => setScale(Math.min(Math.max(0.6, val), 3.5));
-
-  const zoomToFit = () => {
-    if (!containerRef.current) return;
-    const w = containerRef.current.clientWidth - 100;
-    const h = containerRef.current.clientHeight - 200;
+  const computeAutoScale = useCallback(() => {
+    if (!containerRef.current) return scale;
+    const padding = layout === 'dual' ? 160 : 100;
+    const vPadding = 140;
+    const w = containerRef.current.clientWidth - padding;
+    const h = containerRef.current.clientHeight - vPadding;
     const pageAspect = 0.707;
-    const newScale = Math.min(w / 800, h / (800 * pageAspect));
-    setScale(Math.min(Math.max(newScale, 0.6), 2.0));
+    const pageWidth = 800;
+    const pageHeight = pageWidth / pageAspect;
+    const scaleW = w / pageWidth;
+    const scaleH = h / pageHeight;
+    return Math.min(Math.max(Math.min(scaleW, scaleH), 0.3), 2.5);
+  }, [layout, scale]);
+
+  const applyZoomMode = useCallback((mode: ZoomMode) => {
+    if (!containerRef.current) return;
+    const padding = 100;
+    const w = containerRef.current.clientWidth - padding;
+    let newScale: number;
+    switch (mode) {
+      case 'page-fit': {
+        const vPadding = 140;
+        const h = containerRef.current.clientHeight - vPadding;
+        const pageAspect = 0.707;
+        newScale = Math.min(w / 800, h / (800 * pageAspect));
+        break;
+      }
+      case 'page-width':
+        newScale = w / 800;
+        break;
+      case 'actual-size':
+        newScale = 1;
+        break;
+      default:
+        newScale = computeAutoScale();
+    }
+    setScale(Math.min(Math.max(newScale, 0.3), 3.5));
+  }, [computeAutoScale]);
+
+  const setZoomModeAndApply = useCallback((mode: ZoomMode) => {
+    setZoomMode(mode);
+    if (mode !== 'custom') {
+      applyZoomMode(mode);
+    }
+  }, [applyZoomMode]);
+
+  const adjustZoom = (delta: number) => {
+    setZoomMode('custom');
+    setScale(prev => Math.min(Math.max(0.3, prev + delta), 3.5));
   };
 
-  const zoomToWidth = () => {
-    if (!containerRef.current) return;
-    const w = containerRef.current.clientWidth - 100;
-    setScale(Math.min(Math.max(w / 800, 0.6), 3.5));
+  const zoomTo = (val: number) => {
+    setZoomMode('custom');
+    setScale(Math.min(Math.max(0.3, val), 3.5));
   };
+
+  const cycleZoomMode = useCallback(() => {
+    const modes: ZoomMode[] = ['auto', 'page-fit', 'page-width', 'actual-size', 'custom'];
+    const idx = modes.indexOf(zoomMode);
+    const next = modes[(idx + 1) % modes.length];
+    setZoomModeAndApply(next);
+  }, [zoomMode, setZoomModeAndApply]);
+
+  // ResizeObserver for auto-fit
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (zoomMode === 'auto') {
+        const newScale = computeAutoScale();
+        setScale(Math.min(Math.max(newScale, 0.3), 3.5));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [zoomMode, computeAutoScale]);
+
+  // Apply auto-fit on mount when zoomMode is auto
+  useEffect(() => {
+    if (zoomMode === 'auto') {
+      const newScale = computeAutoScale();
+      setScale(Math.min(Math.max(newScale, 0.3), 3.5));
+    }
+  }, [zoomMode, computeAutoScale, totalPages]);
 
   const handleOutlineJump = async (dest: any) => {
     if (!pdfDoc || !dest) return;
@@ -1087,9 +1160,26 @@ export default function OptimizedPDFViewer({
           <Button variant="ghost" size="icon" onClick={() => setShowPrefs(!showPrefs)} className={cn("h-8 w-8 transition-transform active:scale-90", showPrefs ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground")} title="Reading Preferences (Ctrl+P)"><Eye className="w-4 h-4" /></Button>
           <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} className={cn("h-8 w-8 transition-transform active:scale-90", showSearch ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground")} title="Search (Ctrl+F)"><Search className="w-4 h-4" /></Button>
           <div className="flex items-center gap-0.5">
-            <Button variant="ghost" size="icon" onClick={() => adjustZoom(-0.2)} className="h-8 w-8 text-muted-foreground hover:text-foreground transition-transform active:scale-90"><ZoomOut className="w-4 h-4" /></Button>
-            <span className="text-xs font-mono text-muted-foreground w-12 text-center tabular-nums cursor-pointer hover:text-foreground" onClick={zoomToFit} title="Fit to page">{Math.round(scale * 100)}%</span>
-            <Button variant="ghost" size="icon" onClick={() => adjustZoom(0.2)} className="h-8 w-8 text-muted-foreground hover:text-foreground transition-transform active:scale-90"><ZoomIn className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => adjustZoom(-0.2)} className="h-8 w-8 text-muted-foreground hover:text-foreground transition-transform active:scale-90"><ZoomOut className="w-3.5 h-3.5" /></Button>
+            <div className="relative group/zoom">
+              <span className="text-xs font-mono text-muted-foreground w-12 text-center tabular-nums cursor-pointer hover:text-foreground flex items-center justify-center gap-0.5" onClick={() => setZoomModeAndApply('auto')} title={`Zoom mode: ${ZOOM_MODE_LABELS[zoomMode]} (click for auto-fit)`}>
+                {Math.round(scale * 100)}%
+              </span>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-card border border-border shadow-xl rounded-xl p-1 hidden group-hover/zoom:flex flex-col gap-0.5 z-50 min-w-[130px]">
+                {(Object.keys(ZOOM_MODE_LABELS) as ZoomMode[]).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setZoomModeAndApply(mode)}
+                    className={cn("flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors", zoomMode === mode ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                  >
+                    {ZOOM_MODE_ICONS[mode]}
+                    {ZOOM_MODE_LABELS[mode]}
+                    {zoomMode === mode && <span className="ml-auto text-[9px] text-primary">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => adjustZoom(0.2)} className="h-8 w-8 text-muted-foreground hover:text-foreground transition-transform active:scale-90"><ZoomIn className="w-3.5 h-3.5" /></Button>
           </div>
           <div className="h-5 w-px bg-border/60 mx-0.5" />
           <Button variant="ghost" size="icon" onClick={() => setLayout(l => l === 'single' ? 'scroll' : l === 'scroll' ? 'dual' : 'single')} className={cn("h-8 w-8 transition-transform active:scale-90", layout !== 'single' ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground")} title="Toggle Layout (S)">
@@ -1476,7 +1566,7 @@ export default function OptimizedPDFViewer({
           ) : (
             <div
               className={cn(
-                "relative inline-block shadow-2xl rounded-sm will-change-transform",
+                "relative inline-block rounded-sm will-change-transform max-w-full max-h-full",
                 transitionClass,
                 pageRendering && "opacity-80",
                 focusMode && "shadow-none"
@@ -1491,9 +1581,9 @@ export default function OptimizedPDFViewer({
                 transition: 'transform 0.3s ease-out'
               }}
             >
-              <canvas ref={activeCanvasRef} className="block rounded-sm bg-white" style={{ filter: canvasFilter }} />
-              <canvas ref={annotationCanvasRef} className="absolute inset-0 pointer-events-none rounded-sm" />
-              <div ref={activeTextLayerRef} className="absolute inset-0 overflow-hidden select-text text-transparent pointer-events-auto" />
+              <canvas ref={activeCanvasRef} className="block rounded-sm bg-white max-w-full max-h-full" style={{ filter: canvasFilter }} />
+              <canvas ref={annotationCanvasRef} className="absolute inset-0 pointer-events-none rounded-sm max-w-full max-h-full" />
+              <div ref={activeTextLayerRef} className="absolute inset-0 overflow-hidden select-text text-transparent pointer-events-auto max-w-full max-h-full" />
             </div>
           )}
         </main>
