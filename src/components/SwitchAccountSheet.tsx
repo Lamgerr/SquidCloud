@@ -23,7 +23,7 @@ const SwitchAccountSheet: React.FC<SwitchAccountSheetProps> = ({ open, onOpenCha
 
   const handleAddAccount = () => {
     onOpenChange(false);
-    navigate('/login');
+    navigate('/auth');
   };
 
   const handleRemoveAccount = async () => {
@@ -89,7 +89,7 @@ const SwitchAccountSheet: React.FC<SwitchAccountSheetProps> = ({ open, onOpenCha
             profile?.is_premium ? 'bg-amber-500/10 text-amber-500' : 'bg-muted/50 text-muted-foreground',
           )}>
             {profile?.is_premium ? <Crown className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-            <span className="text-xs font-semibold">{profile?.is_premium ? 'Supporter Plan' : 'Free Plan'}</span>
+            <span className="text-xs font-semibold">{profile?.is_premium ? (profile?.tier === 'supporter-plus' ? 'Supporter+' : 'Supporter') : 'Free Plan'}</span>
           </div>
 
           <div className="space-y-1">

@@ -99,7 +99,7 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
                     <Sparkles className="h-3 w-3" />
                   )}
                   <span className="text-[10px] font-semibold">
-                    {profile?.is_premium ? 'Supporter' : 'Free Plan'}
+                    {profile?.is_premium ? (profile?.tier === 'supporter-plus' ? 'Supporter+' : 'Supporter') : 'Free Plan'}
                   </span>
                 </div>
               </div>
