@@ -319,7 +319,4 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
         {loading && (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 p-[14px_16px] bg-card/40 border border-white/5 rounded-xl animate-pulse">
-                <div className="w-8 h-8 rounded-lg bg-white/5 animate-pulse" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-[40%] rounded bg-white/5" />
+              <div key={i} className="flex items-center
