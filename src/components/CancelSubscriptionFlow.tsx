@@ -26,23 +26,13 @@ const CancelSubscriptionFlow: React.FC<CancelSubscriptionFlowProps> = ({
   const handleCancel = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.from('profiles').update({
-        is_premium: false,
-        tier: 'free',
-        subscription_starts_at: null,
-        subscription_expires_at: null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', userId);
+      const { error } = await supabase.rpc('cancel_subscription', {
+        p_user_id: userId,
+        p_reason: reason || null,
+        p_cancelled_by: 'user',
+      });
 
       if (error) throw error;
-
-      await supabase.from('subscription_events').insert({
-        user_id: userId,
-        event_type: 'cancelled',
-        plan_type: planType || 'supporter',
-        billing_period: billingPeriod,
-        metadata: { reason, cancelled_at: new Date().toISOString() },
-      });
 
       toast({ title: 'Subscription cancelled', description: 'Your plan has been cancelled. You can reactivate anytime.' });
       setStep('done');

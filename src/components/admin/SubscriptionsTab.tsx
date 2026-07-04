@@ -245,23 +245,13 @@ const SubscriptionsTab = () => {
   const cancelSubscription = async (userId: string, userName: string) => {
     try {
       const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          is_premium: false,
-          tier: 'free',
-          subscription_starts_at: null,
-          subscription_expires_at: null,
-        })
-        .eq('id', userId);
+        .rpc('cancel_subscription', {
+          p_user_id: userId,
+          p_reason: null,
+          p_cancelled_by: 'admin',
+        });
 
       if (updateError) throw updateError;
-
-      await supabase.from('subscription_events').insert({
-        user_id: userId,
-        event_type: 'cancelled',
-        plan_type: 'free',
-        metadata: { cancelled_by: 'admin' },
-      });
 
       toast.success(`Subscription cancelled for ${userName}`);
 
