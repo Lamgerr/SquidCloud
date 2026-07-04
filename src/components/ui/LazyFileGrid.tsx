@@ -96,7 +96,6 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
   }
 
   const visibleFiles = files.slice(0, visibleCount);
-  const hasMore = visibleCount < files.length;
 
   return (
     <div className="w-full select-none">
@@ -125,3 +124,4 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
 };
 
 export default memo(LazyFileGrid);
+export { LazyFileGrid };
