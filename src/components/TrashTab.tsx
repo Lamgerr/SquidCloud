@@ -91,12 +91,17 @@ const TrashTab: React.FC<TrashTabProps> = ({ workspaceId }) => {
 
   const permanentDelete = async (fileId: string) => {
     try {
-      const { error } = await supabase
-        .from('files')
-        .delete()
-        .eq('id', fileId);
+      const { error } = await supabase.rpc('permanently_delete_file', {
+        file_uuid: fileId
+      });
 
-      if (error) throw error;
+      if (error) {
+        const { error: directError } = await supabase
+          .from('files')
+          .delete()
+          .eq('id', fileId);
+        if (directError) throw directError;
+      }
 
       toast({
         title: "File Permanently Deleted",
@@ -104,11 +109,11 @@ const TrashTab: React.FC<TrashTabProps> = ({ workspaceId }) => {
       });
 
       fetchTrashedFiles();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error permanently deleting file:', error);
       toast({
         title: "Error",
-        description: "Failed to permanently delete file.",
+        description: error?.message || "Failed to permanently delete file.",
         variant: "destructive",
       });
     }
@@ -174,9 +179,22 @@ const TrashTab: React.FC<TrashTabProps> = ({ workspaceId }) => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              if (confirm(`Permanently delete all ${trashedFiles.length} files? This cannot be undone.`)) {
-                trashedFiles.forEach(f => permanentDelete(f.id));
+            onClick={async () => {
+              if (!confirm(`Permanently delete all ${trashedFiles.length} files? This cannot be undone.`)) return;
+              let failed = 0;
+              for (const f of trashedFiles) {
+                try {
+                  await permanentDelete(f.id);
+                } catch {
+                  failed++;
+                }
+              }
+              if (failed > 0) {
+                toast({
+                  title: "Partial Error",
+                  description: `${failed} file(s) could not be deleted.`,
+                  variant: "destructive",
+                });
               }
             }}
             className="gap-2 rounded-xl border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"

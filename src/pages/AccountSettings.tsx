@@ -21,7 +21,7 @@ import {
   User, Mail, Key, Shield, Fingerprint, CheckCircle2, AlertCircle,
   Loader2, Plus, ArrowLeft, Lock, Settings, Trash2, HardDrive, Calendar, Code, Zap,
   FolderOpen, FileArchive, RefreshCw, Crown, Sparkles, Briefcase, TrendingUp,
-  Repeat, Book,
+  Repeat, Book, LogOut,
 } from '@/lib/icon-map';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -106,7 +106,7 @@ const SETTINGS_CATEGORIES = [
 type SettingsCategory = typeof SETTINGS_CATEGORIES[number]['id'];
 
 const AccountSettings = () => {
-  const { user, profile, session } = useAuth();
+  const { user, profile, session, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -1012,6 +1012,16 @@ const AccountSettings = () => {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-border/20">
+          <button
+            onClick={signOut}
+            className="flex w-full items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-[13px] font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:border-red-500/30 active:scale-[0.98]"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
         </div>
       </div>
     );
