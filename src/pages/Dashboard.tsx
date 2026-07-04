@@ -1483,9 +1483,9 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
             <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
               <SheetContent
                 side="left"
-                className="w-[82vw] max-w-[320px] border-r border-border/50 bg-background p-0"
+                className="w-[82vw] max-w-[320px] border-r border-border/50 bg-background/95 backdrop-blur-xl p-0"
               >
-                <div className="flex h-full flex-col">
+                <div className="flex h-full flex-col animate-slide-in-left" style={{ animationDelay: '0ms' }}>
                   <div className="border-b border-border/40 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
                     <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Workspace</p>
                     <p className="mt-1 truncate text-sm font-medium text-foreground">
@@ -1500,7 +1500,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                         { id: 'shared', label: 'Shared', icon: Users },
                         { id: 'trash', label: 'Trash', icon: Trash2 },
                         { id: 'file-requests', label: 'File Requests', icon: Inbox },
-                      ].map((item) => {
+                      ].map((item, i) => {
                         const Icon = item.icon;
                         const isActive = activeTab === item.id;
                         return (
@@ -1511,11 +1511,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                               setMobileSidebarOpen(false);
                             }}
                             className={cn(
-                              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
+                              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all duration-200 active:scale-[0.98]',
                               isActive
                                 ? 'bg-primary/10 text-primary'
                                 : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
                             )}
+                            style={{ animationDelay: `${60 + i * 40}ms` }}
                           >
                             <Icon className="h-4 w-4" />
                             {item.label}
@@ -1532,7 +1533,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                         { id: 'analytics', label: 'Analytics', icon: Activity },
                         { id: 'secrets', label: 'Secrets', icon: Lock },
                         { id: 'settings', label: 'Settings', icon: Settings2, link: '/settings/account' },
-                      ].map((item) => {
+                      ].map((item, i) => {
                         const Icon = item.icon;
                         const isActive = activeTab === item.id;
                         return (
@@ -1544,11 +1545,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                               setMobileSidebarOpen(false);
                             }}
                             className={cn(
-                              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors',
+                              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all duration-200 active:scale-[0.98]',
                               isActive
                                 ? 'bg-primary/10 text-primary'
                                 : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
                             )}
+                            style={{ animationDelay: `${200 + i * 40}ms` }}
                           >
                             <Icon className="h-4 w-4" />
                             {item.label}
@@ -1568,11 +1570,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                             setMobileSidebarOpen(false);
                           }}
                           className={cn(
-                            'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-colors',
+                            'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-200 active:scale-[0.98]',
                             activeProviderType === 'squidcloud'
                               ? 'bg-primary/10 text-primary'
                               : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                           )}
+                          style={{ animationDelay: '360ms' }}
                         >
                           <span className="truncate">SquidCloud</span>
                           {activeProviderType === 'squidcloud' && <Check className="h-3.5 w-3.5" />}
@@ -1583,11 +1586,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                             setMobileSidebarOpen(false);
                           }}
                           className={cn(
-                            'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-colors',
+                            'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-200 active:scale-[0.98]',
                             activeProviderType === 'tebi'
                               ? 'bg-primary/10 text-primary'
                               : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                           )}
+                          style={{ animationDelay: '420ms' }}
                         >
                           <span className="truncate">Tebi.io</span>
                           <div className="flex items-center gap-2">
@@ -1601,7 +1605,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                         <button
                           type="button"
                           disabled
-                          className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm text-muted-foreground/60 opacity-80"
+                          className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm text-muted-foreground/60 opacity-80 transition-all duration-200"
+                          style={{ animationDelay: '480ms' }}
                         >
                           <span className="truncate">Cloudflare R2</span>
                           <span className="text-[10px] uppercase tracking-[0.08em]">Soon</span>
@@ -1619,7 +1624,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                             handleCreateWorkspace();
                             setMobileSidebarOpen(false);
                           }}
-                          className="h-7 rounded-lg px-2 text-xs"
+                          className="h-7 rounded-lg px-2 text-xs transition-all duration-200"
+                          style={{ animationDelay: '540ms' }}
                         >
                           <Plus className="mr-1 h-3.5 w-3.5" />
                           New
@@ -1634,7 +1640,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                             setWorkspaceManageOpen(true);
                             setMobileSidebarOpen(false);
                           }}
-                          className="h-7 w-full justify-start rounded-lg px-2 text-xs text-muted-foreground"
+                          className="h-7 w-full justify-start rounded-lg px-2 text-xs text-muted-foreground transition-all duration-200"
+                          style={{ animationDelay: '580ms' }}
                         >
                           <Users className="mr-1.5 h-3.5 w-3.5" />
                           Collaborators
@@ -1648,7 +1655,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                             setWorkspaceSettingsOpen(true);
                             setMobileSidebarOpen(false);
                           }}
-                          className="h-7 w-full justify-start rounded-lg px-2 text-xs text-muted-foreground"
+                          className="h-7 w-full justify-start rounded-lg px-2 text-xs text-muted-foreground transition-all duration-200"
+                          style={{ animationDelay: '620ms' }}
                         >
                           <Settings2 className="mr-1.5 h-3.5 w-3.5" />
                           Settings
@@ -1656,7 +1664,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                       )}
 
                       <div className="mt-2 space-y-1.5">
-                        {workspaces.map((workspace) => {
+                        {workspaces.map((workspace, i) => {
                           const isActive = workspace.id === activeWorkspaceId;
                           return (
                             <button
@@ -1666,11 +1674,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                                 setMobileSidebarOpen(false);
                               }}
                               className={cn(
-                                'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-colors',
+                                'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-200 active:scale-[0.98]',
                                 isActive
                                   ? 'bg-primary/10 text-primary'
                                   : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                               )}
+                              style={{ animationDelay: `${680 + i * 40}ms` }}
                             >
                               <span className="truncate">{workspace.name}</span>
                               {isActive && <Check className="h-3.5 w-3.5" />}

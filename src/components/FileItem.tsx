@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { formatBytes, FileItem as FileItemType } from '@/lib/api';
 import { FileText, Image, Video, Music, Archive, File, MoreVertical, Star, Share2 } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import FileActionMenu from './FileActionMenu';
+import MobileFileActionSheet from './MobileFileActionSheet';
 import FileViewer from './FileViewer';
 
 interface FileItemProps {
@@ -43,8 +45,19 @@ const FileItem: React.FC<FileItemProps> = ({
   file, viewMode, isSelected = false, onToggleSelect, onClick, onPreview, onDelete, onShare, onDownload, onMoveToFolder
 }) => {
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const longPressRef = useRef<ReturnType<typeof setTimeout>>();
+  const isMobile = useIsMobile();
   const cfg = getFileConfig(file.name, file.type);
   const IconComponent = cfg.icon;
+
+  const handleTouchStart = useCallback(() => {
+    longPressRef.current = setTimeout(() => setMobileSheetOpen(true), 500);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    clearTimeout(longPressRef.current);
+  }, []);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -54,6 +67,15 @@ const FileItem: React.FC<FileItemProps> = ({
       onClick(file);
     } else {
       onPreview ? onPreview() : setViewerOpen(true);
+    }
+  };
+
+  const handleMobileMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setMobileSheetOpen(true);
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50);
     }
   };
 
@@ -71,6 +93,10 @@ const FileItem: React.FC<FileItemProps> = ({
           )}
           onClick={handleClick}
           onDoubleClick={() => setViewerOpen(true)}
+          onTouchStart={isMobile ? handleTouchStart : undefined}
+          onTouchEnd={isMobile ? handleTouchEnd : undefined}
+          onTouchMove={isMobile ? handleTouchEnd : undefined}
+          onContextMenu={isMobile ? (e) => { e.preventDefault(); setMobileSheetOpen(true); } : undefined}
         >
           {/* Top Preview Canvas */}
           <div className={cn(
@@ -109,23 +135,45 @@ const FileItem: React.FC<FileItemProps> = ({
           </div>
 
           {/* Grid Hover Action Menu Trigger */}
-          <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={e => e.stopPropagation()}>
-            <FileActionMenu
-              file={file}
-              onView={() => setViewerOpen(true)}
-              onShare={() => onShare?.(file)}
-              onDownload={() => onDownload?.(file)}
-              onDelete={() => onDelete?.(file)}
-              onMoveToFolder={() => onMoveToFolder?.(file)}
-              trigger={
-                <button className="w-7 h-7 rounded-lg bg-black/60 border border-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-colors shadow-lg">
-                  <MoreVertical className="w-3.5 h-3.5" />
-                </button>
-              }
-            />
+          <div className="absolute top-2.5 right-2.5 z-10" onClick={e => e.stopPropagation()}>
+            {isMobile ? (
+              <button
+                onClick={handleMobileMenuClick}
+                className="w-7 h-7 rounded-lg bg-black/60 border border-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-colors shadow-lg"
+              >
+                <MoreVertical className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <FileActionMenu
+                  file={file}
+                  onView={() => setViewerOpen(true)}
+                  onShare={() => onShare?.(file)}
+                  onDownload={() => onDownload?.(file)}
+                  onDelete={() => onDelete?.(file)}
+                  onMoveToFolder={() => onMoveToFolder?.(file)}
+                  trigger={
+                    <button className="w-7 h-7 rounded-lg bg-black/60 border border-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-colors shadow-lg">
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </button>
+                  }
+                />
+              </div>
+            )}
           </div>
         </div>
         <FileViewer file={file} open={viewerOpen} onClose={() => setViewerOpen(false)} onDelete={onDelete} onShare={onShare} onDownload={onDownload} />
+        {isMobile && (
+          <MobileFileActionSheet
+            isOpen={mobileSheetOpen}
+            onClose={() => setMobileSheetOpen(false)}
+            file={file}
+            onView={() => setViewerOpen(true)}
+            onDownload={() => onDownload?.(file)}
+            onShare={() => onShare?.(file)}
+            onDelete={() => onDelete?.(file)}
+          />
+        )}
       </>
     );
   }
@@ -142,6 +190,10 @@ const FileItem: React.FC<FileItemProps> = ({
         )}
         onClick={handleClick}
         onDoubleClick={() => setViewerOpen(true)}
+        onTouchStart={isMobile ? handleTouchStart : undefined}
+        onTouchEnd={isMobile ? handleTouchEnd : undefined}
+        onTouchMove={isMobile ? handleTouchEnd : undefined}
+        onContextMenu={isMobile ? (e) => { e.preventDefault(); setMobileSheetOpen(true); } : undefined}
       >
         <div className="flex items-center gap-3 min-w-0 pr-3">
           <div className={cn("w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 shadow-sm", cfg.bg)}>
@@ -165,22 +217,44 @@ const FileItem: React.FC<FileItemProps> = ({
         </span>
 
         <div className="flex justify-end shrink-0" onClick={e => e.stopPropagation()}>
-          <FileActionMenu
-            file={file}
-            onView={() => setViewerOpen(true)}
-            onShare={() => onShare?.(file)}
-            onDownload={() => onDownload?.(file)}
-            onDelete={() => onDelete?.(file)}
-            onMoveToFolder={() => onMoveToFolder?.(file)}
-            trigger={
-              <button className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreVertical className="w-4 h-4 text-neutral-400" />
-              </button>
-            }
-          />
+          {isMobile ? (
+            <button
+              onClick={handleMobileMenuClick}
+              className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center transition-opacity"
+            >
+              <MoreVertical className="w-4 h-4 text-neutral-400" />
+            </button>
+          ) : (
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <FileActionMenu
+                file={file}
+                onView={() => setViewerOpen(true)}
+                onShare={() => onShare?.(file)}
+                onDownload={() => onDownload?.(file)}
+                onDelete={() => onDelete?.(file)}
+                onMoveToFolder={() => onMoveToFolder?.(file)}
+                trigger={
+                  <button className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center">
+                    <MoreVertical className="w-4 h-4 text-neutral-400" />
+                  </button>
+                }
+              />
+            </div>
+          )}
         </div>
       </div>
       <FileViewer file={file} open={viewerOpen} onClose={() => setViewerOpen(false)} onDelete={onDelete} onShare={onShare} onDownload={onDownload} />
+      {isMobile && (
+        <MobileFileActionSheet
+          isOpen={mobileSheetOpen}
+          onClose={() => setMobileSheetOpen(false)}
+          file={file}
+          onView={() => setViewerOpen(true)}
+          onDownload={() => onDownload?.(file)}
+          onShare={() => onShare?.(file)}
+          onDelete={() => onDelete?.(file)}
+        />
+      )}
     </>
   );
 };

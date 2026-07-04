@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Search, Crown, Sparkles } from '@/lib/icon-map';
+import { Search, Crown, Sparkles } from '@/lib/icon-map';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,7 +41,10 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
             className="h-9 w-9 rounded-xl p-0 text-muted-foreground hover:bg-muted/50 active:scale-90 transition-all duration-200"
             aria-label="Open navigation menu"
           >
-            <Menu className="h-[18px] w-[18px]" />
+            <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="7" x2="21" y2="7" />
+              <line x1="3" y1="17" x2="21" y2="17" />
+            </svg>
           </Button>
           <h1 className="truncate text-sm font-semibold text-foreground ml-0.5">{title}</h1>
         </div>
