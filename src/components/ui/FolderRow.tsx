@@ -56,8 +56,7 @@ const FolderRow: React.FC<FolderRowProps> = ({
 
   const handleDeleteClick = () => { setMenuOpen(false); setDeleteConfirmOpen(true); };
 
-  const isGrid = viewMode === 'grid';
-  const isCompact = viewMode === 'compact';
+  const isGrid = viewMode === 'grid' || viewMode === 'compact';
 
   return (
     <>
@@ -65,11 +64,9 @@ const FolderRow: React.FC<FolderRowProps> = ({
         <div
           data-kbd-item
           className={cn(
-            'group flex flex-col p-3 rounded-xl cursor-pointer transition-all duration-150',
-            'bg-card border border-border/40',
-            'hover:bg-card/80 hover:border-border/60',
-            'active:scale-[0.97]',
-            selected && 'ring-1 ring-primary/30 border-primary/20'
+            'group relative flex flex-col items-center p-3.5 rounded-2xl cursor-pointer transition-all duration-150 select-none border border-transparent',
+            'bg-[#1a1a24]/40 hover:bg-white/[0.05] active:scale-[0.98]',
+            selected && 'bg-[#007AFF]/15 border-[#007AFF]/50 shadow-[0_0_15px_rgba(0,122,255,0.15)]'
           )}
           onClick={onOpen}
           onDoubleClick={() => setRenaming(true)}
@@ -77,43 +74,15 @@ const FolderRow: React.FC<FolderRowProps> = ({
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}
         >
-          <div className="flex items-start justify-between mb-2.5">
-            <div className="w-11 h-11 rounded-xl bg-muted/60 border border-border/40 flex items-center justify-center shrink-0">
-              <Folder className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div className="shrink-0" onClick={e => e.stopPropagation()}>
-              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-muted/60 focus-visible:outline-none transition-colors"
-                    aria-label="Folder actions"
-                  >
-                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44 p-1">
-                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm" onClick={() => { setMenuOpen(false); setRenaming(true); }}>
-                    <Pencil className="w-4 h-4" />Rename
-                  </DropdownMenuItem>
-                  {onMove && (
-                    <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm" onClick={() => { setMenuOpen(false); onMove(); }}>
-                      <Move className="w-4 h-4" />Move
-                    </DropdownMenuItem>
-                  )}
-                  {onDownload && (
-                    <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm" onClick={() => { setMenuOpen(false); onDownload(); }}>
-                      <Download className="w-4 h-4" />Download
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator className="bg-border/50" />
-                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-destructive focus:text-destructive focus:bg-destructive/10" onClick={handleDeleteClick}>
-                    <Trash2 className="w-4 h-4" />Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+          {/* macOS Embossed Blue Folder Icon */}
+          <div className="relative w-16 h-12 mb-2.5 transition-transform duration-200 group-hover:-translate-y-0.5">
+            <div className="absolute inset-0 bg-gradient-to-b from-[#3a8dff] via-[#1a6eff] to-[#0a4ed9] rounded-xl shadow-md border border-[#63a4ff]/40 flex items-center justify-center">
+              <div className="absolute -top-1.5 left-1.5 w-5 h-2 bg-gradient-to-t from-[#3a8dff] to-[#63a4ff] rounded-t-md border-t border-l border-[#8bc0ff]/50" />
+              <Folder className="w-5 h-5 text-white/30" />
             </div>
           </div>
-          <div className="min-w-0">
+
+          <div className="w-full text-center min-w-0 px-1">
             {renaming ? (
               <input
                 ref={inputRef}
@@ -121,29 +90,63 @@ const FolderRow: React.FC<FolderRowProps> = ({
                 onChange={e => setRenameValue(e.target.value)}
                 onBlur={handleRenameConfirm}
                 onKeyDown={handleRenameKeyDown}
-                className="bg-transparent border-b border-muted-foreground text-sm font-medium outline-none w-full"
+                className="bg-neutral-900 border border-[#007AFF] rounded px-1.5 py-0.5 text-xs text-white text-center w-full outline-none shadow-sm"
                 onClick={e => e.stopPropagation()}
               />
             ) : (
-              <span className="text-sm font-medium text-foreground block truncate" title={folder.name}>
-                {(folder as any).shared && <Share2 className="w-3 h-3 text-primary inline-flex mr-1 -mt-0.5" />}
+              <span className="text-xs font-medium text-neutral-200 block truncate tracking-tight" title={folder.name}>
+                {(folder as any).shared && <Share2 className="w-3 h-3 text-[#007AFF] inline-flex mr-1 -mt-0.5" />}
                 {folder.name}
               </span>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
-              Modified {formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}
+            <p className="text-[10px] text-neutral-500 font-mono mt-0.5 block truncate">
+              {formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}
             </p>
+          </div>
+
+          {/* Grid Context Trigger */}
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center justify-center w-6 h-6 rounded-md hover:bg-white/10 transition-colors">
+                  <MoreVertical className="w-3.5 h-3.5 text-neutral-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44 p-1 bg-[#1a1a24] border-white/10 text-white shadow-2xl">
+                <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); setRenaming(true); }}>
+                  <Pencil className="w-3.5 h-3.5" />Rename
+                </DropdownMenuItem>
+                {onMove && (
+                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); onMove(); }}>
+                    <Move className="w-3.5 h-3.5" />Move
+                  </DropdownMenuItem>
+                )}
+                {onDownload && (
+                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); onDownload(); }}>
+                    <Download className="w-3.5 h-3.5" />Download
+                  </DropdownMenuItem>
+                )}
+                {onNotes && (
+                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); onNotes(); }}>
+                    <MessageSquare className="w-3.5 h-3.5" />Notes
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs text-red-400 focus:text-red-300 focus:bg-red-500/10" onClick={handleDeleteClick}>
+                  <Trash2 className="w-3.5 h-3.5" />Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       ) : (
+        /* macOS Finder List Table Row */
         <div
           data-kbd-item
           className={cn(
-            'group flex items-center gap-3 p-[14px_16px] rounded-[10px] cursor-pointer transition-all duration-150',
-            'bg-card border border-border/30',
-            'hover:bg-card/80 hover:border-border/50',
-            'active:scale-[0.99]',
-            selected && 'ring-1 ring-primary/30 border-primary/20'
+            'group grid grid-cols-[1fr_100px_140px_36px] md:grid-cols-[1fr_110px_150px_100px_36px] items-center px-4 h-11 rounded-xl cursor-pointer transition-all duration-100 select-none border border-transparent',
+            'bg-card/40 hover:bg-white/[0.04]',
+            selected && 'bg-[#007AFF]/15 border-[#007AFF]/40 text-white shadow-sm'
           )}
           onClick={onOpen}
           onDoubleClick={() => setRenaming(true)}
@@ -151,74 +154,85 @@ const FolderRow: React.FC<FolderRowProps> = ({
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}
         >
-          <div className={cn(
-            'rounded-[10px] bg-muted/40 border border-border/30 flex items-center justify-center shrink-0',
-            isCompact ? 'w-9 h-9' : 'w-11 h-11'
-          )}>
-            <Folder className={cn('text-muted-foreground', isCompact ? 'w-[18px] h-[18px]' : 'w-[22px] h-[22px]')} />
+          {/* Name Column */}
+          <div className="flex items-center gap-3 min-w-0 pr-3">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-[#3a8dff] to-[#0a4ed9] border border-[#63a4ff]/30 flex items-center justify-center shrink-0 shadow-sm">
+              <Folder className="w-3.5 h-3.5 text-white" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              {renaming ? (
+                <input
+                  ref={inputRef}
+                  value={renameValue}
+                  onChange={e => setRenameValue(e.target.value)}
+                  onBlur={handleRenameConfirm}
+                  onKeyDown={handleRenameKeyDown}
+                  className="bg-neutral-900 border border-[#007AFF] rounded px-2 py-0.5 text-sm text-white w-full outline-none"
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <span className="text-[13px] font-medium text-neutral-200 block truncate" title={folder.name}>
+                  {(folder as any).shared && <Share2 className="w-3 h-3 text-[#007AFF] inline-flex mr-1.5 -mt-0.5" />}
+                  {folder.name}
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="min-w-0 flex-1">
-            {renaming ? (
-              <input
-                ref={inputRef}
-                value={renameValue}
-                onChange={e => setRenameValue(e.target.value)}
-                onBlur={handleRenameConfirm}
-                onKeyDown={handleRenameKeyDown}
-                className="bg-transparent border-b border-muted-foreground text-foreground text-[15px] font-medium outline-none w-full"
-                onClick={e => e.stopPropagation()}
-              />
-            ) : (
-              <span className={cn('text-foreground block truncate', isCompact ? 'text-[14px]' : 'text-[15px] font-medium')} title={folder.name}>
-                {(folder as any).shared && <Share2 className="w-3.5 h-3.5 text-primary inline-flex mr-1.5 -mt-0.5" />}
-                {folder.name}
-              </span>
-            )}
-            <p className="text-xs text-muted-foreground mt-[3px]">
-              Modified {formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}
-            </p>
-          </div>
+          {/* Kind Column */}
+          <span className="text-xs text-neutral-400 hidden md:block uppercase tracking-wider font-mono text-[11px]">
+            Folder
+          </span>
 
-          <div className="shrink-0" onClick={e => e.stopPropagation()}>
+          {/* Modified Column */}
+          <span className="text-xs text-neutral-400 truncate">
+            {formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}
+          </span>
+
+          {/* Size Column */}
+          <span className="text-xs text-neutral-500 font-mono">--</span>
+
+          {/* Action Menu */}
+          <div className="flex justify-end shrink-0" onClick={e => e.stopPropagation()}>
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-accent/50 focus-visible:outline-none transition-colors"
+                  className="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-white/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                   aria-label="Folder actions"
                 >
-                  <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                  <MoreVertical className="w-4 h-4 text-neutral-400" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 p-1">
-                <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm" onClick={() => { setMenuOpen(false); setRenaming(true); }}>
-                  <Pencil className="w-4 h-4" />Rename
+              <DropdownMenuContent align="end" className="w-44 p-1 bg-[#1a1a24] border-white/10 text-white shadow-2xl">
+                <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); setRenaming(true); }}>
+                  <Pencil className="w-3.5 h-3.5" />Rename
                 </DropdownMenuItem>
                 {onMove && (
-                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm" onClick={() => { setMenuOpen(false); onMove(); }}>
-                    <Move className="w-4 h-4" />Move
+                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); onMove(); }}>
+                    <Move className="w-3.5 h-3.5" />Move
                   </DropdownMenuItem>
                 )}
                 {onDownload && (
-                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm" onClick={() => { setMenuOpen(false); onDownload(); }}>
-                    <Download className="w-4 h-4" />Download
+                  <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); onDownload(); }}>
+                    <Download className="w-3.5 h-3.5" />Download
                   </DropdownMenuItem>
                 )}
                 {onNotes && (
                   <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="rounded-md gap-2 cursor-pointer text-sm">
+                    <DropdownMenuSubTrigger className="rounded-md gap-2 cursor-pointer text-xs">
                       <span>Additional</span>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-44 p-1">
-                      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm" onClick={() => { setMenuOpen(false); onNotes(); }}>
-                        <MessageSquare className="w-4 h-4" />Notes
+                    <DropdownMenuSubContent className="w-44 p-1 bg-[#1a1a24] border-white/10 text-white shadow-2xl">
+                      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); onNotes(); }}>
+                        <MessageSquare className="w-3.5 h-3.5" />Notes
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                 )}
-                <DropdownMenuSeparator className="bg-border/50" />
-                <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-destructive focus:text-destructive focus:bg-destructive/10" onClick={handleDeleteClick}>
-                  <Trash2 className="w-4 h-4" />Delete
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs text-red-400 focus:text-red-300 focus:bg-red-500/10" onClick={handleDeleteClick}>
+                  <Trash2 className="w-3.5 h-3.5" />Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -227,16 +241,16 @@ const FolderRow: React.FC<FolderRowProps> = ({
       )}
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-[#1a1a24] border-white/10 text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete folder?</AlertDialogTitle>
-            <AlertDialogDescription>
-              <strong>{folder.name}</strong> and all its contents will be permanently deleted.
+            <AlertDialogDescription className="text-neutral-400">
+              <strong className="text-white">{folder.name}</strong> and all its contents will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setDeleteConfirmOpen(false); onDelete?.(); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogCancel className="bg-white/5 border-white/10 hover:bg-white/10 text-white">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setDeleteConfirmOpen(false); onDelete?.(); }} className="bg-red-600 text-white hover:bg-red-500">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -268,24 +282,24 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
       <div className="flex items-center justify-between px-1 pb-2">
         <button
           onClick={() => setExpanded(prev => !prev)}
-          className="flex items-center gap-1.5"
+          className="flex items-center gap-1.5 select-none"
         >
           <ChevronDown
             className={cn(
-              'w-3.5 h-3.5 text-muted-foreground/60 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+              'w-3.5 h-3.5 text-neutral-500 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
               !expanded && '-rotate-90'
             )}
           />
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Folders</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Folders</h2>
           {folders.length > 0 && (
-            <span className="text-[11px] text-muted-foreground bg-muted/60 px-[7px] py-[1px] rounded-[10px]">
+            <span className="text-[11px] text-neutral-400 bg-white/[0.06] px-[7px] py-[1px] rounded-[10px]">
               {folders.length}
             </span>
           )}
         </button>
         <button
           onClick={onCreateFolder}
-          className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/60 hover:bg-accent/50 hover:text-foreground transition-colors"
+          className="flex items-center justify-center w-7 h-7 rounded-md text-neutral-500 hover:bg-white/10 hover:text-white transition-colors"
           aria-label="New Folder"
           title="New Folder"
         >
@@ -302,51 +316,10 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
           maxHeight: expanded ? (loading ? 400 : folders.length > 0 ? folders.length * 76 + 200 : 400) : 0,
         }}
       >
-      {loading && (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 p-[14px_16px] bg-card border border-border/30 rounded-[10px]">
-              <div className="w-11 h-11 rounded-[10px] bg-muted/30 animate-pulse" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 w-[60%] rounded bg-muted/30 animate-pulse" />
-                <div className="h-2.5 w-[30%] rounded bg-muted/20 animate-pulse" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showEmpty && (
-        <div className="flex flex-col items-center justify-center min-h-[240px] px-4 py-12">
-          <div className="w-12 h-12 rounded-xl bg-muted/40 border border-border/30 flex items-center justify-center mb-4">
-            <Plus className="w-6 h-6 text-muted-foreground/60" />
-          </div>
-          <h3 className="text-[15px] font-semibold text-foreground mb-1">No folders yet</h3>
-          <p className="text-[13px] text-muted-foreground mb-4 text-center">Create a folder to get started</p>
-          <Button size="sm" className="rounded-lg" onClick={onCreateFolder}>New folder</Button>
-        </div>
-      )}
-
-      {!loading && folders.length > 0 && (
-        <div className={cn(viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5' : 'space-y-2', 'stagger-card')}>
-          {folders.map(f => (
-            <FolderRow
-              key={f.id}
-              folder={f}
-              viewMode={viewMode}
-              selected={f.id === selectedId}
-              onOpen={() => onOpen(f)}
-              onDelete={() => onDelete?.(f)}
-              onRename={(name) => onRename?.(f, name)}
-              onMove={() => onMove?.(f)}
-              onDownload={() => onDownload?.(f)}
-            />
-          ))}
-        </div>
-      )}
-      </div>
-    </section>
-  );
-};
-
-export default FolderRow;
+        {loading && (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-[14px_16px] bg-card/40 border border-white/5 rounded-xl animate-pulse">
+                <div className="w-8 h-8 rounded-lg bg-white/5 animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-[40%] rounded bg-white/5" />
