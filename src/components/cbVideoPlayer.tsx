@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'; // 🚀 Added useMemo
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   Play, Pause, Maximize, Minimize, Loader, Volume2, VolumeX, 
   RotateCcw, RotateCw, Settings, PictureInPicture, AlertCircle, RefreshCw, Cpu, FileVideo 
@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { StreamDecryptorService } from '@/lib/videoStreamer';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 interface CBVideoPlayerProps {
   file: { id: string; name: string; type: string; size: number };
@@ -25,7 +23,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<NodeJS.Timeout>();
-  const ffmpegRef = useRef<FFmpeg>(new FFmpeg());
+  const ffmpegRef = useRef<any>(null);
 
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -47,7 +45,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const [hoverPosition, setHoverPosition] = useState(0);
   const [seekAnimation, setSeekAnimation] = useState<'left' | 'right' | null>(null);
 
-  // WASM Transcoding State
+  // Detect unsupported browser container formats
   const isUnsupportedContainer = useMemo(() => {
     return /\.(avi|mkv|wmv|flv|mov)$/i.test(file.name);
   }, [file.name]);
@@ -68,23 +66,27 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     };
   }, [transcodedUrl]);
 
-  // WASM Transcoding Pipeline
+  // WASM Transcoding Pipeline (Dynamic import prevents Termux build crashes)
   const startLocalTranscoding = async () => {
     try {
       setHasError(false);
       setTranscodeState('loading_engine');
       setTranscodeMessage('Loading FFmpeg WebAssembly Core...');
       
+      const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+      const { fetchFile, toBlobURL } = await import('@ffmpeg/util');
+
+      if (!ffmpegRef.current) {
+        ffmpegRef.current = new FFmpeg();
+      }
       const ffmpeg = ffmpegRef.current;
 
-      // Attach progress listener
-      ffmpeg.on('progress', ({ progress }) => {
+      ffmpeg.on('progress', ({ progress }: { progress: number }) => {
         const pct = Math.min(100, Math.max(0, Math.round(progress * 100)));
         setTranscodeProgress(pct);
         setTranscodeMessage(`Transcoding to MP4... ${pct}%`);
       });
 
-      // Load FFmpeg core scripts from CDN
       if (!ffmpeg.loaded) {
         const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
         await ffmpeg.load({
@@ -102,14 +104,11 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
       const inputName = `input.${inputExtension}`;
       const outputName = 'output.mp4';
 
-      // 1. Fetch decrypted payload from Service Worker into FFmpeg virtual filesystem
       await ffmpeg.writeFile(inputName, await fetchFile(virtualStreamUrl));
 
       setTranscodeMessage('Running ultrafast local video conversion...');
       setTranscodeProgress(15);
 
-      // 2. Execute fast remux/transcode command
-      // -c:v libx264 with ultrafast preset ensures maximum speed in client CPU
       await ffmpeg.exec([
         '-i', inputName,
         '-c:v', 'libx264',
@@ -119,13 +118,11 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
         outputName
       ]);
 
-      // 3. Read output MP4 file and create playable Object URL
       const fileData = await ffmpeg.readFile(outputName);
       const dataArray = new Uint8Array(fileData as ArrayBuffer);
       const videoBlob = new Blob([dataArray.buffer], { type: 'video/mp4' });
       const createdUrl = URL.createObjectURL(videoBlob);
 
-      // Clean up virtual filesystem memory
       await ffmpeg.deleteFile(inputName);
       await ffmpeg.deleteFile(outputName);
 
@@ -157,7 +154,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!videoRef.current || transcodeState !== 'ready' && isUnsupportedContainer) return;
+      if (!videoRef.current || (transcodeState !== 'ready' && isUnsupportedContainer)) return;
       wakeControls();
       switch (e.key.toLowerCase()) {
         case ' ':
@@ -285,12 +282,10 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // Determine active video source URL
   const activeVideoSource = isUnsupportedContainer 
     ? transcodedUrl 
     : `/virtual-stream/${file.id}?retry=${retryCount}`;
 
-  // Error State Overlay
   if (hasError) {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full bg-[#0a0a0f] p-6 text-center border border-neutral-800 rounded-2xl space-y-4 select-none">
@@ -310,7 +305,6 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     );
   }
 
-  // WASM Transcoding Prompt / Active State Overlay
   if (isUnsupportedContainer && transcodeState !== 'ready') {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full bg-[#0a0a0f] p-8 text-center border border-neutral-800 rounded-2xl space-y-6 select-none">
@@ -373,13 +367,31 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
           onError={(e) => {
             console.error("Video playback error:", e);
             setHasError(true);
+            setBuffering(false);
           }}
-          onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
-          onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
+          onLoadedMetadata={() => {
+            setDuration(videoRef.current?.duration || 0);
+            if (videoRef.current && videoRef.current.readyState >= 2) {
+              setBuffering(false);
+            }
+          }}
+          onLoadedData={() => setBuffering(false)}
+          onCanPlay={() => setBuffering(false)}
+          onCanPlayThrough={() => setBuffering(false)}
+          onTimeUpdate={() => {
+            const current = videoRef.current?.currentTime || 0;
+            setCurrentTime(current);
+            if (current > 0 && buffering) {
+              setBuffering(false);
+            }
+          }}
           onPlay={() => setPlaying(true)}
           onPause={() => { setPlaying(false); setControlsVisible(true); }}
-          onWaiting={() => setBuffering(true)}
-          onCanPlay={() => setBuffering(false)}
+          onWaiting={() => {
+            if (videoRef.current && videoRef.current.readyState < 3) {
+              setBuffering(true);
+            }
+          }}
           onSeeking={() => setBuffering(true)}
           onSeeked={() => setBuffering(false)}
         />
