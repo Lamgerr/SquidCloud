@@ -74,7 +74,6 @@ const FolderRow: React.FC<FolderRowProps> = ({
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}
         >
-          {/* macOS Embossed Blue Folder Icon */}
           <div className="relative w-16 h-12 mb-2.5 transition-transform duration-200 group-hover:-translate-y-0.5">
             <div className="absolute inset-0 bg-gradient-to-b from-[#3a8dff] via-[#1a6eff] to-[#0a4ed9] rounded-xl shadow-md border border-[#63a4ff]/40 flex items-center justify-center">
               <div className="absolute -top-1.5 left-1.5 w-5 h-2 bg-gradient-to-t from-[#3a8dff] to-[#63a4ff] rounded-t-md border-t border-l border-[#8bc0ff]/50" />
@@ -104,7 +103,6 @@ const FolderRow: React.FC<FolderRowProps> = ({
             </p>
           </div>
 
-          {/* Grid Context Trigger */}
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -140,7 +138,6 @@ const FolderRow: React.FC<FolderRowProps> = ({
           </div>
         </div>
       ) : (
-        /* macOS Finder List Table Row */
         <div
           data-kbd-item
           className={cn(
@@ -154,7 +151,6 @@ const FolderRow: React.FC<FolderRowProps> = ({
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}
         >
-          {/* Name Column */}
           <div className="flex items-center gap-3 min-w-0 pr-3">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-[#3a8dff] to-[#0a4ed9] border border-[#63a4ff]/30 flex items-center justify-center shrink-0 shadow-sm">
               <Folder className="w-3.5 h-3.5 text-white" />
@@ -180,20 +176,16 @@ const FolderRow: React.FC<FolderRowProps> = ({
             </div>
           </div>
 
-          {/* Kind Column */}
           <span className="text-xs text-neutral-400 hidden md:block uppercase tracking-wider font-mono text-[11px]">
             Folder
           </span>
 
-          {/* Modified Column */}
           <span className="text-xs text-neutral-400 truncate">
             {formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}
           </span>
 
-          {/* Size Column */}
           <span className="text-xs text-neutral-500 font-mono">--</span>
 
-          {/* Action Menu */}
           <div className="flex justify-end shrink-0" onClick={e => e.stopPropagation()}>
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -319,4 +311,47 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
         {loading && (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 p-[14px_16px] bg-card
+              <div key={i} className="flex items-center gap-3 p-[14px_16px] bg-card/40 border border-white/5 rounded-xl animate-pulse">
+                <div className="w-8 h-8 rounded-lg bg-white/5 animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-[40%] rounded bg-white/5" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showEmpty && (
+          <div className="flex flex-col items-center justify-center min-h-[200px] px-4 py-8">
+            <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center mb-3">
+              <Plus className="w-6 h-6 text-neutral-500" />
+            </div>
+            <h3 className="text-[14px] font-semibold text-white mb-1">No folders yet</h3>
+            <p className="text-[12px] text-neutral-400 mb-4 text-center">Create a folder to organize your files</p>
+            <Button size="sm" className="rounded-lg bg-[#007AFF] hover:bg-[#0062cc] text-white" onClick={onCreateFolder}>New folder</Button>
+          </div>
+        )}
+
+        {!loading && folders.length > 0 && (
+          <div className={cn(viewMode === 'grid' || viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3' : 'space-y-0.5', 'stagger-card')}>
+            {folders.map(f => (
+              <FolderRow
+                key={f.id}
+                folder={f}
+                viewMode={viewMode}
+                selected={f.id === selectedId}
+                onOpen={() => onOpen(f)}
+                onDelete={() => onDelete?.(f)}
+                onRename={(name) => onRename?.(f, name)}
+                onMove={() => onMove?.(f)}
+                onDownload={() => onDownload?.(f)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+export default FolderRow;
