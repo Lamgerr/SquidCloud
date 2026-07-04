@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -12,6 +12,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import SwitchAccountSheet from '@/components/SwitchAccountSheet';
 
 interface SidebarProps {
   activeTab: string;
@@ -47,6 +48,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const collapsed = sidebarCollapsed;
+  const [switchOpen, setSwitchOpen] = useState(false);
 
   const NavItem = ({ item }: { item: { id: string; label: string; icon: Icon; shortcut?: string } }) => {
     const isActive = activeTab === item.id;
@@ -221,12 +223,18 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
               <kbd className="ml-auto text-[9px] bg-muted/50 px-1.5 py-0.5 rounded border border-border/30">⌘/</kbd>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border/40 my-1" />
+            <DropdownMenuItem className="gap-2.5 py-2 cursor-pointer text-sm text-muted-foreground focus:text-foreground rounded-md" onClick={() => setSwitchOpen(true)}>
+              <User className="h-4 w-4" /><span>Switch Account</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-border/40 my-1" />
             <DropdownMenuItem className="gap-2.5 py-2 text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer text-sm rounded-md" onClick={onSignOut}>
               <LogOut className="h-4 w-4" /><span>Sign out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <SwitchAccountSheet open={switchOpen} onOpenChange={setSwitchOpen} />
     </aside>
   );
 };

@@ -555,42 +555,25 @@ export async function createFolder(folderName: string, parentFolder: string = ""
 
     devLog('Creating folder:', folderName, 'in parent:', parentFolder);
 
-    // Create the folder path
-    const folderPath = parentFolder 
-      ? `${parentFolder}/${folderName}` 
-      : folderName;
-    
-    const folderInsertData: Record<string, unknown> = {
-      user_id: user.id,
-      name: folderName,
-      path: folderPath,
-      parent_folder: parentFolder || null
-    };
-
-    if (activeWorkspaceId) {
-      folderInsertData.workspace_id = activeWorkspaceId;
+    if (activeProviderType !== 'squidcloud' && !activeProviderId) {
+      throw new Error('Selected provider is not configured. Please complete provider setup first.');
     }
 
-    if (activeProviderType !== 'squidcloud') {
-      if (!activeProviderId) {
-        throw new Error('Selected provider is not configured. Please complete provider setup first.');
-      }
-      folderInsertData.storage_provider_id = activeProviderId;
-    }
-
-    // Insert into folders table
-    const { data: folderData, error: insertError } = await (supabase
-      .from('folders')
-      .insert(folderInsertData as any)
-      .select()
-      .single()) as any;
+    // Insert into folders table via secure RPC
+    const { data: folderData, error: insertError } = await supabase.rpc('create_folder_secure', {
+      p_name: folderName,
+      p_parent_folder: parentFolder || null,
+      p_workspace_id: activeWorkspaceId || null,
+      p_storage_provider_id: activeProviderType !== 'squidcloud' && activeProviderId ? activeProviderId : null,
+    });
 
     if (insertError) {
       console.error("Error creating folder in database:", insertError);
-      throw new Error("Failed to create folder");
+      throw new Error(insertError.message || "Failed to create folder");
     }
 
-    devLog('Created folder in database:', folderData?.id);
+    const folder = folderData as any || {};
+    devLog('Created folder in database:', folder.id);
 
     // Only mirror folder creation to legacy GitHub storage for SquidCloud provider.
     if (activeProviderType === 'squidcloud') {
@@ -621,13 +604,13 @@ export async function createFolder(folderName: string, parentFolder: string = ""
 
     // Return the new folder item
     return {
-      id: folderData.id,
-      name: folderData.name,
-      path: folderData.path,
-      created_at: folderData.created_at,
+      id: folder.id,
+      name: folder.name,
+      path: folder.path,
+      created_at: folder.created_at,
       is_folder: true,
-      parent_folder: folderData.parent_folder,
-      user_id: folderData.user_id
+      parent_folder: folder.parent_folder,
+      user_id: folder.user_id
     };
   } catch (error) {
     console.error("Error creating folder:", error);

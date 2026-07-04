@@ -1483,7 +1483,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
             <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
               <SheetContent
                 side="left"
-                className="w-[82vw] max-w-[320px] border-r border-border/50 bg-background/95 backdrop-blur-xl p-0"
+                className="w-[82vw] max-w-[320px] border-r border-border/50 bg-background p-0"
               >
                 <div className="flex h-full flex-col">
                   <div className="border-b border-border/40 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
