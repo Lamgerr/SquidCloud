@@ -3,7 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import {
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, LayoutGrid,
   Loader2, FileText, Download, Maximize, Minimize, Search, Moon,
-  BookOpen, X, ListTree, Layers, Sun, Eye, Settings, Bookmark,
+  BookOpen, X, ListTree, Layers, Sun, Eye, EyeOff, Settings, Bookmark,
   BookmarkPlus, Highlighter, Pen, StickyNote, Type, Underline,
   Italic, Sigma, Eraser, Signature, ClipboardCopy, BookmarkX,
   ScrollText, Play, Undo2, Redo2, Hash, Thermometer,
@@ -1544,35 +1544,39 @@ export default function OptimizedPDFViewer({
         </aside>
 
         {/* Main canvas */}
-        <main className={cn("flex-1 overflow-hidden flex items-center justify-center relative transition-colors duration-500", themeStyle.bg)}>
+        <main className={cn("flex-1 overflow-auto relative transition-colors duration-500", themeStyle.bg)}>
           {loading ? (
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <span className="text-xs font-mono text-muted-foreground tabular-nums">Loading PDF... {totalPages ? `${totalPages} pages` : ''}</span>
+            <div className="flex items-center justify-center min-h-full">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <span className="text-xs font-mono text-muted-foreground tabular-nums">Loading PDF... {totalPages ? `${totalPages} pages` : ''}</span>
+              </div>
             </div>
           ) : layout === 'scroll' ? (
             <div ref={scrollContainerRef} className="w-full h-full overflow-y-auto overscroll-contain p-8 scroll-smooth" style={{ filter: canvasFilter }} />
           ) : (
-            <div
-              className={cn(
-                "relative inline-block rounded-sm will-change-transform max-w-full max-h-full",
-                transitionClass,
-                pageRendering && "opacity-80",
-                focusMode && "shadow-none"
-              )}
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onContextMenu={handleContextMenu}
-              onMouseUpCapture={handleTextSelect}
-              style={{
-                transform: layout === 'dual' ? 'scale(0.85)' : 'none',
-                transition: 'transform 0.3s ease-out'
-              }}
-            >
-              <canvas ref={activeCanvasRef} className="block rounded-sm bg-white" style={{ filter: canvasFilter }} />
-              <canvas ref={annotationCanvasRef} className="absolute inset-0 pointer-events-none rounded-sm" />
-              <div ref={activeTextLayerRef} className="absolute inset-0 overflow-hidden select-text text-transparent pointer-events-auto" />
+            <div className="flex flex-col items-center justify-start min-h-full w-full p-4">
+              <div
+                className={cn(
+                  "relative inline-block rounded-sm will-change-transform shadow-2xl",
+                  transitionClass,
+                  pageRendering && "opacity-80",
+                  focusMode && "shadow-none"
+                )}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onContextMenu={handleContextMenu}
+                onMouseUpCapture={handleTextSelect}
+                style={{
+                  transform: layout === 'dual' ? 'scale(0.85)' : 'none',
+                  transition: 'transform 0.3s ease-out'
+                }}
+              >
+                <canvas ref={activeCanvasRef} className="block rounded-sm bg-white" style={{ filter: canvasFilter }} />
+                <canvas ref={annotationCanvasRef} className="absolute inset-0 pointer-events-none rounded-sm" />
+                <div ref={activeTextLayerRef} className="absolute inset-0 overflow-hidden select-text text-transparent pointer-events-auto" />
+              </div>
             </div>
           )}
         </main>
