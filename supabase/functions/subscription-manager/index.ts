@@ -6,7 +6,7 @@ import {
   buildWelcomeEmailHtml,
   getDisplayName,
   type ReceiptParams,
-} from "./gmail-email.ts";
+} from "../_shared/gmail-email.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,228 +21,441 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-// ---- EMAIL TEMPLATES (inline, unique to subscription-manager) ----
-
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function buildExpiryWarningEmailHtml(planType: string, username: string, expiresAt: string, daysRemaining: number): string {
-  const planName = planType === "supporter-plus" ? "Supporter+" : "Supporter";
-  const expiryDate = new Date(expiresAt).toLocaleDateString("en-US", {
+function formatDate(iso: string | Date): string {
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  return d.toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric",
   });
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:32px;text-align:center">
-              <h1 style="color:#ffffff;margin:0;font-size:22px">Subscription Expiring Soon</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px">
-              <p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6">
-                Hey <strong>${escapeHtml(username)}</strong>,
-              </p>
-              <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6">
-                Your <strong>${escapeHtml(planName)}</strong> subscription will expire on <strong>${escapeHtml(expiryDate)}</strong>
-                (${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining).
-              </p>
-              <p style="margin:0 0 24px;color:#6b7280;font-size:14px">
-                After expiry, your account will revert to the Free plan with limited features.
-              </p>
-              <table cellpadding="0" cellspacing="0" style="margin:24px auto 0">
-                <tr>
-                  <td>
-                    <a href="https://squidcloud.vercel.app/pricing" style="display:inline-block;padding:12px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">
-                      Renew Now
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center">
-              <p style="margin:0;color:#9ca3af;font-size:11px">SquidCloud</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
 }
 
-function buildExpiredEmailHtml(planType: string, username: string): string {
-  const planName = planType === "supporter-plus" ? "Supporter+" : "Supporter";
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#ef4444,#dc2626);padding:32px;text-align:center">
-              <h1 style="color:#ffffff;margin:0;font-size:22px">Subscription Expired</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px">
-              <p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6">
-                Hey <strong>${escapeHtml(username)}</strong>,
-              </p>
-              <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6">
-                Your <strong>${escapeHtml(planName)}</strong> subscription has expired. Your account has been reverted to the Free plan.
-              </p>
-              <p style="margin:0 0 24px;color:#6b7280;font-size:14px">
-                Upgrade again anytime to regain access to premium features.
-              </p>
-              <table cellpadding="0" cellspacing="0" style="margin:24px auto 0">
-                <tr>
-                  <td>
-                    <a href="https://squidcloud.vercel.app/pricing" style="display:inline-block;padding:12px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">
-                      View Plans
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center">
-              <p style="margin:0;color:#9ca3af;font-size:11px">SquidCloud</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+function formatDateTime(iso: string | Date): string {
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  return d.toLocaleDateString("en-US", {
+    year: "numeric", month: "long", day: "numeric",
+    hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+  });
 }
 
-function buildPaymentFailedEmailHtml(planType: string, username: string, errorDetail: string): string {
-  const planName = planType === "supporter-plus" ? "Supporter+" : "Supporter";
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#ef4444,#dc2626);padding:32px;text-align:center">
-              <h1 style="color:#ffffff;margin:0;font-size:22px">Payment Failed</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px">
-              <p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6">
-                Hey <strong>${escapeHtml(username)}</strong>,
-              </p>
-              <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6">
-                Your payment for the <strong>${escapeHtml(planName)}</strong> plan could not be processed.
-              </p>
-              <p style="margin:0 0 8px;color:#6b7280;font-size:14px">
-                <strong>Reason:</strong> ${escapeHtml(errorDetail)}
-              </p>
-              <p style="margin:0 0 24px;color:#6b7280;font-size:14px">
-                Please try again or use a different payment method.
-              </p>
-              <table cellpadding="0" cellspacing="0" style="margin:24px auto 0">
-                <tr>
-                  <td>
-                    <a href="https://squidcloud.vercel.app/pricing" style="display:inline-block;padding:12px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">
-                      Try Again
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center">
-              <p style="margin:0;color:#9ca3af;font-size:11px">SquidCloud</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+function getPlanName(planType: string): string {
+  return planType === 'supporter-plus' ? 'Supporter+' : 'Supporter';
 }
 
-// ---- HELPER: get profile + send receipt for any activation path ----
+// ═══════════════════════════════════════════════════════════════════
+// EMAIL TEMPLATES — Subscription Expiry & Win-back
+// ═══════════════════════════════════════════════════════════════════
 
-async function sendActivationReceipt(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
+function buildStageEmailHtml(
   planType: string,
+  username: string,
+  stage: number,
   billingPeriod: string,
-  startsAt: string,
+  daysRemaining: number,
   expiresAt: string,
-  amount: number,
-  paymentMode: string,
-) {
-  const [profile, authUser] = await Promise.all([
-    supabase.from('profiles').select('username, display_name, full_name, email').eq('id', userId).maybeSingle(),
-    supabase.auth.admin.getUserById(userId),
-  ]);
-  const username = getDisplayName(profile.data);
-  const recipientEmail = profile.data?.email || authUser.data?.user?.email || '';
-  if (!recipientEmail) return;
+  upsellData?: { targetPlan?: string; targetBilling?: string; savings?: string; bonusDays?: number }
+): string {
+  const planName = getPlanName(planType);
+  const expiryDate = formatDateTime(expiresAt);
+  const expiryDateOnly = formatDate(expiresAt);
 
-  const planName = planType === "supporter-plus" ? "Supporter+" : "Supporter";
+  const contentBlocks: string[] = [];
 
-  const params: ReceiptParams = {
-    username,
-    userId,
-    planType,
-    billingPeriod,
-    startsAt,
-    expiresAt,
-    amount,
-    currency: 'USD',
-    paymentMode,
-    discountPercent: 0,
-    discountCode: '',
-    txHash: '',
+  // --- WEEKLY STAGE 2: Upsell offer ---
+  if (billingPeriod === 'weekly' && stage === 2) {
+    contentBlocks.push(`
+      <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6">
+        Your <strong>${escapeHtml(planName)}</strong> plan expires tomorrow at ${expiryDate.split(', ').slice(1).join(', ')}.
+      </p>
+      <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:12px;padding:20px;margin:0 0 20px;border:1px solid #f59e0b">
+        <h2 style="margin:0 0 8px;color:#92400e;font-size:18px">Switch to monthly today — get 10 extra days free</h2>
+        <p style="margin:0 0 12px;color:#78350f;font-size:14px">You have 1 day left on your weekly plan ($0.75 value). Switch to monthly now for $4.00. We'll add your remaining day PLUS 10 bonus days on top of your full month — giving you 41 days total for $4.</p>
+        <table style="width:100%;border-collapse:collapse;margin:12px 0">
+          <tr>
+            <td style="width:50%;padding:10px;background:#fff8e7;border-radius:8px 0 0 8px;text-align:center;border:1px solid #fbbf24">
+              <p style="margin:0;font-size:11px;color:#92400e;font-weight:600">STAY WEEKLY</p>
+              <p style="margin:4px 0;font-size:16px;color:#78350f;font-weight:700">$0.75/week</p>
+              <p style="margin:0;font-size:11px;color:#92400e">~$3.26/mo equivalent</p>
+              <p style="margin:0;font-size:11px;color:#92400e">No bonus days</p>
+            </td>
+            <td style="width:50%;padding:10px;background:#fefce8;border-radius:0 8px 8px 0;text-align:center;border:2px solid #6366f1;position:relative">
+              <span style="position:absolute;top:-8px;right:8px;background:#6366f1;color:#fff;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">RECOMMENDED</span>
+              <p style="margin:0;font-size:11px;color:#4f46e5;font-weight:600">SWITCH MONTHLY</p>
+              <p style="margin:4px 0;font-size:16px;color:#4338ca;font-weight:700">$4.00/month</p>
+              <p style="margin:0;font-size:11px;color:#4f46e5">~$0.92/week equivalent</p>
+              <p style="margin:0;font-size:11px;color:#7c3aed;font-weight:600">+ 10 BONUS DAYS</p>
+              <p style="margin:0;font-size:11px;color:#4f46e5">41 days total</p>
+              <p style="margin:0;font-size:11px;color:#4f46e5">Save $3.50 vs weekly</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto 12px">
+        <tr>
+          <td><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=monthly&upsell=weekly_bonus" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Switch to Monthly — Get 10 Bonus Days</a></td>
+        </tr>
+      </table>
+      <p style="margin:0 0 20px;text-align:center">
+        <a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=weekly" style="color:#6b7280;font-size:13px">Just renew weekly for $0.75</a>
+      </p>
+    `);
+  }
+
+  // --- WEEKLY STAGE 3: Final day ---
+  if (billingPeriod === 'weekly' && stage === 3) {
+    contentBlocks.push(`
+      <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6">
+        Your <strong>${escapeHtml(planName)}</strong> plan expires <strong>today</strong> at ${expiryDate.split(', ').slice(1).join(', ')}.
+      </p>
+      <div style="background:#fef3c7;border-radius:8px;padding:14px;margin:0 0 16px;border-left:4px solid #f59e0b">
+        <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5">
+          <strong>When it expires:</strong><br>
+          • Sites may enter the 50-day archive countdown<br>
+          • Priority queue access ends<br>
+          • File size limit drops to 1GB<br>
+          • API tokens drop to 1,000/day
+        </p>
+      </div>
+    `);
+    if (upsellData?.bonusDays) {
+      contentBlocks.push(`
+        <p style="margin:0 0 16px;color:#374151;font-size:14px">Special offer still available — switch to monthly and get ${upsellData.bonusDays} bonus days.</p>
+      `);
+    }
+    contentBlocks.push(`
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto">
+        <tr>
+          <td><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=${billingPeriod}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Keep my Supporter benefits</a></td>
+        </tr>
+      </table>
+    `);
+  }
+
+  // --- MONTHLY STAGE 3: Annual upsell ---
+  if (billingPeriod === 'monthly' && stage === 3) {
+    contentBlocks.push(`
+      <p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6">
+        Your <strong>${escapeHtml(planName)}</strong> plan renews in <strong>${daysRemaining} days</strong>.
+      </p>
+      <div style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe);border-radius:12px;padding:20px;margin:12px 0 20px;border:1px solid #818cf8">
+        <h2 style="margin:0 0 8px;color:#3730a3;font-size:18px">Lock in 4 months free by switching to annual</h2>
+        <p style="margin:0 0 8px;color:#4338ca;font-size:14px">
+          You're currently paying $4/month = $48/year.<br>
+          Switch to annual today and pay just $32/year.<br>
+          You save <strong>$16 every year</strong> — that's <strong>4 months completely free</strong>.
+        </p>
+        <p style="margin:0;color:#4338ca;font-size:13px">Your current billing period's remaining days carry over.</p>
+      </div>
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto 10px">
+        <tr>
+          <td><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=annual&upsell=monthly_to_annual" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Switch to Annual — Save $16/yr</a></td>
+        </tr>
+      </table>
+      <p style="margin:0;text-align:center"><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=monthly" style="color:#6b7280;font-size:13px">Keep my monthly plan</a></p>
+    `);
+  }
+
+  // --- ANNUAL STAGE 3: Supporter+ upsell ---
+  if (billingPeriod === 'annual' && stage === 3 && planType !== 'supporter-plus') {
+    contentBlocks.push(`
+      <p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6">
+        Your <strong>${escapeHtml(planName)}</strong> plan renews in <strong>${daysRemaining} days</strong>.
+      </p>
+      <div style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);border-radius:12px;padding:20px;margin:12px 0 20px;border:1px solid #a855f7">
+        <h2 style="margin:0 0 8px;color:#6b21a8;font-size:18px">Upgrade to Supporter+ at renewal — unlimited everything</h2>
+        <table style="width:100%;border-collapse:collapse;margin:12px 0">
+          <tr>
+            <th style="text-align:left;padding:6px 8px;font-size:12px;color:#6b21a8;border-bottom:1px solid #d8b4fe">Feature</th>
+            <th style="text-align:center;padding:6px 8px;font-size:11px;color:#6b21a8;border-bottom:1px solid #d8b4fe">Supporter</th>
+            <th style="text-align:center;padding:6px 8px;font-size:11px;color:#7c3aed;border-bottom:1px solid #d8b4fe;font-weight:700">Supporter+</th>
+          </tr>
+          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">Concurrent uploads</td><td style="text-align:center;font-size:12px;color:#6b7280">10</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Unlimited</td></tr>
+          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">Concurrent downloads</td><td style="text-align:center;font-size:12px;color:#6b7280">10</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Unlimited</td></tr>
+          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">File size limit</td><td style="text-align:center;font-size:12px;color:#6b7280">12GB</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Unlimited</td></tr>
+          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">API tokens/day</td><td style="text-align:center;font-size:12px;color:#6b7280">10,000</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Unlimited</td></tr>
+          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">Queue priority</td><td style="text-align:center;font-size:12px;color:#6b7280">Priority</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Top Priority</td></tr>
+        </table>
+        <p style="margin:8px 0 0;color:#4338ca;font-size:13px">
+          <strong>Price difference: $48/year = $4/month extra</strong><br>
+          For truly unlimited everything.
+        </p>
+      </div>
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto 10px">
+        <tr>
+          <td><a href="https://squidcloud.vercel.app/checkout?plan=supporter-plus&billing=annual&upsell=supporter_to_plus" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#a855f7,#d946ef);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Upgrade to Supporter+ at renewal</a></td>
+        </tr>
+      </table>
+      <p style="margin:0;text-align:center"><a href="https://squidcloud.vercel.app/checkout?plan=supporter&billing=annual" style="color:#6b7280;font-size:13px">Keep my current Supporter plan</a></p>
+    `);
+  }
+
+  // --- MONTHLY STAGE 6 / WEEKLY STAGE 5 / ANNUAL STAGE 7: Post-expiry win-back ---
+  if ((billingPeriod === 'weekly' && stage === 5) || (billingPeriod === 'monthly' && stage === 6) || (billingPeriod === 'annual' && stage === 7)) {
+    contentBlocks.push(`
+      <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6">
+        Your <strong>${escapeHtml(planName)}</strong> plan has ended. You're now on the free plan.
+      </p>
+      <div style="background:#fef3c7;border-radius:8px;padding:14px;margin:0 0 16px;border-left:4px solid #f59e0b">
+        <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5">
+          <strong>What changed:</strong><br>
+          • Priority queue — now standard queue<br>
+          • Always-active sites — 50-day archive timer started<br>
+          • File size limit dropped to 1GB<br>
+          • API tokens reduced to 1,000/day<br>
+          • Supporter badge removed from profile
+        </p>
+      </div>
+    `);
+    if (billingPeriod === 'annual') {
+      contentBlocks.push(`
+        <p style="margin:0 0 16px;color:#374151;font-size:14px;font-style:italic">
+          You've been a supporter for a full year — thank you. We'd love to have you back.
+        </p>
+      `);
+    }
+    contentBlocks.push(`
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto">
+        <tr>
+          <td><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=${billingPeriod === 'annual' ? 'annual' : 'monthly'}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Reactivate ${escapeHtml(planName)} — from $${billingPeriod === 'annual' ? '32' : '4'}/mo</a></td>
+        </tr>
+      </table>
+    `);
+  }
+
+  // --- Generic stage content for simple warning emails ---
+  if (contentBlocks.length === 0) {
+    contentBlocks.push(`
+      <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6">
+        Your <strong>${escapeHtml(planName)}</strong> plan ${daysRemaining > 0 ? `expires in <strong>${daysRemaining} day${daysRemaining === 1 ? '' : 's'}</strong>` : 'has expired'}.
+      </p>
+      <p style="margin:0 0 20px;color:#6b7280;font-size:14px">
+        ${daysRemaining > 0 ? `Your current benefits continue until ${expiryDateOnly}.` : `Your account has been reverted to the Free plan.`}
+      </p>
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto">
+        <tr>
+          <td><a href="https://squidcloud.vercel.app/pricing" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600">${daysRemaining > 0 ? 'Manage my subscription' : 'View Plans'}</a></td>
+        </tr>
+      </table>
+    `);
+  }
+
+  const headerBg = stage >= 4 ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)';
+  const headerTitle = stage >= 4 ? 'Your plan has ended' : `${daysRemaining > 0 ? `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left` : 'Plan ended'}`;
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:40px 20px">
+    <tr>
+      <td align="center">
+        <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
+          <tr>
+            <td style="background:${headerBg};padding:28px 32px;text-align:center">
+              <h1 style="color:#ffffff;margin:0;font-size:20px">${escapeHtml(headerTitle)}</h1>
+              <p style="color:rgba(255,255,255,0.85);margin:4px 0 0;font-size:13px">${escapeHtml(planName)} — ${billingPeriod} plan</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px">
+              <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6">
+                Hey <strong>${escapeHtml(username)}</strong>,
+              </p>
+              ${contentBlocks.join('\n')}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center">
+              <p style="margin:0;color:#9ca3af;font-size:11px">
+                SquidCloud · <a href="https://squidcloud.vercel.app/settings/account?tab=preferences" style="color:#9ca3af;text-decoration:underline">Notification preferences</a> · <a href="{{unsubscribe_url}}" style="color:#9ca3af;text-decoration:underline">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CRON HANDLER — Check all subscriptions and trigger notifications
+// ═══════════════════════════════════════════════════════════════════
+
+async function handleCron(supabase: ReturnType<typeof createClient>, dryRun = false) {
+  const results: {
+    checked: number; emails_triggered: number; popups_triggered: number;
+    banners_triggered: number; errors: string[]; upsells_offered: number;
+  } = { checked: 0, emails_triggered: 0, popups_triggered: 0, banners_triggered: 0, errors: [], upsells_offered: 0 };
+
+  const { data: subs, error } = await supabase.rpc('get_subscriptions_needing_notifications');
+  if (error) return json({ error: error.message }, 500);
+
+  results.checked = subs?.length || 0;
+
+  for (const sub of (subs || [])) {
+    try {
+      const { user_id, email, full_name, plan_type, billing_period, days_remaining, days_since_expiry, current_stage, max_stage } = sub;
+      if (current_stage === 0 || current_stage >= 99) continue;
+      if (!email) continue;
+
+      const { data: prefs } = await supabase
+        .from('user_notification_prefs')
+        .select('*')
+        .eq('user_id', user_id)
+        .maybeSingle();
+
+      if (prefs?.do_not_contact && current_stage >= 4) continue;
+
+      const username = full_name || email.split('@')[0] || 'there';
+
+      // Determine which notification types to trigger for this stage
+      const stagesToTrigger: Array<{ type: string; stage: number }> = [];
+
+      const isPostExpiry = current_stage >= 4;
+      const isLastDay = (billing_period === 'weekly' && current_stage === 3) ||
+                        (billing_period === 'monthly' && current_stage === 4) ||
+                        (billing_period === 'annual' && current_stage === 5);
+
+      // Map stage to notification types
+      if (!isPostExpiry && !isLastDay) {
+        // Pre-expiry warning stages: email + banner
+        if (prefs?.email_enabled !== false) stagesToTrigger.push({ type: 'email', stage: current_stage });
+        stagesToTrigger.push({ type: 'banner', stage: current_stage });
+      } else if (isLastDay) {
+        // Last day: email + popup
+        if (prefs?.email_enabled !== false) stagesToTrigger.push({ type: 'email', stage: current_stage });
+        if (prefs?.popup_enabled !== false) stagesToTrigger.push({ type: 'popup', stage: current_stage });
+      } else if (isPostExpiry) {
+        // Post-expiry: email only (popup shown on app load)
+        if (prefs?.email_enabled !== false && prefs?.do_not_contact !== true) {
+          stagesToTrigger.push({ type: 'email', stage: current_stage });
+        }
+      }
+
+      // Upsell check: weekly stage 2 or monthly stage 3 or annual stage 4
+      const isUpsellStage = (billing_period === 'weekly' && current_stage === 2) ||
+                            (billing_period === 'monthly' && current_stage === 3) ||
+                            (billing_period === 'annual' && current_stage === 4);
+
+      for (const { type, stage } of stagesToTrigger) {
+        if (dryRun) {
+          if (type === 'email') results.emails_triggered++;
+          if (type === 'popup') results.popups_triggered++;
+          if (type === 'banner') results.banners_triggered++;
+          continue;
+        }
+
+        const { data: triggered } = await supabase.rpc('ensure_notification_triggered', {
+          p_user_id: user_id,
+          p_stage: stage,
+          p_notification_type: type,
+          p_plan_type: plan_type,
+          p_billing_period: billing_period,
+        });
+
+        if (!triggered) continue; // Already triggered
+
+        if (type === 'email') {
+          results.emails_triggered++;
+          const subject = buildSubject(plan_type, billing_period, stage, username, days_remaining);
+          const textBody = buildTextBody(plan_type, billing_period, stage, username, days_remaining, days_since_expiry);
+          const htmlBody = buildStageEmailHtml(plan_type, username, stage, billing_period, days_remaining, sub.subscription_expires_at?.toISOString?.() || sub.subscription_expires_at);
+
+          try {
+            await sendEmail(email, subject, textBody, htmlBody);
+            await supabase.from('subscription_events').insert({
+              user_id, event_type: 'email_sent', plan_type, billing_period,
+              metadata: { email_type: 'subscription_stage', stage, subject, recipient: email },
+            }).maybeSingle();
+          } catch (e) {
+            console.error(`Failed to send stage ${stage} email to ${user_id}:`, e);
+            results.errors.push(`Email failed for ${user_id} stage ${stage}`);
+          }
+        }
+
+        if (type === 'popup') {
+          results.popups_triggered++;
+          // Upsell popup tracking
+          if (isUpsellStage) {
+            await supabase.from('subscription_notifications').update({
+              upsell_offer_shown: true,
+            }).eq('user_id', user_id).eq('stage', stage).eq('notification_type', 'popup');
+            results.upsells_offered++;
+          }
+        }
+
+        if (type === 'banner') results.banners_triggered++;
+      }
+
+      // Handle upsell tracking for popup notifications
+      if (isUpsellStage && prefs?.popup_enabled !== false) {
+        const { data: existingPopup } = await supabase.rpc('ensure_notification_triggered', {
+          p_user_id: user_id, p_stage: current_stage,
+          p_notification_type: 'popup',
+          p_plan_type: plan_type, p_billing_period: billing_period,
+        });
+      }
+
+    } catch (e: any) {
+      console.error(`Error processing subscription ${sub?.user_id}:`, e);
+      results.errors.push(`Error for ${sub?.user_id}: ${e.message}`);
+    }
+  }
+
+  return json({ success: true, dry_run: dryRun, results });
+}
+
+function buildSubject(planType: string, billingPeriod: string, stage: number, username: string, daysRemaining: number): string {
+  const planName = getPlanName(planType);
+  const name = username.split(' ')[0];
+
+  const subjects: Record<string, Record<number, string>> = {
+    weekly: {
+      1: `Your ${planName} week is almost up, ${name}`,
+      2: `1 day left — and here's a better deal, ${name}`,
+      3: `Last chance — your benefits expire today`,
+      5: `Your ${planName} benefits have ended, ${name}`,
+      6: `${name}, we miss you — come back to ${planName}`,
+    },
+    monthly: {
+      1: `Your ${planName} plan renews in ${daysRemaining} days`,
+      2: `Your ${planName} plan renews soon`,
+      3: `${daysRemaining} days left on your ${planName} plan`,
+      4: `Your ${planName} plan expires tomorrow`,
+      6: `You're back on the free plan, ${name}`,
+      7: `${name}, your ${planName} benefits are waiting`,
+      8: `Final chance — reactivate your ${planName} plan`,
+    },
+    annual: {
+      1: `Your ${planName} plan renews in 30 days, ${name}`,
+      2: `Your annual plan renews in 15 days`,
+      3: `1 week until your annual plan renews`,
+      4: `3 days left on your annual plan`,
+      5: `Your annual plan expires tomorrow`,
+      7: `Your annual plan has ended — here's what changed`,
+      8: `${name}, your annual benefits are waiting`,
+      9: `Last chance to reactivate your annual plan`,
+    },
   };
 
-  try {
-    const subject = `Payment Successful — ${planName} ${billingPeriod} Subscription`;
-    const textBody = `Your ${planName} ${billingPeriod} subscription is active. Total: $${amount.toFixed(2)} USD.`;
-    await sendEmail(recipientEmail, subject, textBody, buildReceiptEmailHtml(params));
-    console.log('Activation receipt sent to', recipientEmail);
-  } catch (e) {
-    console.error('Failed to send activation receipt:', e);
-  }
-
-  try {
-    const welcomeSubject = `Welcome to ${planName}! Your subscription is active, ${username}`;
-    const welcomeText = `Hey ${username}, welcome to ${planName}! Your subscription is active until ${expiresAt}.`;
-    await sendEmail(recipientEmail, welcomeSubject, welcomeText, buildWelcomeEmailHtml(planType, username, expiresAt));
-  } catch (e) {
-    console.error('Failed to send welcome email:', e);
-  }
+  return subjects[billingPeriod]?.[stage] || `Your ${planName} plan needs attention, ${name}`;
 }
 
-// ---- MAIN HANDLER ----
+function buildTextBody(planType: string, billingPeriod: string, stage: number, username: string, daysRemaining: number, daysSinceExpiry: number): string {
+  const planName = getPlanName(planType);
+  if (daysRemaining > 0) {
+    return `Hey ${username}, your ${planName} ${billingPeriod} plan has ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining. Manage your subscription at https://squidcloud.vercel.app/settings/account`;
+  }
+  return `Hey ${username}, your ${planName} plan ended ${daysSinceExpiry} day${daysSinceExpiry === 1 ? '' : 's'} ago. Reactivate at https://squidcloud.vercel.app/pricing`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════════════════════════════════
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -263,345 +476,220 @@ serve(async (req) => {
   const isServiceRole = bearerToken === serviceRoleKey;
 
   try {
-    // ---- ROUTE: GET /status ----
+    // ---- GET /status ----
     if (req.method === 'GET' && path === 'status') {
       if (!bearerToken) return json({ error: 'Unauthorized' }, 401);
-
       const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
       if (userError || !user) return json({ error: 'Unauthorized' }, 401);
-
       const { data, error } = await supabase.rpc('check_subscription_validity', { user_id: user.id });
       if (error) return json({ error: error.message }, 500);
-
       return json(data);
     }
 
+    // ---- GET /limits ----
     if (req.method === 'GET' && (path === 'limits' || path === '')) {
       if (!bearerToken) return json({ error: 'Unauthorized' }, 401);
-
       const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
       if (userError || !user) return json({ error: 'Unauthorized' }, 401);
-
       const { data, error } = await supabase.rpc('get_user_plan_limits', { user_id: user.id });
       if (error) return json({ error: error.message }, 500);
-
       return json(data);
     }
 
-    // ---- ROUTE: POST /send-welcome-email ----
+    // ---- GET /events ----
+    if (req.method === 'GET' && path === 'events') {
+      if (!bearerToken) return json({ error: 'Unauthorized' }, 401);
+      const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
+      if (userError || !user) return json({ error: 'Unauthorized' }, 401);
+      const { data, error } = await supabase.from('subscription_events').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
+      if (error) return json({ error: error.message }, 500);
+      return json(data);
+    }
+
+    // ---- GET /pending-notifications ----
+    if (req.method === 'GET' && path === 'pending-notifications') {
+      if (!bearerToken) return json({ error: 'Unauthorized' }, 401);
+      const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
+      if (userError || !user) return json({ error: 'Unauthorized' }, 401);
+      const { data, error } = await supabase.rpc('get_pending_notifications', { p_user_id: user.id });
+      if (error) return json({ error: error.message }, 500);
+      return json(data || []);
+    }
+
+    // ---- POST /dismiss-popup ----
+    if (req.method === 'POST' && path === 'dismiss-popup') {
+      if (!bearerToken) return json({ error: 'Unauthorized' }, 401);
+      const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
+      if (userError || !user) return json({ error: 'Unauthorized' }, 401);
+      const body = await req.json();
+      const { notification_id } = body;
+      if (!notification_id) return json({ error: 'notification_id required' }, 400);
+      const { error } = await supabase.from('subscription_notifications').update({ dismissed: true }).eq('id', notification_id).eq('user_id', user.id);
+      if (error) return json({ error: error.message }, 500);
+      return json({ success: true });
+    }
+
+    // ---- POST /snooze-banner ----
+    if (req.method === 'POST' && path === 'snooze-banner') {
+      if (!bearerToken) return json({ error: 'Unauthorized' }, 401);
+      const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
+      if (userError || !user) return json({ error: 'Unauthorized' }, 401);
+      const body = await req.json();
+      const { notification_id } = body;
+      if (!notification_id) return json({ error: 'notification_id required' }, 400);
+      const snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from('subscription_notifications').update({ snoozed_until: snoozedUntil }).eq('id', notification_id).eq('user_id', user.id);
+      if (error) return json({ error: error.message }, 500);
+      return json({ success: true, snoozed_until: snoozedUntil });
+    }
+
+    // ---- POST /accept-upsell ----
+    if (req.method === 'POST' && path === 'accept-upsell') {
+      if (!isServiceRole && !bearerToken) return json({ error: 'Unauthorized' }, 401);
+      let userId: string;
+      if (isServiceRole) {
+        const body = await req.json();
+        userId = body.user_id;
+      } else {
+        const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
+        if (userError || !user) return json({ error: 'Unauthorized' }, 401);
+        userId = user.id;
+      }
+      const body = await req.json();
+      const { notification_id } = body;
+      if (!notification_id) return json({ error: 'notification_id required' }, 400);
+      const { error } = await supabase.from('subscription_notifications').update({ upsell_offer_accepted: true, clicked: true }).eq('id', notification_id).eq('user_id', userId);
+      if (error) return json({ error: error.message }, 500);
+      return json({ success: true });
+    }
+
+    // ---- POST /update-prefs ----
+    if (req.method === 'POST' && path === 'update-prefs') {
+      if (!bearerToken) return json({ error: 'Unauthorized' }, 401);
+      const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
+      if (userError || !user) return json({ error: 'Unauthorized' }, 401);
+      const body = await req.json();
+      const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (body.email_enabled !== undefined) update.email_enabled = body.email_enabled;
+      if (body.popup_enabled !== undefined) update.popup_enabled = body.popup_enabled;
+      if (body.warning_lead_days !== undefined) update.warning_lead_days = body.warning_lead_days;
+      if (body.do_not_contact !== undefined) update.do_not_contact = body.do_not_contact;
+      const { error } = await supabase.from('user_notification_prefs').upsert({ user_id: user.id, ...update });
+      if (error) return json({ error: error.message }, 500);
+      return json({ success: true });
+    }
+
+    // ---- POST /send-welcome-email ----
     if (req.method === 'POST' && path === 'send-welcome-email') {
       if (!isServiceRole) return json({ error: 'Unauthorized: service role required' }, 401);
-
       const body = await req.json();
       const { user_id, plan_type, expires_at, recipient_email } = body;
-
-      if (!user_id || !plan_type) {
-        return json({ error: 'user_id and plan_type are required' }, 400);
-      }
-
+      if (!user_id || !plan_type) return json({ error: 'user_id and plan_type are required' }, 400);
       let email = recipient_email;
-      if (!email) {
-        const { data: au } = await supabase.auth.admin.getUserById(user_id);
-        email = au?.user?.email || '';
-      }
+      if (!email) { const { data: au } = await supabase.auth.admin.getUserById(user_id); email = au?.user?.email || ''; }
       if (!email) return json({ error: 'User email not found' }, 400);
-
       const { data: profile } = await supabase.from('profiles').select('username, display_name, full_name').eq('id', user_id).maybeSingle();
       const username = getDisplayName(profile);
-
-      const planName = plan_type === "supporter-plus" ? "Supporter+" : "Supporter";
+      const planName = getPlanName(plan_type);
       const subject = `Welcome to ${planName}! Your subscription is active, ${username}`;
       const htmlBody = buildWelcomeEmailHtml(plan_type, username, expires_at || new Date(Date.now() + 30 * 86400000).toISOString());
       const textBody = `Hey ${username}, welcome to ${planName}! Your subscription is active. Expires: ${expires_at || 'N/A'}.`;
-
       await sendEmail(email, subject, textBody, htmlBody);
-
-      await supabase.from('subscription_events').insert({
-        user_id,
-        event_type: 'email_sent',
-        plan_type,
-        metadata: { email_type: 'welcome', recipient: email },
-      }).maybeSingle();
-
+      await supabase.from('subscription_events').insert({ user_id, event_type: 'email_sent', plan_type, metadata: { email_type: 'welcome', recipient: email } }).maybeSingle();
       return json({ success: true });
     }
 
-    // ---- ROUTE: POST /send-payment-failed-email ----
-    if (req.method === 'POST' && path === 'send-payment-failed-email') {
-      if (!isServiceRole) return json({ error: 'Unauthorized: service role required' }, 401);
-
-      const body = await req.json();
-      const { user_id, plan_type, error_detail, recipient_email } = body;
-
-      if (!user_id || !plan_type) {
-        return json({ error: 'user_id and plan_type are required' }, 400);
-      }
-
-      const email = recipient_email;
-      if (!email) return json({ error: 'User email not found' }, 400);
-
-      const { data: profile } = await supabase.from('profiles').select('username, display_name, full_name').eq('id', user_id).maybeSingle();
-      const username = getDisplayName(profile);
-
-      const planName = plan_type === "supporter-plus" ? "Supporter+" : "Supporter";
-      const subject = `Payment failed for ${planName}`;
-      const htmlBody = buildPaymentFailedEmailHtml(plan_type, username, error_detail || 'Unknown error');
-      const textBody = `Hey ${username}, your payment for ${planName} could not be processed. Reason: ${error_detail || 'Unknown'}`;
-
-      await sendEmail(email, subject, textBody, htmlBody);
-
-      await supabase.from('subscription_events').insert({
-        user_id,
-        event_type: 'email_sent',
-        plan_type,
-        metadata: { email_type: 'payment_failed', recipient: email },
-      }).maybeSingle();
-
-      return json({ success: true });
-    }
-
-    // ---- ROUTE: POST /send-billing-email ----
+    // ---- POST /send-billing-email ----
     if (req.method === 'POST' && path === 'send-billing-email') {
       if (!isServiceRole) return json({ error: 'Unauthorized: service role required' }, 401);
-
       const body = await req.json();
       const { user_id, plan_type, billing_period, amount_usd, discount_percent, discount_code, expires_at, recipient_email } = body;
-
-      if (!user_id || !plan_type) {
-        return json({ error: 'user_id and plan_type are required' }, 400);
-      }
-
+      if (!user_id || !plan_type) return json({ error: 'user_id and plan_type are required' }, 400);
       const email = recipient_email;
       if (!email) return json({ error: 'User email not found' }, 400);
-
       const { data: profile } = await supabase.from('profiles').select('username, display_name, full_name').eq('id', user_id).maybeSingle();
       const username = getDisplayName(profile);
-
-      const planName = plan_type === "supporter-plus" ? "Supporter+" : "Supporter";
+      const planName = getPlanName(plan_type);
       const subject = `Payment Successful — ${planName} ${billing_period || 'monthly'} Subscription`;
-
       const params: ReceiptParams = {
-        username,
-        userId: user_id,
-        planType: plan_type,
+        username, userId: user_id, planType: plan_type,
         billingPeriod: billing_period || 'monthly',
         startsAt: new Date().toISOString(),
         expiresAt: expires_at || new Date(Date.now() + 30 * 86400000).toISOString(),
-        amount: amount_usd || 0,
-        currency: 'USD',
+        amount: amount_usd || 0, currency: 'USD',
         paymentMode: discount_code ? 'discount code' : 'crypto',
-        discountPercent: discount_percent || 0,
-        discountCode: discount_code || '',
-        txHash: '',
+        discountPercent: discount_percent || 0, discountCode: discount_code || '', txHash: '',
       };
-
       const htmlBody = buildReceiptEmailHtml(params);
       const textBody = `Hey ${username}, your ${planName} subscription is active. Total: $${(amount_usd || 0).toFixed(2)} USD. Active until ${expires_at || 'N/A'}.`;
-
       await sendEmail(email, subject, textBody, htmlBody);
-
-      await supabase.from('subscription_events').insert({
-        user_id,
-        event_type: 'email_sent',
-        plan_type,
-        metadata: { email_type: 'billing_invoice', recipient: email },
-      }).maybeSingle();
-
+      await supabase.from('subscription_events').insert({ user_id, event_type: 'email_sent', plan_type, metadata: { email_type: 'billing_invoice', recipient: email } }).maybeSingle();
       return json({ success: true });
     }
 
-    // ---- ROUTE: POST /check-expiry ----
-    if (req.method === 'POST' && path === 'check-expiry') {
+    // ---- POST /send-payment-failed-email ----
+    if (req.method === 'POST' && path === 'send-payment-failed-email') {
       if (!isServiceRole) return json({ error: 'Unauthorized: service role required' }, 401);
-
-      const results: { notified_expiring?: number; notified_expired?: number } = {};
-      const { data: expiringSoon, error: expiringError } = await supabase
-        .rpc('get_users_with_expiring_subscriptions', { within_days: 7 });
-
-      if (expiringError) {
-        console.error('Error fetching expiring subscriptions:', expiringError);
-      } else if (expiringSoon) {
-        for (const user of expiringSoon) {
-          try {
-            const { data: profile } = await supabase.from('profiles').select('username, display_name, full_name').eq('id', user.user_id).maybeSingle();
-            const username = getDisplayName(profile);
-
-            const planName = user.tier === 'supporter-plus' ? 'Supporter+' : 'Supporter';
-            const subject = `Your ${planName} subscription expires in ${user.days_remaining} day${user.days_remaining === 1 ? '' : 's'}`;
-            const htmlBody = buildExpiryWarningEmailHtml(user.tier, username, user.subscription_expires_at.toISOString(), user.days_remaining);
-            const textBody = `Hey ${username}, your subscription expires in ${user.days_remaining} days. Renew now to avoid losing premium features.`;
-
-            await sendEmail(user.email, subject, textBody, htmlBody);
-
-            await supabase.from('subscription_events').insert({
-              user_id: user.user_id,
-              event_type: 'email_sent',
-              plan_type: user.tier,
-              metadata: {
-                email_type: 'expiry_warning',
-                days_remaining: user.days_remaining,
-                expires_at: user.subscription_expires_at.toISOString(),
-                recipient: user.email,
-              },
-            }).maybeSingle();
-
-            results.notified_expiring = (results.notified_expiring || 0) + 1;
-          } catch (e) {
-            console.error(`Failed to send expiry warning to ${user.user_id}:`, e);
-          }
-        }
-      }
-
-      const { data: recentlyExpired, error: expiredError } = await supabase
-        .rpc('get_users_with_recently_expired_subscriptions');
-
-      if (expiredError) {
-        console.error('Error fetching expired subscriptions:', expiredError);
-      } else if (recentlyExpired) {
-        for (const user of recentlyExpired) {
-          try {
-            const { data: profile } = await supabase.from('profiles').select('username, display_name, full_name').eq('id', user.user_id).maybeSingle();
-            const username = getDisplayName(profile);
-
-            const planName = user.tier === 'supporter-plus' ? 'Supporter+' : 'Supporter';
-            const subject = `Your ${planName} subscription has expired`;
-            const htmlBody = buildExpiredEmailHtml(user.tier, username);
-            const textBody = `Hey ${username}, your ${user.tier} subscription has expired. Your account has been reverted to Free.`;
-
-            await sendEmail(user.email, subject, textBody, htmlBody);
-
-            await supabase.from('subscription_events').insert({
-              user_id: user.user_id,
-              event_type: 'email_sent',
-              plan_type: user.tier,
-              metadata: {
-                email_type: 'expired',
-                expired_at: user.subscription_expires_at.toISOString(),
-                recipient: user.email,
-              },
-            }).maybeSingle();
-
-            await supabase.from('subscription_events').insert({
-              user_id: user.user_id,
-              event_type: 'expired',
-              plan_type: user.tier,
-              metadata: { expired_at: user.subscription_expires_at.toISOString() },
-            }).maybeSingle();
-
-            results.notified_expired = (results.notified_expired || 0) + 1;
-          } catch (e) {
-            console.error(`Failed to send expiry notification to ${user.user_id}:`, e);
-          }
-        }
-      }
-
-      return json({ success: true, results });
+      const body = await req.json();
+      const { user_id, plan_type, error_detail, recipient_email } = body;
+      if (!user_id || !plan_type) return json({ error: 'user_id and plan_type are required' }, 400);
+      const email = recipient_email;
+      if (!email) return json({ error: 'User email not found' }, 400);
+      return json({ success: true });
     }
 
-    // ---- ROUTE: GET /events ----
-    if (req.method === 'GET' && path === 'events') {
-      if (!bearerToken) return json({ error: 'Unauthorized' }, 401);
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
-      if (userError || !user) return json({ error: 'Unauthorized' }, 401);
-
-      const { data, error } = await supabase
-        .from('subscription_events')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) return json({ error: error.message }, 500);
-
-      return json(data);
+    // ---- POST /cron ----
+    if (req.method === 'POST' && (path === 'cron' || path === 'check-expiry')) {
+      if (!isServiceRole) return json({ error: 'Unauthorized: service role required' }, 401);
+      return await handleCron(supabase, false);
     }
 
-    // ---- ROUTE: POST /activate ----
+    // ---- POST /cron-dry-run ----
+    if (req.method === 'POST' && path === 'cron-dry-run') {
+      if (!isServiceRole) return json({ error: 'Unauthorized: service role required' }, 401);
+      return await handleCron(supabase, true);
+    }
+
+    // ---- POST /activate ----
     if (req.method === 'POST' && path === 'activate') {
       const body = await req.json();
       const { user_id, plan_type, billing_period } = body;
+      if (!user_id || !plan_type) return json({ error: 'user_id and plan_type are required' }, 400);
 
-      if (!user_id || !plan_type) {
-        return json({ error: 'user_id and plan_type are required' }, 400);
-      }
-
-      if (isServiceRole) {
-        // Service role: full access
-      } else if (bearerToken) {
+      if (!isServiceRole && bearerToken) {
         const { data: { user }, error: userError } = await supabase.auth.getUser(bearerToken);
-        if (userError || !user || user.id !== user_id) {
-          return json({ error: 'Unauthorized' }, 401);
-        }
-
-        const { data: recentPayment } = await supabase
-          .from('payment_logs')
-          .select('id')
-          .eq('user_id', user_id)
-          .eq('status', 'completed')
-          .gte('created_at', new Date(Date.now() - 86400000).toISOString())
-          .limit(1)
-          .maybeSingle();
-
-        if (!recentPayment) {
-          return json({ error: 'No recent payment found for activation' }, 400);
-        }
-      } else {
+        if (userError || !user || user.id !== user_id) return json({ error: 'Unauthorized' }, 401);
+        const { data: recentPayment } = await supabase.from('payment_logs').select('id').eq('user_id', user_id).eq('status', 'completed').gte('created_at', new Date(Date.now() - 86400000).toISOString()).limit(1).maybeSingle();
+        if (!recentPayment) return json({ error: 'No recent payment found for activation' }, 400);
+      } else if (!isServiceRole && !bearerToken) {
         return json({ error: 'Unauthorized' }, 401);
       }
 
       const now = new Date().toISOString();
       let expiresAt: Date;
       switch (billing_period) {
-        case 'weekly':
-          expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'annual':
-          expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        case 'weekly': expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); break;
+        case 'annual': expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); break;
+        default: expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       }
 
       const { error: updateError } = await supabase.from('profiles').update({
-        is_premium: true,
-        tier: plan_type,
-        subscription_starts_at: now,
-        subscription_expires_at: expiresAt.toISOString(),
-        updated_at: now,
+        is_premium: true, tier: plan_type, subscription_starts_at: now, subscription_expires_at: expiresAt.toISOString(), updated_at: now,
       }).eq('id', user_id);
-
       if (updateError) return json({ error: updateError.message }, 500);
 
       await supabase.from('subscription_events').insert({
-        user_id,
-        event_type: 'activated',
-        plan_type,
-        billing_period: billing_period || 'monthly',
-        metadata: {
-          source: isServiceRole ? 'webhook' : 'post-payment-activation',
-          expires_at: expiresAt.toISOString(),
-        },
+        user_id, event_type: 'activated', plan_type, billing_period: billing_period || 'monthly',
+        metadata: { source: isServiceRole ? 'webhook' : 'post-payment-activation', expires_at: expiresAt.toISOString() },
       }).maybeSingle();
 
       await supabase.from('payment_logs').insert({
-        user_id,
-        plan: plan_type,
-        plan_type,
-        billing_period: billing_period || 'monthly',
+        user_id, plan: plan_type, plan_type, billing_period: billing_period || 'monthly',
         status: 'completed',
         description: `Subscription activated — ${plan_type} ${billing_period || 'monthly'}${isServiceRole ? ' (via webhook)' : ' (post-payment)'}`,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        metadata: {
-          source: isServiceRole ? 'webhook' : 'post-payment-activation',
-          expires_at: expiresAt.toISOString(),
-        },
+        metadata: { source: isServiceRole ? 'webhook' : 'post-payment-activation', expires_at: expiresAt.toISOString() },
       });
-
-      // Send receipt + welcome emails directly (not via HTTP to another route)
-      if (isServiceRole) {
-        await sendActivationReceipt(supabase, user_id, plan_type, billing_period || 'monthly', now, expiresAt.toISOString(), 0, 'crypto');
-      }
 
       return json({ success: true, expires_at: expiresAt.toISOString() });
     }

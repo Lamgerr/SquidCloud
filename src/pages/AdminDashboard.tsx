@@ -20,6 +20,7 @@ import {
   Activity,
   ShieldAlert,
   Crown,
+  Target,
 } from '@/lib/icon-map';
 import { toast } from 'sonner';
 import AnalyticsTab from '@/components/admin/AnalyticsTab';
@@ -32,6 +33,7 @@ import MaintenanceModeTab from '@/components/admin/MaintenanceModeTab';
 import EnterpriseSupabaseControlTab from '@/components/admin/EnterpriseSupabaseControlTab';
 import KZADashboardTab from '@/components/admin/KZADashboardTab';
 import SubscriptionsTab from '@/components/admin/SubscriptionsTab';
+import SubscriptionAnalyticsTab from '@/components/admin/SubscriptionAnalyticsTab';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const AdminDashboard = () => {
@@ -169,7 +171,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
         <Tabs defaultValue="supabase" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 gap-1 rounded-2xl border border-border/50 bg-card/70 p-1.5 lg:grid-cols-10">
+          <TabsList className="grid w-full grid-cols-4 gap-1 rounded-2xl border border-border/50 bg-card/70 p-1.5 lg:grid-cols-11">
             <TabsTrigger value="supabase" className="flex items-center gap-2 rounded-xl">
               <Database className="h-4 w-4" />
               Supabase
@@ -204,7 +206,11 @@ const AdminDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="subscriptions" className="flex items-center gap-2">
               <Crown className="h-4 w-4" />
-              Subscriptions
+              Subs
+            </TabsTrigger>
+            <TabsTrigger value="sub-analytics" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Sub Analytics
             </TabsTrigger>
             <TabsTrigger value="kza" className="flex items-center gap-2">
               <ShieldAlert className="h-4 w-4" />
@@ -246,6 +252,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="subscriptions" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">
             <SubscriptionsTab />
+          </TabsContent>
+
+          <TabsContent value="sub-analytics" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">
+            <SubscriptionAnalyticsTab />
           </TabsContent>
 
           <TabsContent value="kza" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">

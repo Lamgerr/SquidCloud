@@ -6,7 +6,7 @@ import {
   buildWelcomeEmailHtml,
   getDisplayName,
   type ReceiptParams,
-} from "./gmail-email.ts";
+} from "../_shared/gmail-email.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

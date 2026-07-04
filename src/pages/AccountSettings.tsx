@@ -31,6 +31,7 @@ import { Loader } from '@/components/ui/Loader';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import MigrationWizard from '@/components/MigrationWizard';
+import CancelSubscriptionFlow from '@/components/CancelSubscriptionFlow';
 import { cn } from '@/lib/utils';
 
 const ACCOUNT_PREFS_STORAGE_KEY = 'squid_account_settings_v3';
@@ -138,6 +139,7 @@ const AccountSettings = () => {
   const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
   const [paymentLogsLoading, setPaymentLogsLoading] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
+  const [notifPrefs, setNotifPrefs] = useState({ email_enabled: true, popup_enabled: true, warning_lead_days: 7, do_not_contact: false });
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [animating, setAnimating] = useState(false);
@@ -535,6 +537,28 @@ const AccountSettings = () => {
     }
   };
 
+  useEffect(() => {
+    if (isPremium && user) fetchPaymentLogs();
+  }, [isPremium, user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('user_notification_prefs').select('*').eq('user_id', user.id).maybeSingle().then(({ data }) => {
+      if (data) setNotifPrefs({ email_enabled: data.email_enabled ?? true, popup_enabled: data.popup_enabled ?? true, warning_lead_days: data.warning_lead_days ?? 7, do_not_contact: data.do_not_contact ?? false });
+    }).catch(() => {});
+  }, [user?.id]);
+
+  const updateNotifPref = async (key: string, value: boolean | number) => {
+    setNotifPrefs(prev => ({ ...prev, [key]: value }));
+    try {
+      await supabase.functions.invoke('subscription-manager/update-prefs', { body: { [key]: value } });
+    } catch (e) {
+      console.error('Failed to update notification prefs:', e);
+    }
+  };
+
+  const latestPayment = paymentLogs.find(p => p.status === 'completed');
+
   const formatPaymentAmount = (p: any) => {
     if (p.amount_usd != null) return `$${Number(p.amount_usd).toFixed(2)} ${p.currency || 'USD'}`;
     return '—';
@@ -616,6 +640,51 @@ const AccountSettings = () => {
             ))}
           </div>
 
+          {isPremium && (
+            <div className="rounded-xl border border-border/20 bg-muted/20 overflow-hidden">
+              <div className="px-3 py-2 border-b border-border/20">
+                <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Subscription Details</p>
+              </div>
+              <div className={cn('grid', isMobile ? '' : 'grid-cols-2')}>
+                <div className="p-3 border-r border-b border-border/20">
+                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Plan</p>
+                  <p className="text-sm font-medium text-foreground">{userTier}</p>
+                </div>
+                <div className="p-3 border-b border-border/20">
+                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Billing Period</p>
+                  <p className="text-sm font-medium text-foreground capitalize">{latestPayment?.billing_period || '-'}</p>
+                </div>
+                <div className="p-3 border-r border-border/20">
+                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Purchase Date</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.subscription_starts_at ? new Date(profile.subscription_starts_at).toLocaleDateString() : latestPayment?.created_at ? new Date(latestPayment.created_at).toLocaleDateString() : '-'}</p>
+                </div>
+                <div className="p-3 border-border/20">
+                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Expires On</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.subscription_expires_at ? new Date(profile.subscription_expires_at).toLocaleDateString() : '-'}</p>
+                </div>
+                <div className="p-3 border-r border-t border-border/20">
+                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Amount Paid</p>
+                  <p className="text-sm font-medium text-foreground">{latestPayment ? formatPaymentAmount(latestPayment) : '-'}</p>
+                </div>
+                <div className="p-3 border-t border-border/20">
+                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Payment Mode</p>
+                  <p className="text-sm font-medium text-foreground capitalize">{latestPayment?.tx_hash ? 'Crypto' : latestPayment?.discount_code ? 'Discount Code' : latestPayment?.metadata?.source === 'redeem_code' ? 'Redeem Code' : '-'}</p>
+                </div>
+                {latestPayment?.discount_percent ? (
+                  <div className="p-3 border-r border-t border-border/20 col-span-2">
+                    <p className="text-[10px] text-muted-foreground/70 mb-0.5">Discount</p>
+                    <p className="text-sm font-medium text-green-400">{latestPayment.discount_percent}%{latestPayment.discount_code ? ` (${latestPayment.discount_code})` : ''}</p>
+                  </div>
+                ) : latestPayment?.metadata?.code ? (
+                  <div className="p-3 border-r border-t border-border/20 col-span-2">
+                    <p className="text-[10px] text-muted-foreground/70 mb-0.5">Redeem Code</p>
+                    <p className="text-sm font-medium text-emerald-400">{latestPayment.metadata.code}</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+
           <div className={cn('flex gap-2 pt-1', isMobile ? 'flex-col' : 'flex-wrap')}>
             {isPremium ? (
               <>
@@ -653,6 +722,26 @@ const AccountSettings = () => {
               <Button onClick={handleRedeemCode} disabled={!redeemCodeInput.trim() || redeeming} size={isMobile ? 'default' : 'sm'} className="rounded-xl" loading={redeeming}>Redeem</Button>
             </div>
           </div>
+
+          {isPremium && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                  <Trash2 className="h-4 w-4 text-red-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-semibold text-foreground">Cancel Subscription</h4>
+                  <p className="text-xs text-muted-foreground">Your plan will remain active until the end of the billing period</p>
+                </div>
+              </div>
+              <CancelSubscriptionFlow
+                userId={user?.id || ''}
+                planType={profile?.tier}
+                billingPeriod={latestPayment?.billing_period || 'monthly'}
+                onCancelled={() => { refreshProfile(); fetchPaymentLogs(); }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -1012,6 +1101,51 @@ const AccountSettings = () => {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-border/20 space-y-4">
+          <h4 className="text-xs font-semibold text-foreground">Subscription Notifications</h4>
+          <p className="text-[11px] text-muted-foreground/60 -mt-3">Control how and when we remind you about subscription expiry.</p>
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Email notifications</p>
+              <p className="text-xs text-muted-foreground/70 mt-0.5">Receive expiry reminders via email</p>
+            </div>
+            <Switch checked={notifPrefs.email_enabled} onCheckedChange={(v) => updateNotifPref('email_enabled', v)} />
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">In-app popups</p>
+              <p className="text-xs text-muted-foreground/70 mt-0.5">Show expiry warnings inside the app</p>
+            </div>
+            <Switch checked={notifPrefs.popup_enabled} onCheckedChange={(v) => updateNotifPref('popup_enabled', v)} />
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Warning lead time</p>
+              <p className="text-xs text-muted-foreground/70 mt-0.5">How many days before expiry to start warning you</p>
+            </div>
+            <select
+              value={notifPrefs.warning_lead_days}
+              onChange={(e) => updateNotifPref('warning_lead_days', parseInt(e.target.value))}
+              className="h-8 rounded-lg bg-muted/50 border border-border/30 text-xs px-2 text-foreground"
+            >
+              <option value={1}>1 day</option>
+              <option value={3}>3 days</option>
+              <option value={7}>7 days</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Do not contact</p>
+              <p className="text-xs text-muted-foreground/70 mt-0.5">Stop all win-back emails after cancellation or expiry</p>
+            </div>
+            <Switch checked={notifPrefs.do_not_contact} onCheckedChange={(v) => updateNotifPref('do_not_contact', v)} />
+          </div>
         </div>
 
         <div className="mt-6 pt-6 border-t border-border/20">

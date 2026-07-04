@@ -63,6 +63,9 @@ import { useBiometricAuthContext } from '@/contexts/BiometricAuthContext';
 import ProviderSetupModal from '@/components/ui/ProviderSetupModal';
 import WorkspaceCollaboratorsModal, { WorkspaceRole } from '@/components/WorkspaceCollaboratorsModal';
 import { WorkspaceSettingsModal } from '@/components/WorkspaceSettingsModal';
+import { useSubscriptionNotifications } from '@/hooks/useSubscriptionNotifications';
+import SubscriptionBanner from '@/components/SubscriptionBanner';
+import SubscriptionPopup from '@/components/SubscriptionPopup';
 import { downloadAndSaveBlob } from '@/utils/downloadHelper';
 import { backgroundDownloadService } from '@/services/backgroundDownload';
 
@@ -330,6 +333,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
   const isMobile                   = useIsMobile();
   const { verifyOperationNow }     = useBiometricAuthContext();
   const { bookmarks, isBookmarked, getColor, toggleBookmark, setColor } = useBookmarks();
+  const {
+    popups, banners, hasPopup, hasBanner,
+    dismiss: dismissNotification, snooze: snoozeNotification,
+  } = useSubscriptionNotifications();
 
   // ── Keyboard shortcuts ──────────────────────────────────
   useKeyboardShortcut(
@@ -1327,6 +1334,15 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
               }
             />
 
+            {banners.map(b => (
+              <SubscriptionBanner
+                key={b.id}
+                notification={b}
+                onDismiss={dismissNotification}
+                onSnooze={snoozeNotification}
+              />
+            ))}
+
             <main className="px-3 pb-24 pt-2">
               {activeTab === 'files' && (
                 <MobileFilesView
@@ -1829,6 +1845,13 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
             entityName={embedModal.entityName}
           />
         )}
+        {popups.map(p => (
+          <SubscriptionPopup
+            key={p.id}
+            notification={p}
+            onDismiss={dismissNotification}
+          />
+        ))}
       </AppStartupBiometricCheck>
       </FileViewInfoContext.Provider>
     );
@@ -1975,6 +1998,14 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                 </div>
               </div>
             </div>
+            {banners.map(b => (
+              <SubscriptionBanner
+                key={b.id}
+                notification={b}
+                onDismiss={dismissNotification}
+                onSnooze={snoozeNotification}
+              />
+            ))}
             <main data-scroll-container="true" className="flex-1 overflow-y-auto px-6 pb-8 pt-6 lg:px-8">
               <div className="mx-auto w-full max-w-[1400px]">
 
@@ -2315,6 +2346,13 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
           entityName={embedModal.entityName}
         />
       )}
+      {popups.map(p => (
+        <SubscriptionPopup
+          key={p.id}
+          notification={p}
+          onDismiss={dismissNotification}
+        />
+      ))}
     </AppStartupBiometricCheck>
     </FileViewInfoContext.Provider>
   );

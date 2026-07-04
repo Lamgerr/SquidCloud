@@ -169,6 +169,13 @@ export default function CheckoutPage() {
     try {
       if (finalAmount === 0) {
         setStatus('success');
+        supabase.functions.invoke('subscription-manager/activate', {
+          body: {
+            user_id: user.id,
+            plan_type: planId,
+            billing_period: billing,
+          },
+        }).catch((err) => console.error('Admin free activation failed:', err));
         refreshProfile();
         return;
       }

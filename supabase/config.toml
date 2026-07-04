@@ -165,3 +165,8 @@ verify_jwt = false
 
 [functions.video-stream-url]
 verify_jwt = false
+
+[functions.subscription-manager]
+verify_jwt = false
+# Run every hour
+cron = "0 * * * *"
