@@ -13,6 +13,13 @@ import {
   type SqdDoc, type EditorMode, type BackgroundConfig, type SqdObject, type InkStroke,
 } from './editor/sqd';
 
+// Monaco web workers (bundled same-origin so the browser accepts them)
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
+import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+
 /* ------------------------------------------------------------------ *
  *  SquidEditor — a complete, industry-standard text editor.
  *  Inspired by VS Code (coding), Xcode (polish/UX), Obsidian & Notion
@@ -20,18 +27,17 @@ import {
  *  Built on Monaco (coding perfection) + EnhancedMarkdownPreview (KaTeX).
  * ------------------------------------------------------------------ */
 
-// ---- Monaco web-worker setup (CDN, no bundler config needed) ----------
+// ---- Monaco web-worker setup (bundled, same-origin) ----------
 let monacoEnvSet = false;
 function ensureMonacoEnv() {
   if (monacoEnvSet || typeof window === 'undefined') return;
   (window as any).MonacoEnvironment = {
     getWorker(_: unknown, label: string) {
-      const base = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs';
-      if (label === 'json') return new Worker(`${base}/language/json/json.worker.js`);
-      if (label === 'css' || label === 'scss' || label === 'less') return new Worker(`${base}/language/css/css.worker.js`);
-      if (label === 'html' || label === 'handlebars' || label === 'razor') return new Worker(`${base}/language/html/html.worker.js`);
-      if (label === 'typescript' || label === 'javascript') return new Worker(`${base}/language/typescript/ts.worker.js`);
-      return new Worker(`${base}/editor/editor.worker.js`);
+      if (label === 'json') return new JsonWorker();
+      if (label === 'css' || label === 'scss' || label === 'less') return new CssWorker();
+      if (label === 'html' || label === 'handlebars' || label === 'razor') return new HtmlWorker();
+      if (label === 'typescript' || label === 'javascript') return new TsWorker();
+      return new EditorWorker();
     },
   };
   monacoEnvSet = true;
@@ -398,10 +404,11 @@ export default function EnhancedTextEditor({
     let disposed = false;
     const init = async () => {
       if (!containerRef.current) return;
-      ensureMonacoEnv();
-      const monaco = (await import('monaco-editor')).default ?? (await import('monaco-editor'));
-      if (disposed) return;
-      monacoRef.current = monaco;
+      try {
+        ensureMonacoEnv();
+        const monaco = (await import('monaco-editor')).default ?? (await import('monaco-editor'));
+        if (disposed) return;
+        monacoRef.current = monaco;
 
       THEMES.forEach((t) => {
         monaco.editor.defineTheme(t.id, { base: t.base, inherit: true, rules: t.rules, colors: t.colors });
@@ -488,6 +495,10 @@ export default function EnhancedTextEditor({
 
       // Signal that the editor is ready so the reload / default-tab effects run.
       if (!disposed) setEditorReady(true);
+      } catch (err) {
+        console.error('Monaco init failed:', err);
+        if (!disposed) { setEditorReady(true); setLoading(false); }
+      }
     };
 
     init();
