@@ -1193,20 +1193,18 @@ export default function EnhancedTextEditor({
   }, [csvMode, csv, previewContent, fileName]);
 
   // ---- Render -----------------------------------------------------------
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full bg-[#1E1E1E] text-foreground gap-3 select-none">
-        <P.Spinner className="w-6 h-6 animate-spin text-foreground" />
-        <span className="text-sm font-mono">Opening editor…</span>
-      </div>
-    );
-  }
-
   return (
     <div className={cn(
-      'flex flex-col w-full h-full bg-[#1E1E1E] text-foreground font-sans overflow-hidden select-none transition-all duration-200',
+      'flex flex-col w-full h-full bg-[#1E1E1E] text-foreground font-sans overflow-hidden select-none transition-all duration-200 relative',
       fullscreen && 'fixed inset-0 z-[9999]'
     )}>
+      {/* Loading overlay — always rendered AFTER the main shell so containerRef is in the DOM */}
+      {loading && (
+        <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-[#1E1E1E] text-foreground gap-3 select-none">
+          <P.Spinner className="w-6 h-6 animate-spin text-foreground" />
+          <span className="text-sm font-mono">Opening editor…</span>
+        </div>
+      )}
       {/* Title bar */}
       <header className="flex items-center justify-between px-3 h-11 bg-[#252526] border-b border-black/40 shrink-0 gap-2 z-30">
         <div className="flex items-center gap-2 min-w-0">
