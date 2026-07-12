@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidcloud-v12.0.18-streamer';
+const CACHE_NAME = 'squidcloud-v12.0.19-streamer';
 const API_CACHE = 'api-cache-v2';
 const STATIC_CACHE = 'static-cache-v3';
 
@@ -11,30 +11,27 @@ self.addEventListener('activate', event => {
 });
 
 self.streamRequests = new Map();
+self.chunkPrefetch = new Map();
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   
-  // 🚀 VIRTUAL STREAM INTERCEPTOR: Safe HTTP 206 Partial Content handling
   if (url.pathname.startsWith('/virtual-stream/')) {
     const fileId = url.pathname.split('/').pop();
-    const rangeHeader = event.request.headers.get('range') || 'bytes=0-';
+    const rangeHeader = event.request.headers.get('range');
 
     event.respondWith(
       new Promise((resolve) => {
         const requestId = Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
         
-        // Timeout set to 60s for multi-megabyte chunk decryption over slow networks
         const timeoutTimer = setTimeout(() => {
           if (self.streamRequests.has(requestId)) {
             self.streamRequests.delete(requestId);
-            console.warn(`[SW] Stream decryption timed out for request ${requestId}`);
-            // Resolve with HTTP 504 Gateway Timeout so <video> onError catches it gracefully
             resolve(new Response('Stream Decryption Timeout', { status: 504 }));
           }
-        }, 60000);
+        }, 120000);
 
-        self.streamRequests.set(requestId, { resolve, timeoutTimer });
+        self.streamRequests.set(requestId, { resolve, timeoutTimer, fileId });
 
         self.clients.matchAll({ type: 'window' }).then(clients => {
           if (!clients || clients.length === 0) {
@@ -45,7 +42,7 @@ self.addEventListener('fetch', event => {
           clients[0].postMessage({
             type: 'REQUEST_DECRYPT_STREAM',
             fileId,
-            range: rangeHeader,
+            range: rangeHeader || 'bytes=0-',
             requestId
           });
         }).catch(err => {
@@ -84,5 +81,23 @@ self.addEventListener('message', event => {
       
       resolve(new Response(buffer, { status: 206, headers }));
     }
+  }
+
+  if (event.data && event.data.type === 'PREFETCH_CHUNKS') {
+    const { fileId, chunkIndices, shareId } = event.data;
+    self.clients.matchAll({ type: 'window' }).then(clients => {
+      if (clients && clients.length > 0) {
+        chunkIndices.forEach((index, i) => {
+          setTimeout(() => {
+            clients[0].postMessage({
+              type: 'PREFETCH_CHUNK',
+              fileId,
+              chunkIndex: index,
+              shareId
+            });
+          }, i * 200);
+        });
+      }
+    });
   }
 });

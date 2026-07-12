@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   Play, Pause, Maximize, Minimize, Loader, Volume2, VolumeX, 
-  RotateCcw, RotateCw, Settings, PictureInPicture, AlertCircle, RefreshCw, Cpu, FileVideo 
+  RotateCcw, RotateCw, Settings, PictureInPicture, AlertCircle, RefreshCw, Cpu, FileVideo,
+  Wifi, WifiOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -16,6 +17,8 @@ interface CBVideoPlayerProps {
   shareId?: string;
 }
 
+type LoadPhase = 'connecting' | 'decrypting' | 'buffering' | 'ready' | 'error';
+
 const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   file, poster, autoPlay = false, className, shareId
 }) => {
@@ -24,6 +27,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const progressBarRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<NodeJS.Timeout>();
   const ffmpegRef = useRef<any>(null);
+  const retryTimerRef = useRef<NodeJS.Timeout>();
 
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -33,22 +37,25 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const [buffering, setBuffering] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [loadPhase, setLoadPhase] = useState<LoadPhase>('connecting');
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [bufferHealth, setBufferHealth] = useState(0);
+  const [errorMessage, setErrorMessage] = useState('');
   
-  // Advanced Controls
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
   
-  // Scrubbing & Double Tap Feedback
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPosition, setHoverPosition] = useState(0);
   const [seekAnimation, setSeekAnimation] = useState<'left' | 'right' | null>(null);
 
-  // Detect unsupported browser container formats
   const isUnsupportedContainer = useMemo(() => {
     return /\.(avi|mkv|wmv|flv|mov)$/i.test(file.name);
   }, [file.name]);
+
+  const isLargeFile = useMemo(() => file.size > 50 * 1024 * 1024, [file.size]);
 
   const [transcodeState, setTranscodeState] = useState<'idle' | 'loading_engine' | 'transcoding' | 'ready'>('idle');
   const [transcodeProgress, setTranscodeProgress] = useState(0);
@@ -59,14 +66,24 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     StreamDecryptorService.initListener(shareId);
   }, [shareId]);
 
-  // Clean up Blob URLs on unmount
   useEffect(() => {
     return () => {
       if (transcodedUrl) URL.revokeObjectURL(transcodedUrl);
+      clearTimeout(retryTimerRef.current);
     };
   }, [transcodedUrl]);
 
-  // WASM Transcoding Pipeline (Dynamic import prevents Termux build crashes)
+  useEffect(() => {
+    if (isLargeFile && navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'PREFETCH_CHUNKS',
+        fileId: file.id,
+        chunkIndices: [0, 1, 2],
+        shareId
+      });
+    }
+  }, [file.id, isLargeFile, shareId]);
+
   const startLocalTranscoding = async () => {
     try {
       setHasError(false);
@@ -151,7 +168,6 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     return () => clearTimeout(hideTimerRef.current);
   }, [playing, wakeControls]);
 
-  // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!videoRef.current || (transcodeState !== 'ready' && isUnsupportedContainer)) return;
@@ -282,6 +298,31 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  };
+
+  const retryWithBackoff = useCallback(() => {
+    const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+    setErrorMessage(`Retrying in ${Math.round(delay / 1000)}s...`);
+    retryTimerRef.current = setTimeout(() => {
+      setHasError(false);
+      setBuffering(true);
+      setLoadPhase('connecting');
+      setRetryCount(r => r + 1);
+    }, delay);
+  }, [retryCount]);
+
+  const handleRetry = () => {
+    clearTimeout(retryTimerRef.current);
+    setHasError(false);
+    setBuffering(true);
+    setLoadPhase('connecting');
+    setRetryCount(r => r + 1);
+  };
+
   const activeVideoSource = isUnsupportedContainer 
     ? transcodedUrl 
     : `/virtual-stream/${file.id}?retry=${retryCount}`;
@@ -289,18 +330,40 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   if (hasError) {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full bg-[#0a0a0f] p-6 text-center border border-neutral-800 rounded-2xl space-y-4 select-none">
-        <AlertCircle className="w-10 h-10 text-red-400 animate-pulse" />
-        <div className="space-y-1 max-w-md">
-          <p className="text-sm font-semibold text-white">Playback Interrupted</p>
-          <p className="text-xs text-neutral-400">The video stream timed out or encountered an unreadable codec format.</p>
+        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+          <AlertCircle className="w-7 h-7 text-red-400" />
         </div>
-        <Button 
-          onClick={() => { setHasError(false); setBuffering(true); setRetryCount(r => r + 1); }} 
-          size="sm" 
-          className="bg-red-600 hover:bg-red-500 text-white gap-2"
-        >
-          <RefreshCw className="w-4 h-4" /> Reload Stream
-        </Button>
+        <div className="space-y-1 max-w-md">
+          <p className="text-sm font-semibold text-white">Stream Interrupted</p>
+          <p className="text-xs text-neutral-400">
+            {errorMessage || 'The encrypted video stream could not be loaded. This may be due to a slow connection or large file size.'}
+          </p>
+          {isLargeFile && (
+            <p className="text-[10px] text-neutral-500 mt-1">
+              Large file: {formatFileSize(file.size)} — chunked decryption in progress
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={handleRetry}
+            size="sm" 
+            className="bg-red-600 hover:bg-red-500 text-white gap-2"
+          >
+            <RefreshCw className="w-4 h-4" /> Retry
+          </Button>
+          <Button 
+            onClick={retryWithBackoff}
+            size="sm" 
+            variant="outline"
+            className="border-neutral-700 text-neutral-300 gap-2"
+          >
+            <Wifi className="w-4 h-4" /> Auto Retry
+          </Button>
+        </div>
+        {retryCount > 0 && (
+          <p className="text-[10px] text-neutral-500">Attempt {retryCount + 1}</p>
+        )}
       </div>
     );
   }
@@ -363,26 +426,56 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
           className="absolute inset-0 w-full h-full object-contain"
           poster={poster}
           playsInline
+          preload={isLargeFile ? 'metadata' : 'auto'}
           autoPlay={autoPlay}
           onError={(e) => {
             console.error("Video playback error:", e);
             setHasError(true);
             setBuffering(false);
+            setLoadPhase('error');
           }}
           onLoadedMetadata={() => {
             setDuration(videoRef.current?.duration || 0);
             if (videoRef.current && videoRef.current.readyState >= 2) {
               setBuffering(false);
+              setLoadPhase('ready');
             }
           }}
-          onLoadedData={() => setBuffering(false)}
-          onCanPlay={() => setBuffering(false)}
-          onCanPlayThrough={() => setBuffering(false)}
+          onLoadedData={() => {
+            setBuffering(false);
+            setLoadPhase('ready');
+          }}
+          onCanPlay={() => {
+            setBuffering(false);
+            setLoadPhase('ready');
+          }}
+          onCanPlayThrough={() => {
+            setBuffering(false);
+            setLoadPhase('ready');
+          }}
           onTimeUpdate={() => {
             const current = videoRef.current?.currentTime || 0;
             setCurrentTime(current);
+            if (videoRef.current) {
+              const buffered = videoRef.current.buffered;
+              if (buffered.length > 0) {
+                const end = buffered.end(buffered.length - 1);
+                setBufferHealth(end - current);
+              }
+            }
             if (current > 0 && buffering) {
               setBuffering(false);
+              setLoadPhase('ready');
+            }
+          }}
+          onProgress={() => {
+            if (videoRef.current && isLargeFile) {
+              const buffered = videoRef.current.buffered;
+              if (buffered.length > 0 && duration > 0) {
+                const end = buffered.end(buffered.length - 1);
+                const pct = Math.min(100, Math.round((end / duration) * 100));
+                setLoadProgress(pct);
+              }
             }
           }}
           onPlay={() => setPlaying(true)}
@@ -411,10 +504,49 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Buffering Spinner */}
+      {/* Loading / Buffering Overlay */}
       {buffering && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 bg-black/20 backdrop-blur-[1px]">
-          <Loader className="w-12 h-12 text-red-600 animate-spin" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 bg-black/30 backdrop-blur-[2px] transition-opacity duration-500">
+          <div className="relative">
+            <Loader className="w-12 h-12 text-white/80 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
+            </div>
+          </div>
+          {isLargeFile && loadPhase !== 'ready' && (
+            <div className="mt-4 space-y-2 text-center">
+              <p className="text-xs text-white/60 font-medium">
+                {loadPhase === 'connecting' && 'Establishing encrypted stream...'}
+                {loadPhase === 'decrypting' && 'Decrypting video chunks...'}
+                {loadPhase === 'buffering' && 'Buffering for smooth playback...'}
+              </p>
+              {loadProgress > 0 && (
+                <div className="w-48 mx-auto">
+                  <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-white/50 rounded-full transition-all duration-300"
+                      style={{ width: `${loadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-white/40 mt-1">{loadProgress}% buffered</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Buffer Health Indicator (large files) */}
+      {isLargeFile && playing && bufferHealth > 0 && !buffering && (
+        <div className="absolute top-3 right-3 z-10 pointer-events-none">
+          <div className={cn(
+            "px-2 py-0.5 rounded-full text-[10px] font-mono backdrop-blur-sm transition-all duration-300",
+            bufferHealth > 30 ? "bg-green-500/20 text-green-300/80" :
+            bufferHealth > 10 ? "bg-yellow-500/20 text-yellow-300/80" :
+            "bg-red-500/20 text-red-300/80"
+          )}>
+            {bufferHealth.toFixed(1)}s buffered
+          </div>
         </div>
       )}
 
@@ -434,6 +566,12 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
           onMouseLeave={() => setHoverTime(null)}
           className="w-full h-1.5 hover:h-2.5 bg-white/20 rounded-full relative cursor-pointer transition-all duration-150 py-1"
         >
+          {isLargeFile && (
+            <div 
+              className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-white/10 rounded-full"
+              style={{ width: `${(loadProgress / 100) * 100}%` }}
+            />
+          )}
           {hoverTime !== null && (
             <div 
               className="absolute -top-9 bg-neutral-900 border border-neutral-700 px-2 py-1 rounded text-xs font-mono text-white shadow-lg pointer-events-none -translate-x-1/2"
@@ -484,7 +622,6 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
               <PictureInPicture className="w-5 h-5" />
             </button>
 
-            {/* Playback Speed Selector */}
             <div className="relative">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} 

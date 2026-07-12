@@ -2,7 +2,57 @@ import { downloadChunk } from './res54';
 import { decryptData } from './encryption';
 import { supabase } from '@/integrations/supabase/client';
 
-const chunkCache = new Map<number, ArrayBuffer>();
+const DECRYPT_CACHE_MAX = 12;
+const chunkCache = new Map<string, { data: ArrayBuffer; timestamp: number }>();
+const inflightRequests = new Map<string, Promise<ArrayBuffer>>();
+
+function cacheKey(fileId: string, index: number) {
+  return `${fileId}:${index}`;
+}
+
+function evictOldest() {
+  if (chunkCache.size <= DECRYPT_CACHE_MAX) return;
+  let oldestKey = '';
+  let oldestTs = Infinity;
+  for (const [k, v] of chunkCache) {
+    if (v.timestamp < oldestTs) {
+      oldestTs = v.timestamp;
+      oldestKey = k;
+    }
+  }
+  if (oldestKey) chunkCache.delete(oldestKey);
+}
+
+async function fetchAndDecryptChunk(
+  chunk: any,
+  meta: any,
+  shareId?: string,
+  fileId?: string
+): Promise<ArrayBuffer> {
+  const key = cacheKey(fileId || '', chunk.index);
+  const cached = chunkCache.get(key);
+  if (cached) return cached.data;
+
+  const inflight = inflightRequests.get(key);
+  if (inflight) return inflight;
+
+  const promise = (async () => {
+    try {
+      const downloadResult = await downloadChunk(chunk, 0, shareId);
+      const decrypted = await decryptData(downloadResult.data, meta.encryptionKey);
+      chunkCache.set(key, { data: decrypted, timestamp: Date.now() });
+      evictOldest();
+      inflightRequests.delete(key);
+      return decrypted;
+    } catch (err) {
+      inflightRequests.delete(key);
+      throw err;
+    }
+  })();
+
+  inflightRequests.set(key, promise);
+  return promise;
+}
 
 export class StreamDecryptorService {
   static isListening = false;
@@ -26,9 +76,8 @@ export class StreamDecryptorService {
 
           const meta = JSON.parse(file.tags[0]);
           const chunks = meta.chunks.filter((c: any) => c.repo && c.path).sort((a: any, b: any) => a.index - b.index);
-          const STANDARD_CHUNK_SIZE = 8 * 1024 * 1024; // 8MB Backblaze chunks
+          const STANDARD_CHUNK_SIZE = 8 * 1024 * 1024;
 
-          // 1. Locate the exact chunk containing the requested startByte
           let targetChunk = null;
           let chunkStartOffset = 0;
           let currentOffset = 0;
@@ -45,22 +94,8 @@ export class StreamDecryptorService {
 
           if (!targetChunk) throw new Error("Requested byte range is out of bounds");
 
-          // 2. Fetch and decrypt the target chunk (or retrieve from RAM cache)
-          let decryptedBuffer: ArrayBuffer;
-          if (chunkCache.has(targetChunk.index)) {
-            decryptedBuffer = chunkCache.get(targetChunk.index)!;
-          } else {
-            const downloadResult = await downloadChunk(targetChunk, 0, shareId);
-            decryptedBuffer = await decryptData(downloadResult.data, meta.encryptionKey);
-            
-            chunkCache.set(targetChunk.index, decryptedBuffer);
-            if (chunkCache.size > 3) {
-              const oldestKey = chunkCache.keys().next().value;
-              if (oldestKey !== undefined) chunkCache.delete(oldestKey);
-            }
-          }
+          const decryptedBuffer = await fetchAndDecryptChunk(targetChunk, meta, shareId, fileId);
 
-          // 3. Slice the exact requested byte window inside this chunk
           const localStart = startByte - chunkStartOffset;
           const maxLocalEnd = decryptedBuffer.byteLength - 1;
           const localEnd = requestedEndByte !== undefined 
@@ -79,8 +114,10 @@ export class StreamDecryptorService {
               end: endByte,
               totalSize: file.size,
               contentType: file.type
-            }, [slicedBuffer]); // Transferable object for zero-copy memory transfer
+            }, [slicedBuffer]);
           }
+
+          StreamDecryptorService.prefetchAdjacent(fileId, targetChunk.index, chunks, meta, shareId, file.size, STANDARD_CHUNK_SIZE);
 
         } catch (err: any) {
           console.error('[VirtualServer] Decryption failed:', err);
@@ -93,6 +130,30 @@ export class StreamDecryptorService {
           }
         }
       }
+    });
+  }
+
+  private static prefetchAdjacent(
+    fileId: string,
+    currentIndex: number,
+    chunks: any[],
+    meta: any,
+    shareId?: string,
+    totalSize?: number,
+    chunkSize?: number
+  ) {
+    const prefetchIndices: number[] = [];
+    for (let delta = 1; delta <= 3; delta++) {
+      const nextIdx = currentIndex + delta;
+      if (nextIdx < chunks.length) prefetchIndices.push(nextIdx);
+    }
+    prefetchIndices.forEach((idx, i) => {
+      setTimeout(() => {
+        const key = cacheKey(fileId, idx);
+        if (!chunkCache.has(key) && !inflightRequests.has(key)) {
+          fetchAndDecryptChunk(chunks[idx], meta, shareId, fileId).catch(() => {});
+        }
+      }, i * 300);
     });
   }
 }

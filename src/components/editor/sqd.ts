@@ -1,10 +1,13 @@
 export type Point = { x: number; y: number; p?: number };
 
+export type BrushType = 'pen' | 'pencil' | 'brush' | 'marker';
+
 export interface InkStroke {
   id: string;
   color: string;
   size: number;
   points: Point[];
+  brush?: BrushType;
 }
 
 export type SqdObjectType = 'rect' | 'ellipse' | 'line' | 'arrow' | 'textbox' | 'image';

@@ -10,7 +10,7 @@ import { backgroundCss } from './editor/backgrounds';
 import { shapePath, SHAPE_TYPES } from './editor/shapes';
 import {
   isSqdName, serializeDoc, parseDoc, defaultBackground,
-  type SqdDoc, type EditorMode, type BackgroundConfig, type SqdObject, type InkStroke,
+  type SqdDoc, type EditorMode, type BackgroundConfig, type SqdObject, type InkStroke, type BrushType,
 } from './editor/sqd';
 
 // Monaco web workers (bundled same-origin so the browser accepts them)
@@ -122,10 +122,10 @@ const THEMES: ThemeDef[] = [
       { token: 'function', foreground: '41A1F0' },
     ],
     colors: {
-      'editor.background': '#1E1E1E', 'editor.foreground': '#FFFFFF',
+      'editor.background': '#111113', 'editor.foreground': '#FFFFFF',
       'editorLineNumber.foreground': '#6C6C6C', 'editor.selectionBackground': '#264F78',
       'editor.lineHighlightBackground': '#2A2A2A', 'editorCursor.foreground': '#FFFFFF',
-      'editorWidget.background': '#252526', 'editorGutter.background': '#1E1E1E',
+      'editorWidget.background': '#191a1c', 'editorGutter.background': '#111113',
       'scrollbarSlider.background': '#4B556380',
     },
   },
@@ -156,7 +156,7 @@ const THEMES: ThemeDef[] = [
       { token: 'function', foreground: 'DCDCAA' },
     ],
     colors: {
-      'editor.background': '#1E1E1E', 'editor.foreground': '#D4D4D4',
+      'editor.background': '#111113', 'editor.foreground': '#D4D4D4',
       'editorLineNumber.foreground': '#858585', 'editor.selectionBackground': '#264F78',
       'editor.lineHighlightBackground': '#2D2D2D', 'editorCursor.foreground': '#AEAFAD',
       'scrollbarSlider.background': '#5A5A5A80',
@@ -350,7 +350,8 @@ export default function EnhancedTextEditor({
   // ---- Notes / Apple Pencil / objects / .sqd state ----------------------
   const [mode, setMode] = useState<EditorMode>('text');
   const [tool, setTool] = useState<'off' | 'pen' | 'eraser' | 'select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'textbox'>('pen');
-  const [inkColor, setInkColor] = useState('#1f2430');
+  const [brushType, setBrushType] = useState<BrushType>('pen');
+  const [inkColor, setInkColor] = useState('#c8c8c8');
   const [penSize, setPenSize] = useState(3);
   const [penOnly, setPenOnly] = useState(true);
   const [strokes, setStrokes] = useState<InkStroke[]>([]);
@@ -1195,18 +1196,18 @@ export default function EnhancedTextEditor({
   // ---- Render -----------------------------------------------------------
   return (
     <div className={cn(
-      'flex flex-col w-full h-full bg-[#1E1E1E] text-foreground font-sans overflow-hidden select-none transition-all duration-200 relative',
+      'flex flex-col w-full h-full bg-[#111113] text-[#e0e0e0] font-sans overflow-hidden select-none transition-all duration-200 relative',
       fullscreen && 'fixed inset-0 z-[9999]'
     )}>
       {/* Loading overlay — always rendered AFTER the main shell so containerRef is in the DOM */}
       {loading && (
-        <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-[#1E1E1E] text-foreground gap-3 select-none">
-          <P.Spinner className="w-6 h-6 animate-spin text-foreground" />
-          <span className="text-sm font-mono">Opening editor…</span>
+        <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-[#111113] text-[#e0e0e0] gap-3 select-none">
+          <P.Spinner className="w-6 h-6 animate-spin text-[#666]" />
+          <span className="text-sm font-mono text-[#666]">Opening editor…</span>
         </div>
       )}
       {/* Title bar */}
-      <header className="flex items-center justify-between px-3 h-11 bg-[#252526] border-b border-black/40 shrink-0 gap-2 z-30">
+      <header className="flex items-center justify-between px-3 h-11 bg-[#191a1c] border-b border-white/[0.06] shrink-0 gap-2 z-30">
         <div className="flex items-center gap-2 min-w-0">
           <P.FileText className="w-4 h-4 text-[#4EC9B0] shrink-0" />
           <span className="text-sm font-medium truncate max-w-[40vw]">{fileName}</span>
@@ -1223,7 +1224,7 @@ export default function EnhancedTextEditor({
             <span className="capitalize">{mode}</span>
           </button>
           {modeOpen && (
-            <div className="absolute left-0 top-9 z-40 w-56 bg-[#252526] border border-white/10 rounded-xl shadow-2xl p-1.5 animate-in fade-in zoom-in-95">
+            <div className="absolute left-0 top-9 z-40 w-56 bg-[#191a1c] border border-white/10 rounded-xl shadow-2xl p-1.5 animate-in fade-in zoom-in-95">
               {[
                 { id: 'text', label: 'Text / Code', icon: P.TextColumns, d: 'Plain code editor' },
                 { id: 'write', label: 'Write', icon: P.PencilSimple, d: 'Text + handwriting' },
@@ -1272,7 +1273,7 @@ export default function EnhancedTextEditor({
       {tabs.length > 0 && (
         <div className="flex items-center gap-1 px-2 h-9 bg-[#1b1b1b] border-b border-black/40 overflow-x-auto no-scrollbar shrink-0">
           {tabs.map((t, i) => (
-            <div key={t.id} onClick={() => switchTab(i)} className={cn('group flex items-center gap-1.5 h-7 pl-2.5 pr-1 rounded-t-md text-xs cursor-pointer border border-b-0 transition-colors shrink-0', i === activeTab ? 'bg-[#252526] text-foreground border-white/10' : 'text-muted-foreground hover:bg-white/5 border-transparent')}>
+            <div key={t.id} onClick={() => switchTab(i)} className={cn('group flex items-center gap-1.5 h-7 pl-2.5 pr-1 rounded-t-md text-xs cursor-pointer border border-b-0 transition-colors shrink-0', i === activeTab ? 'bg-[#191a1c] text-foreground border-white/10' : 'text-muted-foreground hover:bg-white/5 border-transparent')}>
               <span className="max-w-[150px] truncate">{t.name}</span>
               {i === activeTab && isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
               <button onClick={(e) => { e.stopPropagation(); closeTab(i); }} className="w-4 h-4 grid place-items-center rounded hover:bg-white/15 opacity-0 group-hover:opacity-100 transition-opacity" title="Close"><P.X className="w-3 h-3" /></button>
@@ -1284,7 +1285,7 @@ export default function EnhancedTextEditor({
 
       {/* Markdown formatting toolbar */}
       {markdown && !readonly && view !== 'preview' && (
-        <div className="flex items-center gap-0.5 px-2 h-9 bg-[#2D2D30] border-b border-black/30 overflow-x-auto no-scrollbar shrink-0">
+        <div className="flex items-center gap-0.5 px-2 h-9 bg-[#191a1c] border-b border-white/[0.06] overflow-x-auto no-scrollbar shrink-0">
           {[['# ', 'H1'], ['## ', 'H2'], ['### ', 'H3']].map(([p, l]) => (
             <button key={l} onClick={() => mdLinePrefix(p)} className="h-7 px-2 text-xs font-semibold rounded text-muted-foreground hover:text-foreground hover:bg-white/5" title={`Heading ${l}`}>{l}</button>
           ))}
@@ -1312,13 +1313,30 @@ export default function EnhancedTextEditor({
 
       {/* Notes / Apple Pencil / objects toolbar */}
       {mode !== 'text' && mode !== 'reading' && !readonly && (
-        <div className="flex items-center gap-1 px-2 h-10 bg-[#2D2D30] border-b border-black/30 overflow-x-auto no-scrollbar shrink-0 text-muted-foreground">
+        <div className="flex items-center gap-1 px-2 h-10 bg-[#191a1c] border-b border-white/[0.06] overflow-x-auto no-scrollbar shrink-0 text-[#999]">
           <button onClick={() => setTool('pen')} className={cn('h-7 px-2 rounded flex items-center gap-1 text-xs', tool === 'pen' ? 'bg-primary text-primary-foreground' : 'hover:bg-white/5 hover:text-foreground')} title="Pen (Apple Pencil)"><P.Pen className="w-4 h-4" /> Pen</button>
+          <div className="flex items-center gap-0.5 px-1">
+            {([
+              { id: 'pen' as BrushType, label: 'Pen', icon: '✏️' },
+              { id: 'pencil' as BrushType, label: 'Pencil', icon: '✏' },
+              { id: 'brush' as BrushType, label: 'Brush', icon: '🖌' },
+              { id: 'marker' as BrushType, label: 'Marker', icon: '🖍' },
+            ]).map((b) => (
+              <button
+                key={b.id}
+                onClick={() => setBrushType(b.id)}
+                className={cn('h-6 px-1.5 rounded text-[10px]', brushType === b.id ? 'bg-white/15 text-foreground' : 'hover:bg-white/5 text-muted-foreground')}
+                title={b.label}
+              >
+                {b.icon} {b.label}
+              </button>
+            ))}
+          </div>
           <button onClick={() => setTool('eraser')} className={cn('h-7 px-2 rounded flex items-center gap-1 text-xs', tool === 'eraser' ? 'bg-primary text-primary-foreground' : 'hover:bg-white/5 hover:text-foreground')} title="Eraser"><P.Eraser className="w-4 h-4" /> Erase</button>
           <button onClick={() => setPenOnly((p) => !p)} className={cn('h-7 w-7 grid place-items-center rounded', penOnly ? 'text-emerald-400' : 'hover:bg-white/5 hover:text-foreground')} title={penOnly ? 'Palm rejection ON (Apple Pencil only)' : 'Palm rejection OFF (finger draws)'}><P.Hand className="w-4 h-4" /></button>
           <div className="flex items-center gap-1 px-1">
-            {['#1f2430', '#e03131', '#1971c2', '#2f9e44', '#f08c00', '#9c36b5', '#ffffff'].map((c) => (
-              <button key={c} onClick={() => setInkColor(c)} className={cn('w-4 h-4 rounded-full border', inkColor === c ? 'ring-2 ring-offset-1 ring-offset-[#2D2D30] ring-white' : 'border-white/20')} style={{ background: c }} title={c} />
+            {['#c8c8c8', '#e03131', '#1971c2', '#2f9e44', '#f08c00', '#9c36b5', '#ffffff'].map((c) => (
+              <button key={c} onClick={() => setInkColor(c)} className={cn('w-4 h-4 rounded-full border', inkColor === c ? 'ring-2 ring-offset-1 ring-offset-[#191a1c] ring-white/60' : 'border-white/10')} style={{ background: c }} title={c} />
             ))}
             <input type="color" value={inkColor} onChange={(e) => setInkColor(e.target.value)} className="w-5 h-5 rounded bg-transparent border-0 cursor-pointer p-0" title="Custom ink color" />
           </div>
@@ -1331,7 +1349,7 @@ export default function EnhancedTextEditor({
           <div className="relative">
             <button onClick={() => setShapesOpen((o) => !o)} className={cn('h-7 px-2 rounded flex items-center gap-1 text-xs', ['rect', 'ellipse', 'triangle', 'diamond', 'parallelogram', 'trapezoid', 'pentagon', 'hexagon', 'star', 'arrow', 'doubleArrow', 'cylinder', 'cloud', 'callout', 'heart', 'sticky', 'polygon', 'line', 'textbox'].includes(tool) ? 'bg-primary text-primary-foreground' : 'hover:bg-white/5 hover:text-foreground')} title="Shapes">&#9632; Shapes</button>
             {shapesOpen && (
-              <div className="absolute left-0 top-9 z-40 w-64 bg-[#252526] border border-white/10 rounded-xl shadow-2xl p-2 animate-in fade-in zoom-in-95">
+              <div className="absolute left-0 top-9 z-40 w-64 bg-[#191a1c] border border-white/10 rounded-xl shadow-2xl p-2 animate-in fade-in zoom-in-95">
                 <div className="grid grid-cols-6 gap-1">
                   {SHAPE_TYPES.map((s) => (
                     <button key={s.id} onClick={() => { setMode(mode === 'text' ? 'write' : mode); setTool(s.id); setShapesOpen(false); }} title={s.label} className={cn('h-9 grid place-items-center rounded hover:bg-white/10', tool === s.id ? 'bg-primary/20 text-foreground' : 'text-muted-foreground')}>
@@ -1376,7 +1394,7 @@ export default function EnhancedTextEditor({
       <div className="flex flex-1 relative overflow-hidden">
         {/* Outline panel */}
         {outlineOpen && (
-          <aside className="w-56 bg-[#252526] border-r border-black/40 overflow-y-auto shrink-0 p-2 text-xs animate-in slide-in-left duration-200">
+          <aside className="w-56 bg-[#151618] border-r border-white/[0.06] overflow-y-auto shrink-0 p-2 text-xs animate-in slide-in-left duration-200">
             <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Outline</div>
             {(contentRef.current.match(/^#{1,6}\s+(.+)$/gm) || []).map((h, i) => {
               const level = h.match(/^#+/)![0].length;
@@ -1395,6 +1413,7 @@ export default function EnhancedTextEditor({
                 <InkCanvas
                   active={inkActive}
                   tool={drawTool}
+                  brush={brushType}
                   color={inkColor}
                   size={penSize}
                   penOnly={penOnly}
@@ -1447,7 +1466,7 @@ export default function EnhancedTextEditor({
               </div>
             </Section>
             <Section label="Font">
-              <select value={fontPreset} onChange={(e) => setFontPreset(Number(e.target.value))} className="w-full bg-[#1E1E1E] border border-white/10 rounded px-2 py-1.5 text-xs text-foreground">
+              <select value={fontPreset} onChange={(e) => setFontPreset(Number(e.target.value))} className="w-full bg-[#111113] border border-white/10 rounded px-2 py-1.5 text-xs text-foreground">
                 {FONT_PRESETS.map((f, i) => <option key={i} value={i}>{f.split(',')[0].replace(/"/g, '')}</option>)}
               </select>
             </Section>
@@ -1477,7 +1496,7 @@ export default function EnhancedTextEditor({
       {/* Command palette */}
       {paletteOpen && (
         <div className="absolute inset-0 z-40 flex items-start justify-center pt-[12vh] bg-black/40 animate-in fade-in duration-150" onClick={() => setPaletteOpen(false)}>
-          <div className="w-[min(640px,92vw)] bg-[#252526] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top duration-150" onClick={(e) => e.stopPropagation()}>
+          <div className="w-[min(640px,92vw)] bg-[#191a1c] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top duration-150" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 px-3 border-b border-white/10">
               <P.Command className="w-4 h-4 text-muted-foreground" />
               <input autoFocus value={paletteQuery} onChange={(e) => { setPaletteQuery(e.target.value); setPaletteIndex(0); }} onKeyDown={(e) => {
@@ -1507,7 +1526,7 @@ export default function EnhancedTextEditor({
       {/* Shortcuts modal */}
       {shortcutsOpen && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 animate-in fade-in" onClick={() => setShortcutsOpen(false)}>
-          <div className="w-[min(560px,92vw)] max-h-[80vh] overflow-y-auto bg-[#252526] border border-white/10 rounded-xl p-5 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+          <div className="w-[min(560px,92vw)] max-h-[80vh] overflow-y-auto bg-[#191a1c] border border-white/10 rounded-xl p-5 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold">Keyboard Shortcuts</h3><P.X className="w-4 h-4 cursor-pointer text-muted-foreground" onClick={() => setShortcutsOpen(false)} /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
               {[
@@ -1527,7 +1546,7 @@ export default function EnhancedTextEditor({
       {/* Image import modal (device / URL / SquidCloud) */}
       {importOpen && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 animate-in fade-in" onClick={() => setImportOpen(false)}>
-          <div className="w-[min(560px,92vw)] max-h-[80vh] overflow-y-auto bg-[#252526] border border-white/10 rounded-xl p-5 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+          <div className="w-[min(560px,92vw)] max-h-[80vh] overflow-y-auto bg-[#191a1c] border border-white/10 rounded-xl p-5 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold">Insert Image</h3>
               <P.X className="w-4 h-4 cursor-pointer text-muted-foreground" onClick={() => setImportOpen(false)} />
@@ -1563,7 +1582,7 @@ export default function EnhancedTextEditor({
       {/* Open-files modal */}
       {openFilesOpen && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 animate-in fade-in" onClick={() => setOpenFilesOpen(false)}>
-          <div className="w-[min(560px,92vw)] max-h-[80vh] overflow-y-auto bg-[#252526] border border-white/10 rounded-xl p-5 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+          <div className="w-[min(560px,92vw)] max-h-[80vh] overflow-y-auto bg-[#191a1c] border border-white/10 rounded-xl p-5 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold">Open File</h3>
               <P.X className="w-4 h-4 cursor-pointer text-muted-foreground" onClick={() => setOpenFilesOpen(false)} />
@@ -1635,7 +1654,7 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
 }
 function Popover({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="absolute right-3 top-12 z-40 w-72 bg-[#252526] border border-white/10 rounded-xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150 max-h-[80vh] overflow-y-auto">
+    <div className="absolute right-3 top-12 z-40 w-72 bg-[#191a1c] border border-white/10 rounded-xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150 max-h-[80vh] overflow-y-auto">
       <div className="flex items-center justify-between mb-2"><span className="text-xs font-semibold">{title}</span><P.X className="w-4 h-4 text-muted-foreground cursor-pointer" onClick={onClose} /></div>
       {children}
     </div>
