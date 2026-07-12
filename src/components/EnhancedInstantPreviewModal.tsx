@@ -63,7 +63,7 @@ const getFileTypeLabel = (file: any) => {
   if (file.type?.startsWith('audio/')) return 'Audio';
   if (file.type === 'application/pdf') return 'PDF';
   if (file.type?.includes('spreadsheet') || file.name?.match(/\.(xlsx?|csv|ods)$/i)) return 'Sheet';
-  if (file.type?.startsWith('text/') || file.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|html|css|yml|yaml)$/i)) return 'Text';
+  if (file.type?.startsWith('text/') || file.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|html|css|yml|yaml|sqd)$/i)) return 'Text';
   return 'File';
 };
 
@@ -88,7 +88,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const isStreamingVideo = file?.type?.startsWith('video/') && file?.encrypted && file?.storage_path === 'res54_distributed';
   const canProgressiveLoad = !isArchive && !isStreamingVideo && (
     file?.type?.startsWith('text/') || file?.type === 'application/json' ||
-    file?.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|py|html|css|scss|yml|yaml|xml|sql|log)$/i)
+    file?.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|py|html|css|scss|yml|yaml|xml|sql|log|sqd)$/i)
   );
 
   // 🚀 FOOLPROOF CLOSE HANDLER: Instantly closes UI & safely unpops history
@@ -260,7 +260,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const isVideo = file.type?.startsWith('video/');
   const isPDF = file.type === 'application/pdf';
   const isSpreadsheet = file.type?.includes('spreadsheet') || file.type === 'text/csv' || file.name?.match(/\.(xlsx?|csv|ods)$/i);
-  const isText = file.type?.startsWith('text/') || file.type === 'application/json' || file.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|py|html|css|scss|yml|yaml|xml|sql|log)$/i);
+  const isText = file.type?.startsWith('text/') || file.type === 'application/json' || file.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|py|html|css|scss|yml|yaml|xml|sql|log|sqd)$/i);
 
   const renderPreview = () => {
     if (isArchive) {

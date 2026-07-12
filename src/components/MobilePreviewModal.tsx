@@ -115,8 +115,8 @@ const MobilePreviewModal: React.FC<MobilePreviewModalProps> = ({
                           file.type?.includes('csv') ||
                           file.name?.endsWith('.csv') ||
                           file.name?.endsWith('.xlsx');
-    const isText = file.type?.startsWith('text/') || 
-                   file.name?.match(/\.(txt|md|json|js|ts|jsx|tsx|css|html|xml|yaml|yml)$/i);
+    const isText = file.type?.startsWith('text/') ||
+                   file.name?.match(/\.(txt|md|json|js|ts|jsx|tsx|css|html|xml|yaml|yml|sqd)$/i);
 
     if (isVideo) {
       return (

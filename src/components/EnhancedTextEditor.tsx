@@ -305,6 +305,7 @@ export default function EnhancedTextEditor({
   const statsTimer = useRef<number | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [editorReady, setEditorReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -485,18 +486,8 @@ export default function EnhancedTextEditor({
       if (markdown && !isMobile) setView('split');
       else setView('edit');
 
-      if (decodedBlob) {
-        // loading handled by the reload effect -> openFile()
-      } else {
-        const id = file?.id || 'tab_' + Math.random().toString(36).slice(2, 8);
-        buffers.current[id] = { text: '', lang: detectLang(fileName), background: defaultBackground(), strokes: [], objects: [], mode: 'text', tool: 'off', dirty: false };
-        if (!disposed) {
-          setTabs([{ id, name: fileName }]);
-          setActiveTab(0);
-          setLoading(false);
-        }
-      }
-      if (!decodedBlob) setLoading(false);
+      // Signal that the editor is ready so the reload / default-tab effects run.
+      if (!disposed) setEditorReady(true);
     };
 
     init();
@@ -690,16 +681,28 @@ export default function EnhancedTextEditor({
     }
   };
 
+  // ---- Default empty tab when there is no file to open ----------------
+  useEffect(() => {
+    if (!editorReady) return;
+    if (!decodedBlob && tabs.length === 0) {
+      const id = file?.id || 'tab_' + Math.random().toString(36).slice(2, 8);
+      buffers.current[id] = { text: '', lang: detectLang(fileName), background: defaultBackground(), strokes: [], objects: [], mode: 'text', tool: 'off', dirty: false };
+      setTabs([{ id, name: fileName }]);
+      setActiveTab(0);
+      setLoading(false);
+    }
+  }, [editorReady, decodedBlob]);
+
   // ---- Reload when blob changes ----------------------------------------
   useEffect(() => {
-    if (!editorRef.current) return;
+    if (!editorReady) return;
     if (decodedBlob !== lastBlob.current) {
       lastBlob.current = decodedBlob;
       setLoading(true);
       openFile(file, decodedBlob).finally(() => setLoading(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decodedBlob, openFile]);
+  }, [decodedBlob, openFile, editorReady]);
 
   // Load active tab buffer into the editor + overlay
   useEffect(() => {
