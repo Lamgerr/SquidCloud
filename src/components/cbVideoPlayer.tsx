@@ -36,6 +36,11 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [buffering, setBuffering] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const hasErrorRef = useRef(false);
+  const setHasErrorTracked = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setHasError(v);
+    hasErrorRef.current = typeof v === 'function' ? v(hasErrorRef.current) : v;
+  }, []);
   const [retryCount, setRetryCount] = useState(0);
   const [loadPhase, setLoadPhase] = useState<LoadPhase>('connecting');
   const [loadProgress, setLoadProgress] = useState(0);
@@ -62,17 +67,32 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const [transcodeMessage, setTranscodeMessage] = useState('Initializing WebAssembly Engine...');
   const [transcodedUrl, setTranscodedUrl] = useState<string | null>(null);
   const [streamReady, setStreamReady] = useState(false);
+  const streamReadyRef = useRef(false);
 
   useEffect(() => {
     StreamDecryptorService.initListener(shareId);
     let cancelled = false;
     StreamDecryptorService.seedFileMeta(file.id, shareId).then(() => {
-      if (!cancelled) setStreamReady(true);
-    }).catch(() => {
-      if (!cancelled) setStreamReady(true);
+      if (!cancelled) {
+        streamReadyRef.current = true;
+        setStreamReady(true);
+        if (hasErrorRef.current) {
+          setHasErrorTracked(false);
+          setBuffering(true);
+          setRetryCount(r => r + 1);
+        }
+      }
+    }).catch((err) => {
+      console.error('[Player] Seed failed:', err);
+      if (!cancelled) {
+        streamReadyRef.current = true;
+        setStreamReady(true);
+        setHasErrorTracked(true);
+        setErrorMessage('Failed to prepare video stream: ' + (err?.message || 'unknown'));
+      }
     });
     return () => { cancelled = true; };
-  }, [shareId, file.id]);
+  }, [shareId, file.id, setHasErrorTracked]);
 
   useEffect(() => {
     return () => {
@@ -89,7 +109,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
 
   const startLocalTranscoding = async () => {
     try {
-      setHasError(false);
+      setHasErrorTracked(false);
       setTranscodeState('loading_engine');
       setTranscodeMessage('Loading FFmpeg WebAssembly Core...');
       
@@ -151,7 +171,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
       setBuffering(false);
     } catch (err: any) {
       console.error('[WASM Transcoder Error]:', err);
-      setHasError(true);
+      setHasErrorTracked(true);
       setTranscodeState('idle');
     }
   };
@@ -311,7 +331,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
     setErrorMessage(`Retrying in ${Math.round(delay / 1000)}s...`);
     retryTimerRef.current = setTimeout(() => {
-      setHasError(false);
+      setHasErrorTracked(false);
       setBuffering(true);
       setLoadPhase('connecting');
       setRetryCount(r => r + 1);
@@ -320,7 +340,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
 
   const handleRetry = () => {
     clearTimeout(retryTimerRef.current);
-    setHasError(false);
+    setHasErrorTracked(false);
     setBuffering(true);
     setLoadPhase('connecting');
     setRetryCount(r => r + 1);
@@ -435,9 +455,11 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
           autoPlay={autoPlay}
           onError={(e) => {
             console.error("Video playback error:", e);
-            setHasError(true);
-            setBuffering(false);
-            setLoadPhase('error');
+            if (streamReadyRef.current) {
+              setHasErrorTracked(true);
+              setBuffering(false);
+              setLoadPhase('error');
+            }
           }}
           onLoadedMetadata={() => {
             setDuration(videoRef.current?.duration || 0);

@@ -1,6 +1,4 @@
-const CACHE_NAME = 'squidcloud-v12.0.22-streamer';
-const API_CACHE = 'api-cache-v2';
-const STATIC_CACHE = 'static-cache-v3';
+const CACHE_NAME = 'squidcloud-v12.0.23-streamer';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
@@ -21,244 +19,215 @@ function openDB() {
   });
 }
 
-async function getCachedMeta(fileId) {
+async function idbGet(store, key) {
   try {
     const db = await openDB();
-    const tx = db.transaction('file-meta', 'readonly');
-    const req = tx.objectStore('file-meta').get(fileId);
     return new Promise((resolve) => {
+      const tx = db.transaction(store, 'readonly');
+      const req = tx.objectStore(store).get(key);
       req.onsuccess = () => { db.close(); resolve(req.result || null); };
       req.onerror = () => { db.close(); resolve(null); };
     });
   } catch { return null; }
 }
 
-async function getCachedUrls(fileId) {
+async function idbPut(store, key, val) {
   try {
     const db = await openDB();
-    const tx = db.transaction('download-urls', 'readonly');
-    const req = tx.objectStore('download-urls').get(fileId);
     return new Promise((resolve) => {
-      req.onsuccess = () => { db.close(); resolve(req.result || null); };
-      req.onerror = () => { db.close(); resolve(null); };
+      const tx = db.transaction(store, 'readwrite');
+      tx.objectStore(store).put(val, key);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); resolve(); };
     });
-  } catch { return null; }
+  } catch {}
 }
 
-const chunkDecryptCache = new Map();
+const decryptCache = new Map();
 const inflight = new Map();
 
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const CHUNK = 32768;
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
-}
-
-function base64ToArrayBuffer(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-async function aesGcmDecrypt(iv, encrypted, keyStr, additionalData) {
+async function aesGcmDecrypt(iv, encrypted, keyStr, aad) {
   const keyBytes = new TextEncoder().encode(keyStr.slice(0, 32).padEnd(32, '0'));
   const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
   const opts = { name: 'AES-GCM', iv };
-  if (additionalData) opts.additionalData = additionalData;
+  if (aad) opts.additionalData = aad;
   return crypto.subtle.decrypt(opts, key, encrypted);
 }
 
-async function decryptChunk(data, encryptionKey) {
-  let binary;
-  if (typeof data === 'string') {
-    binary = base64ToArrayBuffer(data);
+async function decryptChunk(rawData, encryptionKey) {
+  let bin;
+  if (rawData instanceof ArrayBuffer) {
+    bin = new Uint8Array(rawData);
+  } else if (typeof rawData === 'string') {
+    const b = atob(rawData);
+    bin = new Uint8Array(b.length);
+    for (let i = 0; i < b.length; i++) bin[i] = b.charCodeAt(i);
   } else {
-    binary = new Uint8Array(data);
+    bin = new Uint8Array(rawData);
   }
 
-  const headerLen = new DataView(binary.buffer, 0, 4).getUint32(0, true);
-  if (headerLen > 0 && headerLen < 1000) {
+  if (bin.byteLength < 4) throw new Error('Data too small');
+
+  const dv = new DataView(bin.buffer, bin.byteOffset, bin.byteLength);
+  const first4 = dv.getUint32(0, true);
+
+  if (first4 > 0 && first4 < 1000 && first4 < bin.byteLength - 4) {
     try {
-      const header = JSON.parse(new TextDecoder().decode(binary.slice(4, 4 + headerLen)));
+      const headerJson = new TextDecoder().decode(bin.slice(4, 4 + first4));
+      const header = JSON.parse(headerJson);
       if (header.version >= 2 && header.chunks > 0 && Array.isArray(header.ivs)) {
-        let offset = 4 + headerLen;
-        const chunkSize = header.chunkSize || Math.ceil((binary.byteLength - offset) / header.chunks);
-        const results = [];
+        let offset = 4 + first4;
+        const chunkSz = header.chunkSize || Math.ceil((bin.byteLength - offset) / header.chunks);
+        const parts = [];
         for (let i = 0; i < header.chunks; i++) {
-          const iv = typeof header.ivs[i] === 'string' ? base64ToArrayBuffer(header.ivs[i]) : new Uint8Array(header.ivs[i]);
-          const end = Math.min(offset + chunkSize, binary.byteLength);
-          const encrypted = binary.slice(offset, end);
-          const decrypted = await aesGcmDecrypt(iv, encrypted, encryptionKey);
-          results.push(new Uint8Array(decrypted));
+          const iv = typeof header.ivs[i] === 'string'
+            ? Uint8Array.from(atob(header.ivs[i]), c => c.charCodeAt(0))
+            : new Uint8Array(header.ivs[i]);
+          const end = Math.min(offset + chunkSz, bin.byteLength);
+          parts.push(new Uint8Array(await aesGcmDecrypt(iv, bin.slice(offset, end), encryptionKey)));
           offset = end;
         }
-        const totalLen = results.reduce((s, b) => s + b.byteLength, 0);
-        const merged = new Uint8Array(totalLen);
+        const total = parts.reduce((s, p) => s + p.byteLength, 0);
+        const out = new Uint8Array(total);
         let pos = 0;
-        for (const r of results) { merged.set(r, pos); pos += r.byteLength; }
-        return merged.buffer;
+        for (const p of parts) { out.set(p, pos); pos += p.byteLength; }
+        return out.buffer;
       }
-    } catch (e) { /* not multi-chunk */ }
+    } catch {}
   }
 
   try {
-    const dataLen = new DataView(binary.buffer, 0, 4).getUint32(0, true);
-    const additionalData = binary.slice(4, 4 + dataLen);
-    const iv = binary.slice(4 + dataLen, 4 + dataLen + 12);
-    const encrypted = binary.slice(4 + dataLen + 12);
-    return await aesGcmDecrypt(iv, encrypted, encryptionKey, additionalData);
-  } catch (e) {
-    if (binary.byteLength > 12) {
-      const iv = binary.slice(0, 12);
-      const encrypted = binary.slice(12);
-      return await aesGcmDecrypt(iv, encrypted, encryptionKey);
+    const aadLen = dv.getUint32(0, true);
+    const aad = bin.slice(4, 4 + aadLen);
+    const iv = bin.slice(4 + aadLen, 4 + aadLen + 12);
+    const enc = bin.slice(4 + aadLen + 12);
+    return await aesGcmDecrypt(iv, enc, encryptionKey, aad);
+  } catch (e1) {
+    try {
+      return await aesGcmDecrypt(bin.slice(0, 12), bin.slice(12), encryptionKey);
+    } catch (e2) {
+      throw new Error('Decrypt failed: ' + e1.message);
     }
-    throw e;
   }
 }
 
-async function fetchDecryptCache(fileId, chunkIndex, encryptionKey, urls) {
-  const key = `${fileId}:${chunkIndex}`;
-  const cached = chunkDecryptCache.get(key);
-  if (cached) return cached;
+async function fetchAndDecrypt(fileId, chunkIdx, encryptionKey, urls) {
+  const cacheKey = `${fileId}:${chunkIdx}`;
+  if (decryptCache.has(cacheKey)) return decryptCache.get(cacheKey);
+  if (inflight.has(cacheKey)) return inflight.get(cacheKey);
 
-  if (inflight.has(key)) return inflight.get(key);
-
-  const promise = (async () => {
+  const p = (async () => {
     try {
-      const url = urls[chunkIndex];
-      if (!url) throw new Error(`No URL for chunk ${chunkIndex}`);
+      const url = urls[chunkIdx];
+      if (!url) throw new Error('No URL for chunk ' + chunkIdx);
 
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`B2 ${resp.status}`);
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error('B2 ' + r.status);
 
-      const arrayBuf = await resp.arrayBuffer();
-      const decrypted = await decryptChunk(arrayBuf, encryptionKey);
+      const buf = await r.arrayBuffer();
+      const plain = await decryptChunk(buf, encryptionKey);
 
-      chunkDecryptCache.set(key, decrypted);
-      if (chunkDecryptCache.size > 20) {
-        const oldest = chunkDecryptCache.keys().next().value;
-        if (oldest !== undefined) chunkDecryptCache.delete(oldest);
+      decryptCache.set(cacheKey, plain);
+      if (decryptCache.size > 20) {
+        const oldest = decryptCache.keys().next().value;
+        if (oldest !== undefined) decryptCache.delete(oldest);
       }
-      inflight.delete(key);
-      return decrypted;
+      inflight.delete(cacheKey);
+      return plain;
     } catch (err) {
-      inflight.delete(key);
+      inflight.delete(cacheKey);
       throw err;
     }
   })();
 
-  inflight.set(key, promise);
-  return promise;
+  inflight.set(cacheKey, p);
+  return p;
 }
 
-function findChunkForByte(chunks, fileSize, chunkSize, startByte) {
-  let offset = 0;
+function findChunk(chunks, fileSize, chunkSize, startByte) {
+  let off = 0;
   for (let i = 0; i < chunks.length; i++) {
     const sz = i === chunks.length - 1 ? (fileSize % chunkSize || chunkSize) : chunkSize;
-    if (startByte >= offset && startByte < offset + sz) {
-      return { chunkIndex: chunks[i].index, chunkStartOffset: offset, chunkSize: sz };
+    if (startByte >= off && startByte < off + sz) {
+      return { idx: chunks[i].index, off };
     }
-    offset += sz;
+    off += sz;
   }
   return null;
 }
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-
-  if (url.pathname.startsWith('/virtual-stream/')) {
-    const fileId = url.pathname.split('/').pop();
-    const rangeHeader = event.request.headers.get('range');
-
-    event.respondWith(
-      (async () => {
-        try {
-          const meta = await getCachedMeta(fileId);
-          if (!meta) return new Response('Metadata not cached', { status: 503 });
-
-          const urls = await getCachedUrls(fileId);
-          if (!urls) return new Response('URLs not cached', { status: 503 });
-
-          let startByte = 0;
-          let requestedEndByte = undefined;
-
-          if (rangeHeader) {
-            const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-            if (match) {
-              startByte = parseInt(match[1], 10);
-              if (match[2]) requestedEndByte = parseInt(match[2], 10);
-            }
-          }
-
-          const target = findChunkForByte(meta.chunks, meta.fileSize, meta.chunkSize, startByte);
-          if (!target) return new Response('Range out of bounds', { status: 416 });
-
-          const decryptedBuffer = await fetchDecryptCache(fileId, target.chunkIndex, meta.encryptionKey, urls);
-
-          const localStart = startByte - target.chunkStartOffset;
-          const maxEnd = decryptedBuffer.byteLength - 1;
-          const localEnd = requestedEndByte !== undefined
-            ? Math.min(maxEnd, requestedEndByte - target.chunkStartOffset)
-            : maxEnd;
-
-          const sliced = decryptedBuffer.slice(localStart, localEnd + 1);
-          const endByte = startByte + sliced.byteLength - 1;
-
-          const headers = new Headers({
-            'Content-Type': meta.fileType || 'video/mp4',
-            'Accept-Ranges': 'bytes',
-            'Content-Range': `bytes ${startByte}-${endByte}/${meta.fileSize}`,
-            'Content-Length': sliced.byteLength.toString(),
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-          });
-
-          return new Response(sliced, { status: 206, headers });
-        } catch (err) {
-          console.error('[SW Stream]', err.message);
-          return new Response('Stream error: ' + err.message, { status: 500 });
-        }
-      })()
-    );
+  if (!url.pathname.startsWith('/virtual-stream/')) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  const fileId = url.pathname.split('/').pop();
+  const rangeHeader = event.request.headers.get('range');
+
+  event.respondWith((async () => {
+    try {
+      const meta = await idbGet('file-meta', fileId);
+      if (!meta) return new Response('No metadata', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+
+      const urls = await idbGet('download-urls', fileId);
+      if (!urls) return new Response('No URLs', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+
+      let startByte = 0;
+      let endByte = undefined;
+      if (rangeHeader) {
+        const m = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+        if (m) {
+          startByte = parseInt(m[1], 10);
+          if (m[2]) endByte = parseInt(m[2], 10);
+        }
+      }
+
+      const t = findChunk(meta.chunks, meta.fileSize, meta.chunkSize, startByte);
+      if (!t) return new Response('Range OOB', { status: 416 });
+
+      const plain = await fetchAndDecrypt(fileId, t.idx, meta.encryptionKey, urls);
+
+      const locStart = startByte - t.off;
+      const locEnd = endByte !== undefined
+        ? Math.min(plain.byteLength - 1, endByte - t.off)
+        : plain.byteLength - 1;
+
+      const sliced = plain.slice(locStart, locEnd + 1);
+      const respEnd = startByte + sliced.byteLength - 1;
+
+      return new Response(sliced, {
+        status: 206,
+        headers: {
+          'Content-Type': meta.fileType || 'video/mp4',
+          'Accept-Ranges': 'bytes',
+          'Content-Range': `bytes ${startByte}-${respEnd}/${meta.fileSize}`,
+          'Content-Length': String(sliced.byteLength),
+          'Cache-Control': 'no-store',
+        },
+      });
+    } catch (err) {
+      return new Response('Error: ' + err.message, { status: 500, headers: { 'Content-Type': 'text/plain' } });
+    }
+  })());
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'CACHE_FILE_META') {
-    const { fileId, meta } = event.data;
-    openDB().then(db => {
-      const tx = db.transaction('file-meta', 'readwrite');
-      tx.objectStore('file-meta').put(meta, fileId);
-      tx.oncomplete = () => db.close();
-    });
-  }
+  const d = event.data;
+  if (!d) return;
 
-  if (event.data?.type === 'CACHE_DOWNLOAD_URLS') {
-    const { fileId, urls } = event.data;
-    openDB().then(db => {
-      const tx = db.transaction('download-urls', 'readwrite');
-      tx.objectStore('download-urls').put(urls, fileId);
-      tx.oncomplete = () => db.close();
-    });
-  }
+  if (d.type === 'CACHE_FILE_META') idbPut('file-meta', d.fileId, d.meta);
+  if (d.type === 'CACHE_DOWNLOAD_URLS') idbPut('download-urls', d.fileId, d.urls);
 
-  if (event.data?.type === 'PREFETCH_CHUNKS') {
-    const { fileId, chunkIndices } = event.data;
+  if (d.type === 'PREFETCH_CHUNKS') {
     (async () => {
-      const meta = await getCachedMeta(fileId);
-      const urls = await getCachedUrls(fileId);
+      const meta = await idbGet('file-meta', d.fileId);
+      const urls = await idbGet('download-urls', d.fileId);
       if (!meta || !urls) return;
-      for (const idx of chunkIndices) {
-        if (urls[idx] && !chunkDecryptCache.has(`${fileId}:${idx}`)) {
-          fetchDecryptCache(fileId, idx, meta.encryptionKey, urls).catch(() => {});
+      for (const idx of d.chunkIndices) {
+        if (urls[idx] && !decryptCache.has(`${d.fileId}:${idx}`)) {
+          fetchAndDecrypt(d.fileId, idx, meta.encryptionKey, urls).catch(() => {});
           await new Promise(r => setTimeout(r, 100));
         }
       }
