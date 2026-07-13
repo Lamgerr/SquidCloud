@@ -61,10 +61,17 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const [transcodeProgress, setTranscodeProgress] = useState(0);
   const [transcodeMessage, setTranscodeMessage] = useState('Initializing WebAssembly Engine...');
   const [transcodedUrl, setTranscodedUrl] = useState<string | null>(null);
+  const [streamReady, setStreamReady] = useState(false);
 
   useEffect(() => {
     StreamDecryptorService.initListener(shareId);
-    StreamDecryptorService.seedFileMeta(file.id, shareId);
+    let cancelled = false;
+    StreamDecryptorService.seedFileMeta(file.id, shareId).then(() => {
+      if (!cancelled) setStreamReady(true);
+    }).catch(() => {
+      if (!cancelled) setStreamReady(true);
+    });
+    return () => { cancelled = true; };
   }, [shareId, file.id]);
 
   useEffect(() => {
@@ -319,9 +326,11 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     setRetryCount(r => r + 1);
   };
 
-  const activeVideoSource = isUnsupportedContainer 
-    ? transcodedUrl 
-    : `/virtual-stream/${file.id}?retry=${retryCount}`;
+  const activeVideoSource = !streamReady
+    ? null
+    : isUnsupportedContainer 
+      ? transcodedUrl 
+      : `/virtual-stream/${file.id}?retry=${retryCount}`;
 
   if (hasError) {
     return (
