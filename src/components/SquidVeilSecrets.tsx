@@ -12,6 +12,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { SUPABASE_URL } from '@/lib/supabaseEnv';
 
 interface Secret {
   id: string;
@@ -21,7 +22,6 @@ interface Secret {
   updated_at: string;
 }
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const BASE_URL = `${SUPABASE_URL}/functions/v1/cloudbliss-api`;
 
 async function secretsFetch(path: string, options: RequestInit & { apiKey?: string }) {

@@ -1,8 +1,6 @@
 import { isNativePlatform } from '@/utils/mobile';
 
-const DEFAULT_PUBLIC_APP_ORIGIN = (
-  import.meta.env.VITE_PUBLIC_APP_URL || 'https://squidcloud.vercel.app'
-).replace(/\/+$/, '');
+const FALLBACK_PUBLIC_APP_ORIGIN = 'https://squidcloud.vercel.app';
 
 const NATIVE_APP_SCHEME = 'live.squidcloud.app://';
 
@@ -13,24 +11,25 @@ const isLocalHost = (hostname: string): boolean => {
 };
 
 export const getPublicAppOrigin = (): string => {
-  if (typeof window === 'undefined') {
-    return DEFAULT_PUBLIC_APP_ORIGIN;
+  const configured = (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined) || FALLBACK_PUBLIC_APP_ORIGIN;
+  try {
+    // Validate it actually parses as an absolute URL before using it as a base.
+    const candidate = configured.replace(/\/+$/, '');
+    new URL(candidate);
+    return candidate;
+  } catch {
+    return FALLBACK_PUBLIC_APP_ORIGIN;
   }
-
-  if (isNativePlatform()) {
-    return DEFAULT_PUBLIC_APP_ORIGIN;
-  }
-
-  if (isLocalHost(window.location.hostname)) {
-    return DEFAULT_PUBLIC_APP_ORIGIN;
-  }
-
-  return window.location.origin.replace(/\/+$/, '');
 };
 
 export const buildPublicUrl = (path: string): string => {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return new URL(normalizedPath, `${getPublicAppOrigin()}/`).toString();
+  try {
+    return new URL(normalizedPath, `${getPublicAppOrigin()}/`).toString();
+  } catch {
+    // Fallback to a root-relative path so the app never crashes on URL construction.
+    return normalizedPath;
+  }
 };
 
 export const getOAuthRedirectUrl = (): string => {

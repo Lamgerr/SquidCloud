@@ -17,6 +17,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient' // adjust path to your supabase client
+import { SUPABASE_URL as PROJECT_URL, SUPABASE_ANON_KEY } from '@/lib/supabaseEnv'
 
 const SECRET    = import.meta.env.VITE_KZA_CLIENT_SECRET as string
 const CLIENT_ID = (import.meta.env.VITE_KZA_CLIENT_ID ?? 'squidcloud-web') as string
@@ -74,8 +75,8 @@ export async function kzaCheck(
   const { data: { user: { app_metadata: { supabaseUrl } = {} } = {} } = {} } =
     await supabase.auth.getUser().catch(() => ({ data: {} as any }))
 
-  const projectUrl = import.meta.env.VITE_SUPABASE_URL as string
-  const anonKey    = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+  const projectUrl = PROJECT_URL
+  const anonKey    = SUPABASE_ANON_KEY
   const sentinelUrl = `${projectUrl}/functions/v1/kza-sentinel`
   const pathname    = new URL(sentinelUrl).pathname
 

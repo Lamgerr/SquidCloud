@@ -8,6 +8,7 @@ import {
   ChevronRight, ChevronDown, X, Loader2, AlertCircle, ExternalLink,
 } from '@/lib/icon-map';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { SUPABASE_URL } from '@/lib/supabaseEnv';
 
 interface Secret {
   id: string;
@@ -17,7 +18,6 @@ interface Secret {
   updated_at: string;
 }
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const BASE_URL = `${SUPABASE_URL}/functions/v1/cloudbliss-api`;
 
 const SquidVeilSecretsMobile = () => {

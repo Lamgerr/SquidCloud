@@ -1,7 +1,6 @@
-const MAXELPAY_API = 'https://api.maxelpay.com/api/v1';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabaseEnv';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const MAXELPAY_API = 'https://api.maxelpay.com/api/v1';
 
 async function callProxy(endpoint: string, payload: any, testMode = false): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/maxelpay-proxy`, {

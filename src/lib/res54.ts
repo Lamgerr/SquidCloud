@@ -6,6 +6,7 @@ import { base64ToArrayBuffer } from '@/services/byok-encryption';
 import { requestEphemeralBYOKKey, requestKeySelection, requestMandatoryBYOKSetup, type BYOKPromptReason } from '@/services/ephemeral-byok-prompt';
 import { deriveFileKey, deriveChunkKey, generatePerFileKey, encryptChunkV3, decryptChunkV3 } from '@/lib/encryption-v3';
 import type { FileKeyMaterial } from '@/lib/encryption-v3';
+import { SUPABASE_URL } from '@/lib/supabaseEnv';
 
 const isProductionBuild = import.meta.env.PROD;
 const ACTIVE_WORKSPACE_STORAGE_KEY = 'squid_active_workspace_id';
@@ -469,7 +470,7 @@ export const uploadFileWithRes54 = async (
   const { data: { session } } = await supabase.auth.getSession();
   const accessToken = session?.access_token;
   if (!accessToken) throw new Error('Authentication required');
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseUrl = SUPABASE_URL;
 
   if (file.size === 0) throw new Error('File is empty');
   if (file.size > LARGE_FILE_THRESHOLD) progressCallback?.(0, 'preparing', { message: 'Preparing large file upload strategy' });
