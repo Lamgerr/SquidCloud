@@ -3,11 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { Capacitor } from '@capacitor/core';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Prefer build-time env vars; fall back to the public project values so a production
+// APK build (which may not have a local .env) still boots. The anon key is public by design.
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)
+  || 'https://aouqcwbdoyrccjcrhzzi.supabase.co';
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)
+  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvdXFjd2Jkb3lyY2NqY3JoenppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NjAyMTEsImV4cCI6MjA1ODUzNjIxMX0.b_VHC6uP3Efw3o_yibCoZKmsCIVZgOJ4FUF1NK-nd7U';
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing Supabase environment variables. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.warn('Using fallback Supabase credentials (VITE_SUPABASE_* env vars were not provided at build time).');
 }
 
 // Import the supabase client like this:
