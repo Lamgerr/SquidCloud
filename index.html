@@ -6,6 +6,35 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <!-- Early fatal-error catcher: runs BEFORE the module bundle so parse/eval/load
+         failures (common in older Android System WebViews) surface instead of a blank page. -->
+    <script>
+      (function () {
+        function showFatal(msg) {
+          if (document.getElementById('fatal-error-overlay')) return;
+          var overlay = document.createElement('div');
+          overlay.id = 'fatal-error-overlay';
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0f172a;color:#e2e8f0;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:24px;overflow:auto;white-space:pre-wrap;word-break:break-word;';
+          overlay.textContent = 'SquidCloud failed to start.\n\n' + msg + '\n\nPlease report this message to the developer.';
+          (document.body || document.documentElement).appendChild(overlay);
+        }
+        window.__showFatal = showFatal;
+        window.addEventListener('error', function (e) {
+          if (e && e.message) {
+            var detail = (e.error && (e.error.stack || e.error.message)) || e.message;
+            showFatal(String(detail));
+          } else if (e && e.target && (e.target.src || e.target.href)) {
+            showFatal('Failed to load resource: ' + (e.target.src || e.target.href));
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          showFatal(String((r && (r.stack || r.message)) || r));
+        });
+      })();
+    </script>
+
     <meta name="description" content="SquidCloud - Secure, Unlimited Cloud Storage for Your Digital Life with end-to-end encryption" />
     <meta name="keywords" content="cloud storage, secure storage, encrypted files, file sharing, unlimited storage" />
     <meta name="theme-color" content="#2563eb" />

@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => ({
     sourcemap: false,
     reportCompressedSize: false,
     minify: 'esbuild',
-    target: 'esnext',
+    target: 'es2018',
     rollupOptions: {
       external: [
       // Mark Node.js built-ins as external since we're building for browser
