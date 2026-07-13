@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { isNativePlatform } from '@/utils/mobile';
 
 interface SquidLogoProps {
   size?: number;
@@ -9,6 +10,20 @@ interface SquidLogoProps {
 
 const SquidLogo: React.FC<SquidLogoProps> = ({ size = 32, className, showBg = true }) => {
   const iconSize = Math.round(size * 0.625);
+
+  // In the native Android app, render the bundled PNG app icon instead of the inline SVG.
+  if (isNativePlatform()) {
+    return (
+      <img
+        src="/icon-512x512.png"
+        alt="SquidCloud"
+        width={size}
+        height={size}
+        className={cn('shrink-0 rounded-[10px]', className)}
+      />
+    );
+  }
+
   return (
     <div
       className={cn(
