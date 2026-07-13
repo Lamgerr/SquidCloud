@@ -2,9 +2,14 @@ import { downloadChunk } from './res54';
 import { decryptData } from './encryption';
 import { supabase } from '@/integrations/supabase/client';
 
-const DECRYPT_CACHE_MAX = 12;
+const DECRYPT_CACHE_MAX = 16;
 const chunkCache = new Map<string, { data: ArrayBuffer; timestamp: number }>();
 const inflightRequests = new Map<string, Promise<ArrayBuffer>>();
+const metadataCache = new Map<string, { file: any; meta: any; chunks: any[]; ts: number }>();
+
+const METADATA_TTL = 5 * 60 * 1000;
+const PREFETCH_COUNT = 6;
+const PREFETCH_DELAY = 150;
 
 function cacheKey(fileId: string, index: number) {
   return `${fileId}:${index}`;
@@ -23,11 +28,39 @@ function evictOldest() {
   if (oldestKey) chunkCache.delete(oldestKey);
 }
 
+async function getFileMeta(fileId: string) {
+  const cached = metadataCache.get(fileId);
+  if (cached && Date.now() - cached.ts < METADATA_TTL) return cached;
+
+  const { data: file, error: dbError } = await supabase.from('files').select('*').eq('id', fileId).single();
+  if (dbError || !file) throw new Error("File metadata not found");
+
+  const meta = JSON.parse(file.tags[0]);
+  const chunks = meta.chunks.filter((c: any) => c.repo && c.path).sort((a: any, b: any) => a.index - b.index);
+  const entry = { file, meta, chunks, ts: Date.now() };
+  metadataCache.set(fileId, entry);
+  return entry;
+}
+
+function findChunkForByte(chunks: any[], fileSize: number, startByte: number) {
+  const STANDARD_CHUNK_SIZE = 8 * 1024 * 1024;
+  let currentOffset = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    const cSize = (i === chunks.length - 1) ? (fileSize % STANDARD_CHUNK_SIZE || STANDARD_CHUNK_SIZE) : STANDARD_CHUNK_SIZE;
+    if (startByte >= currentOffset && startByte < currentOffset + cSize) {
+      return { chunk: chunks[i], chunkStartOffset: currentOffset, chunkSize: cSize };
+    }
+    currentOffset += cSize;
+  }
+  return null;
+}
+
 async function fetchAndDecryptChunk(
   chunk: any,
   meta: any,
   shareId?: string,
-  fileId?: string
+  fileId?: string,
+  retries = 2
 ): Promise<ArrayBuffer> {
   const key = cacheKey(fileId || '', chunk.index);
   const cached = chunkCache.get(key);
@@ -37,17 +70,24 @@ async function fetchAndDecryptChunk(
   if (inflight) return inflight;
 
   const promise = (async () => {
-    try {
-      const downloadResult = await downloadChunk(chunk, 0, shareId);
-      const decrypted = await decryptData(downloadResult.data, meta.encryptionKey);
-      chunkCache.set(key, { data: decrypted, timestamp: Date.now() });
-      evictOldest();
-      inflightRequests.delete(key);
-      return decrypted;
-    } catch (err) {
-      inflightRequests.delete(key);
-      throw err;
+    let lastErr: any;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const downloadResult = await downloadChunk(chunk, attempt, shareId);
+        const decrypted = await decryptData(downloadResult.data, meta.encryptionKey);
+        chunkCache.set(key, { data: decrypted, timestamp: Date.now() });
+        evictOldest();
+        inflightRequests.delete(key);
+        return decrypted;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+        }
+      }
     }
+    inflightRequests.delete(key);
+    throw lastErr;
   })();
 
   inflightRequests.set(key, promise);
@@ -71,28 +111,11 @@ export class StreamDecryptorService {
           const startByte = match ? parseInt(match[1], 10) : 0;
           const requestedEndByte = (match && match[2]) ? parseInt(match[2], 10) : undefined;
           
-          const { data: file, error: dbError } = await supabase.from('files').select('*').eq('id', fileId).single();
-          if (dbError || !file) throw new Error("File metadata not found");
+          const { file, meta, chunks } = await getFileMeta(fileId);
 
-          const meta = JSON.parse(file.tags[0]);
-          const chunks = meta.chunks.filter((c: any) => c.repo && c.path).sort((a: any, b: any) => a.index - b.index);
-          const STANDARD_CHUNK_SIZE = 8 * 1024 * 1024;
-
-          let targetChunk = null;
-          let chunkStartOffset = 0;
-          let currentOffset = 0;
-
-          for (let i = 0; i < chunks.length; i++) {
-            const cSize = (i === chunks.length - 1) ? (file.size % STANDARD_CHUNK_SIZE || STANDARD_CHUNK_SIZE) : STANDARD_CHUNK_SIZE;
-            if (startByte >= currentOffset && startByte < currentOffset + cSize) {
-              targetChunk = chunks[i];
-              chunkStartOffset = currentOffset;
-              break;
-            }
-            currentOffset += cSize;
-          }
-
-          if (!targetChunk) throw new Error("Requested byte range is out of bounds");
+          const found = findChunkForByte(chunks, file.size, startByte);
+          if (!found) throw new Error("Requested byte range is out of bounds");
+          const { chunk: targetChunk, chunkStartOffset } = found;
 
           const decryptedBuffer = await fetchAndDecryptChunk(targetChunk, meta, shareId, fileId);
 
@@ -117,7 +140,7 @@ export class StreamDecryptorService {
             }, [slicedBuffer]);
           }
 
-          StreamDecryptorService.prefetchAdjacent(fileId, targetChunk.index, chunks, meta, shareId, file.size, STANDARD_CHUNK_SIZE);
+          StreamDecryptorService.prefetchAdjacent(fileId, targetChunk.index, chunks, meta, shareId);
 
         } catch (err: any) {
           console.error('[VirtualServer] Decryption failed:', err);
@@ -138,22 +161,21 @@ export class StreamDecryptorService {
     currentIndex: number,
     chunks: any[],
     meta: any,
-    shareId?: string,
-    totalSize?: number,
-    chunkSize?: number
+    shareId?: string
   ) {
-    const prefetchIndices: number[] = [];
-    for (let delta = 1; delta <= 3; delta++) {
+    for (let delta = 1; delta <= PREFETCH_COUNT; delta++) {
       const nextIdx = currentIndex + delta;
-      if (nextIdx < chunks.length) prefetchIndices.push(nextIdx);
-    }
-    prefetchIndices.forEach((idx, i) => {
+      if (nextIdx >= chunks.length) break;
+      const key = cacheKey(fileId, nextIdx);
+      if (chunkCache.has(key) || inflightRequests.has(key)) continue;
+      
+      const idx = nextIdx;
       setTimeout(() => {
-        const key = cacheKey(fileId, idx);
-        if (!chunkCache.has(key) && !inflightRequests.has(key)) {
+        const k = cacheKey(fileId, idx);
+        if (!chunkCache.has(k) && !inflightRequests.has(k)) {
           fetchAndDecryptChunk(chunks[idx], meta, shareId, fileId).catch(() => {});
         }
-      }, i * 300);
-    });
+      }, delta * PREFETCH_DELAY);
+    }
   }
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidcloud-v12.0.19-streamer';
+const CACHE_NAME = 'squidcloud-v12.0.20-streamer';
 const API_CACHE = 'api-cache-v2';
 const STATIC_CACHE = 'static-cache-v3';
 
@@ -29,7 +29,7 @@ self.addEventListener('fetch', event => {
             self.streamRequests.delete(requestId);
             resolve(new Response('Stream Decryption Timeout', { status: 504 }));
           }
-        }, 120000);
+        }, 180000);
 
         self.streamRequests.set(requestId, { resolve, timeoutTimer, fileId });
 

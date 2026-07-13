@@ -426,7 +426,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
           className="absolute inset-0 w-full h-full object-contain"
           poster={poster}
           playsInline
-          preload={isLargeFile ? 'metadata' : 'auto'}
+          preload="auto"
           autoPlay={autoPlay}
           onError={(e) => {
             console.error("Video playback error:", e);
