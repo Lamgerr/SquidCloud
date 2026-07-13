@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidcloud-v12.0.24-streamer';
+const CACHE_NAME = 'squidcloud-v12.0.26-streamer';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
@@ -7,6 +7,60 @@ const metaCache = new Map();
 const urlCache = new Map();
 const decryptCache = new Map();
 const inflight = new Map();
+
+const DB_NAME = 'sq-stream-v2';
+const DB_VERSION = 1;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
+      if (!db.objectStoreNames.contains('urls')) db.createObjectStore('urls');
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => { console.error('[SW] IDB open failed', req.error); reject(req.error); };
+  });
+}
+
+async function idbGet(store, key) {
+  try {
+    const db = await openDB();
+    return new Promise((res) => {
+      const tx = db.transaction(store, 'readonly');
+      const r = tx.objectStore(store).get(key);
+      r.onsuccess = () => { db.close(); res(r.result || null); };
+      r.onerror = () => { db.close(); res(null); };
+    });
+  } catch { return null; }
+}
+
+async function idbPut(store, key, val) {
+  try {
+    const db = await openDB();
+    return new Promise((res) => {
+      const tx = db.transaction(store, 'readwrite');
+      tx.objectStore(store).put(val, key);
+      tx.oncomplete = () => { db.close(); res(); };
+      tx.onerror = () => { db.close(); res(); };
+    });
+  } catch (e) { console.warn('[SW] IDB write failed', e); }
+}
+
+async function getMeta(fileId) {
+  if (metaCache.has(fileId)) return metaCache.get(fileId);
+  const fromIdb = await idbGet('meta', fileId);
+  if (fromIdb) { metaCache.set(fileId, fromIdb); return fromIdb; }
+  return null;
+}
+
+async function getUrls(fileId) {
+  if (urlCache.has(fileId)) return urlCache.get(fileId);
+  const fromIdb = await idbGet('urls', fileId);
+  if (fromIdb) { urlCache.set(fileId, fromIdb); return fromIdb; }
+  return null;
+}
 
 async function aesGcmDecrypt(iv, encrypted, keyStr, aad) {
   const keyBytes = new TextEncoder().encode(keyStr.slice(0, 32).padEnd(32, '0'));
@@ -81,7 +135,7 @@ async function fetchDecrypt(fileId, chunkIdx, encryptionKey, urls) {
       const buf = await r.arrayBuffer();
       const plain = await decryptChunk(buf, encryptionKey);
       decryptCache.set(ck, plain);
-      if (decryptCache.size > 20) {
+      if (decryptCache.size > 25) {
         const oldest = decryptCache.keys().next().value;
         if (oldest !== undefined) decryptCache.delete(oldest);
       }
@@ -118,10 +172,10 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith((async () => {
     try {
-      const meta = metaCache.get(fileId);
-      if (!meta) return new Response('No metadata for ' + fileId, { status: 503 });
-      const urls = urlCache.get(fileId);
-      if (!urls) return new Response('No URLs for ' + fileId, { status: 503 });
+      const meta = await getMeta(fileId);
+      if (!meta) return new Response('No metadata', { status: 503 });
+      const urls = await getUrls(fileId);
+      if (!urls) return new Response('No URLs', { status: 503 });
 
       let startByte = 0;
       let endByte;
@@ -132,6 +186,10 @@ self.addEventListener('fetch', (event) => {
 
       const t = findChunk(meta.chunks, meta.fileSize, meta.chunkSize, startByte);
       if (!t) return new Response('Range OOB', { status: 416 });
+
+      if (!urls[t.idx]) {
+        return new Response('Chunk not ready', { status: 503, headers: { 'Retry-After': '1' } });
+      }
 
       const plain = await fetchDecrypt(fileId, t.idx, meta.encryptionKey, urls);
       const locStart = startByte - t.off;
@@ -159,17 +217,28 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
   const d = event.data;
   if (!d) return;
-  if (d.type === 'SET_META') metaCache.set(d.fileId, d.meta);
-  if (d.type === 'SET_URLS') urlCache.set(d.fileId, d.urls);
+
+  if (d.type === 'SET_META') {
+    metaCache.set(d.fileId, d.meta);
+    idbPut('meta', d.fileId, d.meta);
+  }
+
+  if (d.type === 'SET_URLS') {
+    const existing = urlCache.get(d.fileId) || {};
+    const merged = { ...existing, ...d.urls };
+    urlCache.set(d.fileId, merged);
+    idbPut('urls', d.fileId, merged);
+  }
+
   if (d.type === 'PREFETCH') {
     (async () => {
-      const meta = metaCache.get(d.fileId);
-      const urls = urlCache.get(d.fileId);
+      const meta = await getMeta(d.fileId);
+      const urls = await getUrls(d.fileId);
       if (!meta || !urls) return;
       for (const idx of d.indices) {
         if (urls[idx] && !decryptCache.has(`${d.fileId}:${idx}`)) {
           fetchDecrypt(d.fileId, idx, meta.encryptionKey, urls).catch(() => {});
-          await new Promise(r => setTimeout(r, 100));
+          await new Promise(r => setTimeout(r, 80));
         }
       }
     })();

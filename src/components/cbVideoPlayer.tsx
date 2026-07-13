@@ -338,8 +338,8 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
     }, delay);
   }, [retryCount]);
 
-  const handleRetry = () => {
-    clearTimeout(retryTimerRef.current);
+  const handleRetry = (clearTimer = true) => {
+    if (clearTimer) clearTimeout(retryTimerRef.current);
     setHasErrorTracked(false);
     setBuffering(true);
     setLoadPhase('connecting');
@@ -360,9 +360,9 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
         </div>
         <div className="space-y-1 max-w-md">
           <p className="text-sm font-semibold text-white">Stream Interrupted</p>
-          <p className="text-xs text-neutral-400">
-            {errorMessage || 'The encrypted video stream could not be loaded. This may be due to a slow connection or large file size.'}
-          </p>
+            <p className="text-xs text-neutral-400">
+              {errorMessage || 'The encrypted video stream could not be loaded after multiple attempts.'}
+            </p>
           {isLargeFile && (
             <p className="text-[10px] text-neutral-500 mt-1">
               Large file: {formatFileSize(file.size)} — chunked decryption in progress
@@ -456,9 +456,16 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
           onError={(e) => {
             console.error("Video playback error:", e);
             if (streamReadyRef.current) {
-              setHasErrorTracked(true);
-              setBuffering(false);
-              setLoadPhase('error');
+              if (retryCount < 8) {
+                const delay = Math.min(500 * Math.pow(1.5, retryCount), 5000);
+                retryTimerRef.current = setTimeout(() => {
+                  handleRetry(false);
+                }, delay);
+              } else {
+                setHasErrorTracked(true);
+                setBuffering(false);
+                setLoadPhase('error');
+              }
             }
           }}
           onLoadedMetadata={() => {
