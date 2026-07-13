@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => ({
     format: 'es',
     plugins: () => [wasm(), topLevelAwait()]
   },
-  base: '/',
+  base: './',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

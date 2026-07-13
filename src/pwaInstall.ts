@@ -1,8 +1,12 @@
 
+import { Capacitor } from '@capacitor/core';
+
 // Function to register service worker for PWA
 export const registerServiceWorker = async () => {
   if ('serviceWorker' in navigator) {
     try {
+      if (Capacitor.isNativePlatform()) return null;
+
       // Check if we already have an active service worker for this scope
       const existingRegistration = await navigator.serviceWorker.getRegistration('/');
       if (existingRegistration && existingRegistration.active) {

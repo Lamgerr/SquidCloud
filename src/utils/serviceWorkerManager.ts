@@ -3,6 +3,8 @@
  * Ensures users get the latest version without manual cache clearing
  */
 
+import { Capacitor } from '@capacitor/core';
+
 export class ServiceWorkerManager {
   private static instance: ServiceWorkerManager;
   private registration: ServiceWorkerRegistration | null = null;
@@ -18,6 +20,7 @@ export class ServiceWorkerManager {
   }
 
   async init(): Promise<void> {
+    if (Capacitor.isNativePlatform()) return;
     if ('serviceWorker' in navigator) {
       try {
         // Register service worker
