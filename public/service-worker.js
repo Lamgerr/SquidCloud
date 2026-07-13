@@ -1,48 +1,10 @@
-const CACHE_NAME = 'squidcloud-v12.0.23-streamer';
+const CACHE_NAME = 'squidcloud-v12.0.24-streamer';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-const DB_NAME = 'squidcloud-video-stream';
-const DB_VERSION = 1;
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains('file-meta')) db.createObjectStore('file-meta');
-      if (!db.objectStoreNames.contains('download-urls')) db.createObjectStore('download-urls');
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function idbGet(store, key) {
-  try {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(store, 'readonly');
-      const req = tx.objectStore(store).get(key);
-      req.onsuccess = () => { db.close(); resolve(req.result || null); };
-      req.onerror = () => { db.close(); resolve(null); };
-    });
-  } catch { return null; }
-}
-
-async function idbPut(store, key, val) {
-  try {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(store, 'readwrite');
-      tx.objectStore(store).put(val, key);
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror = () => { db.close(); resolve(); };
-    });
-  } catch {}
-}
-
+const metaCache = new Map();
+const urlCache = new Map();
 const decryptCache = new Map();
 const inflight = new Map();
 
@@ -58,23 +20,17 @@ async function decryptChunk(rawData, encryptionKey) {
   let bin;
   if (rawData instanceof ArrayBuffer) {
     bin = new Uint8Array(rawData);
-  } else if (typeof rawData === 'string') {
-    const b = atob(rawData);
-    bin = new Uint8Array(b.length);
-    for (let i = 0; i < b.length; i++) bin[i] = b.charCodeAt(i);
   } else {
     bin = new Uint8Array(rawData);
   }
-
-  if (bin.byteLength < 4) throw new Error('Data too small');
+  if (bin.byteLength < 16) throw new Error('Data too small to decrypt');
 
   const dv = new DataView(bin.buffer, bin.byteOffset, bin.byteLength);
   const first4 = dv.getUint32(0, true);
 
   if (first4 > 0 && first4 < 1000 && first4 < bin.byteLength - 4) {
     try {
-      const headerJson = new TextDecoder().decode(bin.slice(4, 4 + first4));
-      const header = JSON.parse(headerJson);
+      const header = JSON.parse(new TextDecoder().decode(bin.slice(4, 4 + first4)));
       if (header.version >= 2 && header.chunks > 0 && Array.isArray(header.ivs)) {
         let offset = 4 + first4;
         const chunkSz = header.chunkSize || Math.ceil((bin.byteLength - offset) / header.chunks);
@@ -111,36 +67,32 @@ async function decryptChunk(rawData, encryptionKey) {
   }
 }
 
-async function fetchAndDecrypt(fileId, chunkIdx, encryptionKey, urls) {
-  const cacheKey = `${fileId}:${chunkIdx}`;
-  if (decryptCache.has(cacheKey)) return decryptCache.get(cacheKey);
-  if (inflight.has(cacheKey)) return inflight.get(cacheKey);
+async function fetchDecrypt(fileId, chunkIdx, encryptionKey, urls) {
+  const ck = `${fileId}:${chunkIdx}`;
+  if (decryptCache.has(ck)) return decryptCache.get(ck);
+  if (inflight.has(ck)) return inflight.get(ck);
 
   const p = (async () => {
     try {
       const url = urls[chunkIdx];
       if (!url) throw new Error('No URL for chunk ' + chunkIdx);
-
       const r = await fetch(url, { cache: 'no-store' });
       if (!r.ok) throw new Error('B2 ' + r.status);
-
       const buf = await r.arrayBuffer();
       const plain = await decryptChunk(buf, encryptionKey);
-
-      decryptCache.set(cacheKey, plain);
+      decryptCache.set(ck, plain);
       if (decryptCache.size > 20) {
         const oldest = decryptCache.keys().next().value;
         if (oldest !== undefined) decryptCache.delete(oldest);
       }
-      inflight.delete(cacheKey);
+      inflight.delete(ck);
       return plain;
     } catch (err) {
-      inflight.delete(cacheKey);
+      inflight.delete(ck);
       throw err;
     }
   })();
-
-  inflight.set(cacheKey, p);
+  inflight.set(ck, p);
   return p;
 }
 
@@ -148,9 +100,7 @@ function findChunk(chunks, fileSize, chunkSize, startByte) {
   let off = 0;
   for (let i = 0; i < chunks.length; i++) {
     const sz = i === chunks.length - 1 ? (fileSize % chunkSize || chunkSize) : chunkSize;
-    if (startByte >= off && startByte < off + sz) {
-      return { idx: chunks[i].index, off };
-    }
+    if (startByte >= off && startByte < off + sz) return { idx: chunks[i].index, off };
     off += sz;
   }
   return null;
@@ -168,32 +118,24 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith((async () => {
     try {
-      const meta = await idbGet('file-meta', fileId);
-      if (!meta) return new Response('No metadata', { status: 503, headers: { 'Content-Type': 'text/plain' } });
-
-      const urls = await idbGet('download-urls', fileId);
-      if (!urls) return new Response('No URLs', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+      const meta = metaCache.get(fileId);
+      if (!meta) return new Response('No metadata for ' + fileId, { status: 503 });
+      const urls = urlCache.get(fileId);
+      if (!urls) return new Response('No URLs for ' + fileId, { status: 503 });
 
       let startByte = 0;
-      let endByte = undefined;
+      let endByte;
       if (rangeHeader) {
         const m = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-        if (m) {
-          startByte = parseInt(m[1], 10);
-          if (m[2]) endByte = parseInt(m[2], 10);
-        }
+        if (m) { startByte = parseInt(m[1], 10); if (m[2]) endByte = parseInt(m[2], 10); }
       }
 
       const t = findChunk(meta.chunks, meta.fileSize, meta.chunkSize, startByte);
       if (!t) return new Response('Range OOB', { status: 416 });
 
-      const plain = await fetchAndDecrypt(fileId, t.idx, meta.encryptionKey, urls);
-
+      const plain = await fetchDecrypt(fileId, t.idx, meta.encryptionKey, urls);
       const locStart = startByte - t.off;
-      const locEnd = endByte !== undefined
-        ? Math.min(plain.byteLength - 1, endByte - t.off)
-        : plain.byteLength - 1;
-
+      const locEnd = endByte !== undefined ? Math.min(plain.byteLength - 1, endByte - t.off) : plain.byteLength - 1;
       const sliced = plain.slice(locStart, locEnd + 1);
       const respEnd = startByte + sliced.byteLength - 1;
 
@@ -208,7 +150,8 @@ self.addEventListener('fetch', (event) => {
         },
       });
     } catch (err) {
-      return new Response('Error: ' + err.message, { status: 500, headers: { 'Content-Type': 'text/plain' } });
+      console.error('[SW]', err.message);
+      return new Response('Error: ' + err.message, { status: 500 });
     }
   })());
 });
@@ -216,18 +159,16 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
   const d = event.data;
   if (!d) return;
-
-  if (d.type === 'CACHE_FILE_META') idbPut('file-meta', d.fileId, d.meta);
-  if (d.type === 'CACHE_DOWNLOAD_URLS') idbPut('download-urls', d.fileId, d.urls);
-
-  if (d.type === 'PREFETCH_CHUNKS') {
+  if (d.type === 'SET_META') metaCache.set(d.fileId, d.meta);
+  if (d.type === 'SET_URLS') urlCache.set(d.fileId, d.urls);
+  if (d.type === 'PREFETCH') {
     (async () => {
-      const meta = await idbGet('file-meta', d.fileId);
-      const urls = await idbGet('download-urls', d.fileId);
+      const meta = metaCache.get(d.fileId);
+      const urls = urlCache.get(d.fileId);
       if (!meta || !urls) return;
-      for (const idx of d.chunkIndices) {
+      for (const idx of d.indices) {
         if (urls[idx] && !decryptCache.has(`${d.fileId}:${idx}`)) {
-          fetchAndDecrypt(d.fileId, idx, meta.encryptionKey, urls).catch(() => {});
+          fetchDecrypt(d.fileId, idx, meta.encryptionKey, urls).catch(() => {});
           await new Promise(r => setTimeout(r, 100));
         }
       }
