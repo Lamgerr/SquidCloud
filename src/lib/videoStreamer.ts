@@ -1,181 +1,128 @@
-import { downloadChunk } from './res54';
-import { decryptData } from './encryption';
 import { supabase } from '@/integrations/supabase/client';
+import { cacheFileMeta, cacheDownloadUrls, type CachedFileMeta } from './videoStreamCache';
 
-const DECRYPT_CACHE_MAX = 16;
-const chunkCache = new Map<string, { data: ArrayBuffer; timestamp: number }>();
-const inflightRequests = new Map<string, Promise<ArrayBuffer>>();
-const metadataCache = new Map<string, { file: any; meta: any; chunks: any[]; ts: number }>();
+const PREFETCH_COUNT = 8;
+const URL_REFRESH_THRESHOLD = 60 * 60 * 1000;
 
-const METADATA_TTL = 5 * 60 * 1000;
-const PREFETCH_COUNT = 6;
-const PREFETCH_DELAY = 150;
-
-function cacheKey(fileId: string, index: number) {
-  return `${fileId}:${index}`;
-}
-
-function evictOldest() {
-  if (chunkCache.size <= DECRYPT_CACHE_MAX) return;
-  let oldestKey = '';
-  let oldestTs = Infinity;
-  for (const [k, v] of chunkCache) {
-    if (v.timestamp < oldestTs) {
-      oldestTs = v.timestamp;
-      oldestKey = k;
-    }
-  }
-  if (oldestKey) chunkCache.delete(oldestKey);
-}
-
-async function getFileMeta(fileId: string) {
-  const cached = metadataCache.get(fileId);
-  if (cached && Date.now() - cached.ts < METADATA_TTL) return cached;
-
-  const { data: file, error: dbError } = await supabase.from('files').select('*').eq('id', fileId).single();
-  if (dbError || !file) throw new Error("File metadata not found");
-
-  const meta = JSON.parse(file.tags[0]);
-  const chunks = meta.chunks.filter((c: any) => c.repo && c.path).sort((a: any, b: any) => a.index - b.index);
-  const entry = { file, meta, chunks, ts: Date.now() };
-  metadataCache.set(fileId, entry);
-  return entry;
-}
-
-function findChunkForByte(chunks: any[], fileSize: number, startByte: number) {
-  const STANDARD_CHUNK_SIZE = 8 * 1024 * 1024;
-  let currentOffset = 0;
+function findChunkForByte(chunks: any[], fileSize: number, chunkSize: number, startByte: number) {
+  let offset = 0;
   for (let i = 0; i < chunks.length; i++) {
-    const cSize = (i === chunks.length - 1) ? (fileSize % STANDARD_CHUNK_SIZE || STANDARD_CHUNK_SIZE) : STANDARD_CHUNK_SIZE;
-    if (startByte >= currentOffset && startByte < currentOffset + cSize) {
-      return { chunk: chunks[i], chunkStartOffset: currentOffset, chunkSize: cSize };
+    const sz = i === chunks.length - 1 ? (fileSize % chunkSize || chunkSize) : chunkSize;
+    if (startByte >= offset && startByte < offset + sz) {
+      return { chunkIndex: chunks[i].index, chunkStartOffset: offset };
     }
-    currentOffset += cSize;
+    offset += sz;
   }
   return null;
 }
 
-async function fetchAndDecryptChunk(
-  chunk: any,
-  meta: any,
-  shareId?: string,
-  fileId?: string,
-  retries = 2
-): Promise<ArrayBuffer> {
-  const key = cacheKey(fileId || '', chunk.index);
-  const cached = chunkCache.get(key);
-  if (cached) return cached.data;
-
-  const inflight = inflightRequests.get(key);
-  if (inflight) return inflight;
-
-  const promise = (async () => {
-    let lastErr: any;
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const downloadResult = await downloadChunk(chunk, attempt, shareId);
-        const decrypted = await decryptData(downloadResult.data, meta.encryptionKey);
-        chunkCache.set(key, { data: decrypted, timestamp: Date.now() });
-        evictOldest();
-        inflightRequests.delete(key);
-        return decrypted;
-      } catch (err) {
-        lastErr = err;
-        if (attempt < retries) {
-          await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
-        }
-      }
-    }
-    inflightRequests.delete(key);
-    throw lastErr;
-  })();
-
-  inflightRequests.set(key, promise);
-  return promise;
-}
-
 export class StreamDecryptorService {
   static isListening = false;
+  static seededFiles = new Set<string>();
 
   static initListener(shareId?: string) {
     if (!('serviceWorker' in navigator) || this.isListening) return;
-    
     this.isListening = true;
-
-    navigator.serviceWorker.addEventListener('message', async (event) => {
-      if (event.data && event.data.type === 'REQUEST_DECRYPT_STREAM') {
-        const { fileId, range, requestId } = event.data;
-        
-        try {
-          const match = range.match(/bytes=(\d+)-(\d*)/);
-          const startByte = match ? parseInt(match[1], 10) : 0;
-          const requestedEndByte = (match && match[2]) ? parseInt(match[2], 10) : undefined;
-          
-          const { file, meta, chunks } = await getFileMeta(fileId);
-
-          const found = findChunkForByte(chunks, file.size, startByte);
-          if (!found) throw new Error("Requested byte range is out of bounds");
-          const { chunk: targetChunk, chunkStartOffset } = found;
-
-          const decryptedBuffer = await fetchAndDecryptChunk(targetChunk, meta, shareId, fileId);
-
-          const localStart = startByte - chunkStartOffset;
-          const maxLocalEnd = decryptedBuffer.byteLength - 1;
-          const localEnd = requestedEndByte !== undefined 
-            ? Math.min(maxLocalEnd, requestedEndByte - chunkStartOffset) 
-            : maxLocalEnd;
-
-          const slicedBuffer = decryptedBuffer.slice(localStart, localEnd + 1);
-          const endByte = startByte + slicedBuffer.byteLength - 1;
-
-          if (navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'DECRYPT_STREAM_RESPONSE',
-              requestId,
-              buffer: slicedBuffer,
-              start: startByte,
-              end: endByte,
-              totalSize: file.size,
-              contentType: file.type
-            }, [slicedBuffer]);
-          }
-
-          StreamDecryptorService.prefetchAdjacent(fileId, targetChunk.index, chunks, meta, shareId);
-
-        } catch (err: any) {
-          console.error('[VirtualServer] Decryption failed:', err);
-          if (navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'DECRYPT_STREAM_RESPONSE',
-              requestId,
-              error: err?.message || 'Decryption pipeline failure'
-            });
-          }
-        }
-      }
-    });
   }
 
-  private static prefetchAdjacent(
-    fileId: string,
-    currentIndex: number,
-    chunks: any[],
-    meta: any,
-    shareId?: string
-  ) {
-    for (let delta = 1; delta <= PREFETCH_COUNT; delta++) {
-      const nextIdx = currentIndex + delta;
-      if (nextIdx >= chunks.length) break;
-      const key = cacheKey(fileId, nextIdx);
-      if (chunkCache.has(key) || inflightRequests.has(key)) continue;
-      
-      const idx = nextIdx;
-      setTimeout(() => {
-        const k = cacheKey(fileId, idx);
-        if (!chunkCache.has(k) && !inflightRequests.has(k)) {
-          fetchAndDecryptChunk(chunks[idx], meta, shareId, fileId).catch(() => {});
+  static async seedFileMeta(fileId: string, shareId?: string): Promise<void> {
+    if (this.seededFiles.has(fileId)) return;
+    if (!navigator.serviceWorker?.controller) return;
+
+    try {
+      const { data: file, error } = await supabase.from('files').select('*').eq('id', fileId).single();
+      if (error || !file) throw new Error('File metadata not found');
+
+      const meta = JSON.parse(file.tags[0]);
+      const chunks = meta.chunks
+        .filter((c: any) => c.repo && c.path)
+        .sort((a: any, b: any) => a.index - b.index);
+
+      const STANDARD_CHUNK_SIZE = 8 * 1024 * 1024;
+
+      const cachedMeta: CachedFileMeta = {
+        fileId,
+        fileSize: file.size,
+        fileType: file.type,
+        encryptionKey: meta.encryptionKey,
+        chunks,
+        chunkSize: STANDARD_CHUNK_SIZE,
+        ts: Date.now(),
+      };
+
+      await cacheFileMeta(cachedMeta);
+
+      navigator.serviceWorker.controller.postMessage({
+        type: 'CACHE_FILE_META',
+        fileId,
+        meta: cachedMeta,
+      });
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const urls = new Map<number, string>();
+
+      const downloadPromises = chunks.map(async (chunk) => {
+        try {
+          const body: any = {
+            action: 'download',
+            path: chunk.path,
+            repo: chunk.repo,
+          };
+          if (shareId) {
+            body.shareId = shareId;
+          } else if (session?.user?.id) {
+            body.userId = session.user.id;
+          }
+          if (chunk.accountId) {
+            body.nodeId = chunk.accountId - 1;
+          }
+
+          const response = await supabase.functions.invoke('github-storage', { body });
+          if (response.error) throw new Error(response.error.message);
+
+          const responseData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+          if (responseData.downloadUrl) {
+            urls.set(chunk.index, responseData.downloadUrl);
+          }
+        } catch (e) {
+          console.warn(`[Streamer] Failed to get URL for chunk ${chunk.index}:`, e);
         }
-      }, delta * PREFETCH_DELAY);
+      });
+
+      await Promise.all(downloadPromises);
+
+      const urlObj: Record<number, string> = {};
+      urls.forEach((v, k) => { urlObj[k] = v; });
+      await cacheDownloadUrls(fileId, urls);
+
+      navigator.serviceWorker.controller.postMessage({
+        type: 'CACHE_DOWNLOAD_URLS',
+        fileId,
+        urls: urlObj,
+      });
+
+      this.seededFiles.add(fileId);
+
+      this.prefetchChunks(fileId, 0, chunks);
+
+    } catch (err) {
+      console.error('[Streamer] Seed failed:', err);
+    }
+  }
+
+  static prefetchChunks(fileId: string, currentIndex: number, chunks: any[]) {
+    if (!navigator.serviceWorker?.controller) return;
+    const indices: number[] = [];
+    for (let d = 1; d <= PREFETCH_COUNT; d++) {
+      const idx = currentIndex + d;
+      if (idx < chunks.length) indices.push(idx);
+    }
+    if (indices.length > 0) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'PREFETCH_CHUNKS',
+        fileId,
+        chunkIndices: indices,
+      });
     }
   }
 }

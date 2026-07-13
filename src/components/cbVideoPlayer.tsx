@@ -64,7 +64,8 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
 
   useEffect(() => {
     StreamDecryptorService.initListener(shareId);
-  }, [shareId]);
+    StreamDecryptorService.seedFileMeta(file.id, shareId);
+  }, [shareId, file.id]);
 
   useEffect(() => {
     return () => {
@@ -74,15 +75,10 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   }, [transcodedUrl]);
 
   useEffect(() => {
-    if (isLargeFile && navigator.serviceWorker?.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'PREFETCH_CHUNKS',
-        fileId: file.id,
-        chunkIndices: [0, 1, 2],
-        shareId
-      });
-    }
-  }, [file.id, isLargeFile, shareId]);
+    return () => {
+      clearTimeout(retryTimerRef.current);
+    };
+  }, []);
 
   const startLocalTranscoding = async () => {
     try {
