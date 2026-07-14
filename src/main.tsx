@@ -38,6 +38,28 @@ registerServiceWorker()
     console.error('Service Worker registration failed:', error);
   });
 
+// Self-heal from stale-deployment module failures. After a new production deploy, a tab
+// that was already open can still reference chunk hashes that have since been purged from
+// the server, which makes lazy imports (e.g. the Monaco code editor) throw
+// "Failed to load dynamically imported module". Reloading once with a cache-bust lets the
+// page fetch the current, healthy bundle instead of stranding the user on a dead tab.
+const MODULE_LOAD_FAIL = /Failed to (load|fetch) dynamically imported module|Importing a module script failed|Failed to fetch.*module/i;
+
+function tryRecoverModuleLoad(message: string): boolean {
+  if (!MODULE_LOAD_FAIL.test(message)) return false;
+  const KEY = 'sc_module_recover';
+  try {
+    if (sessionStorage.getItem(KEY)) return false; // already attempted this session; don't loop
+    sessionStorage.setItem(KEY, '1');
+  } catch {
+    // ignore storage errors (private mode etc.)
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set('cache_bust', Date.now().toString());
+  window.location.href = url.toString();
+  return true;
+}
+
 // Surface fatal errors instead of a silent blank page (critical for the native/APK build,
 // where a single thrown error in a deep component otherwise unmounts the whole tree).
 function showFatalOverlay(message: string) {
@@ -57,6 +79,7 @@ window.addEventListener('error', (event) => {
   if (!event.message) return;
   const detail = (event.error && (event.error.stack || event.error.message)) || event.message;
   console.error('[fatal]', detail);
+  if (tryRecoverModuleLoad(String(detail))) return; // stale-deploy recovery: reload once
   showFatalOverlay(String(detail));
 });
 
@@ -64,6 +87,7 @@ window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason;
   const detail = (reason && (reason.stack || reason.message)) || String(reason);
   console.error('[fatal]', detail);
+  if (tryRecoverModuleLoad(String(detail))) return; // stale-deploy recovery: reload once
   showFatalOverlay(String(detail));
 });
 

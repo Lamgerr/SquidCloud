@@ -71,6 +71,7 @@ const SquidVeilDocs = lazy(() => import("./pages/SquidVeilDocs"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const EmbedPage = lazy(() => import("./pages/EmbedPage"));
+const HybridNoteEditor = lazy(() => import("./components/drawing/HybridNoteEditor"));
 
 const RouteSuspense = ({ children }: { children: ReactNode }) => (
   <Suspense fallback={<div className="flex min-h-[30vh] items-center justify-center text-sm text-muted-foreground">Loading...</div>}>
@@ -221,6 +222,17 @@ const AppContent = () => {
               <ProtectedRoute>
                 <ErrorBoundary>
                   <Dashboard />
+                </ErrorBoundary>
+              </ProtectedRoute>
+            </RouteSuspense>
+            </AnimatedRoute>
+          } />
+          <Route path="/notes" element={
+            <AnimatedRoute>
+            <RouteSuspense>
+              <ProtectedRoute>
+                <ErrorBoundary>
+                  <HybridNoteEditor />
                 </ErrorBoundary>
               </ProtectedRoute>
             </RouteSuspense>

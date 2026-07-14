@@ -81,8 +81,8 @@ const getBYOKRuntimePolicy = async (userId: string): Promise<BYOKRuntimePolicy> 
 const WORKER_POOL_SIZE = 4;
 let encryptionWorkers: Worker[] | null = null;
 
-const getEncryptionWorker = (chunkIndex: number): Worker => {
-  if (!encryptionWorkers) {
+const getEncryptionWorker = (chunkIndex: number): Worker | null => {
+  if (!encryptionWorkers || encryptionWorkers.length === 0) {
     encryptionWorkers = [];
     for (let i = 0; i < WORKER_POOL_SIZE; i++) {
       try {
@@ -92,10 +92,65 @@ const getEncryptionWorker = (chunkIndex: number): Worker => {
         devWarn('Web Worker not available:', error);
       }
     }
-    if (encryptionWorkers.length === 0) throw new Error('No Web Workers available for encryption');
+    if (encryptionWorkers.length === 0) {
+      // Leave the pool as null (not an empty array) so the next call re-attempts
+      // creation instead of returning `undefined` for every future chunk.
+      encryptionWorkers = null;
+      return null;
+    }
   }
   return encryptionWorkers[chunkIndex % encryptionWorkers.length];
 };
+
+// Main-thread fallbacks used when Web Workers are unavailable. Mirrors the
+// encryption performed inside workers/upload-worker.ts so uploads still succeed.
+async function encryptDataMainThread(data: ArrayBuffer, keyString: string): Promise<ArrayBuffer> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(keyString.slice(0, 32).padEnd(32, '0'));
+  const key = await crypto.subtle.importKey(
+    'raw', keyData, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const additionalData = encoder.encode(`res54-v2-${Date.now()}`);
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData }, key, data
+  );
+  const encryptedBytes = new Uint8Array(encrypted);
+  const combined = new Uint8Array(4 + additionalData.byteLength + iv.byteLength + encryptedBytes.byteLength);
+  const view = new DataView(combined.buffer, 0, 4);
+  view.setUint32(0, additionalData.byteLength, true);
+  combined.set(additionalData, 4);
+  combined.set(iv, 4 + additionalData.byteLength);
+  combined.set(encryptedBytes, 4 + additionalData.byteLength + iv.byteLength);
+  return combined.buffer;
+}
+
+const V3_MAGIC = new Uint8Array([0x52, 0x45, 0x03]);
+
+async function encryptChunkV3MainThread(
+  data: ArrayBuffer,
+  chunkKeyRaw: ArrayBuffer,
+  iv: Uint8Array,
+  aad: Uint8Array
+): Promise<ArrayBuffer> {
+  const key = await crypto.subtle.importKey(
+    'raw', chunkKeyRaw, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
+  );
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: aad, tagLength: 128 }, key, data
+  );
+  const encBytes = new Uint8Array(encrypted);
+  const origLen = new Uint8Array(4);
+  new DataView(origLen.buffer).setUint32(0, data.byteLength, true);
+  const header = new Uint8Array(V3_MAGIC.length + origLen.length + iv.length);
+  header.set(V3_MAGIC, 0);
+  header.set(origLen, V3_MAGIC.length);
+  header.set(iv, V3_MAGIC.length + origLen.length);
+  const result = new Uint8Array(header.length + encBytes.length);
+  result.set(header);
+  result.set(encBytes, header.length);
+  return result.buffer;
+}
 
 const terminateAllWorkers = () => {
   if (encryptionWorkers) {
@@ -156,10 +211,12 @@ async function encryptChunkWithWorkerV3(chunkData: ArrayBuffer, index: number): 
   const encoder = new TextEncoder();
   const aad = encoder.encode(`res54-v3|${userId}|${fileId}|${index}|${totalChunks}`);
   const loadBalancer = getLoadBalancer();
-  
+
+  const worker = getEncryptionWorker(index);
+  if (!worker) return encryptChunkV3MainThread(chunkData, chunkKeyRaw, iv, aad);
+
   return loadBalancer.execute(
     () => new Promise<ArrayBuffer>((resolve, reject) => {
-      const worker = getEncryptionWorker(index);
       const timeout = setTimeout(() => {
         worker.removeEventListener('message', handler);
         reject(new Error(`V3 encryption timeout for chunk ${index}`));
@@ -249,9 +306,10 @@ async function encryptChunkDispatch(chunkData: ArrayBuffer, encryptionKey: strin
 
 const encryptChunkWithWorker = async (chunkData: ArrayBuffer, encryptionKey: string, index: number): Promise<ArrayBuffer> => {
   const loadBalancer = getLoadBalancer();
+  const worker = getEncryptionWorker(index);
+  if (!worker) return encryptDataMainThread(chunkData, encryptionKey);
   return loadBalancer.execute(
     () => new Promise<ArrayBuffer>((resolve, reject) => {
-      const worker = getEncryptionWorker(index);
       const timeout = setTimeout(() => {
         worker.removeEventListener('message', handler);
         reject(new Error(`Encryption timeout for chunk ${index}`));

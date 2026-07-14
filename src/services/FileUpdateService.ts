@@ -57,8 +57,10 @@ export class FileUpdateService {
 
       console.log('FileUpdateService: Encrypting and uploading updated content...');
 
-      // Upload with RES54 encryption
-      // This will create a new encrypted version
+      // Re-encrypt + upload the new content. uploadFileWithRes54 also inserts a
+      // fresh file record (with its own id/chunks); we treat that as a temporary
+      // carrier and point the *existing* file record at its chunks/key below,
+      // then delete the temporary record so we never create duplicates.
       const uploadResult = await uploadFileWithRes54(
         updatedFile,
         (progress, stage) => {
@@ -70,8 +72,14 @@ export class FileUpdateService {
         throw new Error('Upload failed - no file ID returned');
       }
 
-      // Update file metadata in database with new encryption details
-      // Note: encryption_key will be hashed by DB trigger automatically
+      // Repoint the EXISTING file record at the new content's chunks + key.
+      // metadata.chunks already contains the freshly uploaded B2 paths; we mirror
+      // exactly the format uploadFileWithRes54 stores so the download path stays valid.
+      const metadataString = JSON.stringify({
+        ...uploadResult.metadata,
+        encryptionKey: uploadResult.encryptionKey,
+      });
+
       const { data: updatedFileData, error: updateError } = await supabase
         .from('files')
         .update({
@@ -80,6 +88,7 @@ export class FileUpdateService {
           encrypted: true,
           encryption_key: uploadResult.encryptionKey, // DB trigger will hash this
           storage_path: 'res54_distributed',
+          tags: [metadataString],
         })
         .eq('id', fileId)
         .select()
@@ -89,6 +98,9 @@ export class FileUpdateService {
         console.error('FileUpdateService: Database update failed:', updateError);
         throw new Error('Failed to update file metadata');
       }
+
+      // Remove the temporary duplicate record created by the upload step.
+      await supabase.from('files').delete().eq('id', uploadResult.id);
 
       console.log('FileUpdateService: File updated successfully');
 

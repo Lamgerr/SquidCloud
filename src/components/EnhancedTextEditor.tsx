@@ -12,6 +12,8 @@ import {
   isSqdName, serializeDoc, parseDoc, defaultBackground,
   type SqdDoc, type EditorMode, type BackgroundConfig, type SqdObject, type InkStroke, type BrushType,
 } from './editor/sqd';
+import { defineMonoThemes, monoThemeDark, monoThemeLight, MONO_DARK_ID, MONO_LIGHT_ID } from './editor/monacoTheme';
+import './editor/monaco-mono.css';
 
 // Monaco web workers (bundled same-origin so the browser accepts them)
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
@@ -110,7 +112,15 @@ function isCsv(name?: string) {
 
 // ---- Themes (Xcode / VS Code / GitHub / Monokai / Dracula / Solarized) -
 interface ThemeDef { id: string; label: string; base: 'vs' | 'vs-dark'; rules: any[]; colors: Record<string, string>; }
-const THEMES: ThemeDef[] = [
+  const THEMES: ThemeDef[] = [
+  {
+    id: MONO_DARK_ID, label: 'Mono Dark', base: 'vs-dark',
+    rules: monoThemeDark.rules as any[], colors: monoThemeDark.colors as Record<string, string>,
+  },
+  {
+    id: MONO_LIGHT_ID, label: 'Mono Light', base: 'vs',
+    rules: monoThemeLight.rules as any[], colors: monoThemeLight.colors as Record<string, string>,
+  },
   {
     id: 'squid-xcode-dark', label: 'Xcode Dark', base: 'vs-dark',
     rules: [
@@ -322,7 +332,7 @@ export default function EnhancedTextEditor({
   const [fontSize, setFontSize] = useState(isMobile ? 14 : 13);
   const [zoom, setZoom] = useState(1);
   const [lang, setLang] = useState('plaintext');
-  const [themeId, setThemeId] = useState('squid-xcode-dark');
+  const [themeId, setThemeId] = useState(MONO_DARK_ID);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -414,6 +424,8 @@ export default function EnhancedTextEditor({
       THEMES.forEach((t) => {
         monaco.editor.defineTheme(t.id, { base: t.base, inherit: true, rules: t.rules, colors: t.colors });
       });
+      // Register the strict monochrome (Xcode-like) themes
+      defineMonoThemes(monaco);
 
       const detected = detectLang(fileName);
       setLang(detected);
@@ -425,7 +437,7 @@ export default function EnhancedTextEditor({
         fontSize,
         fontFamily: FONT_PRESETS[fontPreset],
         fontLigatures: ligatures,
-        lineHeight: 1.6,
+        lineHeight: 22,
         minimap: { enabled: minimap },
         lineNumbers: lineNumbers ? 'on' : 'off',
         scrollBeyondLastLine: false,
@@ -435,20 +447,28 @@ export default function EnhancedTextEditor({
         renderWhitespace: whitespace ? 'all' : 'none',
         renderControlCharacters: controlChars,
         smoothScrolling: smoothScroll,
+        mouseWheelScrollSensitivity: 1.1,
+        fastScrollSensitivity: 6,
+        scrollPredominantAxis: true,
         cursorBlinking: 'smooth',
         cursorSmoothCaretAnimation: cursorAnim ? 'on' : 'off',
+        cursorWidth: 1.4,
+        cursorSurroundingLines: 8,
+        cursorSurroundingLinesStyle: 'all',
         bracketPairColorization: { enabled: bracketColor },
         guides: { bracketPairs: guides, indentation: guides, highlightActiveIndentation: guides },
         wordWrap: wordWrap ? 'on' : 'off',
         stickyScroll: { enabled: stickyScroll },
         folding,
         glyphMargin,
-        padding: { top: 14, bottom: 14 },
-        roundedSelection: true,
-        cursorBlinking: 'smooth',
+        roundedSelection: false,
         'semanticHighlighting.enabled': true,
         scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10, useShadows: false },
         overviewRulerLanes: 0,
+        renderLineHighlight: 'all',
+        renderLineHighlightOnlyWhenFocus: true,
+        letterSpacing: 0.2,
+        padding: { top: 18, bottom: 18 },
         contextmenu: true,
         matchBrackets: 'always',
         autoClosingBrackets: 'always',
@@ -456,7 +476,7 @@ export default function EnhancedTextEditor({
         autoSurround: 'languageDefined',
         dragAndDrop: true,
         links: true,
-        colorDecorators: true,
+        colorDecorators: false,
         occurrencesHighlight: 'singleFile',
         selectionHighlight: true,
         codeLens: false,

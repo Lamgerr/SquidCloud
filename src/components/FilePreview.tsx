@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Eye, Download, File, FileText, Image, Video, Music, FileSpreadsheet, FileCode, Lock, Maximize, Minimize } from '@/lib/icon-map';
 import { downloadFile } from '@/lib/api';
+import { FileUpdateService } from '@/services/FileUpdateService';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
@@ -132,24 +133,25 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
 
   const handleSaveTextFile = async () => {
     if (!file.id || !editorRef.current) return;
-    
+
     try {
       setLoading(true);
       const newContent = editorRef.current.value;
-      
-      // Create new blob with updated content
+
+      // Persist the edited content to the backend (re-encrypted + re-uploaded).
+      const result = await FileUpdateService.updateTextFile(file.id, newContent, file);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save changes');
+      }
+
+      // Update local state for immediate UI feedback.
       const blob = new Blob([newContent], { type: file.type });
-      
-      // Update in storage
-      // For this feature to be fully implemented, you'd need to add
-      // an update function to your API that handles file updates
-      
-      // Update local state
       const url = URL.createObjectURL(blob);
+      if (previewContent) URL.revokeObjectURL(previewContent);
       setPreviewContent(url);
       setTextContent(newContent);
       setIsEditing(false);
-      
+
       toast({
         title: "File saved",
         description: `${file.name} has been updated`,

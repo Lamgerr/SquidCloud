@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize, cn } from '@/lib/utils';
-import { FileIcon, FolderIcon, MoreVertical, Share2, Lock } from '@/lib/icon-map';
+import { FileIcon, FolderIcon, MoreVertical, Share2, Lock, Image, Video, Music, Archive, Code, FileText } from '@/lib/icon-map';
 import FileCardMenu from './FileCardMenu';
 import MobileFileActionSheet from './MobileFileActionSheet';
 import MobilePreviewModal from './MobilePreviewModal';
@@ -143,16 +143,22 @@ const FileCard: React.FC<FileCardProps> = ({
   const isFolder = file.type === 'folder';
   const isImage = file.type?.startsWith('image/');
   const isVideo = file.type?.startsWith('video/');
-  const isDocument = file.type?.includes('pdf') || 
-                     file.type?.includes('document') || 
-                     file.type?.includes('text');
+  const isAudio = file.type?.startsWith('audio/');
+  const isArchive = /\.(zip|rar|7z|tar|gz|bz2|tgz)$/i.test(file.name || '');
+  const isCode = /\.(js|jsx|ts|tsx|json|py|java|cpp|c|h|rb|go|rs|php|html|css|scss|sh|yml|yaml|xml|sql|md)$/i.test(file.name || '');
+  const isDocument = !isCode && (file.type?.includes('pdf') ||
+                     file.type?.includes('document') ||
+                     file.type?.includes('text'));
 
   const getFileIcon = () => {
     const iconClass = "w-6 h-6";
     if (isFolder) return <FolderIcon className={cn(iconClass, "text-primary")} strokeWidth={1.5} />;
-    if (isImage) return <FileIcon className={cn(iconClass, "text-emerald-500")} strokeWidth={1.5} />;
-    if (isVideo) return <FileIcon className={cn(iconClass, "text-purple-500")} strokeWidth={1.5} />;
-    if (isDocument) return <FileIcon className={cn(iconClass, "text-rose-500")} strokeWidth={1.5} />;
+    if (isImage) return <Image className={cn(iconClass, "text-emerald-500")} strokeWidth={1.5} />;
+    if (isVideo) return <Video className={cn(iconClass, "text-purple-500")} strokeWidth={1.5} />;
+    if (isAudio) return <Music className={cn(iconClass, "text-amber-500")} strokeWidth={1.5} />;
+    if (isArchive) return <Archive className={cn(iconClass, "text-orange-500")} strokeWidth={1.5} />;
+    if (isCode) return <Code className={cn(iconClass, "text-cyan-500")} strokeWidth={1.5} />;
+    if (isDocument) return <FileText className={cn(iconClass, "text-rose-500")} strokeWidth={1.5} />;
     return <FileIcon className={cn(iconClass, "text-muted-foreground")} strokeWidth={1.5} />;
   };
 
