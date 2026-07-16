@@ -32,6 +32,44 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
     
     <title>SquidCloud - Secure, Unlimited Cloud Storage</title>
+    <script>
+      (function () {
+        function showFatal(msg) {
+          if (document.getElementById('fatal-error-overlay')) return;
+          var overlay = document.createElement('div');
+          overlay.id = 'fatal-error-overlay';
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0f172a;color:#e2e8f0;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:24px;overflow:auto;white-space:pre-wrap;word-break:break-word;';
+          overlay.textContent = 'SquidCloud failed to start.\n\n' + msg + '\n\nPlease report this message to the developer.';
+          (document.body || document.documentElement).appendChild(overlay);
+        }
+        window.__showFatal = showFatal;
+        function tryReloadForStaleDeploy() {
+          try {
+            if (sessionStorage.getItem('sc_module_recover')) return false;
+            sessionStorage.setItem('sc_module_recover', '1');
+          } catch (e) { return false; }
+          var url = new URL(window.location.href);
+          url.searchParams.set('cache_bust', Date.now().toString());
+          window.location.href = url.toString();
+          return true;
+        }
+        window.addEventListener('error', function (e) {
+          if (e && e.message) {
+            var detail = (e.error && (e.error.stack || e.error.message)) || e.message;
+            showFatal(String(detail));
+          } else if (e && e.target && (e.target.src || e.target.href)) {
+            var src = e.target.src || e.target.href;
+            if (!/\.m?js($|\?)/.test(src)) return;
+            if (tryReloadForStaleDeploy()) return;
+            showFatal('Failed to load resource: ' + src);
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          showFatal(String((r && (r.stack || r.message)) || r));
+        });
+      })();
+    </script>
     <script type="module" crossorigin src="/assets/index-tm_wbFe3.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-CLwJA-wx.css">
   </head>

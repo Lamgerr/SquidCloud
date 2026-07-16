@@ -44,7 +44,7 @@ const ContextMenuSubContent = React.forwardRef<
   <ContextMenuPrimitive.SubContent
     ref={ref}
     className={cn(
-      "z-[120] min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md opacity-0 scale-[0.97] data-[state=open]:opacity-100 data-[state=open]:scale-100 transition-all duration-120 ease-out will-change-opacity will-change-transform",
+      "z-[120] min-w-[8rem] overflow-hidden rounded-md lg-dropdown p-1 text-popover-foreground opacity-0 scale-[0.97] data-[state=open]:opacity-100 data-[state=open]:scale-100 transition-all duration-120 ease-out will-change-opacity will-change-transform",
       className
     )}
     {...props}
@@ -60,7 +60,7 @@ const ContextMenuContent = React.forwardRef<
     <ContextMenuPrimitive.Content
       ref={ref}
       className={cn(
-        "z-[120] min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md opacity-0 scale-[0.97] data-[state=open]:opacity-100 data-[state=open]:scale-100 transition-all duration-120 ease-out will-change-opacity will-change-transform",
+        "z-[120] min-w-[8rem] overflow-hidden rounded-md lg-dropdown p-1 text-popover-foreground opacity-0 scale-[0.97] data-[state=open]:opacity-100 data-[state=open]:scale-100 transition-all duration-120 ease-out will-change-opacity will-change-transform",
         className
       )}
       {...props}

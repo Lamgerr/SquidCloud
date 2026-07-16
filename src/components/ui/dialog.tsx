@@ -97,14 +97,14 @@ const DialogContent = React.forwardRef<
           className={cn(
             "fixed bottom-0 left-0 right-0 z-50 mt-24",
             "flex flex-col rounded-t-[20px]",
-            "bg-[#1C2128] border border-[#373E47] border-b-0",
+            "lg-strong border-b-0",
             "max-h-[85vh] overflow-y-auto",
             zIndexClass,
             className
           )}
           {...(props as any)}
         >
-          <div className="mx-auto mt-4 h-1 w-9 rounded-full bg-[#444C56]" />
+          <div className="mx-auto mt-4 h-1 w-9 rounded-full bg-white/20" />
           {children}
         </DrawerPrimitive.Content>
       </DrawerPrimitive.Portal>
@@ -124,10 +124,10 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border p-5 shadow-lg",
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 p-5 shadow-lg",
           "translate-x-[-50%] translate-y-[-50%]",
           "rounded-[20px]",
-          "border-border/40 bg-card",
+          "lg-strong",
           "scale-[0.96] opacity-0 data-[state=open]:opacity-100 data-[state=open]:scale-100",
           "transition-[opacity,transform] duration-200 ease-out",
           "will-change-transform will-change-opacity",
@@ -141,9 +141,9 @@ const DialogContent = React.forwardRef<
         {!hideClose && (
           <DialogPrimitive.Close
             className={cn(
-              "absolute right-4 top-4 h-8 w-8 rounded-[8px] flex items-center justify-center",
-              "bg-muted/40 hover:bg-destructive/8 hover:text-destructive",
-              "text-muted-foreground border border-border/25",
+              "absolute right-4 top-4 h-8 w-8 rounded-[8px] flex items-center justify-center z-10",
+              "bg-white/10 hover:bg-destructive/20 hover:text-destructive",
+              "text-muted-foreground border border-white/10",
               "focus:outline-none focus:ring-2 focus:ring-ring/40 focus:ring-offset-2",
               "transition-all"
             )}

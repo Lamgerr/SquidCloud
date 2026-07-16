@@ -19,7 +19,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/60 opacity-0 data-[state=open]:opacity-100 transition-opacity duration-150 will-change-opacity",
+      "fixed inset-0 z-50 bg-black/55 backdrop-blur-sm opacity-0 data-[state=open]:opacity-100 transition-opacity duration-150 will-change-opacity",
       className
     )}
     {...props}
@@ -29,16 +29,16 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-card shadow-2xl transition-transform duration-150 ease-out will-change-transform transform-gpu data-[state=open]:translate-x-0 data-[state=open]:translate-y-0",
+  "fixed z-50 gap-4 lg shadow-2xl transition-transform duration-150 ease-out will-change-transform transform-gpu data-[state=open]:translate-x-0 data-[state=open]:translate-y-0",
   {
     variants: {
       side: {
-        top: "inset-x-0 top-0 border-b border-border/40 rounded-b-2xl -translate-y-full data-[state=open]:translate-y-0",
+        top: "inset-x-0 top-0 border-b border-white/10 rounded-b-2xl -translate-y-full data-[state=open]:translate-y-0",
         bottom:
-          "inset-x-0 bottom-0 border-t border-border/40 rounded-t-2xl translate-y-full data-[state=open]:translate-y-0",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r border-border/40 -translate-x-full data-[state=open]:translate-x-0 sm:max-w-sm",
+          "inset-x-0 bottom-0 border-t border-white/10 rounded-t-2xl translate-y-full data-[state=open]:translate-y-0",
+        left: "inset-y-0 left-0 h-full w-3/4 border-r border-white/10 -translate-x-full data-[state=open]:translate-x-0 sm:max-w-sm",
         right:
-          "inset-y-0 right-0 h-full w-3/4 border-l border-border/40 translate-x-full data-[state=open]:translate-x-0 sm:max-w-sm",
+          "inset-y-0 right-0 h-full w-3/4 border-l border-white/10 translate-x-full data-[state=open]:translate-x-0 sm:max-w-sm",
       },
     },
     defaultVariants: {

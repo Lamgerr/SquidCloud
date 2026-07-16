@@ -514,12 +514,15 @@ export default function OptimizedPDFViewer({
       });
 
       if (activeTextLayerRef.current && textContent) {
+        const renderTextLayerFn = (pdfjsLib as any).renderTextLayer;
         activeTextLayerRef.current.innerHTML = '';
         activeTextLayerRef.current.style.width = `${viewport.width}px`;
         activeTextLayerRef.current.style.height = `${viewport.height}px`;
-        pdfjsLib.renderTextLayer({
-          textContentSource: textContent, container: activeTextLayerRef.current, viewport
-        });
+        if (typeof renderTextLayerFn === 'function') {
+          renderTextLayerFn({
+            textContentSource: textContent, container: activeTextLayerRef.current, viewport
+          });
+        }
       }
     } catch (err: any) {
       if (err?.name !== 'RenderingCancelledException') console.error(err);

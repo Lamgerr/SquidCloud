@@ -31,13 +31,9 @@ const toastVariants = cva(
     "overflow-hidden border p-4 pr-12",
     // Squircle — 16px = var(--sq-lg)
     "rounded-[16px]",
-    // Glass surface
-    "bg-white/85 text-slate-900",
-    "border-slate-200/60",
-    "shadow-[0_8px_32px_-8px_rgba(15,23,42,0.35),0_2px_8px_-2px_rgba(15,23,42,0.1)]",
-    "supports-[backdrop-filter]:backdrop-blur-xl",
-    // Dark
-    "dark:bg-slate-900/90 dark:text-slate-50 dark:border-slate-700/50",
+    // Liquid glass surface
+    "lg-strong text-foreground",
+    "border-white/10",
     // Swipe / state
     "transition-all duration-300 ease-out",
     "data-[swipe=cancel]:translate-x-0",
@@ -57,7 +53,7 @@ const toastVariants = cva(
         default:
           "before:from-sky-400 before:via-blue-500 before:to-indigo-500",
         destructive:
-          "border-red-200/60 bg-rose-50/90 text-rose-950 before:from-rose-400 before:via-rose-500 before:to-rose-600 dark:border-red-500/50 dark:bg-rose-950/80 dark:text-rose-100",
+          "border-red-400/30 text-red-100 before:from-rose-400 before:via-rose-500 before:to-rose-600",
       },
     },
     defaultVariants: {
@@ -85,21 +81,19 @@ const ToastAction = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Action
     ref={ref}
-    className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center",
-      // Squircle — 8px = var(--sq-xs)
-      "rounded-[8px]",
-      "border border-slate-200/60 bg-white/60 px-3",
-      "text-sm font-medium text-slate-700",
-      "transition-colors hover:bg-white hover:text-slate-900",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300",
-      "disabled:pointer-events-none disabled:opacity-50",
-      "dark:border-slate-700/50 dark:bg-slate-900/60 dark:text-slate-100",
-      "dark:hover:bg-slate-900 dark:hover:text-white",
-      "group-[.destructive]:border-rose-300/50 group-[.destructive]:hover:bg-rose-100/60",
-      "group-[.destructive]:hover:text-rose-900",
-      className
-    )}
+      className={cn(
+        "inline-flex h-8 shrink-0 items-center justify-center",
+        // Squircle — 8px = var(--sq-xs)
+        "rounded-[8px]",
+        "border border-white/10 bg-white/10 px-3",
+        "text-sm font-medium text-foreground",
+        "transition-colors hover:bg-white/20",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+        "disabled:pointer-events-none disabled:opacity-50",
+        "group-[.destructive]:border-red-400/30 group-[.destructive]:hover:bg-red-500/20",
+        "group-[.destructive]:hover:text-red-100",
+        className
+      )}
     {...props}
   />
 ))
@@ -111,18 +105,17 @@ const ToastClose = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Close
     ref={ref}
-    className={cn(
+      className={cn(
       "absolute right-3 top-3",
       // Squircle close button — 8px
       "rounded-[8px]",
-      "bg-white/50 p-1.5 shadow-sm",
-      "text-slate-500 opacity-100 transition-all",
-      "hover:bg-white hover:text-slate-700",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200",
+      "bg-white/10 p-1.5 shadow-sm",
+      "text-muted-foreground opacity-100 transition-all",
+      "hover:bg-white/20 hover:text-foreground",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
       "md:opacity-0 md:group-hover:opacity-100",
-      "group-[.destructive]:bg-rose-100/70 group-[.destructive]:text-rose-500",
-      "group-[.destructive]:hover:text-rose-700",
-      "dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
+      "group-[.destructive]:bg-red-500/20 group-[.destructive]:text-red-300",
+      "group-[.destructive]:hover:text-red-100",
       className
     )}
     toast-close=""
@@ -140,7 +133,7 @@ const ToastTitle = React.forwardRef<
   <ToastPrimitives.Title
     ref={ref}
     className={cn(
-      "text-[0.9rem] font-semibold tracking-tight text-slate-900 dark:text-white",
+      "text-[0.9rem] font-semibold tracking-tight text-foreground",
       className
     )}
     {...props}
@@ -155,7 +148,7 @@ const ToastDescription = React.forwardRef<
   <ToastPrimitives.Description
     ref={ref}
     className={cn(
-      "text-[0.8125rem] leading-relaxed text-slate-600/90 dark:text-slate-300",
+      "text-[0.8125rem] leading-relaxed text-muted-foreground",
       className
     )}
     {...props}

@@ -103,6 +103,19 @@ export function strokeBBox(points: InputPoint[], size: number): BBox {
   return { minX: minX - r, minY: minY - r, maxX: maxX + r, maxY: maxY + r };
 }
 
+export function recomputeBBox(points: InputPoint[], size = 0): BBox {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const r = size / 2 + 2;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  return { minX: minX - r, minY: minY - r, maxX: maxX + r, maxY: maxY + r };
+}
+
 export function bboxOverlap(a: BBox, b: BBox): boolean {
   return !(a.maxX < b.minX || a.minX > b.maxX || a.maxY < b.minY || a.minY > b.maxY);
 }

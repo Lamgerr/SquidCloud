@@ -715,6 +715,12 @@ body {
   border: 1px solid var(--glass-border-strong);
 }
 
+/* Dark-mode depth layers — keep surfaces readable on the space background */
+.dark .lg-surface { background: hsl(var(--card) / 0.70); }
+.dark .lg-raised  { background: hsl(var(--card) / 0.72); }
+.dark .lg-elevated { background: hsl(var(--card) / 0.80); }
+.dark .lg-modal   { background: hsl(var(--card) / 0.90); }
+
 /* ── Card — macOS frosted glass ────────────── */
 .lg-card {
   background: hsl(var(--card) / 0.55);
@@ -734,7 +740,7 @@ body {
 }
 
 .dark .lg-card {
-  background: hsl(var(--card) / 0.65);
+  background: hsl(var(--card) / 0.82);
   box-shadow: 0 2px 8px hsl(0 0% 0% / 0.2);
 }
 .dark .lg-card:hover {
@@ -1076,6 +1082,134 @@ body {
 .lg-text-label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: hsl(var(--muted-foreground) / 0.6); }
 .lg-text-caption { font-size: 12px; color: hsl(var(--muted-foreground) / 0.7); }
 .lg-text-meta { font-size: 11px; color: hsl(var(--muted-foreground) / 0.5); }
+
+/* ═══════════════════════════════════════════════════════════════
+   LIQUID GLASS TIERS — macOS-style deep blur + specular highlights
+   Three tiers: .lg (standard), .lg-strong (elevated), .lg-subtle (light)
+
+   Visibility & stacking notes:
+   • Backgrounds are opaque enough to read text on top (esp. in dark mode).
+   • `isolation: isolate` makes the element a stacking context so the
+     specular highlight (painted via background-image) always sits *behind*
+     the content, never covering text.
+   • The gradient border ring (::after) is gated behind @supports so it
+     never paints a full overlay where mask-composite is unsupported.
+   ═══════════════════════════════════════════════════════════════ */
+
+.lg,
+.lg-strong,
+.lg-subtle {
+  position: relative;
+  isolation: isolate;
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+}
+
+/* ── Tier 1: Standard glass ────────────────── */
+.lg {
+  --lg-filter: blur(32px) saturate(1.7) brightness(1.06);
+  background-color: rgba(255,255,255,0.12);
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.03) 45%, transparent 66%);
+  border: 1px solid rgba(255,255,255,0.16);
+  box-shadow:
+    0 14px 40px -10px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.18);
+}
+.dark .lg {
+  background-color: rgba(13,16,32,0.72);
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.015) 42%, transparent 66%);
+  border-color: rgba(255,255,255,0.10);
+  box-shadow:
+    0 14px 40px -10px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* ── Tier 2: Strong glass (modals, toasts, popups, navbar) ── */
+.lg-strong {
+  --lg-filter: blur(44px) saturate(1.9) brightness(1.08);
+  background-color: rgba(255,255,255,0.16);
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 42%, transparent 66%);
+  border: 1px solid rgba(255,255,255,0.22);
+  box-shadow:
+    0 26px 64px -12px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    inset 0 -1px 0 rgba(255,255,255,0.04);
+}
+.dark .lg-strong {
+  background-color: rgba(11,14,28,0.82);
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 40%, transparent 66%);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow:
+    0 26px 64px -12px rgba(0,0,0,0.68),
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    0 0 0 1px rgba(79,195,247,0.05);
+}
+
+/* ── Tier 3: Subtle glass (tooltips, tabs, light panels) ── */
+.lg-subtle {
+  --lg-filter: blur(22px) saturate(1.5);
+  background-color: rgba(255,255,255,0.10);
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%);
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow:
+    0 8px 28px -8px rgba(0,0,0,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.14);
+}
+.dark .lg-subtle {
+  background-color: rgba(13,16,32,0.86);
+  background-image: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 55%);
+  border-color: rgba(255,255,255,0.10);
+  box-shadow:
+    0 8px 28px -8px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* ── Gradient border ring (the "liquid" edge) — safe behind @supports ── */
+@supports (-webkit-mask-composite: xor) or (mask-composite: exclude) {
+  .lg::after,
+  .lg-strong::after,
+  .lg-subtle::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.05) 45%, rgba(255,255,255,0.24) 100%);
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+/* ── Glass entrance animation ── */
+@keyframes lg-glass-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.lg-glass-enter {
+  animation: lg-glass-enter 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Glass hover glow (for elevated elements) ── */
+.lg-glow {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.lg-glow:hover {
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.3),
+    0 0 20px rgba(79,195,247,0.10),
+    inset 0 1px 0 rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.18);
+}
 
 /* ═══════════════════════════════════════════════════════════════
    PREMIUM DARK MODE — improved surface hierarchy & depth

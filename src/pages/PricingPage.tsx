@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,45 @@ import {
   Check, X, Zap, Crown, Sparkles, CheckCircle, ShieldCheck,
   Globe, Lock, Users, TrendingUp,
 } from '@/lib/icon-map';
+
+/* Hallmark · genre: atmospheric (space custom) · macrostructure: Stat-Led pricing
+ * theme: Deep Space · liquid glass (real multi-layer) · parallax starfield
+ * nebula centerpiece behind hero · bouncy spring entrances
+ */
+
+const EASE_OUT = [0.16, 1, 0.3, 1] as const;
+const BOUNCE = { type: 'spring' as const, stiffness: 300, damping: 15 };
+const BOUNCE_SOFT = { type: 'spring' as const, stiffness: 200, damping: 18 };
+
+const rnd = (n: number) => {
+  const x = Math.sin(n * 99.13) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+/* ─── Star data (87 total) ─── */
+const FAR = Array.from({ length: 50 }, (_, i) => ({
+  x: rnd(i * 7) * 100, y: rnd(i * 13) * 100,
+  s: 1 + rnd(i * 19), o: 0.15 + rnd(i * 23) * 0.35,
+  d: rnd(i * 29) * 6,
+}));
+const MID = Array.from({ length: 25 }, (_, i) => ({
+  x: rnd(i * 31 + 100) * 100, y: rnd(i * 37 + 100) * 100,
+  s: 1.5 + rnd(i * 41 + 100) * 1.5, o: 0.25 + rnd(i * 43 + 100) * 0.45,
+  d: rnd(i * 47 + 100) * 5,
+}));
+const NEAR = Array.from({ length: 12 }, (_, i) => ({
+  x: rnd(i * 51 + 200) * 100, y: rnd(i * 53 + 200) * 100,
+  s: 2 + rnd(i * 59 + 200) * 2.5, o: 0.4 + rnd(i * 61 + 200) * 0.6,
+  d: rnd(i * 67 + 200) * 4,
+}));
+const SHOOTERS = Array.from({ length: 4 }, (_, i) => ({
+  x: 85 + rnd(i * 71) * 30, y: 2 + rnd(i * 73) * 35,
+  delay: i * 2.5 + rnd(i * 79) * 3,
+  dur: 0.5 + rnd(i * 83) * 0.4,
+  len: 120 + rnd(i * 89) * 60,
+}));
+
+/* ═══ Pricing data (preserved exactly) ═══ */
 
 type Billing = 'weekly' | 'monthly' | 'annual';
 
@@ -72,7 +111,6 @@ function getPrice(planId: string, billing: Billing): { main: string; sub: string
   if (billing === 'monthly') {
     return { main: `$${p.monthly}`, sub: '/month' };
   }
-  const monthlyEq = p.annual / 12;
   const monthlyTotal = p.monthly * 12;
   return {
     main: `$${p.annual}`,
@@ -102,7 +140,7 @@ const PLAN_CONFIGS: Record<string, Omit<PlanCardProps, 'billing' | 'userTier' | 
     tagline: 'Unlimited storage, always',
     description: '',
     icon: Zap,
-    color: 'text-muted-foreground',
+    color: 'text-white/50',
     variant: 'free',
     features: [
       { label: 'Concurrent uploads', free: '2', paid: '10' },
@@ -156,6 +194,75 @@ const COMPARISON_ROWS = [
   { feature: 'Supporter badge', free: '—', supp: '✓', suppPlus: '✓' },
 ];
 
+/* ═══ Sub-components ═══ */
+
+function Starfield({ scrollY }: { scrollY: ReturnType<typeof useScroll>['scrollY'] }) {
+  const farY = useTransform(scrollY, [0, 1200], [0, -40]);
+  const midY = useTransform(scrollY, [0, 1200], [0, -90]);
+  const nearY = useTransform(scrollY, [0, 1200], [0, -160]);
+
+  return (
+    <div className="fixed inset-0 -z-10 overflow-hidden bg-[#030014]">
+      {/* Nebula blooms (background) */}
+      <div className="absolute top-[10%] left-[15%] w-[400px] h-[400px] rounded-full bg-purple-600/[0.06] blur-[130px] pointer-events-none" />
+      <div className="absolute bottom-[15%] right-[10%] w-[350px] h-[350px] rounded-full bg-blue-500/[0.05] blur-[110px] pointer-events-none" />
+
+      {/* 3-layer parallax stars */}
+      <motion.div className="absolute inset-0 will-change-transform" style={{ y: farY }}>
+        {FAR.map((s, i) => (
+          <span key={`f-${i}`} className="star absolute rounded-full bg-white"
+            style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, opacity: s.o, animationDuration: `${2.5 + s.d}s`, animationDelay: `${s.d}s` }} />
+        ))}
+      </motion.div>
+      <motion.div className="absolute inset-0 will-change-transform" style={{ y: midY }}>
+        {MID.map((s, i) => (
+          <span key={`m-${i}`} className="star absolute rounded-full bg-white"
+            style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, opacity: s.o, animationDuration: `${2.5 + s.d}s`, animationDelay: `${s.d}s` }} />
+        ))}
+      </motion.div>
+      <motion.div className="absolute inset-0 will-change-transform" style={{ y: nearY }}>
+        {NEAR.map((s, i) => (
+          <span key={`n-${i}`} className="star absolute rounded-full bg-white"
+            style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, opacity: s.o, animationDuration: `${2 + s.d}s`, animationDelay: `${s.d}s`, boxShadow: `0 0 ${s.s * 4}px rgba(180,220,255,0.5)` }} />
+        ))}
+      </motion.div>
+
+      {/* Shooting stars */}
+      {SHOOTERS.map((s, i) => (
+        <div key={`sh-${i}`} className="shooting-star absolute pointer-events-none will-change-transform"
+          style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.len, height: 1.5,
+            background: 'linear-gradient(90deg, rgba(255,255,255,0.9), rgba(180,220,255,0.3), transparent)',
+            borderRadius: 999, animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s`,
+            animationIterationCount: 'infinite', transform: 'rotate(-25deg)' }} />
+      ))}
+    </div>
+  );
+}
+
+function NebulaCenterpiece() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+      {/* Main nebula cloud */}
+      <div className="nebula-pulse absolute w-[700px] h-[500px] opacity-40">
+        {/* Core — deep purple */}
+        <div className="absolute top-[20%] left-[25%] w-[350px] h-[300px] rounded-full bg-purple-600/30 blur-[100px]" />
+        {/* Left wing — electric blue */}
+        <div className="absolute top-[30%] left-[5%] w-[280px] h-[250px] rounded-full bg-blue-500/25 blur-[90px]" />
+        {/* Right wing — cyan */}
+        <div className="absolute top-[25%] right-[10%] w-[260px] h-[240px] rounded-full bg-cyan-400/20 blur-[85px]" />
+        {/* Upper bloom — pink */}
+        <div className="absolute top-[5%] left-[35%] w-[200px] h-[180px] rounded-full bg-pink-500/15 blur-[80px]" />
+        {/* Lower haze — deep blue */}
+        <div className="absolute bottom-[10%] left-[20%] w-[320px] h-[200px] rounded-full bg-indigo-500/20 blur-[110px]" />
+        {/* Core bright spot */}
+        <div className="absolute top-[35%] left-[40%] w-[120px] h-[100px] rounded-full bg-white/8 blur-[60px]" />
+      </div>
+    </div>
+  );
+}
+
+/* ═══ PlanCard ═══ */
+
 function PlanCard({ config, billing, userTier, onSelect }: {
   config: typeof PLAN_CONFIGS[string];
   billing: Billing;
@@ -168,49 +275,53 @@ function PlanCard({ config, billing, userTier, onSelect }: {
   const prices = PLAN_PRICES[config.id];
   const annualMonthlyEq = prices ? prices.annual / 12 : 0;
   const index = Object.keys(PLAN_CONFIGS).indexOf(config.id);
+  const isPlus = config.variant === 'supporter-plus';
+  const isSup = config.variant === 'supporter';
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: index * 0.1, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0, y: 50, scale: 0.92 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ ...BOUNCE, delay: index * 0.12 }}
+      whileHover={{ y: -8, scale: 1.02, transition: { duration: 0.25, ...BOUNCE } }}
       className={cn(
-        'relative flex flex-col rounded-2xl border transition-all duration-300',
-        config.variant === 'supporter-plus' && [
-          'border-purple-500/40 shadow-[0_0_50px_-12px_hsl(270,80%,50%/0.25)]',
-          'bg-gradient-to-b from-purple-500/5 to-card scale-[1.02] z-10',
-        ],
-        config.variant === 'supporter' && [
-          'border-primary/30 shadow-[0_0_30px_-12px_hsl(var(--primary)/0.15)] bg-card',
-        ],
-        config.variant === 'free' && [
-          'border-border/20 bg-card/50 hover:border-border/40',
-        ],
-        isCurrentPlan && 'ring-2 ring-primary/40',
+        'group relative flex flex-col rounded-2xl overflow-hidden cursor-default',
+        isPlus ? 'lg-strong scale-[1.02] z-10' : 'lg',
+        isCurrentPlan && 'ring-2 ring-[hsl(var(--brand))]/40',
       )}
     >
       {/* Best Value badge */}
-      {config.variant === 'supporter-plus' && (
+      {isPlus && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
-          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-1 text-xs font-semibold shadow-lg shadow-purple-500/25 border-0">
+          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-1 text-xs font-semibold shadow-lg shadow-purple-500/25 border-0 relative z-10">
             <Sparkles className="h-3 w-3 mr-1" /> Best Value
           </Badge>
         </div>
       )}
 
-      <div className="relative p-6 pb-0">
+      {/* Hover glow bloom */}
+      <div className={cn(
+        'absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none',
+        isPlus
+          ? 'bg-gradient-to-b from-purple-500/[0.08] to-transparent'
+          : isSup
+            ? 'bg-gradient-to-b from-[hsl(var(--brand))]/[0.06] to-transparent'
+            : 'bg-gradient-to-b from-white/[0.03] to-transparent',
+      )} />
+
+      <div className="relative p-6 pb-0 z-10">
         <div className="flex items-center gap-3 mb-4">
           <div className={cn(
             'h-10 w-10 rounded-xl flex items-center justify-center border',
-            config.variant === 'supporter-plus' && 'bg-purple-500/15 border-purple-500/20',
-            config.variant === 'supporter' && 'bg-primary/15 border-primary/20',
-            config.variant === 'free' && 'bg-muted/20 border-border/20',
+            isPlus && 'bg-purple-500/15 border-purple-500/20',
+            isSup && 'bg-[hsl(var(--brand))]/15 border-[hsl(var(--brand))]/20',
+            !isPlus && !isSup && 'bg-white/5 border-white/10',
           )}>
             <config.icon className={cn('h-5 w-5', config.color)} />
           </div>
           <div>
-            <h3 className="text-base font-bold text-foreground">{config.name}</h3>
-            <p className="text-[11px] text-muted-foreground">{config.tagline}</p>
+            <h3 className="text-base font-bold text-white">{config.name}</h3>
+            <p className="text-[11px] text-white/45">{config.tagline}</p>
           </div>
         </div>
 
@@ -219,13 +330,13 @@ function PlanCard({ config, billing, userTier, onSelect }: {
           <div className="flex items-baseline gap-1.5">
             <span className={cn(
               'text-3xl font-bold tracking-tight',
-              config.variant === 'supporter-plus' ? 'text-purple-300' : 'text-foreground',
+              isPlus ? 'text-purple-300' : 'text-white',
             )}>
               {price.main}
             </span>
-            <span className="text-sm text-muted-foreground">{price.sub}</span>
+            <span className="text-sm text-white/45">{price.sub}</span>
             {isAnnual && price.original && (
-              <span className="text-xs text-muted-foreground/50 line-through ml-1">{price.original}</span>
+              <span className="text-xs text-white/30 line-through ml-1">{price.original}</span>
             )}
           </div>
           {isAnnual && config.id !== 'free' && (
@@ -238,7 +349,7 @@ function PlanCard({ config, billing, userTier, onSelect }: {
 
         {/* Billing toggle */}
         {config.id !== 'free' && (
-          <div className="flex gap-1 mt-4 bg-muted/20 rounded-xl p-0.5 border border-border/10">
+          <div className="flex gap-1 mt-4 lg-subtle rounded-xl p-0.5">
             {BILLING_OPTIONS.map((b) => {
               const isSel = billing === b.value;
               return (
@@ -246,15 +357,15 @@ function PlanCard({ config, billing, userTier, onSelect }: {
                   key={b.value}
                   onClick={() => onSelect(config.id, b.value)}
                   className={cn(
-                    'flex-1 text-[10px] font-semibold py-1.5 rounded-lg transition-all duration-200',
+                    'flex-1 text-[10px] font-semibold py-1.5 rounded-lg transition-all duration-200 relative z-10',
                     isSel
-                      ? 'bg-background text-foreground shadow-sm border border-border/20'
-                      : 'text-muted-foreground/60 hover:text-foreground/80',
+                      ? 'bg-white/10 text-white shadow-sm border border-white/10'
+                      : 'text-white/40 hover:text-white/70',
                   )}
                 >
                   {b.label}
                   {b.badge && isAnnual && (
-                    <span className="block text-[8px] font-bold text-emerald-500">{b.badge}</span>
+                    <span className="block text-[8px] font-bold text-emerald-400">{b.badge}</span>
                   )}
                 </button>
               );
@@ -264,18 +375,13 @@ function PlanCard({ config, billing, userTier, onSelect }: {
 
         {/* CTA */}
         <Button
-          variant={isCurrentPlan ? 'outline' : config.variant === 'supporter-plus' ? 'default' : config.variant === 'supporter' ? 'default' : 'outline'}
+          variant={isCurrentPlan ? 'outline' : 'default'}
           className={cn(
-            'w-full mt-4 rounded-xl h-10 text-sm font-semibold transition-all',
-            isCurrentPlan && 'opacity-60 cursor-default',
-            !isCurrentPlan && config.variant === 'supporter-plus' && [
-              'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-500/90 hover:to-pink-500/90',
-              'shadow-lg shadow-purple-500/25 text-white border-0',
-            ],
-            !isCurrentPlan && config.variant === 'supporter' && [
-              'bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90',
-              'shadow-md shadow-primary/20',
-            ],
+            'w-full mt-4 rounded-xl h-10 text-sm font-semibold transition-all relative z-10',
+            isCurrentPlan && 'opacity-50 cursor-default border-white/10 text-white/40',
+            !isCurrentPlan && isPlus && 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-500/90 hover:to-pink-500/90 shadow-lg shadow-purple-500/25 text-white border-0',
+            !isCurrentPlan && isSup && 'bg-gradient-to-r from-[hsl(var(--brand))] to-purple-500 hover:from-[hsl(var(--brand)/0.9)] hover:to-purple-500/90 shadow-md shadow-[hsl(var(--brand)/0.2)] text-white border-0',
+            !isCurrentPlan && !isPlus && !isSup && 'border-white/15 text-white/70 hover:text-white hover:bg-white/[0.06] hover:border-white/25',
           )}
           disabled={isCurrentPlan}
           onClick={() => !isCurrentPlan && onSelect(config.id, billing)}
@@ -283,15 +389,14 @@ function PlanCard({ config, billing, userTier, onSelect }: {
           {isCurrentPlan ? 'Current Plan' : config.id === 'free' ? 'Get Started' : config.id === 'supporter' ? 'Go Supporter' : 'Go Unlimited'}
         </Button>
 
-        {/* Description line */}
         {config.description && (
-          <p className="text-[11px] text-muted-foreground/60 text-center mt-2">{config.description}</p>
+          <p className="text-[11px] text-white/35 text-center mt-2 relative z-10">{config.description}</p>
         )}
       </div>
 
       {/* Feature highlights */}
-      <div className="relative p-6 pt-5 flex-1 flex flex-col">
-        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+      <div className="relative p-6 pt-5 flex-1 flex flex-col z-10">
+        <p className="text-[11px] font-semibold text-white/35 uppercase tracking-wider mb-3">
           {config.variant === 'free' ? 'What you get' : 'Everything in Free, plus'}
         </p>
         <ul className="space-y-2.5 flex-1">
@@ -300,12 +405,12 @@ function PlanCard({ config, billing, userTier, onSelect }: {
               key={f.label}
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.25 + i * 0.04, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ delay: 0.3 + i * 0.05, duration: 0.3, ease: EASE_OUT }}
               className="flex items-start gap-2.5"
             >
-              <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-              <span className="text-xs leading-snug text-foreground/80">
-                <span className="font-semibold text-foreground">{config.variant === 'free' ? f.free : f.paid}</span>
+              <CheckCircle className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+              <span className="text-xs leading-snug text-white/65">
+                <span className="font-semibold text-white">{config.variant === 'free' ? f.free : f.paid}</span>
                 {' '}{f.label}
               </span>
             </motion.li>
@@ -316,31 +421,30 @@ function PlanCard({ config, billing, userTier, onSelect }: {
   );
 }
 
+/* ═══ ComparisonTable ═══ */
+
 function ComparisonTable({ isMobile }: { isMobile: boolean }) {
   const table = (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b border-border/20 bg-muted/10">
-          <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Feature</th>
-          <th className="px-4 py-3 text-xs font-semibold text-center text-muted-foreground/60">Free</th>
-          <th className="px-4 py-3 text-xs font-semibold text-center text-primary">Supporter</th>
+        <tr className="border-b border-white/[0.06]">
+          <th className="text-left px-4 py-3 text-xs font-semibold text-white/40">Feature</th>
+          <th className="px-4 py-3 text-xs font-semibold text-center text-white/30">Free</th>
+          <th className="px-4 py-3 text-xs font-semibold text-center text-[hsl(var(--brand))]">Supporter</th>
           <th className="px-4 py-3 text-xs font-semibold text-center text-purple-400">Supporter+</th>
         </tr>
       </thead>
       <tbody>
         {COMPARISON_ROWS.map((row, i) => (
-          <tr key={row.feature} className={cn(
-            'border-b border-border/10',
-            i % 2 === 0 ? 'bg-background' : 'bg-muted/5',
-          )}>
-            <td className="px-4 py-2.5 text-xs font-medium text-foreground whitespace-nowrap">{row.feature}</td>
+          <tr key={row.feature} className="border-b border-white/[0.04]">
+            <td className="px-4 py-2.5 text-xs font-medium text-white/70 whitespace-nowrap">{row.feature}</td>
             <td className={cn(
               'px-4 py-2.5 text-xs text-center',
-              row.noDiff ? 'text-foreground/80 font-medium' : 'text-muted-foreground/50',
+              row.noDiff ? 'text-white/60 font-medium' : 'text-white/30',
             )}>
               {row.free}
             </td>
-            <td className="px-4 py-2.5 text-xs text-center font-medium text-primary">{row.supp}</td>
+            <td className="px-4 py-2.5 text-xs text-center font-medium text-[hsl(var(--brand))]">{row.supp}</td>
             <td className="px-4 py-2.5 text-xs text-center font-medium text-purple-400">{row.suppPlus}</td>
           </tr>
         ))}
@@ -351,7 +455,7 @@ function ComparisonTable({ isMobile }: { isMobile: boolean }) {
   if (isMobile) {
     return (
       <div className="overflow-x-auto -mx-4 px-4">
-        <div className="min-w-[500px] rounded-2xl border border-border/20 overflow-hidden">
+        <div className="min-w-[500px] lg rounded-2xl overflow-hidden">
           {table}
         </div>
       </div>
@@ -359,11 +463,13 @@ function ComparisonTable({ isMobile }: { isMobile: boolean }) {
   }
 
   return (
-    <div className="rounded-2xl border border-border/20 overflow-hidden">
+    <div className="lg rounded-2xl overflow-hidden">
       {table}
     </div>
   );
 }
+
+/* ═══ FAQSection ═══ */
 
 function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -371,16 +477,16 @@ function FAQSection() {
   return (
     <div className="max-w-2xl mx-auto space-y-2">
       {FAQS.map((faq, i) => (
-        <div key={i} className="rounded-xl border border-border/20 bg-card/50 overflow-hidden">
+        <div key={i} className="lg rounded-xl overflow-hidden">
           <button
             onClick={() => setOpenIndex(openIndex === i ? null : i)}
-            className="w-full flex items-center justify-between px-4 py-3 text-left text-sm font-medium text-foreground hover:bg-accent/30 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3 text-left text-sm font-medium text-white/80 hover:text-white transition-colors relative z-10"
           >
             {faq.q}
             <motion.span
               animate={{ rotate: openIndex === i ? 180 : 0 }}
               transition={{ duration: 0.2 }}
-              className="text-muted-foreground shrink-0 ml-2"
+              className="text-white/40 shrink-0 ml-2"
             >
               ▼
             </motion.span>
@@ -391,10 +497,10 @@ function FAQSection() {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                transition={{ duration: 0.25, ease: EASE_OUT }}
                 className="overflow-hidden"
               >
-                <p className="px-4 pb-3 text-xs text-muted-foreground leading-relaxed">{faq.a}</p>
+                <p className="px-4 pb-3 text-xs text-white/45 leading-relaxed relative z-10">{faq.a}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -404,12 +510,18 @@ function FAQSection() {
   );
 }
 
+/* ═══ Main ═══ */
+
 export default function PricingPage() {
   const { user, profile } = useAuth();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [billing, setBilling] = useState<Billing>('monthly');
   const userTier = profile?.is_premium ? (profile?.tier || 'supporter') : 'free';
+
+  const { scrollY } = useScroll();
+  const heroY = useTransform(scrollY, [0, 600], [0, -80]);
+  const heroO = useTransform(scrollY, [0, 400], [1, 0]);
 
   const handleSelect = (planId: string, bill: Billing) => {
     setBilling(bill);
@@ -423,40 +535,160 @@ export default function PricingPage() {
   const planEntries = Object.entries(PLAN_CONFIGS) as [string, typeof PLAN_CONFIGS[string]][];
 
   return (
-    <div className="min-h-screen bg-background overflow-hidden">
-      {/* Background orbs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
-        <div className="absolute -bottom-40 -right-40 w-[400px] h-[400px] rounded-full bg-purple-500/5 blur-[100px]" />
-      </div>
+    <div className="relative min-h-screen text-white overflow-x-clip">
+      <style>{`
+        /* ── Twinkle ── */
+        @keyframes twinkle { 0%,100% { opacity: var(--o, 0.4); } 50% { opacity: 1; } }
+        .star { animation: twinkle ease-in-out infinite; }
 
-      {/* Hero */}
-      <section className="relative overflow-hidden px-4 pt-16 pb-6 text-center">
+        /* ── Shooting star ── */
+        @keyframes shoot {
+          0% { transform: translateX(0) translateY(0) rotate(-25deg); opacity: 1; }
+          60% { opacity: 1; }
+          100% { transform: translateX(-130vw) translateY(45vh) rotate(-25deg); opacity: 0; }
+        }
+        .shooting-star { animation: shoot linear forwards; }
+
+        /* ── Nebula breathing ── */
+        @keyframes nebula-pulse {
+          0%, 100% { opacity: 0.35; transform: scale(1); }
+          50% { opacity: 0.55; transform: scale(1.03); }
+        }
+        .nebula-pulse { animation: nebula-pulse 12s ease-in-out infinite; will-change: transform, opacity; }
+
+        /* ═══ REAL LIQUID GLASS ═══ */
+        .lg {
+          position: relative;
+          backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
+          -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.1);
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+          box-shadow:
+            0 8px 32px rgba(0,0,0,0.3),
+            inset 0 1px 0 rgba(255,255,255,0.1),
+            inset 0 -1px 0 rgba(255,255,255,0.03);
+        }
+        .lg::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 25%, transparent 50%);
+          pointer-events: none;
+          z-index: 1;
+          transition: opacity 200ms ease-out;
+        }
+        .lg:hover::before {
+          background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 30%, transparent 55%);
+        }
+        .lg::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          padding: 1px;
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 40%, transparent 70%, rgba(255,255,255,0.08) 100%);
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          pointer-events: none;
+          z-index: 1;
+        }
+
+        /* Strong variant */
+        .lg-strong {
+          backdrop-filter: blur(56px) saturate(2) brightness(1.15);
+          -webkit-backdrop-filter: blur(56px) saturate(2) brightness(1.15);
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.12);
+          box-shadow:
+            0 16px 64px rgba(0,0,0,0.4),
+            0 0 80px hsl(var(--brand) / 0.08),
+            inset 0 1px 0 rgba(255,255,255,0.15),
+            inset 0 -1px 0 rgba(255,255,255,0.05);
+        }
+        .lg-strong::before {
+          background: linear-gradient(135deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.05) 30%, transparent 55%);
+        }
+        .lg-strong::after {
+          background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 35%, transparent 65%, rgba(255,255,255,0.1) 100%);
+        }
+
+        /* Subtle variant */
+        .lg-subtle {
+          backdrop-filter: blur(24px) saturate(1.5) brightness(1.05);
+          -webkit-backdrop-filter: blur(24px) saturate(1.5) brightness(1.05);
+          background: rgba(255,255,255,0.025);
+          border: 1px solid rgba(255,255,255,0.06);
+          box-shadow:
+            0 4px 16px rgba(0,0,0,0.2),
+            inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+
+        /* ── Reduced motion ── */
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 150ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 150ms !important;
+          }
+          .shooting-star { opacity: 0 !important; }
+        }
+      `}</style>
+
+      <Starfield scrollY={scrollY} />
+
+      {/* ═══ Hero with nebula centerpiece ═══ */}
+      <section className="relative overflow-hidden px-4 pt-20 pb-8 text-center">
+        <NebulaCenterpiece />
+
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="relative max-w-2xl mx-auto"
+          style={{ y: heroY, opacity: heroO }}
         >
-          <h1 className="text-3xl md:text-5xl font-bold text-foreground tracking-tight mb-4 leading-tight">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ ...BOUNCE, delay: 0.1 }}
+            className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full lg-subtle mb-6"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[hsl(var(--brand))]/60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[hsl(var(--brand))]" />
+            </span>
+            <span className="text-[11px] font-medium text-white/70 relative z-10">Pricing</span>
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ ...BOUNCE, delay: 0.2 }}
+            className="text-3xl md:text-5xl font-bold tracking-[-0.04em] leading-[1.08] mb-4"
+          >
             Unlimited storage.{' '}
-            <span className="bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-[hsl(var(--brand))]">
               Your speed, your call.
             </span>
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground max-w-lg mx-auto leading-relaxed">
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...BOUNCE_SOFT, delay: 0.35 }}
+            className="text-sm md:text-base text-white/50 max-w-lg mx-auto leading-relaxed"
+          >
             Every plan gets unlimited storage. Upgrading gives you speed, concurrency, and priority.
-          </p>
+          </motion.p>
         </motion.div>
 
         {/* Billing toggle */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-8 mb-6"
+          transition={{ ...BOUNCE, delay: 0.4 }}
+          className="mt-8 mb-6 relative z-10"
         >
-          <div className="inline-flex gap-1 bg-muted/20 rounded-xl p-0.5 border border-border/10 shadow-sm">
+          <div className="inline-flex gap-1 lg-subtle rounded-xl p-0.5">
             {BILLING_OPTIONS.map((b) => {
               const isSel = billing === b.value;
               return (
@@ -464,10 +696,10 @@ export default function PricingPage() {
                   key={b.value}
                   onClick={() => setBilling(b.value)}
                   className={cn(
-                    'relative px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200',
+                    'relative px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 z-10',
                     isSel
-                      ? 'bg-background text-foreground shadow-sm border border-border/20'
-                      : 'text-muted-foreground/60 hover:text-foreground/80',
+                      ? 'bg-white/10 text-white shadow-sm border border-white/10'
+                      : 'text-white/40 hover:text-white/70',
                   )}
                 >
                   {b.label}
@@ -475,7 +707,7 @@ export default function PricingPage() {
                     <motion.span
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500"
+                      className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400"
                     >
                       {b.badge}
                     </motion.span>
@@ -487,7 +719,7 @@ export default function PricingPage() {
         </motion.div>
       </section>
 
-      {/* Plan cards */}
+      {/* ═══ Plan cards ═══ */}
       <section className={cn(
         'relative px-4 pb-12',
         isMobile
@@ -511,90 +743,96 @@ export default function PricingPage() {
       <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5, duration: 0.4 }}
-        className="text-center text-xs text-muted-foreground/60 pb-12 -mt-4"
+        transition={{ delay: 0.6, duration: 0.4 }}
+        className="text-center text-xs text-white/30 pb-12 -mt-4 relative z-10"
       >
         No hidden fees. Cancel anytime. Powered by MaxelPay.
       </motion.p>
 
-      {/* Feature comparison table */}
+      {/* ═══ Feature comparison table ═══ */}
       <section className="relative px-4 pb-20">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-40px' }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          viewport={{ once: true, margin: '-60px' }}
+          transition={BOUNCE}
           className="max-w-4xl mx-auto"
         >
           <div className="text-center mb-8">
-            <h2 className="text-lg font-bold text-foreground">Full feature comparison</h2>
-            <p className="text-xs text-muted-foreground mt-1">Everything at a glance</p>
+            <h2 className="text-lg font-bold text-white">Full feature comparison</h2>
+            <p className="text-xs text-white/40 mt-1">Everything at a glance</p>
           </div>
 
           <ComparisonTable isMobile={isMobile} />
 
-          <p className="text-[10px] text-muted-foreground/50 text-center mt-4 max-w-lg mx-auto">
+          <p className="text-[10px] text-white/25 text-center mt-4 max-w-lg mx-auto">
             Storage is and always will be unlimited for all tiers. We charge for speed, persistence, and API capacity — not your data.
           </p>
         </motion.div>
       </section>
 
-      {/* FAQ */}
+      {/* ═══ FAQ ═══ */}
       <motion.section
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-40px' }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="border-t border-border/10 px-4 py-14"
+        viewport={{ once: true, margin: '-60px' }}
+        transition={BOUNCE}
+        className="border-t border-white/[0.06] px-4 py-14"
       >
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-lg font-bold text-foreground text-center mb-8">Frequently asked questions</h2>
+          <h2 className="text-lg font-bold text-white text-center mb-8">Frequently asked questions</h2>
           <FAQSection />
         </div>
       </motion.section>
 
-      {/* MaxelPay trust */}
+      {/* ═══ MaxelPay trust ═══ */}
       <motion.section
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-40px' }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="border-t border-border/10 px-4 py-14 text-center bg-gradient-to-b from-transparent to-primary/[0.02]"
+        viewport={{ once: true, margin: '-60px' }}
+        transition={BOUNCE}
+        className="border-t border-white/[0.06] px-4 py-14 text-center"
       >
         <div className="max-w-lg mx-auto">
-          <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck className="h-7 w-7 text-emerald-500" />
+          <div className="lg h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-4 relative z-10">
+            <ShieldCheck className="h-7 w-7 text-emerald-400" />
           </div>
-          <h2 className="text-lg font-bold text-foreground mb-2">Secure crypto payments</h2>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            All payments are processed securely through <strong className="text-foreground">MaxelPay</strong> — a no-KYC cryptocurrency payment gateway.
+          <h2 className="text-lg font-bold text-white mb-2 relative z-10">Secure crypto payments</h2>
+          <p className="text-xs text-white/45 leading-relaxed relative z-10">
+            All payments are processed securely through <strong className="text-white/80">MaxelPay</strong> — a no-KYC cryptocurrency payment gateway.
             Pay with USDT, USDC, ETH, BTC, and more. Your funds are settled instantly on-chain.
             No credit card required. No personal information shared.
           </p>
-          <p className="text-[10px] text-muted-foreground/50 mt-4">
+          <p className="text-[10px] text-white/25 mt-4 relative z-10">
             Powered by MaxelPay &bull; Multi-chain &bull; No KYC &bull; Instant settlement
           </p>
         </div>
       </motion.section>
 
-      {/* Bottom CTA */}
+      {/* ═══ Bottom CTA ═══ */}
       <motion.section
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-40px' }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="border-t border-border/10 px-4 py-14 text-center"
+        viewport={{ once: true, margin: '-60px' }}
+        transition={BOUNCE}
+        className="border-t border-white/[0.06] px-4 py-14 text-center"
       >
         <div className="max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-foreground mb-2">Still on the fence?</h2>
-          <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-            Every tier gets unlimited storage. Upgrade only when you outgrow the free lane — your files never will.
-          </p>
-          <Button asChild variant="outline" className="rounded-xl h-10">
-            <a href={user ? '/dashboard' : '/auth'}>
-              {user ? 'Back to Dashboard' : 'Create Free Account'}
-            </a>
-          </Button>
+          <div className="lg-strong rounded-3xl p-10 text-center relative overflow-hidden">
+            {/* Internal glow */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--brand))]/[0.06] via-transparent to-transparent pointer-events-none" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-[hsl(var(--brand))]/[0.1] rounded-full blur-[60px] pointer-events-none glow-pulse" />
+
+            <h2 className="text-xl font-bold text-white mb-2 relative z-10">Still on the fence?</h2>
+            <p className="text-sm text-white/45 mb-6 leading-relaxed relative z-10">
+              Every tier gets unlimited storage. Upgrade only when you outgrow the free lane — your files never will.
+            </p>
+            <Button asChild variant="outline" className="rounded-xl h-10 border-white/15 text-white/70 hover:text-white hover:bg-white/[0.06] relative z-10">
+              <a href={user ? '/dashboard' : '/auth'}>
+                {user ? 'Back to Dashboard' : 'Create Free Account'}
+              </a>
+            </Button>
+          </div>
         </div>
       </motion.section>
     </div>

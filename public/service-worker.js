@@ -1,7 +1,18 @@
 const CACHE_NAME = 'squidcloud-v12.0.26-streamer';
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil((async () => {
+    // Purge caches left behind by previous deployments so a stale shell/bundle
+    // can never be served after a redeploy.
+    const names = await caches.keys();
+    await Promise.all(
+      names.map((n) => (n !== CACHE_NAME ? caches.delete(n) : Promise.resolve()))
+    );
+    await self.clients.claim();
+  })());
+});
 
 const metaCache = new Map();
 const urlCache = new Map();
@@ -163,7 +174,13 @@ function findChunk(chunks, fileSize, chunkSize, startByte) {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (!url.pathname.startsWith('/virtual-stream/')) {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    // The app shell and hashed assets must always come from the network so a
+    // redeploy never serves a stale HTML referencing purged bundle hashes.
+    if (event.request.mode === 'navigate' || url.pathname.startsWith('/assets/')) {
+      event.respondWith(fetch(event.request, {cache: 'no-store'}));
+    } else {
+      event.respondWith(fetch(event.request, {cache: 'no-store'}).catch(() => caches.match(event.request)));
+    }
     return;
   }
 

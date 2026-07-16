@@ -112,11 +112,8 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
         <div
           className={cn(
             'mx-3 mb-3 w-full max-w-md',
-            'lg-elevated rounded-2xl',
-            'shadow-lg shadow-black/5 dark:shadow-black/20',
-            'bg-card/85 backdrop-blur-2xl',
-            'border border-border/20',
-            'transition-all duration-300',
+            'lg-strong rounded-[28px]',
+            'transition-all duration-300 lg-glow',
             mounted ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0',
           )}
         >

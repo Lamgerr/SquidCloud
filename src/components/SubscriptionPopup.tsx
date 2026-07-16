@@ -60,14 +60,13 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
-              'relative w-full max-w-md rounded-2xl border border-border/20 bg-card shadow-2xl overflow-hidden',
-              'backdrop-blur-2xl',
+              'relative w-full max-w-md rounded-2xl border border-white/10 lg-strong shadow-2xl overflow-hidden',
             )}
           >
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500" />
             <button
               onClick={() => onDismiss(notification.id)}
-              className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-muted/50 hover:bg-muted/80 flex items-center justify-center transition-colors z-10"
+              className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
             >
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -85,7 +84,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
               </p>
 
               <div className="grid grid-cols-2 gap-3 mb-5">
-                <div className="rounded-xl bg-muted/30 border border-border/20 p-3 text-center">
+                <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
                   <p className="text-[10px] font-semibold text-muted-foreground mb-2">STAY WEEKLY</p>
                   <p className="text-lg font-bold text-foreground">$0.75</p>
                   <p className="text-[11px] text-muted-foreground">per week</p>
@@ -164,13 +163,12 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             className={cn(
-              'relative w-full max-w-sm rounded-2xl border border-border/20 bg-card shadow-2xl p-6',
-              'backdrop-blur-2xl',
+              'relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6',
             )}
           >
             <button
               onClick={() => onDismiss(notification.id)}
-              className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-muted/50 hover:bg-muted/80 flex items-center justify-center transition-colors"
+              className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
             >
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -185,7 +183,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
               </div>
             </div>
 
-            <div className="rounded-xl bg-muted/30 border border-border/20 p-3 mb-5 space-y-1.5">
+                <div className="rounded-xl bg-white/5 border border-white/10 p-3 mb-5 space-y-1.5">
               <p className="text-xs text-muted-foreground">What changes when it expires:</p>
               <p className="text-xs text-foreground/80 flex items-center gap-2">
                 <span className="text-amber-400">•</span> Sites enter 50-day archive countdown
@@ -249,8 +247,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
-              'relative w-full max-w-sm rounded-2xl border border-border/20 bg-card shadow-2xl p-6',
-              'backdrop-blur-2xl',
+              'relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6',
             )}
           >
             <div className="flex items-center gap-3 mb-4">
@@ -263,7 +260,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
               </div>
             </div>
 
-            <div className="rounded-xl bg-muted/30 border border-border/20 p-3 mb-5 space-y-2">
+                <div className="rounded-xl bg-white/5 border border-white/10 p-3 mb-5 space-y-2">
               <p className="text-xs text-red-400 flex items-center gap-2">
                 <X className="h-3 w-3" /> Priority queue — now standard queue
               </p>
@@ -313,9 +310,9 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
           <motion.div
             initial={{ opacity: 0, scale: 0.92, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className={cn('relative w-full max-w-sm rounded-2xl border border-border/20 bg-card shadow-2xl p-6 backdrop-blur-2xl')}
+            className={cn('relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6')}
           >
-            <button onClick={() => onDismiss(notification.id)} className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-muted/50 hover:bg-muted/80 flex items-center justify-center transition-colors">
+            <button onClick={() => onDismiss(notification.id)} className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
 
@@ -323,7 +320,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
             <p className="text-sm text-muted-foreground mb-5">Your annual plan renews in 7 days. Upgrade to Supporter+ before then.</p>
 
             <div className="grid grid-cols-2 gap-2 mb-5">
-              <div className="rounded-xl bg-muted/30 border border-border/20 p-3">
+              <div className="rounded-xl bg-white/5 border border-white/10 p-3">
                 <p className="text-xs font-semibold text-muted-foreground mb-3">SUPPORTER</p>
                 <div className="space-y-1.5 text-[11px]">
                   <p className="text-foreground/80">10 concurrent ops</p>

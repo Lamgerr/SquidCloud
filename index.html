@@ -20,12 +20,34 @@
           (document.body || document.documentElement).appendChild(overlay);
         }
         window.__showFatal = showFatal;
+
+        // Stale-deploy recovery. After a redeploy, a browser that cached index.html
+        // (e.g. via an over-eager `immutable` Cache-Control) can keep requesting JS
+        // chunk hashes that have since been purged from the server, producing
+        // "Failed to load resource: /assets/index-*.js". Reload once with a cache-bust
+        // so the page fetches the current, healthy bundle instead of stranding the user.
+        function tryReloadForStaleDeploy() {
+          try {
+            if (sessionStorage.getItem('sc_module_recover')) return false;
+            sessionStorage.setItem('sc_module_recover', '1');
+          } catch (e) { return false; }
+          var url = new URL(window.location.href);
+          url.searchParams.set('cache_bust', Date.now().toString());
+          window.location.href = url.toString();
+          return true;
+        }
+
         window.addEventListener('error', function (e) {
           if (e && e.message) {
             var detail = (e.error && (e.error.stack || e.error.message)) || e.message;
             showFatal(String(detail));
           } else if (e && e.target && (e.target.src || e.target.href)) {
-            showFatal('Failed to load resource: ' + (e.target.src || e.target.href));
+            var src = e.target.src || e.target.href;
+            // Only treat JavaScript module/script load failures as fatal/recoverable.
+            // A missing favicon/font/stylesheet should never blank the whole app.
+            if (!/\.m?js($|\?)/.test(src)) return;
+            if (tryReloadForStaleDeploy()) return; // stale-deploy recovery: reload once
+            showFatal('Failed to load resource: ' + src);
           }
         }, true);
         window.addEventListener('unhandledrejection', function (e) {

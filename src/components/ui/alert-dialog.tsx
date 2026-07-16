@@ -44,12 +44,12 @@ const AlertDialogContent = React.forwardRef<
             "left-0 right-0 bottom-0 top-auto",
             "translate-y-full data-[state=open]:translate-y-0",
             "max-w-full mx-0 rounded-t-[20px] rounded-b-none",
-            "bg-[#1C2128] border-0",
+            "lg-strong border-b-0",
             "max-h-[90vh] overflow-y-auto",
           ].join(" ") : [
             "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]",
             "max-w-md rounded-2xl",
-            "bg-[#1C2128] border border-[#2D333B] p-6",
+            "lg-strong p-6",
             "opacity-0 scale-[0.96] data-[state=open]:opacity-100 data-[state=open]:scale-100",
           ].join(" "),
           className
@@ -58,7 +58,7 @@ const AlertDialogContent = React.forwardRef<
         {...props}
       >
         {isMobile && (
-          <div className="mx-auto mt-3 h-1 w-9 rounded-full bg-[#444C56] shrink-0 mb-1" />
+          <div className="mx-auto mt-3 h-1 w-9 rounded-full bg-white/20 shrink-0 mb-1" />
         )}
         {children}
       </AlertDialogPrimitive.Content>
@@ -117,7 +117,7 @@ const AlertDialogTitle = React.forwardRef<
       ref={ref}
       className={cn(
         "font-semibold",
-        isMobile ? "text-[17px] text-[#E6EDF3]" : "text-lg text-[#E6EDF3]",
+        isMobile ? "text-[17px] text-foreground" : "text-lg text-foreground",
         className
       )}
       {...props}
@@ -137,7 +137,7 @@ const AlertDialogDescription = React.forwardRef<
       ref={ref}
       className={cn(
         "text-sm",
-        isMobile ? "text-[#768390] text-[14px] leading-[1.5] mt-1" : "text-[#768390]",
+        isMobile ? "text-muted-foreground text-[14px] leading-[1.5] mt-1" : "text-muted-foreground",
         className
       )}
       {...props}
@@ -158,7 +158,7 @@ const AlertDialogAction = React.forwardRef<
       ref={ref}
       className={cn(
         buttonVariants(),
-        isMobile ? "h-[56px] rounded-none bg-transparent text-[#E6EDF3] text-[16px] font-normal border-0 border-t border-[#2D333B] hover:bg-[#2D333B] active:bg-[#2D333B] justify-start px-5 transition-colors duration-80" : "",
+        isMobile ? "h-[56px] rounded-none bg-transparent text-foreground text-[16px] font-normal border-0 border-t border-border/40 hover:bg-accent/60 active:bg-accent/80 justify-start px-5 transition-colors duration-80" : "",
         className
       )}
       {...props}
@@ -179,8 +179,8 @@ const AlertDialogCancel = React.forwardRef<
       className={cn(
         buttonVariants({ variant: "outline" }),
         isMobile
-          ? "h-[56px] rounded-none bg-transparent text-[#8B949E] text-[16px] font-normal border-0 border-t border-[#2D333B] hover:bg-[#2D333B] active:bg-[#2D333B] justify-start px-5 transition-colors duration-80"
-          : "bg-transparent border border-[#2D333B] text-[#8B949E] hover:border-[#444C56] rounded-lg px-4 py-2 text-sm",
+          ? "h-[56px] rounded-none bg-transparent text-muted-foreground text-[16px] font-normal border-0 border-t border-border/40 hover:bg-accent/60 active:bg-accent/80 justify-start px-5 transition-colors duration-80"
+          : "bg-transparent border border-border/40 text-muted-foreground hover:border-border/60 rounded-lg px-4 py-2 text-sm",
         className
       )}
       {...props}

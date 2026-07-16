@@ -25,13 +25,14 @@
   [headers.values]
     Content-Type = "application/json"
 
-# Disable caching for index.html
+# Disable caching for index.html — never let the HTML shell be cached as immutable,
+# otherwise a redeploy can leave clients requesting purged JS chunk hashes.
 [[headers]]
   for = "/index.html"
   [headers.values]
-    Cache-Control = "no-cache"
-
-# Cache control for assets
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    
+# Cache control for assets (hashed filenames are safe to cache forever)
 [[headers]]
   for = "/assets/*"
   [headers.values]
@@ -46,6 +47,9 @@
     Content-Security-Policy = "default-src 'none'"
     
 # Security headers for all paths - Updated CSP to allow external fonts and scripts
+# NOTE: no Cache-Control here on purpose — the catch-all would otherwise leak
+# `immutable` onto /index.html and cause stale-deploy chunk 404s. HTML caching is
+# handled explicitly by the /index.html rule above (no-cache).
 [[headers]]
   for = "/*"
   [headers.values]
@@ -53,7 +57,6 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Content-Security-Policy = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.gpteng.co; style-src 'self' 'unsafe-inline' https://rsms.me https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://rsms.me; img-src 'self' data: blob: https:; connect-src 'self' https: data: *..live; object-src 'none'; media-src 'self' blob: data:; worker-src 'self' blob:;"
-    Cache-Control = "public, max-age=31557600, immutable"
 
 # Specific redirect for shared files to handle client-side routing
 [[redirects]]

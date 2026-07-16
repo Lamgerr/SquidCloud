@@ -41,13 +41,13 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[20px] bg-[#1C2128] [overscroll-behavior-y:contain]",
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[20px] lg-strong [overscroll-behavior-y:contain]",
         className
       )}
       style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
       {...props}
     >
-      <div className="mx-auto mt-3 h-1 w-9 rounded-full bg-[#444C56] shrink-0" />
+      <div className="mx-auto mt-3 h-1 w-9 rounded-full bg-white/20 shrink-0" />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
@@ -82,10 +82,10 @@ const DrawerTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Title
     ref={ref}
-    className={cn(
-      "text-[17px] font-semibold text-[#E6EDF3] leading-none tracking-tight",
-      className
-    )}
+      className={cn(
+        "text-[17px] font-semibold text-foreground leading-none tracking-tight",
+        className
+      )}
     {...props}
   />
 ))
@@ -97,7 +97,7 @@ const DrawerDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-[#768390]", className)}
+    className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
 ))
