@@ -75,11 +75,22 @@ function showFatalOverlay(message: string) {
 }
 
 window.addEventListener('error', (event) => {
-  // Ignore resource load failures (e.g. a broken <img>/<script>); only surface script errors.
   if (!event.message) return;
+  // Firefox false-positive: dynamic import failures can fire on the main script tag.
+  // If the app is already running, resource errors without a real script error are
+  // likely false-positives from Firefox's buggy event attribution.
+  if (!event.error && /Failed to (load|fetch) resource/i.test(event.message)) return;
   const detail = (event.error && (event.error.stack || event.error.message)) || event.message;
   console.error('[fatal]', detail);
-  if (tryRecoverModuleLoad(String(detail))) return; // stale-deploy recovery: reload once
+  if (tryRecoverModuleLoad(String(detail))) return;
+  showFatalOverlay(String(detail));
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason;
+  const detail = (reason && (reason.stack || reason.message)) || String(reason);
+  console.error('[fatal]', detail);
+  if (tryRecoverModuleLoad(String(detail))) return;
   showFatalOverlay(String(detail));
 });
 

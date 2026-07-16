@@ -43,11 +43,20 @@
             showFatal(String(detail));
           } else if (e && e.target && (e.target.src || e.target.href)) {
             var src = e.target.src || e.target.href;
-            // Only treat JavaScript module/script load failures as fatal/recoverable.
-            // A missing favicon/font/stylesheet should never blank the whole app.
             if (!/\.m?js($|\?)/.test(src)) return;
+            // Firefox bug: when a dynamic import() fails, the error event can be
+            // incorrectly attributed to the MAIN entry <script> tag instead of the
+            // actual chunk that failed. If the app is already rendered (#root has
+            // children), the main script loaded fine — this is a false positive.
+            var rootEl = document.getElementById('root');
+            if (rootEl && rootEl.children.length > 0) {
+              console.warn('[fatal] Ignoring false-positive script error (app running):', src, e.target);
+              return;
+            }
             if (tryReloadForStaleDeploy()) return; // stale-deploy recovery: reload once
-            showFatal('Failed to load resource: ' + src);
+            var tagInfo = '';
+            try { tagInfo = '\n\nElement: <' + (e.target.tagName || '?') + ' ' + (e.target.className || '') + '>\nOuter: ' + (e.target.outerHTML || '?').slice(0, 300); } catch(_) {}
+            showFatal('Failed to load resource: ' + src + tagInfo);
           }
         }, true);
         window.addEventListener('unhandledrejection', function (e) {
