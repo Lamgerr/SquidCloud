@@ -44,12 +44,12 @@ const AlertDialogContent = React.forwardRef<
             "left-0 right-0 bottom-0 top-auto",
             "translate-y-full data-[state=open]:translate-y-0",
             "max-w-full mx-0 rounded-t-[20px] rounded-b-none",
-            "lg-strong border-b-0",
+            "bg-card/80 backdrop-blur-2xl border border-white/10 border-b-0 shadow-2xl",
             "max-h-[90vh] overflow-y-auto",
           ].join(" ") : [
             "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]",
             "max-w-md rounded-2xl",
-            "lg-strong p-6",
+            "bg-card/80 backdrop-blur-2xl border border-white/10 shadow-2xl p-6",
             "opacity-0 scale-[0.96] data-[state=open]:opacity-100 data-[state=open]:scale-100",
           ].join(" "),
           className

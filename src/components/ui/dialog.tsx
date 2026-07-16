@@ -97,7 +97,7 @@ const DialogContent = React.forwardRef<
           className={cn(
             "fixed bottom-0 left-0 right-0 z-50 mt-24",
             "flex flex-col rounded-t-[20px]",
-            "lg-strong border-b-0",
+            "bg-card/80 backdrop-blur-2xl border border-white/10 border-b-0 shadow-2xl",
             "max-h-[85vh] overflow-y-auto",
             zIndexClass,
             className
@@ -124,10 +124,10 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 p-5 shadow-lg",
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 p-5 shadow-2xl",
           "translate-x-[-50%] translate-y-[-50%]",
           "rounded-[20px]",
-          "lg-strong",
+          "bg-card/80 backdrop-blur-2xl border border-white/10",
           "scale-[0.96] opacity-0 data-[state=open]:opacity-100 data-[state=open]:scale-100",
           "transition-[opacity,transform] duration-200 ease-out",
           "will-change-transform will-change-opacity",
