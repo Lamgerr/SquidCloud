@@ -135,8 +135,8 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
                     className={cn(
                       'flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300',
                       isActive
-                        ? 'bg-primary/12 text-primary scale-100'
-                        : 'text-muted-foreground/50 scale-100 group-hover:text-foreground/70',
+                        ? 'bg-foreground/10 text-foreground scale-100'
+                        : 'text-muted-foreground/40 scale-100 group-hover:text-foreground/70',
                     )}
                   >
                     <Icon
@@ -151,7 +151,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
                     className={cn(
                       'text-[9px] font-medium tracking-wide transition-all duration-300',
                       isActive
-                        ? 'text-primary/90 translate-y-0'
+                        ? 'text-foreground/80 translate-y-0'
                         : 'text-muted-foreground/40 translate-y-0',
                     )}
                   >
@@ -167,9 +167,9 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
                 className={cn(
                   'relative flex items-center justify-center',
                   'h-[46px] w-[46px] rounded-full',
-                  'bg-primary text-primary-foreground',
-                  'shadow-lg shadow-primary/30 dark:shadow-primary/20',
-                  'hover:shadow-primary/40 hover:scale-105',
+                  'bg-foreground/10 text-foreground',
+                  'shadow-lg shadow-black/20 dark:shadow-black/40',
+                  'hover:bg-foreground/15 hover:scale-105',
                   'active:scale-90 transition-all duration-200',
                   createDisabled && 'opacity-60 cursor-not-allowed active:scale-100 hover:scale-100',
                   mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
@@ -179,7 +179,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
                 aria-label="Create"
               >
                 <Plus className="h-5 w-5" strokeWidth={2.5} />
-                <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-30 motion-safe:animate-ping" />
+                <span className="absolute inset-0 rounded-full bg-foreground/10 animate-ping opacity-30 motion-safe:animate-ping" />
               </button>
             </div>
 
@@ -200,8 +200,8 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
                     className={cn(
                       'flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300',
                       isActive
-                        ? 'bg-primary/12 text-primary scale-100'
-                        : 'text-muted-foreground/50 scale-100 group-hover:text-foreground/70',
+                        ? 'bg-foreground/10 text-foreground scale-100'
+                        : 'text-muted-foreground/40 scale-100 group-hover:text-foreground/70',
                     )}
                   >
                     <Icon
@@ -216,7 +216,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
                     className={cn(
                       'text-[9px] font-medium tracking-wide transition-all duration-300',
                       isActive
-                        ? 'text-primary/90 translate-y-0'
+                        ? 'text-foreground/80 translate-y-0'
                         : 'text-muted-foreground/40 translate-y-0',
                     )}
                   >

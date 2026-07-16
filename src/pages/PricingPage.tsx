@@ -285,7 +285,7 @@ function PlanCard({ config, billing, userTier, onSelect }: {
       transition={{ ...BOUNCE, delay: index * 0.12 }}
       whileHover={{ y: -8, scale: 1.02, transition: { duration: 0.25, ...BOUNCE } }}
       className={cn(
-        'group relative flex flex-col rounded-2xl overflow-hidden cursor-default',
+        'group relative flex flex-col rounded-2xl cursor-default',
         isPlus ? 'lg-strong scale-[1.02] z-10' : 'lg',
         isCurrentPlan && 'ring-2 ring-[hsl(var(--brand))]/40',
       )}
@@ -575,7 +575,7 @@ export default function PricingPage() {
           border-radius: inherit;
           background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 25%, transparent 50%);
           pointer-events: none;
-          z-index: 1;
+          z-index: -1;
           transition: opacity 200ms ease-out;
         }
         .lg:hover::before {
@@ -592,7 +592,7 @@ export default function PricingPage() {
           -webkit-mask-composite: xor;
           mask-composite: exclude;
           pointer-events: none;
-          z-index: 1;
+          z-index: -1;
         }
 
         /* Strong variant */
