@@ -467,7 +467,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/\/functions\/v1\/subscription-manager/, '').replace(/^\/|\/$/g, '');
+  const path = url.pathname.replace(/^\/subscription-manager\//, '');
 
   const authHeader = req.headers.get('Authorization') ?? '';
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';

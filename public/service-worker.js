@@ -176,7 +176,11 @@ self.addEventListener('fetch', (event) => {
   if (!url.pathname.startsWith('/virtual-stream/')) {
     // The app shell and hashed assets must always come from the network so a
     // redeploy never serves a stale HTML referencing purged bundle hashes.
-    if (event.request.mode === 'navigate' || url.pathname.startsWith('/assets/')) {
+    // Assets are hashed and can be served from the network directly (no SW hop needed).
+    // The SW must NOT intercept /assets/ because Firefox can fail the SW's fetch for
+    // these requests where Chrome handles them gracefully, causing a permanent fatal error.
+    if (url.pathname.startsWith('/assets/')) return; // skip SW entirely for assets
+    if (event.request.mode === 'navigate') {
       event.respondWith(fetch(event.request, {cache: 'no-store'}));
     } else {
       event.respondWith(fetch(event.request, {cache: 'no-store'}).catch(() => caches.match(event.request)));

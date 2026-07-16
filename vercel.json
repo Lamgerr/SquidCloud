@@ -23,6 +23,12 @@
       ]
     },
     {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31557600, immutable" }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
@@ -68,12 +74,6 @@
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
         { "key": "Service-Worker-Allowed", "value": "/" }
-      ]
-    },
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31557600, immutable" }
       ]
     },
     {
