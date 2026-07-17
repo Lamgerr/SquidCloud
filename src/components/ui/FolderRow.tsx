@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Folder, MoreVertical, Share2, Trash2, Pencil, Download, Move, Plus, ChevronDown, MessageSquare } from '@/lib/icon-map';
-import { Button } from '@/components/ui/button';
+import { GlassButton } from '@/components/ui/glasscn/glass-button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -10,9 +10,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription,
+  AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  GlassAlertDialogContent,
+} from '@/components/ui/glasscn/glass-alert-dialog';
 import { FolderItem } from '@/lib/api';
 
 interface FolderRowProps {
@@ -233,7 +234,7 @@ const FolderRow: React.FC<FolderRowProps> = ({
       )}
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent className="bg-[#1a1a24] border-white/10 text-white">
+        <GlassAlertDialogContent className="text-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete folder?</AlertDialogTitle>
             <AlertDialogDescription className="text-neutral-400">
@@ -244,7 +245,7 @@ const FolderRow: React.FC<FolderRowProps> = ({
             <AlertDialogCancel className="bg-white/5 border-white/10 hover:bg-white/10 text-white">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setDeleteConfirmOpen(false); onDelete?.(); }} className="bg-red-600 text-white hover:bg-red-500">Delete</AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogContent>
+        </GlassAlertDialogContent>
       </AlertDialog>
     </>
   );
@@ -328,7 +329,7 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
             </div>
             <h3 className="text-[14px] font-semibold text-white mb-1">No folders yet</h3>
             <p className="text-[12px] text-neutral-400 mb-4 text-center">Create a folder to organize your files</p>
-            <Button size="sm" className="rounded-lg bg-[#007AFF] hover:bg-[#0062cc] text-white" onClick={onCreateFolder}>New folder</Button>
+            <GlassButton size="sm" className="rounded-lg bg-[#007AFF] hover:bg-[#0062cc] text-white" onClick={onCreateFolder}>New folder</GlassButton>
           </div>
         )}
 

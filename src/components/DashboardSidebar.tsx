@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-
+import { springs, layoutSpring } from '@/lib/motion';
 
 interface DashboardSidebarProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
 
-  // Typographic, Squircled Nav Item (No Icons)
+  // Liquid nav item — active state rides a shared-layout glass pill.
   const NavItem = ({
     label,
     shortLabel,
@@ -43,19 +44,27 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     onClick: () => void;
     active?: boolean;
   }) => (
-    <button
+    <motion.button
       onClick={onClick}
+      whileTap={{ scale: 0.95 }}
+      transition={springs.snappy}
       className={cn(
-        'w-full flex items-center justify-center px-4 py-3 rounded-[20px] transition-all duration-400 ease-[cubic-bezier(0.25,1,0.5,1)] relative overflow-hidden group',
-        active
-          ? 'bg-foreground text-background shadow-[0_4px_20px_rgba(0,0,0,0.15)] scale-[0.98]'
-          : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5 active:scale-95'
+        'mono-ring group relative w-full flex items-center justify-center px-4 py-3 rounded-[20px] overflow-hidden',
+        'transition-colors duration-300',
+        active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
     >
+      {active && (
+        <motion.span
+          layoutId="sidebar-active-pill"
+          transition={layoutSpring}
+          className="absolute inset-0 rounded-[20px] mono-glass-subtle"
+        />
+      )}
       {isOpen ? (
         <span
           className={cn(
-            'w-full text-left truncate transition-all duration-400',
+            'relative z-10 w-full text-left truncate transition-all duration-300',
             active ? 'font-bold tracking-tight text-[15px]' : 'font-medium tracking-wide text-sm'
           )}
         >
@@ -64,43 +73,61 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       ) : (
         <span
           className={cn(
-            'block text-[11px] font-bold uppercase tracking-widest transition-all duration-400',
-            active ? 'text-background' : 'text-muted-foreground group-hover:text-foreground'
+            'relative z-10 block text-[11px] font-bold uppercase tracking-widest transition-all duration-300',
+            active ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
           )}
         >
           {shortLabel}
         </span>
       )}
-    </button>
+    </motion.button>
   );
 
   return (
     <>
-      {/* Floating Modern Squircle Sidebar Container */}
-      <div
+      {/* Floating liquid-glass sidebar */}
+      <motion.div
+        animate={{ width: isOpen ? 240 : 80 }}
+        transition={springs.fluid}
         className={cn(
-          'fixed left-4 top-4 bottom-4 bg-card/40 backdrop-blur-3xl border border-border/40 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col z-40 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] rounded-[32px] overflow-hidden',
-          isOpen ? 'w-[240px]' : 'w-[80px]'
+          'mono-glass-strong fixed left-4 top-4 bottom-4 z-40 flex flex-col overflow-hidden rounded-[32px]',
+          'shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)]'
         )}
       >
-        {/* Header - Typographic Logo & Toggle */}
-        <div className="h-24 flex items-center justify-between px-6 flex-shrink-0 pt-2">
-          {isOpen ? (
-            <span className="font-black text-xl tracking-tighter truncate bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/60 transition-opacity duration-300">
-              SquidCloud
-            </span>
-          ) : (
-            <span className="w-full text-center font-black text-xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/60">
-              SC
-            </span>
-          )}
+        {/* Brand */}
+        <div className="flex h-24 items-center justify-center px-6 pt-2 flex-shrink-0">
+          <AnimatePresence mode="wait" initial={false}>
+            {isOpen ? (
+              <motion.span
+                key="full"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={springs.soft}
+                className="truncate bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-black text-xl tracking-tighter text-transparent"
+              >
+                SquidCloud
+              </motion.span>
+            ) : (
+              <motion.span
+                key="mini"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={springs.bouncy}
+                className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-black text-xl tracking-tighter text-transparent"
+              >
+                SC
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Categories / Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 space-y-6 smooth-scrollbar pb-6">
+        {/* Navigation */}
+        <nav className="smooth-scrollbar flex-1 space-y-6 overflow-y-auto px-3 pb-6">
           <div className="space-y-1.5">
             {isOpen && (
-              <p className="text-[10px] font-bold text-muted-foreground/50 px-4 pb-2 uppercase tracking-[0.2em] transition-opacity duration-300">
+              <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 transition-opacity duration-300">
                 Storage
               </p>
             )}
@@ -110,11 +137,11 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             <NavItem label="Trash" shortLabel="TR" onClick={onTrashClick} active={isActive('/trash')} />
           </div>
 
-          <div className="mx-4 h-[1px] bg-border/40 rounded-full" />
+          <div className="mx-4 h-[1px] rounded-full bg-white/10" />
 
           <div className="space-y-1.5">
             {isOpen && (
-              <p className="text-[10px] font-bold text-muted-foreground/50 px-4 pb-2 uppercase tracking-[0.2em] transition-opacity duration-300">
+              <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 transition-opacity duration-300">
                 Tools
               </p>
             )}
@@ -124,9 +151,9 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
           {isAdmin && (
             <div className="space-y-1.5 pt-2">
-              <div className="mx-4 mb-6 h-[1px] bg-border/40 rounded-full" />
+              <div className="mx-4 mb-6 h-[1px] rounded-full bg-white/10" />
               {isOpen && (
-                <p className="text-[10px] font-bold text-muted-foreground/50 px-4 pb-2 uppercase tracking-[0.2em] transition-opacity duration-300">
+                <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 transition-opacity duration-300">
                   Admin
                 </p>
               )}
@@ -135,51 +162,57 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           )}
         </nav>
 
-        {/* Footer Area - Typographic Actions */}
-        <div className="px-3 pb-4 pt-2 space-y-2 flex-shrink-0 bg-card/20 backdrop-blur-xl border-t border-border/20 rounded-b-[32px]">
+        {/* Footer */}
+        <div className="mono-glass-subtle flex-shrink-0 space-y-2 rounded-b-[32px] border-t border-white/10 px-3 pb-4 pt-2">
           {isOpen && userEmail && (
-            <div className="mb-4 px-4 py-3 rounded-[20px] bg-foreground/5 border border-foreground/5">
-              <p className="text-[13px] font-bold text-foreground truncate tracking-tight">
+            <div className="mb-4 rounded-[20px] border border-white/10 bg-white/5 px-4 py-3">
+              <p className="truncate text-[13px] font-bold tracking-tight text-foreground">
                 {userEmail.split('@')[0]}
               </p>
-              <p className="text-[11px] font-medium text-muted-foreground truncate tracking-wide">
+              <p className="truncate text-[11px] font-medium tracking-wide text-muted-foreground">
                 {userEmail}
               </p>
             </div>
           )}
-          
+
           <NavItem label="Settings" shortLabel="ST" onClick={onSettingsClick} />
-          
-          <button
+
+          <motion.button
             onClick={onLogout}
-            className={cn(
-              'w-full flex items-center justify-center px-4 py-3 rounded-[20px] transition-all duration-400 ease-[cubic-bezier(0.25,1,0.5,1)] text-sm font-bold text-destructive/80 hover:bg-destructive hover:text-destructive-foreground active:scale-95'
-            )}
+            whileTap={{ scale: 0.95 }}
+            transition={springs.snappy}
+            className="mono-ring group flex w-full items-center justify-center rounded-[20px] px-4 py-3 text-sm font-bold text-destructive/80 transition-colors duration-300 hover:bg-destructive hover:text-destructive-foreground"
           >
             {isOpen ? (
               <span className="w-full text-left tracking-wide">Logout</span>
             ) : (
               <span className="text-[11px] uppercase tracking-widest">OUT</span>
             )}
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Floating Toggle Button (Outside the sidebar) */}
-      <button
+      {/* Floating glass toggle */}
+      <motion.button
         onClick={onToggle}
+        whileTap={{ scale: 0.9 }}
+        whileHover={{ backgroundColor: 'rgba(255,255,255,0.10)' }}
+        transition={springs.snappy}
         className={cn(
-          "fixed top-8 z-50 flex items-center justify-center w-8 h-12 bg-card/60 backdrop-blur-xl border border-border/40 shadow-sm transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-foreground/10 active:scale-90 text-foreground font-bold rounded-r-[12px] rounded-l-[4px]",
-          isOpen ? "left-[260px]" : "left-[100px]"
+          'mono-glass-subtle mono-ring fixed top-8 z-50 flex h-12 w-8 items-center justify-center rounded-l-[4px] rounded-r-[12px] text-foreground font-bold',
+          'shadow-[0_8px_30px_-10px_rgba(0,0,0,0.6)]',
+          isOpen ? 'left-[260px]' : 'left-[100px]'
         )}
       >
-        <span className="text-[10px] tracking-tighter">
-          {isOpen ? "◀" : "▶"}
-        </span>
-      </button>
+        <span className="text-[10px] tracking-tighter">{isOpen ? '◀' : '▶'}</span>
+      </motion.button>
 
-      {/* Main content offset mapping to floated boundaries */}
-      <div className={cn('transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]', isOpen ? 'ml-[272px]' : 'ml-[112px]')} />
+      <div
+        className={cn(
+          'transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]',
+          isOpen ? 'ml-[272px]' : 'ml-[112px]'
+        )}
+      />
     </>
   );
 };

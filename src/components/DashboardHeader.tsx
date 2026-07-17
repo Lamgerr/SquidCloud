@@ -1,9 +1,12 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { GlassButton } from '@/components/ui/glasscn/glass-button';
+import { GlassInput } from '@/components/ui/glasscn/glass-input';
+import { GlassCard } from '@/components/ui/glasscn/glass-card';
 import { Search, Bell } from '@/lib/icon-map';
 import { Gamepad2 } from 'lucide-react';
+import { springs, staggerContainer, riseItem } from '@/lib/motion';
 
 interface DashboardHeaderProps {
   title: string;
@@ -32,76 +35,105 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   return (
     <div className="space-y-4 px-8 pt-6 pb-4">
       {/* Header Row */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+      <div className="flex items-center justify-between gap-4">
+        <motion.h1
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={springs.soft}
+          className="truncate text-2xl font-bold tracking-tighter text-foreground"
+        >
           {title}
-        </h1>
-        {actions}
+        </motion.h1>
+        {actions && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={springs.soft}
+            className="flex items-center gap-3"
+          >
+            {actions}
+          </motion.div>
+        )}
       </div>
 
       {/* Search and Tools Row */}
       <div className="flex items-center gap-3">
-        {/* Games Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onGamesClick}
-          className="h-9 px-3 rounded-lg border border-border/50 hover:bg-accent/50 text-sm font-medium text-muted-foreground hover:text-foreground gap-1.5 shrink-0"
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={springs.soft}
+          whileTap={{ scale: 0.98 }}
         >
-          <Gamepad2 className="w-4 h-4" />
-          Games?
-        </Button>
+          <GlassButton
+            variant="ghost"
+            size="sm"
+            onClick={onGamesClick}
+            className="h-9 gap-1.5 rounded-lg border border-white/10 px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Gamepad2 className="h-4 w-4" />
+            Games?
+          </GlassButton>
+        </motion.div>
 
-        {/* Search Input */}
         {onSearchChange && (
-          <div className="flex-1 max-w-md relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <Input
+          <div className="group relative max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground" />
+            <GlassInput
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-9 h-9 rounded-lg border-border/50 bg-accent/30 text-sm placeholder:text-muted-foreground/70 transition-all focus:bg-accent/50 focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+              className="h-9 rounded-lg border-white/10 pl-9 text-sm text-foreground placeholder:text-muted-foreground/70 transition-all focus:border-white/25 focus:bg-white/[0.08] focus:ring-1 focus:ring-white/15"
             />
           </div>
         )}
 
-        {/* Notifications */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-9 w-9 p-0 rounded-lg border border-border/50 hover:bg-accent/50"
-        >
-          <Bell className="w-4 h-4 text-muted-foreground" />
-        </Button>
+        <motion.div whileTap={{ scale: 0.94 }} transition={springs.snappy}>
+          <GlassButton
+            variant="ghost"
+            size="sm"
+            className="h-9 w-9 rounded-lg border border-white/10 p-0 hover:text-foreground"
+          >
+            <Bell className="h-4 w-4 text-muted-foreground" />
+          </GlassButton>
+        </motion.div>
       </div>
 
       {/* Stats Row */}
       {showStats && stats.length > 0 && (
-        <div className="grid grid-cols-4 gap-3">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+        >
           {stats.map((stat, idx) => (
-            <div
+            <motion.div
               key={idx}
-              className="group relative overflow-hidden rounded-lg border border-border/50 bg-card/50 px-4 py-3 backdrop-blur transition-all duration-200 hover:border-border/70 hover:bg-card/70"
+              variants={riseItem}
             >
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  'w-10 h-10 rounded-lg flex items-center justify-center bg-accent/50',
-                  stat.color
-                )}>
-                  {stat.icon}
+              <GlassCard className="group relative overflow-hidden rounded-xl border border-white/10 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 items-center justify-center rounded-lg bg-white/8',
+                      stat.color
+                    )}
+                  >
+                    {stat.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {stat.label}
+                    </p>
+                    <p className="truncate text-lg font-semibold tracking-tight text-foreground">
+                      {stat.value}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    {stat.label}
-                  </p>
-                  <p className="text-lg font-semibold text-foreground truncate">
-                    {stat.value}
-                  </p>
-                </div>
-              </div>
-            </div>
+              </GlassCard>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );
