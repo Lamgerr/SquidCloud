@@ -1,243 +1,223 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, Copy, Check, Fingerprint, Database, TerminalSquare } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import SquidLogo from '@/components/ui/SquidLogo';
+import { 
+  Check, 
+  Cloud, 
+  FolderLock, 
+  ShieldAlert, 
+  Zap, 
+  Users, 
+  ChevronRight,
+  Database
+} from 'lucide-react';
 
 export default function Index() {
-  const { user } = useAuth();
-  const [copied, setCopied] = useState(false);
+  // Animation for the floating UI widgets seen in the examples
+  const floatAnimation = {
+    animate: {
+      y: [0, -15, 0],
+      transition: {
+        duration: 5,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }
+  };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText('npm install -g squidcloudctl');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const floatAnimationReverse = {
+    animate: {
+      y: [0, 15, 0],
+      transition: {
+        duration: 6,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#020202] text-zinc-300 font-sans selection:bg-zinc-100 selection:text-black flex flex-col">
+    <div className="min-h-screen bg-[#FDFDFD] text-gray-900 font-sans overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
       
-      {/* ═══ SYS.NAV ═══ */}
-      <header className="sticky top-0 z-50 grid grid-cols-1 md:grid-cols-12 border-b border-zinc-900 bg-[#020202]">
+      {/* ═══ MINIMALIST NAVIGATION ═══ */}
+      <nav className="relative z-50 mx-auto max-w-7xl flex items-center justify-between px-6 py-6 md:px-12">
+        <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+            <Database size={18} strokeWidth={2.5} />
+          </div>
+          SquidCloud
+        </div>
         
-        {/* Branding */}
-        <div className="md:col-span-3 lg:col-span-2 border-r border-zinc-900 p-4 flex items-center">
-          <Link to="/" className="flex items-center gap-3 group">
-            <SquidLogo size={16} className="text-zinc-100 transition-transform group-hover:rotate-90 duration-500" />
-            <span className="font-bold text-[11px] tracking-[0.2em] uppercase text-zinc-100">SquidCloud</span>
-          </Link>
+        <div className="hidden md:flex items-center gap-10 text-sm font-medium text-gray-500">
+          <a href="#product" className="hover:text-gray-900 transition-colors">Product</a>
+          <a href="#features" className="hover:text-gray-900 transition-colors">Features</a>
+          <a href="#solutions" className="hover:text-gray-900 transition-colors">Solutions</a>
+          <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
         </div>
 
-        {/* Index Links */}
-        <nav className="hidden md:flex md:col-span-6 lg:col-span-8 border-r border-zinc-900 items-center">
-          <a href="#sys-specs" className="h-full px-6 flex items-center border-r border-zinc-900 text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900/50 transition-colors">
-            / Specs
+        <div className="flex items-center gap-6">
+          <a href="/login" className="hidden sm:block text-sm font-medium text-gray-600 hover:text-gray-900">Sign in</a>
+          <a href="/demo" className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] ring-1 ring-gray-100 hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.1)] transition-all">
+            Get demo
           </a>
-          <a href="#sys-arch" className="h-full px-6 flex items-center border-r border-zinc-900 text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900/50 transition-colors">
-            / Arch
-          </a>
-        </nav>
-
-        {/* Auth Action */}
-        <div className="md:col-span-3 lg:col-span-2 flex items-center">
-          <Link 
-            to={user ? "/dashboard" : "/auth"} 
-            className="w-full h-full p-4 flex items-center justify-between text-[11px] font-mono font-bold text-black bg-zinc-100 hover:bg-white hover:pl-6 transition-all"
-          >
-            {user ? 'CONSOLE' : 'INIT'}
-            <ArrowUpRight size={14} />
-          </Link>
         </div>
-      </header>
+      </nav>
 
-      <main className="flex-grow flex flex-col">
-        {/* ═══ SYS.HERO ═══ */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 border-b border-zinc-900 flex-grow">
+      {/* ═══ FLOATING WIDGET HERO SECTION ═══ */}
+      <main>
+        <section className="relative min-h-[85vh] flex flex-col items-center justify-center px-6 pt-10 pb-32">
           
-          {/* Main Display */}
-          <div className="lg:col-span-9 border-r border-zinc-900 p-6 md:p-12 lg:p-20 flex flex-col justify-between min-h-[60vh]">
-            <motion.div
-              initial={{ opacity: 0, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, filter: 'blur(0px)' }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
+          {/* Subtle Dotted Background (Inspired by ChronoTask) */}
+          <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-60 pointer-events-none" />
+
+          {/* --- FLOATING UI ELEMENTS --- */}
+          <div className="absolute inset-0 pointer-events-none z-10 max-w-7xl mx-auto overflow-hidden lg:overflow-visible">
+            
+            {/* Top Left: Checklist Widget */}
+            <motion.div 
+              {...floatAnimation}
+              className="absolute top-[10%] left-[5%] md:left-[10%] bg-white p-4 rounded-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-gray-50/50 flex flex-col gap-3 w-48 rotate-[-4deg]"
             >
-              <h1 className="text-[12vw] lg:text-[10rem] font-black leading-[0.8] tracking-tighter uppercase text-zinc-100">
-                Absolute
-                <br />
-                <span className="text-zinc-700">Zero.</span>
-              </h1>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Tasks Secure</div>
+              <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl">
+                <div className="bg-indigo-500 h-6 w-6 rounded-lg flex items-center justify-center text-white"><Check size={12} strokeWidth={3} /></div>
+                <div className="h-2 w-16 bg-gray-200 rounded-full"></div>
+              </div>
+              <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl">
+                <div className="bg-emerald-400 h-6 w-6 rounded-lg flex items-center justify-center text-white"><Check size={12} strokeWidth={3} /></div>
+                <div className="h-2 w-20 bg-gray-200 rounded-full"></div>
+              </div>
             </motion.div>
 
+            {/* Bottom Left: Main App Icon (Inspired by CoreShift center icon) */}
             <motion.div 
-              className="max-w-2xl mt-16 lg:mt-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
+              {...floatAnimationReverse}
+              className="absolute bottom-[20%] left-[8%] md:left-[15%] bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-[2rem] shadow-[0_20px_50px_-10px_rgba(99,102,241,0.4)] rotate-[6deg]"
             >
-              <p className="text-lg md:text-2xl text-zinc-400 font-medium leading-tight">
-                Zero-knowledge architecture. Dual-layer encryption. Keys completely isolated from host infrastructure. 
-                <span className="text-zinc-100"> Cloud storage engineered for hostility.</span>
-              </p>
+               <FolderLock size={40} className="text-white" strokeWidth={1.5} />
+            </motion.div>
+
+            {/* Top Right: Integration/App Icons */}
+            <motion.div 
+              {...floatAnimationReverse}
+              className="absolute top-[15%] right-[5%] md:right-[12%] bg-white p-5 rounded-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-gray-50/50 flex flex-col gap-4 rotate-[3deg]"
+            >
+              <div className="text-xs font-bold text-gray-800">100+ Integrations</div>
+              <div className="flex gap-3">
+                <div className="h-12 w-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500"><Cloud size={24} /></div>
+                <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500"><Zap size={24} /></div>
+                <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500"><ShieldAlert size={24} /></div>
+              </div>
+            </motion.div>
+
+            {/* Bottom Right: Users/Team Widget */}
+            <motion.div 
+              {...floatAnimation}
+              className="absolute bottom-[25%] right-[5%] md:right-[15%] bg-white p-4 rounded-[2rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-gray-50/50 flex items-center gap-4 rotate-[-5deg]"
+            >
+              <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                <Users size={20} />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-gray-900">Team Access</div>
+                <div className="text-xs text-gray-500">Active now</div>
+              </div>
             </motion.div>
           </div>
 
-          {/* Terminal / Status Rail */}
-          <div className="lg:col-span-3 flex flex-col bg-[#050505]">
-            <div className="flex-grow p-6 border-b border-zinc-900 flex flex-col justify-end">
-              <div className="mb-8">
-                <span className="inline-block w-2 h-2 bg-emerald-500 mr-3 animate-pulse"></span>
-                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Network Active</span>
-              </div>
-              <ul className="space-y-4 font-mono text-[11px] uppercase tracking-wider">
-                <li className="flex justify-between border-b border-zinc-900 pb-2">
-                  <span className="text-zinc-600">Core</span> <span className="text-zinc-300">RES54.v12</span>
-                </li>
-                <li className="flex justify-between border-b border-zinc-900 pb-2">
-                  <span className="text-zinc-600">Cipher</span> <span className="text-zinc-300">XChaCha20</span>
-                </li>
-                <li className="flex justify-between pb-2">
-                  <span className="text-zinc-600">Trust</span> <span className="text-zinc-300">Trustless</span>
-                </li>
-              </ul>
-            </div>
-            
-            <button 
-              onClick={handleCopy}
-              className="p-6 flex items-center justify-between text-left group hover:bg-zinc-100 hover:text-black transition-colors"
+          {/* --- CENTER HERO CONTENT --- */}
+          <div className="relative z-20 text-center max-w-4xl mx-auto mt-12">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
             >
-              <div>
-                <span className="block text-[10px] font-mono text-zinc-600 group-hover:text-zinc-500 uppercase tracking-widest mb-2">
-                  Global CLI Install
-                </span>
-                <code className="text-sm font-mono tracking-tight">
-                  <span className="text-zinc-700 group-hover:text-black mr-2">$</span>
-                  npm i -g squidcloud
-                </code>
+              <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-bold tracking-tight text-gray-900 leading-[1.1]">
+                Store, secure, and scale <br className="hidden md:block" />
+                <span className="text-gray-400 font-medium">all in one place</span>
+              </h1>
+              
+              <p className="mt-8 text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
+                SquidCloud is a modern, all-in-one storage platform designed to perfectly fit your business needs. Effortlessly manage your data and boost security.
+              </p>
+              
+              <div className="mt-10">
+                <a href="/demo" className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-8 py-4 text-base font-semibold text-white shadow-[0_8px_25px_-8px_rgba(79,70,229,0.5)] hover:bg-indigo-700 hover:shadow-[0_12px_35px_-8px_rgba(79,70,229,0.6)] transition-all hover:-translate-y-0.5">
+                  Get free demo
+                </a>
               </div>
-              {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} className="text-zinc-600 group-hover:text-black" />}
-            </button>
+            </motion.div>
           </div>
         </section>
 
-        {/* ═══ SYS.SPECS (Ledger Form) ═══ */}
-        <section id="sys-specs" className="border-b border-zinc-900">
-          <div className="grid grid-cols-1 md:grid-cols-12 border-b border-zinc-900 bg-[#050505]">
-            <div className="md:col-span-3 p-6 flex items-center">
-              <h2 className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">System Specifications</h2>
+        {/* ═══ VISUAL FEATURE GRID (BENTO STYLE) ═══ */}
+        <section className="relative z-20 bg-gray-50 rounded-t-[3rem] md:rounded-t-[5rem] py-24 px-6 md:px-12 mt-12">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">Everything you need to scale</h2>
             </div>
-          </div>
 
-          <div className="flex flex-col">
-            {[
-              {
-                id: "01",
-                label: "Client-Side Cryptography",
-                title: "Dual-Layer Cipher Matrix",
-                desc: "Data undergoes non-linear wave splitting via XChaCha20 on local hardware prior to network transit, followed by AES-256-GCM application at rest. Server infrastructure hosts strictly unaligned matrix noise.",
-                icon: Fingerprint
-              },
-              {
-                id: "02",
-                label: "Role-Based Access Control",
-                title: "Mathematical Workspaces",
-                desc: "Granular file-level access controlled by cryptographic keys, not application logic. Workspace identities form trust rings, bypassing legacy administrative escalation vulnerabilities.",
-                icon: Database
-              },
-              {
-                id: "03",
-                label: "Integration & Telemetry",
-                title: "Native Developer Engine",
-                desc: "Command-line integration, comprehensive webhook dispatchers, and API Keys v2.1. Embed zero-knowledge storage directly into CI/CD pipelines without exposing payload state.",
-                icon: TerminalSquare
-              }
-            ].map((spec) => (
-              <div 
-                key={spec.id} 
-                className="grid grid-cols-1 md:grid-cols-12 border-b border-zinc-900 group hover:bg-zinc-100 hover:text-black transition-colors duration-0"
-              >
-                <div className="md:col-span-3 p-6 md:p-8 border-r border-zinc-900 flex flex-col justify-between">
-                  <span className="text-[10px] font-mono text-zinc-600 group-hover:text-zinc-400 uppercase tracking-widest mb-4 block">
-                    [{spec.id}] {spec.label}
-                  </span>
-                  <spec.icon size={24} className="text-zinc-700 group-hover:text-black" />
-                </div>
-                
-                <div className="md:col-span-9 p-6 md:p-12">
-                  <h3 className="text-3xl md:text-5xl font-bold tracking-tighter uppercase mb-6 text-zinc-100 group-hover:text-black">
-                    {spec.title}
-                  </h3>
-                  <p className="text-lg text-zinc-500 group-hover:text-zinc-800 font-medium max-w-3xl leading-relaxed">
-                    {spec.desc}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Feature 1: Large Card */}
+              <div className="md:col-span-2 bg-white rounded-[2.5rem] p-10 shadow-[0_10px_40px_-20px_rgba(0,0,0,0.05)] border border-gray-100 flex flex-col justify-between overflow-hidden relative group">
+                <div className="relative z-10 max-w-md">
+                  <div className="h-14 w-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 mb-6">
+                    <ShieldAlert size={28} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">Zero-Knowledge Architecture</h3>
+                  <p className="text-gray-500 leading-relaxed">
+                    Data is encrypted client-side before it ever reaches our servers. You hold the keys, ensuring total privacy.
                   </p>
                 </div>
+                {/* Decorative background element */}
+                <div className="absolute right-[-10%] bottom-[-20%] w-64 h-64 bg-indigo-50 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-700" />
               </div>
-            ))}
-          </div>
-        </section>
 
-        {/* ═══ SYS.ACTION ═══ */}
-        <section className="bg-zinc-100 text-black border-b border-zinc-900 group">
-          <Link to={user ? "/dashboard" : "/auth"} className="grid grid-cols-1 md:grid-cols-12 cursor-pointer">
-            <div className="md:col-span-9 p-12 md:p-20 border-r border-zinc-300">
-              <h2 className="text-5xl md:text-8xl font-black tracking-tighter uppercase leading-[0.85] mb-6">
-                Initialize <br/> Workspace.
-              </h2>
-              <p className="text-xl font-medium text-zinc-600 max-w-lg">
-                Zero infrastructure overhead. Free forever for individual developers. No credit card required.
-              </p>
+              {/* Feature 2: Small Card */}
+              <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_10px_40px_-20px_rgba(0,0,0,0.05)] border border-gray-100">
+                <div className="h-14 w-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500 mb-6">
+                  <Cloud size={28} />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Global Edge</h3>
+                <p className="text-gray-500 leading-relaxed">
+                  Distribute and retrieve data from edge locations worldwide instantly.
+                </p>
+              </div>
+
+              {/* Feature 3: Small Card */}
+              <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_10px_40px_-20px_rgba(0,0,0,0.05)] border border-gray-100">
+                <div className="h-14 w-14 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 mb-6">
+                  <Users size={28} />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Granular Access</h3>
+                <p className="text-gray-500 leading-relaxed">
+                  Manage permissions easily at the file or entire workspace level.
+                </p>
+              </div>
+
+              {/* Feature 4: Large Card */}
+              <div className="md:col-span-2 bg-gray-900 rounded-[2.5rem] p-10 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.3)] flex flex-col justify-between relative overflow-hidden group">
+                <div className="relative z-10 max-w-md">
+                  <div className="h-14 w-14 rounded-2xl bg-white/10 flex items-center justify-center text-white mb-6 backdrop-blur-md">
+                    <Zap size={28} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Lightning Fast APIs</h3>
+                  <p className="text-gray-400 leading-relaxed mb-8">
+                    Integrate seamlessly into your workflow with native SDKs and robust REST APIs designed for developers.
+                  </p>
+                  <a href="/docs" className="inline-flex items-center text-white font-semibold group-hover:gap-3 gap-2 transition-all">
+                    Read Documentation <ChevronRight size={18} />
+                  </a>
+                </div>
+                {/* Decorative background element */}
+                <div className="absolute right-0 top-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/20 via-transparent to-transparent opacity-60" />
+              </div>
+
             </div>
-            <div className="md:col-span-3 flex items-center justify-center p-12 bg-zinc-200/50 group-hover:bg-black group-hover:text-white transition-all">
-              <ArrowUpRight size={80} className="transform group-hover:scale-110 transition-transform" />
-            </div>
-          </Link>
+          </div>
         </section>
       </main>
 
-      {/* ═══ SYS.FOOTER ═══ */}
-      <footer className="bg-[#020202] text-zinc-500 font-mono text-[10px] uppercase tracking-widest p-6 border-t-[12px] border-zinc-100">
-        <div className="grid grid-cols-2 md:grid-cols-12 gap-8 md:gap-0 pb-12 border-b border-zinc-900">
-          
-          <div className="col-span-2 md:col-span-6 lg:col-span-4">
-            <SquidLogo size={20} className="text-zinc-100 mb-6" />
-            <p className="leading-relaxed max-w-xs text-zinc-600">
-              SQ.CLOUD // Engineered for hostility.<br/>
-              Zero-knowledge data matrix.
-            </p>
-          </div>
-
-          <div className="col-span-1 md:col-span-3 lg:col-span-2">
-            <span className="block text-zinc-300 mb-6">Product</span>
-            <ul className="space-y-4">
-              <li><Link to="/auth" className="hover:text-zinc-100 transition-colors">Start Free</Link></li>
-              <li><Link to="/api-docs" className="hover:text-zinc-100 transition-colors">Developer API</Link></li>
-              <li><Link to="/cli" className="hover:text-zinc-100 transition-colors">Terminal CLI</Link></li>
-              <li><Link to="/changelog" className="hover:text-zinc-100 transition-colors">Changelog</Link></li>
-            </ul>
-          </div>
-
-          <div className="col-span-1 md:col-span-3 lg:col-span-2">
-            <span className="block text-zinc-300 mb-6">Resources</span>
-            <ul className="space-y-4">
-              <li><Link to="/docs" className="hover:text-zinc-100 transition-colors">Documentation</Link></li>
-              <li><Link to="/github" className="hover:text-zinc-100 transition-colors">Open Source</Link></li>
-              <li><Link to="/status" className="hover:text-zinc-100 transition-colors">System Status</Link></li>
-            </ul>
-          </div>
-
-          <div className="col-span-2 md:col-span-12 lg:col-span-4 lg:text-right mt-8 lg:mt-0 flex flex-col justify-between">
-            <div className="flex gap-6 lg:justify-end">
-              <Link to="/privacy" className="hover:text-zinc-100 transition-colors">Privacy</Link>
-              <Link to="/terms" className="hover:text-zinc-100 transition-colors">Terms</Link>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <span>&copy; {new Date().getFullYear()} SQUIDCLOUD INC.</span>
-          <span className="text-zinc-700">STATUS: NOMINAL</span>
-        </div>
-      </footer>
     </div>
   );
 }
