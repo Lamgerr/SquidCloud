@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { Button } from '@/components/ui/button';
 import {
   AlertCircle, ChevronLeft, ChevronRight, Download, FileText,
@@ -27,16 +27,16 @@ const decryptedBlobCache = new Map<string, { blob: Blob; url: string; timestamp:
 const MAX_CACHE_ITEMS = 15;
 
 const CustomDialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+  React.ElementRef<typeof DialogPrimitive.Popup>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Popup>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="z-[60] bg-background sm:bg-background/95 sm:backdrop-blur-2xl opacity-0 data-[state=open]:opacity-100 transition-opacity duration-200 ease-out" />
-    <DialogPrimitive.Content
+    <DialogOverlay className="z-[60] bg-background sm:bg-background/95 sm:backdrop-blur-2xl opacity-0 data-open:opacity-100 transition-opacity duration-200 ease-out" />
+    <DialogPrimitive.Popup
       ref={ref}
       className={cn(
         'fixed inset-0 z-[60] flex flex-col w-screen h-screen max-w-none rounded-none border-0 bg-background text-foreground shadow-2xl overflow-hidden',
-        'opacity-0 scale-[0.98] data-[state=open]:opacity-100 data-[state=open]:scale-100',
+        'opacity-0 scale-[0.98] data-open:opacity-100 data-open:scale-100',
         'transition-all duration-200 ease-out will-change-transform',
         className
       )}

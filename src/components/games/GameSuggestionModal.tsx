@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -20,17 +20,17 @@ import {
   Smartphone
 } from 'lucide-react';
 
-interface CustomDialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+interface CustomDialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Popup> {
   isMobile?: boolean;
 }
 
 const CustomDialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ElementRef<typeof DialogPrimitive.Popup>,
   CustomDialogContentProps
 >(({ className, children, isMobile, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay className="z-[70] bg-black/85 backdrop-blur-xl animate-in fade-in duration-200" />
-    <DialogPrimitive.Content
+    <DialogPrimitive.Popup
       ref={ref}
       className={cn(
         isMobile
@@ -41,7 +41,7 @@ const CustomDialogContent = React.forwardRef<
       {...props}
     >
       {children}
-    </DialogPrimitive.Content>
+    </DialogPrimitive.Popup>
   </DialogPortal>
 ));
 CustomDialogContent.displayName = 'CustomDialogContent';

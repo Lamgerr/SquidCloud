@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -15,12 +15,12 @@ import { backgroundUploadService, UploadTask } from '@/services/backgroundUpload
 import { backgroundDownloadService, DownloadTask } from '@/services/backgroundDownload';
 
 const CustomDialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+  React.ElementRef<typeof DialogPrimitive.Popup>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Popup>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay className="z-[70] bg-black/85 backdrop-blur-2xl animate-in fade-in duration-200" />
-    <DialogPrimitive.Content
+    <DialogPrimitive.Popup
       ref={ref}
       className={cn(
         'fixed inset-0 z-[70] flex flex-col w-screen h-screen max-w-none rounded-none border-0 bg-[#0a0a0f] text-foreground shadow-2xl overflow-hidden',
@@ -30,7 +30,7 @@ const CustomDialogContent = React.forwardRef<
       {...props}
     >
       {children}
-    </DialogPrimitive.Content>
+    </DialogPrimitive.Popup>
   </DialogPortal>
 ));
 CustomDialogContent.displayName = 'CustomDialogContent';
