@@ -514,7 +514,8 @@ export default function OptimizedPDFViewer({
       });
 
       if (activeTextLayerRef.current && textContent) {
-        const renderTextLayerFn = (pdfjsLib as any).renderTextLayer;
+        const pdfjsAny = pdfjsLib as any;
+        const renderTextLayerFn = pdfjsAny.renderTextLayer;
         activeTextLayerRef.current.innerHTML = '';
         activeTextLayerRef.current.style.width = `${viewport.width}px`;
         activeTextLayerRef.current.style.height = `${viewport.height}px`;
