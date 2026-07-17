@@ -7,7 +7,18 @@ import { FrostGlassVariantProp, glassVariantStyles } from "@/lib/glass-variants"
 import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import { Button } from "../button";
-import { DialogContent } from "../dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
+  DialogContent,
+} from "../dialog";
 import { LiquidGlass } from "./liquid-glass";
 
 type GlassDialogContentProps = DialogPrimitive.Popup.Props & {

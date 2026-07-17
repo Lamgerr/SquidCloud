@@ -7,7 +7,16 @@ import { FrostGlassVariantProp, glassVariantStyles } from "@/lib/glass-variants"
 import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import { Button } from "../button";
-import { SheetContent } from "../sheet";
+import {
+  Sheet,
+  SheetClose,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetContent,
+} from "../sheet";
 import { LiquidGlass } from "./liquid-glass";
 
 type GlassSheetContentProps = SheetPrimitive.Popup.Props & {
