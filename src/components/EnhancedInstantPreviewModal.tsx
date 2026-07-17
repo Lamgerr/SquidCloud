@@ -42,7 +42,7 @@ const CustomDialogContent = React.forwardRef<
       )}
     >
       {children}
-    </DialogPrimitive.Content>
+    </DialogPrimitive.Popup>
   </DialogPortal>
 ));
 CustomDialogContent.displayName = 'CustomDialogContent';
