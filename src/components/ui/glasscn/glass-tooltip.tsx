@@ -77,9 +77,13 @@ function GlassTooltipContent({
   );
 }
 
+const GlassTooltip = TooltipPrimitive.Root;
+const GlassTooltipTrigger = TooltipPrimitive.Trigger;
+const GlassTooltipProvider = TooltipPrimitive.Provider;
+
 export {
   GlassTooltipContent,
-  TooltipPrimitive.Root as GlassTooltip,
-  TooltipPrimitive.Trigger as GlassTooltipTrigger,
-  TooltipPrimitive.Provider as GlassTooltipProvider,
+  GlassTooltip,
+  GlassTooltipTrigger,
+  GlassTooltipProvider,
 };
