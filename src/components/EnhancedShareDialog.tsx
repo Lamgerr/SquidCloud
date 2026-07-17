@@ -42,12 +42,23 @@ const COUNTRIES = [
 ];
 
 export const EnhancedShareDialog: React.FC<EnhancedShareDialogProps> = ({ open, onClose, onShareChange, file }) => {
-  const { toast } = useToast();
-  const { verifyOperationNow } = useBiometricAuthContext();
   const isMobile = useIsMobile();
   if (isMobile) {
     return <MobileEnhancedShareDialog open={open} onClose={onClose} onShareChange={onShareChange} file={file} />;
   }
+  return (
+    <EnhancedShareDialogDesktop
+      open={open}
+      onClose={onClose}
+      onShareChange={onShareChange}
+      file={file}
+    />
+  );
+};
+
+const EnhancedShareDialogDesktop: React.FC<EnhancedShareDialogProps> = ({ open, onClose, onShareChange, file }) => {
+  const { toast } = useToast();
+  const { verifyOperationNow } = useBiometricAuthContext();
 
   const [shareType, setShareType] = useState<'public' | 'user_specific'>('public');
   const [allowedEmails, setAllowedEmails] = useState<string[]>([]);

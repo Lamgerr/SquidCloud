@@ -37,7 +37,24 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     console.warn('PDFViewer: Missing required file prop or file.name');
     return null;
   }
+  return (
+    <PDFViewerInner
+      file={file}
+      src={src}
+      open={open}
+      onClose={onClose}
+      onDownload={onDownload}
+    />
+  );
+};
 
+const PDFViewerInner: React.FC<PDFViewerProps> = ({
+  file,
+  src,
+  open,
+  onClose,
+  onDownload
+}) => {
   const [scale, setScale] = useState(1);
   const [pageNum, setPageNum] = useState(1);
   const [numPages, setNumPages] = useState(0);
