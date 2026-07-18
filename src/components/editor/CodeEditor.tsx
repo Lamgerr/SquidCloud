@@ -35,15 +35,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
 
   // ---- full, commented editor configuration ----
   const baseOptions: MonacoEditorNS.IStandaloneEditorConstructionOptions = {
-    fontSize: 13,
-    // Monospace pairing: Berkeley Mono* > JetBrains Mono > SF Mono > Monaco/Consolas.
-    // * requires a license (see summary). Falls back gracefully.
+    fontSize: 14,
+    // Monospace pairing: Geist Mono (bundled) > JetBrains Mono > SF Mono > Monaco/Consolas.
+    // Geist Mono is the primary, high-legibility face.
     fontFamily:
-      '"JetBrains Mono","SF Mono","Berkeley Mono","Monaco","Inconsolata","Roboto Mono","Consolas",monospace',
+      '"Geist Mono","JetBrains Mono","SF Mono","Berkeley Mono","Monaco","Inconsolata","Roboto Mono","Consolas",monospace',
     fontLigatures: true, // enables liga + calt (e.g. =>, !=, ==)
     fontWeight: '400',
-    lineHeight: 22, // generous, Xcode-like breathing room
-    letterSpacing: 0.2,
+    lineHeight: 23, // generous, comfortable breathing room
+    letterSpacing: 0.3,
     cursorBlinking: 'smooth', // smooth (not instant) blink
     cursorSmoothCaretAnimation: 'on', // animated caret glide
     cursorWidth: 1.4, // thin, restrained cursor
@@ -67,7 +67,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       handleMouseWheel: true,
     },
     minimap: { enabled: false }, // removed — barely-there is still clutter
-    padding: { top: 18, bottom: 18 }, // generous Xcode-style margins
+    padding: { top: 20, bottom: 20 }, // generous, comfortable margins
     guides: {
       indentation: true, // single subtle shade
       bracketPairs: true, // subtle horizontal guide

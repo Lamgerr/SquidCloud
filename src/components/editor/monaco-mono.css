@@ -2,7 +2,7 @@
    SquidCloud Monochrome Editor — global overrides for Monaco.
    Monaco injects many inline styles, so key widget rules use
    !important. Everything stays in one cool-grayscale family;
-   the single desaturated accent (#8aa0c8) is used ONLY for the
+   the single NEUTRAL accent (#a1a1aa) is used ONLY for the
    caret/selection glow, never for syntax coloring.
    ============================================================ */
 
@@ -13,10 +13,24 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* Premium, comfortable surface — rounded glass card */
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0a0a0c;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 24px 60px -24px rgba(0, 0, 0, 0.75);
+}
+
+/* Round the editor body so the surface corner matches the shell */
+.monaco-editor {
+  border-radius: 14px;
+  overflow: hidden;
 }
 /* Soft focus ring on the shell instead of a generic <div> look */
 .mono-editor-shell:focus-within {
-  box-shadow: inset 0 0 0 1px rgba(138, 160, 200, 0.40);
+  box-shadow: inset 0 0 0 1px rgba(161, 161, 170, 0.40);
 }
 
 /* ---- base surface ---- */
@@ -24,7 +38,7 @@
 .monaco-editor .margin,
 .monaco-editor-background,
 .monaco-editor .glyph-margin {
-  background: #0d0e12 !important;
+  background: #0a0a0c !important;
 }
 
 /* crisp sub-pixel text + subtle smooth-caret halo */
@@ -35,10 +49,10 @@
   text-rendering: optimizeLegibility;
 }
 .monaco-editor .cursor {
-  box-shadow: 0 0 0 0.5px rgba(138, 160, 200, 0.45);
+  box-shadow: 0 0 0 0.5px rgba(161, 161, 170, 0.45);
 }
 .monaco-editor .margin {
-  background: #14151a !important;
+  background: #121214 !important;
 }
 
 /* generous line numbers, dim until active */
@@ -59,7 +73,7 @@
 /* selection — soft, never harsh */
 .monaco-editor .selected-text,
 .monaco-editor .view-line span.inline-selected-text {
-  background: rgba(138, 160, 200, 0.20) !important;
+  background: rgba(161, 161, 170, 0.20) !important;
   color: inherit !important;
 }
 
@@ -100,7 +114,7 @@
 
 /* ---- minimap (only if enabled): match background ---- */
 .monaco-editor .minimap {
-  background: #0d0e12 !important;
+  background: #0a0a0c !important;
 }
 .monaco-editor .minimap .minimap-decorations {
   opacity: 0.5;
@@ -139,7 +153,7 @@
 
 /* ---- context menu: restyled to the monochrome theme ---- */
 .monaco-menu {
-  background: #14151a !important;
+  background: #121214 !important;
   border: 1px solid #1c1e26 !important;
   border-radius: 10px !important;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55) !important;
@@ -170,11 +184,11 @@
 .monaco-editor .find-widget {
   border-radius: 10px !important;
   border: 1px solid #1c1e26 !important;
-  background: #14151a !important;
+  background: #121214 !important;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55) !important;
 }
 .monaco-editor .find-widget input {
-  background: #0d0e12 !important;
+  background: #0a0a0c !important;
   color: #c7ccd6 !important;
   border-radius: 6px !important;
 }
@@ -183,5 +197,5 @@
 .monaco-editor .peekview-widget,
 .monaco-editor .reference-zone-widget {
   border: 1px solid #1c1e26 !important;
-  background: #14151a !important;
+  background: #121214 !important;
 }

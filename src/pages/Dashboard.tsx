@@ -1509,7 +1509,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                     </p>
                   </div>
 
-                  <div data-scroll-container="true" className="flex-1 overflow-y-auto px-3 py-3">
+                  <div data-scroll-container="true" className="flex-1 overscroll-y-contain overflow-y-auto px-3 py-3">
                     <div className="space-y-1">
                       {[
                         { id: 'files', label: 'Files', icon: FileStack },
@@ -2006,7 +2006,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                 onSnooze={snoozeNotification}
               />
             ))}
-            <main data-scroll-container="true" className="flex-1 overflow-y-auto px-6 pb-8 pt-6 lg:px-8">
+            <main data-scroll-container="true" className="flex-1 overscroll-y-contain overflow-y-auto px-6 pb-8 pt-6 lg:px-8">
               <div className="mx-auto w-full max-w-[1400px]">
 
               {/* ── Files tab ── */}

@@ -150,7 +150,7 @@ const MobileFileActionSheet: React.FC<MobileFileActionSheetProps> = ({
     }
   };
 
-  const Row: React.FC<{ icon: React.ComponentType<{ className?: string }>; label: string; onClick?: () => void; destructive?: boolean; noBorder?: boolean }> = ({ icon: Icon, label, onClick, destructive, noBorder }) => (
+  const Row: React.FC<{ icon: React.ComponentType<{ className?: string }>; label: string; onClick?: () => void; destructive?: boolean }> = ({ icon: Icon, label, onClick, destructive }) => (
     <button
       onClick={() => {
         if ('vibrate' in navigator) navigator.vibrate(30);
@@ -162,13 +162,12 @@ const MobileFileActionSheet: React.FC<MobileFileActionSheetProps> = ({
         }
       }}
       className={cn(
-        'flex items-center gap-4 w-full h-[56px] px-5 text-[16px] font-normal transition-colors duration-80 active:bg-[#2D333B]',
-        destructive ? 'text-[#F85149]' : 'text-[#E6EDF3]',
-        !noBorder && 'border-b border-[#2D333B]'
+        'flex items-center gap-3 w-full px-3 py-3 rounded-xl text-[15px] font-normal transition-colors duration-80 text-left active:bg-[#2D333B]',
+        destructive ? 'text-[#F85149]' : 'text-[#E6EDF3] hover:bg-[#2D333B]'
       )}
     >
-      <Icon className={cn('w-5 h-5', destructive ? 'text-[#F85149]' : 'text-[#8B949E]')} />
-      {label}
+      <Icon className={cn('w-[18px] h-[18px] shrink-0', destructive ? 'text-[#F85149]' : 'text-[#8B949E]')} />
+      <span className="flex-1 truncate">{label}</span>
     </button>
   );
 
@@ -190,38 +189,40 @@ const MobileFileActionSheet: React.FC<MobileFileActionSheetProps> = ({
         </div>
       }
     >
-      {onView && <Row icon={Eye} label="Preview" onClick={onView} />}
-      {onDownload && <Row icon={Download} label="Download" onClick={onDownload} />}
-      {isHtmlFile && <Row icon={Globe} label={pubStatus?.status === 'live' ? 'Manage Published Site' : 'Publish as Website'} onClick={() => { onClose(); setTimeout(() => setPublishModalOpen(true), 50); }} />}
-      <Row icon={Share2} label={isShared ? 'Manage Share' : 'Share'} onClick={handleShareClick} />
-      {isShared && (
-        <Row icon={XCircle} label="Revoke Share" onClick={handleRevokeShare} />
-      )}
-      {isShared && (
-        <Row icon={Settings} label="Manage All Shares" onClick={() => { onClose(); navigate('/manage/shares'); }} />
-      )}
-      <Row icon={Copy} label="Copy Link" onClick={handleCopyLink} />
-      <Row icon={ExternalLink} label="Open in New Tab" onClick={handleOpenInNewTab} />
-      {onOpenInCbCode && <Row icon={Code2} label="Open in cbCode" onClick={onOpenInCbCode} />}
-      {isArchive && onExtract && <Row icon={Archive} label="Extract Archive" onClick={onExtract} />}
-      {onCopy && <Row icon={Copy} label="Make a copy" onClick={onCopy} />}
-      <Row icon={Move} label="Move" onClick={() => { onClose(); setTimeout(() => setShowMoveSheet(true), 50); }} />
-      {onRename && <Row icon={Edit} label="Rename" onClick={onRename} />}
-      {onFavorite && <Row icon={Star} label={isFavorited ? 'Remove favorite' : 'Add favorite'} onClick={onFavorite} />}
-      {onArchive && <Row icon={Archive} label="Archive" onClick={onArchive} />}
-      <Row icon={Info} label="Details" onClick={() => { onClose(); setTimeout(() => setShowInfoSheet(true), 50); }} />
-      {showVaultActions && onRemoveFromVault && (
-        <Row icon={Undo2} label="Remove from Vault" onClick={onRemoveFromVault} />
-      )}
-      {!showVaultActions && onMoveToVault && (
-        <Row icon={Shield} label="Move to Vault" onClick={onMoveToVault} />
-      )}
-      {onDelete && (
-        <>
-          <div className="h-px bg-[#2D333B]" />
-          <Row icon={Trash2} label="Delete" onClick={onDelete} destructive noBorder />
-        </>
-      )}
+      <div className="px-2 pb-2 space-y-0.5">
+        {onView && <Row icon={Eye} label="Preview" onClick={onView} />}
+        {onDownload && <Row icon={Download} label="Download" onClick={onDownload} />}
+        {isHtmlFile && <Row icon={Globe} label={pubStatus?.status === 'live' ? 'Manage Published Site' : 'Publish as Website'} onClick={() => { onClose(); setTimeout(() => setPublishModalOpen(true), 50); }} />}
+        <Row icon={Share2} label={isShared ? 'Manage Share' : 'Share'} onClick={handleShareClick} />
+        {isShared && (
+          <Row icon={XCircle} label="Revoke Share" onClick={handleRevokeShare} />
+        )}
+        {isShared && (
+          <Row icon={Settings} label="Manage All Shares" onClick={() => { onClose(); navigate('/manage/shares'); }} />
+        )}
+        <Row icon={Copy} label="Copy Link" onClick={handleCopyLink} />
+        <Row icon={ExternalLink} label="Open in New Tab" onClick={handleOpenInNewTab} />
+        {onOpenInCbCode && <Row icon={Code2} label="Open in cbCode" onClick={onOpenInCbCode} />}
+        {isArchive && onExtract && <Row icon={Archive} label="Extract Archive" onClick={onExtract} />}
+        {onCopy && <Row icon={Copy} label="Make a copy" onClick={onCopy} />}
+        <Row icon={Move} label="Move" onClick={() => { onClose(); setTimeout(() => setShowMoveSheet(true), 50); }} />
+        {onRename && <Row icon={Edit} label="Rename" onClick={onRename} />}
+        {onFavorite && <Row icon={Star} label={isFavorited ? 'Remove favorite' : 'Add favorite'} onClick={onFavorite} />}
+        {onArchive && <Row icon={Archive} label="Archive" onClick={onArchive} />}
+        <Row icon={Info} label="Details" onClick={() => { onClose(); setTimeout(() => setShowInfoSheet(true), 50); }} />
+        {showVaultActions && onRemoveFromVault && (
+          <Row icon={Undo2} label="Remove from Vault" onClick={onRemoveFromVault} />
+        )}
+        {!showVaultActions && onMoveToVault && (
+          <Row icon={Shield} label="Move to Vault" onClick={onMoveToVault} />
+        )}
+        {onDelete && (
+          <>
+            <div className="h-px bg-[#2D333B] my-1.5" />
+            <Row icon={Trash2} label="Delete" onClick={onDelete} destructive />
+          </>
+        )}
+      </div>
     </MobileSheet>
 
     <ShareManagementDialog

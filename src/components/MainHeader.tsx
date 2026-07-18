@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { GlassButton } from '@/components/ui/glasscn/glass-button';
+import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard, 
   Shield, 
@@ -26,11 +26,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  GlassTooltip,
-  GlassTooltipContent,
-  GlassTooltipProvider,
-  GlassTooltipTrigger,
-} from "@/components/ui/glasscn/glass-tooltip";
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 
 /**
@@ -79,37 +79,41 @@ const NavIconButton: React.FC<NavIconButtonProps> = ({
   );
 
   const tooltipContent = (
-    <GlassTooltipContent 
-      side="bottom" 
+    <TooltipContent
+      side="bottom"
       sideOffset={8}
       className="text-popover-foreground text-xs px-2.5 py-1.5 rounded-lg shadow-lg animate-fade-in-scale"
     >
       {label}
-    </GlassTooltipContent>
+    </TooltipContent>
   );
 
   if (to) {
     return (
-      <GlassTooltip>
-        <GlassTooltipTrigger asChild>
-          <Link to={to} className={buttonClasses} aria-label={label}>
-            {content}
-          </Link>
-        </GlassTooltipTrigger>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Link to={to} className={buttonClasses} aria-label={label}>
+              {content}
+            </Link>
+          }
+        />
         {tooltipContent}
-      </GlassTooltip>
+      </Tooltip>
     );
   }
 
   return (
-    <GlassTooltip>
-      <GlassTooltipTrigger asChild>
-        <button onClick={onClick} className={buttonClasses} aria-label={label}>
-          {content}
-        </button>
-      </GlassTooltipTrigger>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button onClick={onClick} className={buttonClasses} aria-label={label}>
+            {content}
+          </button>
+        }
+      />
       {tooltipContent}
-    </GlassTooltip>
+    </Tooltip>
   );
 };
 
@@ -138,7 +142,7 @@ const MainHeader: React.FC = () => {
   const isActiveRoute = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   return (
-      <GlassTooltipProvider delayDuration={200}>
+      <TooltipProvider delayDuration={200}>
       <header 
         className={cn(
           "sticky top-0 z-50 w-full",
@@ -299,12 +303,12 @@ const MainHeader: React.FC = () => {
                   >
                     Sign In
                   </Link>
-                  <GlassButton 
-                    asChild
+                  <Button
+                    render={<Link to="/auth" />}
                     className="h-9 px-5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm rounded-lg transition-all duration-150 active:scale-[0.97] shadow-sm shadow-primary/15"
                   >
-                    <Link to="/auth">Get Started</Link>
-                   </GlassButton>
+                    Get Started
+                  </Button>
                 </div>
               )}
             </nav>
@@ -367,7 +371,7 @@ const MainHeader: React.FC = () => {
           </nav>
         )}
       </header>
-      </GlassTooltipProvider>
+      </TooltipProvider>
   );
 };
 

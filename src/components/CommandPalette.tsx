@@ -811,7 +811,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       <div 
         ref={listRef}
         className={cn(
-          "overflow-y-auto",
+          "overflow-y-auto min-h-0",
           isMobile ? "flex-1" : "max-h-[360px]"
         )}
       >
@@ -940,7 +940,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent 
           side="bottom" 
-          className="h-[85vh] flex flex-col p-0 rounded-t-2xl [&>button:last-child]:top-3 [&>button:last-child]:right-4"
+          className="flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 rounded-t-2xl [&>button:last-child]:top-3 [&>button:last-child]:right-4"
         >
           {/* Handle indicator */}
           <div className="flex justify-center pt-3 pb-2">

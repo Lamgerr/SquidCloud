@@ -181,7 +181,7 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
   });
 
   const content = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-5 py-2 border-b border-border/20">
         <div className="relative flex-1">
@@ -302,7 +302,7 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) { setExpandedAnalytics(null); setConfirmRevoke(null); } onOpenChange(v); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] p-0 flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[85vh] p-0 flex flex-col overflow-hidden">
         <DialogHeader className="px-5 pt-4 pb-0">
           <DialogTitle className="flex items-center gap-2">
             <Share2 className="h-5 w-5" />

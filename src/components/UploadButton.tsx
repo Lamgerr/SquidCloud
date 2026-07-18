@@ -1,10 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GlassButton } from '@/components/ui/glasscn/glass-button';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Folder, Upload as UploadIcon, Camera, Image as ImageIcon } from '@/lib/icon-map';
-import { Popover, PopoverTrigger } from '@/components/ui/popover';
-import { GlassPopoverContent } from '@/components/ui/glasscn/glass-popover';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
 import { Progress } from '@/components/ui/progress';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -275,23 +274,25 @@ const UploadButton: React.FC<UploadButtonProps> = ({
     <>
       {allowFolderUpload ? (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
-          <PopoverTrigger asChild>
-            <GlassButton
+          <PopoverTrigger
+          render={
+            <Button
               variant={variant}
               size={size}
               data-upload-trigger={uploadTargetKey}
             >
               {buttonContent}
-            </GlassButton>
-          </PopoverTrigger>
-          <GlassPopoverContent 
+            </Button>
+          }
+        />
+          <PopoverContent
             className="w-auto p-3"
           >
             <div className="grid gap-3">
               {/* Show camera/gallery options on native mobile */}
               {isNativePlatform() && (
                 <>
-                  <GlassButton
+                  <Button
                     size="sm"
                     className={cn(
                       "w-full transition-all duration-200",
@@ -301,8 +302,8 @@ const UploadButton: React.FC<UploadButtonProps> = ({
                   >
                     <Camera className="h-4 w-4 mr-2" />
                     Take Photo
-                  </GlassButton>
-                  <GlassButton
+                  </Button>
+                  <Button
                     size="sm"
                     className={cn(
                       "w-full transition-all duration-200",
@@ -312,11 +313,11 @@ const UploadButton: React.FC<UploadButtonProps> = ({
                   >
                     <ImageIcon className="h-4 w-4 mr-2" />
                     From Gallery
-                  </GlassButton>
+                  </Button>
                   <div className="border-t border-border my-1" />
                 </>
               )}
-              <GlassButton
+              <Button
                 size="sm"
                 className={cn(
                   "w-full transition-all duration-200",
@@ -326,8 +327,8 @@ const UploadButton: React.FC<UploadButtonProps> = ({
               >
                 <Upload className="h-4 w-4 mr-2" />
                 {allowMultiple ? "Upload Files" : "Upload File"}
-              </GlassButton>
-              <GlassButton
+              </Button>
+              <Button
                 size="sm"
                 className={cn(
                   "w-full transition-all duration-200",
@@ -337,19 +338,19 @@ const UploadButton: React.FC<UploadButtonProps> = ({
               >
                 <Folder className="h-4 w-4 mr-2" />
                 Upload Folder
-              </GlassButton>
+              </Button>
             </div>
-          </GlassPopoverContent>
+          </PopoverContent>
         </Popover>
       ) : (
-        <GlassButton
+        <Button
           onClick={triggerFileUpload}
           variant={variant}
           size={size}
           data-upload-trigger={uploadTargetKey}
         >
           {buttonContent}
-        </GlassButton>
+        </Button>
       )}
       
       <input
@@ -407,7 +408,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({
             )}>
               Uploading {Object.keys(uploadingFiles).length} file(s)
             </h3>
-            <GlassButton 
+            <Button 
               variant="ghost" 
               size="sm" 
               className={cn(
@@ -417,7 +418,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({
               onClick={() => setShowProgress(false)}
             >
               ×
-            </GlassButton>
+            </Button>
           </div>
           
           <div className="space-y-4 max-h-60 overflow-auto custom-scrollbar">

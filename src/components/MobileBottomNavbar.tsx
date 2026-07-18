@@ -1,19 +1,25 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   BarChart3,
-  Files,
   Folder,
   Plus,
   User,
   Users,
   FileStack,
   Upload,
+  Download,
+  Home,
+  X
 } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import CreateItemDialog from '@/components/CreateItemDialog';
 import { useCreateItem } from '@/hooks/use-create-item';
 import type { CreateFileType } from '@/hooks/use-create-item';
+
+// Import background services to read progress directly
+import { backgroundUploadService, UploadTask } from '@/services/backgroundUpload';
+import { backgroundDownloadService, DownloadTask } from '@/services/backgroundDownload';
 
 interface MobileBottomNavbarProps {
   activeTab: string;
@@ -33,10 +39,6 @@ const navItems = [
   { id: 'account', label: 'Account', icon: User },
 ];
 
-const haptic = (duration: number = 10) => {
-  if ('vibrate' in navigator) navigator.vibrate(duration);
-};
-
 const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
   activeTab,
   onTabChange,
@@ -47,25 +49,84 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
   currentPath = '',
   onFileCreated,
 }) => {
+  const haptic = (duration: number = 10) => {
+    if ('vibrate' in navigator) navigator.vibrate(duration);
+  };
+
+  // Instantly scroll the active scroll container(s) to the very top.
+  const scrollToTopInstant = () => {
+    const containers = document.querySelectorAll<HTMLElement>('[data-scroll-container="true"]');
+    containers.forEach(el => el.scrollTo({ top: 0, behavior: 'auto' }));
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
+  // Detect a fast double-tap on a nav icon: second tap within 300ms
+  // jumps the view to the top instead of running the single-tap action.
+  const lastTapRef = useRef<{ id: string; t: number }>({ id: '', t: 0 });
+
+  const activate = (id: string, single: () => void) => {
+    const now = Date.now();
+    if (lastTapRef.current.id === id && now - lastTapRef.current.t < 300) {
+      lastTapRef.current = { id: '', t: 0 };
+      scrollToTopInstant();
+      haptic(15);
+      return;
+    }
+    lastTapRef.current = { id, t: now };
+    single();
+  };
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const prevTabRef = useRef(activeTab);
 
+  // --- Morphing & Scroll State ---
+  const [isScrolledDown, setIsScrolledDown] = useState(false);
+  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
+  const [downloadTasks, setDownloadTasks] = useState<DownloadTask[]>([]);
+
   useEffect(() => {
     setMounted(true);
+    
+    // Highly sensitive scroll detection for instant morphing
+    let lastY = window.scrollY;
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      if (currentY > lastY + 2) { 
+        setIsScrolledDown(true); 
+      } else if (currentY < lastY - 2 || currentY < 10) { 
+        setIsScrolledDown(false); 
+      }
+      lastY = currentY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Subscribe to background tasks
+    const unsubsUpload = backgroundUploadService.subscribe(setUploadTasks);
+    const unsubsDownload = backgroundDownloadService.subscribe(setDownloadTasks);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      unsubsUpload();
+      unsubsDownload();
+    };
   }, []);
 
+  // Calculate active stats for the morphed pill
+  const activeUploads = uploadTasks.filter(t => t.status === 'uploading' || t.status === 'pending');
+  const isUploading = activeUploads.length > 0;
+  const uploadProgress = isUploading ? activeUploads.reduce((acc, t) => acc + t.progress, 0) / activeUploads.length : 0;
+
+  const activeDownloads = downloadTasks.filter(t => t.status === 'downloading');
+  const isDownloading = activeDownloads.length > 0;
+  const downloadProgress = isDownloading ? activeDownloads.reduce((acc, t) => acc + t.progress, 0) / activeDownloads.length : 0;
+
+  // Determine if we should show the morphed layout
+  const isMorphed = isScrolledDown && (isUploading || isDownloading);
+
   const {
-    fileTypes,
-    dialogOpen,
-    setDialogOpen,
-    fileName,
-    setFileName,
-    createMode,
-    creating,
-    openFileDialog,
-    openFolderDialog,
-    submit,
+    fileTypes, dialogOpen, setDialogOpen, fileName, setFileName,
+    createMode, creating, openFileDialog, openFolderDialog, submit,
   } = useCreateItem({ currentPath, onItemCreated: onFileCreated });
 
   const quickFileTypes = useMemo<CreateFileType[]>(() => fileTypes.slice(0, 4), [fileTypes]);
@@ -74,6 +135,11 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
     if (tabId === 'account') {
       haptic(10);
       window.location.href = '/settings/account';
+      return;
+    }
+    if (tabId === 'home') {
+      haptic(10);
+      window.location.href = '/';
       return;
     }
     prevTabRef.current = activeTab;
@@ -91,144 +157,142 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
     input?.click();
   };
 
-  const openCreateMenu = () => {
-    if (createDisabled) { onCreateDisabled?.(); return; }
-    setCreateSheetOpen(true);
-    haptic(10);
-  };
-
   const handleSelectOption = (callback: (type?: CreateFileType) => void, type?: CreateFileType) => {
     if (createDisabled) { onCreateDisabled?.(); return; }
     setCreateSheetOpen(false);
     type ? callback(type) : callback();
   };
 
-  const getTabIndex = (id: string) => navItems.findIndex(i => i.id === id);
   const navMid = Math.ceil(navItems.length / 2);
 
   return (
     <>
-      <div className={cn('fixed inset-x-0 bottom-0 z-50 flex justify-center', className)}>
+      <div 
+        className={cn(
+          'fixed bottom-6 inset-x-0 z-50 flex justify-center pointer-events-none px-4', 
+          className
+        )}
+      >
         <div
           className={cn(
-            'mx-3 mb-3 w-full max-w-md',
-            'lg-strong rounded-[28px]',
-            'transition-all duration-300 lg-glow',
-            mounted ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0',
+            'pointer-events-auto flex items-center p-1.5 overflow-hidden',
+            'rounded-full bg-background/85 backdrop-blur-2xl border border-border/40',
+            'shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)]',
+            'transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)]',
+            mounted ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-12 opacity-0 scale-95',
+            isMorphed ? 'w-full max-w-[340px] gap-2' : 'w-full max-w-md gap-1'
           )}
         >
-          <div className="flex items-center justify-around h-[60px] px-2">
-            {navItems.slice(0, navMid).map((item, i) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleTabClick(item.id)}
-                  className="group relative flex flex-col items-center justify-center flex-1 h-full py-1"
-                  aria-label={item.label}
-                  style={{
-                    transitionDelay: mounted ? `${i * 60}ms` : '0ms',
-                  }}
-                >
-                  <div
-                    className={cn(
-                      'flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300',
-                      isActive
-                        ? 'bg-foreground/10 text-foreground scale-100'
-                        : 'text-muted-foreground/40 scale-100 group-hover:text-foreground/70',
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        'transition-all duration-300',
-                        isActive ? 'h-5 w-5' : 'h-[18px] w-[18px]',
-                      )}
-                      strokeWidth={isActive ? 2.5 : 1.5}
-                    />
-                  </div>
-                  <span
-                    className={cn(
-                      'text-[9px] font-medium tracking-wide transition-all duration-300',
-                      isActive
-                        ? 'text-foreground/80 translate-y-0'
-                        : 'text-muted-foreground/40 translate-y-0',
-                    )}
-                  >
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
-
-            <div className="flex items-center justify-center flex-1 relative">
+          {/* ═══ STANDARD NAV (Left Side) OR MORPHED HOME ═══ */}
+          <div className={cn("flex items-center transition-all duration-400", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
+            {navItems.slice(0, navMid).map((item) => (
               <button
-                onClick={openCreateMenu}
+                key={item.id}
+                onClick={() => item.id === 'files' ? activate('files', () => handleTabClick('files')) : handleTabClick(item.id)}
                 className={cn(
-                  'relative flex items-center justify-center',
-                  'h-[46px] w-[46px] rounded-full',
-                  'bg-foreground/10 text-foreground',
-                  'shadow-lg shadow-black/20 dark:shadow-black/40',
-                  'hover:bg-foreground/15 hover:scale-105',
-                  'active:scale-90 transition-all duration-200',
-                  createDisabled && 'opacity-60 cursor-not-allowed active:scale-100 hover:scale-100',
-                  mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0',
+                  'relative flex items-center justify-center gap-2 rounded-full transition-all duration-300',
+                  activeTab === item.id ? 'bg-foreground/10 text-foreground px-4 h-12' : 'w-12 h-12 text-muted-foreground/60 hover:text-foreground/80'
                 )}
-                style={{ transitionDelay: '120ms' }}
-                aria-disabled={createDisabled}
-                aria-label="Create"
               >
-                <Plus className="h-5 w-5" strokeWidth={2.5} />
-                <span className="absolute inset-0 rounded-full bg-foreground/10 animate-ping opacity-30 motion-safe:animate-ping" />
+                <item.icon className="h-5 w-5 shrink-0" strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                {activeTab === item.id && <span className="text-sm font-semibold tracking-tight">{item.label}</span>}
               </button>
-            </div>
-
-            {navItems.slice(navMid).map((item, i) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleTabClick(item.id)}
-                  className="group relative flex flex-col items-center justify-center flex-1 h-full py-1"
-                  aria-label={item.label}
-                  style={{
-                    transitionDelay: mounted ? `${(i + navMid + 1) * 60}ms` : '0ms',
-                  }}
-                >
-                  <div
-                    className={cn(
-                      'flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300',
-                      isActive
-                        ? 'bg-foreground/10 text-foreground scale-100'
-                        : 'text-muted-foreground/40 scale-100 group-hover:text-foreground/70',
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        'transition-all duration-300',
-                        isActive ? 'h-5 w-5' : 'h-[18px] w-[18px]',
-                      )}
-                      strokeWidth={isActive ? 2.5 : 1.5}
-                    />
-                  </div>
-                  <span
-                    className={cn(
-                      'text-[9px] font-medium tracking-wide transition-all duration-300',
-                      isActive
-                        ? 'text-foreground/80 translate-y-0'
-                        : 'text-muted-foreground/40 translate-y-0',
-                    )}
-                  >
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
+            ))}
           </div>
+
+          {/* Morphed Home Button (Only visible when merged) */}
+          <button 
+            onClick={() => activate('home', () => { haptic(10); if (window.location.pathname !== '/') window.location.href = '/'; })}
+            className={cn(
+              "flex items-center justify-center rounded-full shrink-0 transition-all duration-400",
+              isMorphed ? "w-11 h-11 bg-muted/40 text-foreground hover:bg-muted/60 opacity-100" : "w-0 h-11 opacity-0"
+            )}
+          >
+             <Home className="w-5 h-5 shrink-0" strokeWidth={2} />
+          </button>
+
+          {/* ═══ STANDARD CREATE BUTTON ═══ */}
+          <div className={cn("px-1 transition-all duration-400", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
+            <button
+              onClick={() => { 
+                if (createDisabled) { 
+                  onCreateDisabled?.(); 
+                } else {
+                  setCreateSheetOpen(true); 
+                  haptic(10); 
+                }
+              }}
+              className={cn(
+                'relative flex items-center justify-center h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-all',
+                createDisabled && 'opacity-60 cursor-not-allowed active:scale-100'
+              )}
+            >
+              <Plus className="h-6 w-6" strokeWidth={2.5} />
+            </button>
+          </div>
+
+          {/* ═══ MORPHED PROGRESS PILL ═══ */}
+          <div 
+            className={cn(
+              "flex items-center justify-between rounded-full bg-muted/30 transition-all duration-400 overflow-hidden",
+              isMorphed ? "flex-1 h-11 px-3 opacity-100" : "w-0 h-11 opacity-0 p-0 border-0"
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="relative flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                <svg className="w-6 h-6 -rotate-90 absolute inset-0" viewBox="0 0 36 36">
+                  <circle className="text-foreground/10" strokeWidth="4" stroke="currentColor" fill="none" r="14" cx="18" cy="18" />
+                  <circle 
+                    className={cn("transition-all duration-300", isUploading ? "text-blue-500" : "text-emerald-500")} 
+                    strokeWidth="4" strokeDasharray={`${isUploading ? uploadProgress : downloadProgress}, 100`} strokeLinecap="round" stroke="currentColor" fill="none" r="14" cx="18" cy="18" 
+                  />
+                </svg>
+                {isUploading ? <Upload className="w-2.5 h-2.5 text-blue-500" /> : <Download className="w-2.5 h-2.5 text-emerald-500" />}
+              </div>
+              <span className="text-xs font-semibold text-foreground truncate">
+                {isUploading ? `Uploading ${Math.round(uploadProgress)}%` : `Downloading ${Math.round(downloadProgress)}%`}
+              </span>
+            </div>
+            
+            <button 
+              onClick={(e) => { e.stopPropagation(); isUploading ? backgroundUploadService.clearCompleted() : backgroundDownloadService.clearCompleted(); }} 
+              className="w-6 h-6 rounded-full bg-foreground/10 hover:bg-foreground/20 flex items-center justify-center shrink-0 transition-colors"
+            >
+              <X className="w-3 h-3 text-foreground/70" />
+            </button>
+          </div>
+
+          {/* ═══ STANDARD NAV (Right Side) ═══ */}
+          <div className={cn("flex items-center transition-all duration-400", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
+            {navItems.slice(navMid).map((item) => (
+              <button
+                key={item.id}
+                onClick={() => item.id === 'files' ? activate('files', () => handleTabClick('files')) : handleTabClick(item.id)}
+                className={cn(
+                  'relative flex items-center justify-center gap-2 rounded-full transition-all duration-300',
+                  activeTab === item.id ? 'bg-foreground/10 text-foreground px-4 h-12' : 'w-12 h-12 text-muted-foreground/60 hover:text-foreground/80'
+                )}
+              >
+                <item.icon className="h-5 w-5 shrink-0" strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                {activeTab === item.id && <span className="text-sm font-semibold tracking-tight">{item.label}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* Morphed Account Button */}
+          <button 
+            onClick={() => handleTabClick('account')}
+            className={cn(
+              "flex items-center justify-center rounded-full shrink-0 transition-all duration-400",
+              isMorphed ? "w-11 h-11 bg-muted/40 text-foreground hover:bg-muted/60 opacity-100" : "w-0 h-11 opacity-0"
+            )}
+          >
+             <User className="w-5 h-5 shrink-0" strokeWidth={2} />
+          </button>
         </div>
       </div>
 
+      {/* ═══ SHEET & CREATE DIALOG ═══ */}
       <Sheet open={createSheetOpen} onOpenChange={setCreateSheetOpen}>
         <SheetContent
           side="bottom"
@@ -263,7 +327,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
             </button>
 
             <div>
-              <h4 className="mb-2.5 text-xs font-medium text-muted-foreground/70 px-1">Quick Files</h4>
+              <h4 className="mb-2.5 mt-4 text-xs font-medium text-muted-foreground/70 px-1">Quick Files</h4>
               <div className="grid grid-cols-2 gap-2.5">
                 {quickFileTypes.map((type, i) => (
                   <button

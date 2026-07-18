@@ -6,6 +6,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -47,17 +48,23 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  const isMobile = useIsMobile()
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          isMobile
+            ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] w-full flex-col rounded-t-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 shadow-2xl outline-none duration-200 data-[open]:animate-in data-[open]:fade-in-0 data-[open]:slide-in-from-bottom-4 data-[closed]:animate-out data-[closed]:fade-out-0 data-[closed]:slide-out-to-bottom-4"
+            : "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overflow-x-hidden break-words data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
       >
+        {isMobile && (
+          <div className="mx-auto mb-3 mt-0.5 h-1 w-10 shrink-0 rounded-full bg-foreground/20" />
+        )}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close

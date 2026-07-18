@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   AlertCircle, ChevronLeft, ChevronRight, Download, FileText,
   Image as ImageIcon, Lock, Music, Share2, Video, X, Box,
+  Maximize, Minimize,
 } from '@/lib/icon-map';
 import { cn, formatFileSize } from '@/lib/utils';
 import { downloadFileWithRes54, downloadFilePreview } from '@/lib/res54';
@@ -31,12 +32,12 @@ const CustomDialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Popup>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="z-[60] bg-background sm:bg-background/95 sm:backdrop-blur-2xl opacity-0 data-open:opacity-100 transition-opacity duration-200 ease-out" />
+    <DialogOverlay className="z-[60] bg-background sm:bg-background/95 sm:backdrop-blur-2xl transition-opacity duration-200 ease-out" />
     <DialogPrimitive.Popup
       ref={ref}
       className={cn(
         'fixed inset-0 z-[60] flex flex-col w-screen h-screen max-w-none rounded-none border-0 bg-background text-foreground shadow-2xl overflow-hidden',
-        'opacity-0 scale-[0.98] data-open:opacity-100 data-open:scale-100',
+        'data-[open]:opacity-100 data-[closed]:opacity-0',
         'transition-all duration-200 ease-out will-change-transform',
         className
       )}
@@ -81,6 +82,27 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const isMobile = useIsMobile();
   const loadGenRef = useRef(0);
   const isClosingRef = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Keep the toggle icon in sync with real fullscreen state (incl. ESC / OS exit).
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      const req: any = (el as any).requestFullscreen?.();
+      if (req && typeof req.catch === 'function') req.catch(() => {});
+    } else {
+      (document as any).exitFullscreen?.();
+    }
+  }, []);
+
 
   const is3DModel = file?.name?.match(/\.(glb|gltf|stl|obj)$/i);
   const isArchive = file?.name?.match(/\.(zip|rar|7z|tar\.gz|tgz)$/i);
@@ -96,8 +118,10 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     if (isClosingRef.current) return;
     isClosingRef.current = true;
 
-    // Immediately trigger React state close
-    onClose();
+     // Immediately trigger React state close
+     onClose();
+     // Exit OS fullscreen if it was engaged
+     if (document.fullscreenElement) (document as any).exitFullscreen?.();
 
     // Clean up mobile history state silently without double-firing popstate
     if (window.history.state?.previewModal) {
@@ -295,7 +319,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <CustomDialogContent>
+      <CustomDialogContent ref={contentRef}>
         <DialogPrimitive.Title className="sr-only">Preview {file?.name || 'file'}</DialogPrimitive.Title>
         <DialogPrimitive.Description className="sr-only">Full-screen document preview.</DialogPrimitive.Description>
         
@@ -325,6 +349,9 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
             <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               {hasPrevious && <Button variant="ghost" size="sm" onClick={onPrevious} className="h-8 w-8 rounded-xl p-0 text-muted-foreground"><ChevronLeft className="h-4 w-4" /></Button>}
               {hasNext && <Button variant="ghost" size="sm" onClick={onNext} className="h-8 w-8 rounded-xl p-0 text-muted-foreground"><ChevronRight className="h-4 w-4" /></Button>}
+              <Button variant="ghost" size="sm" onClick={toggleFullscreen} title={isFullscreen ? 'Exit full screen' : 'Full screen'} className="h-8 w-8 rounded-xl p-0 text-muted-foreground">
+                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              </Button>
               <Button variant="ghost" size="sm" onClick={handleShare} className="h-8 w-8 sm:h-9 sm:px-3 rounded-xl gap-2 text-muted-foreground"><Share2 className="h-4 w-4" /></Button>
               {!isArchive && <Button variant="ghost" size="sm" onClick={handleDownload} className="h-8 w-8 sm:h-9 sm:px-3 rounded-xl gap-2 text-muted-foreground"><Download className="h-4 w-4" /></Button>}
               {!isMobile && (

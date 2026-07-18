@@ -193,7 +193,7 @@ const NativeMobileBridge = () => {
 
 const AppContent = () => {
   const location = useLocation();
-  const showHeader = !['/', '/auth', '/dashboard', '/onboarding', '/cb/pdf/viewer', '/scripts'].some(path =>
+  const showHeader = !['/', '/auth', '/dashboard', '/onboarding', '/pricing', '/cb/pdf/viewer', '/scripts'].some(path =>
     path === location.pathname || location.pathname.startsWith('/cb/pdf/viewer') || location.pathname.startsWith('/scripts')
   );
   const showMaintenanceBanner = !location.pathname.startsWith('/ad/');

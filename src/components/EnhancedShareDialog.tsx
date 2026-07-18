@@ -291,7 +291,7 @@ const EnhancedShareDialogDesktop: React.FC<EnhancedShareDialogProps> = ({ open, 
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isFolder ? <Folder className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
@@ -329,7 +329,7 @@ const EnhancedShareDialogDesktop: React.FC<EnhancedShareDialogProps> = ({ open, 
                   <Input placeholder="email@example.com" value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addEmail())}
-                    className="h-8 text-sm" />
+                    className="h-8 text-sm flex-1 min-w-0" />
                   <Button onClick={addEmail} size="sm" className="h-8 w-8 p-0" disabled={!emailInput.trim()}>
                     <UserPlus className="w-3.5 h-3.5" />
                   </Button>
@@ -348,7 +348,7 @@ const EnhancedShareDialogDesktop: React.FC<EnhancedShareDialogProps> = ({ open, 
             )}
 
             {/* Grid: Expiry + Password */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium flex items-center gap-1"><Clock className="w-3 h-3" /> Expires</Label>
                 <div className="flex flex-wrap gap-1">
@@ -401,7 +401,7 @@ const EnhancedShareDialogDesktop: React.FC<EnhancedShareDialogProps> = ({ open, 
             {showAdvanced && (
               <div className="space-y-3 p-3 border rounded-lg bg-muted/10">
                 {/* Row 1: Max views + View only */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="flex items-center gap-1.5 text-xs font-medium">
                       <Eye className="w-3 h-3" /> Max views
@@ -427,7 +427,7 @@ const EnhancedShareDialogDesktop: React.FC<EnhancedShareDialogProps> = ({ open, 
                 </div>
 
                 {/* Row 2: Download limit + Collect email */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="flex items-center gap-1.5 text-xs font-medium">
                       <Download className="w-3 h-3" /> Download limit
@@ -533,7 +533,7 @@ const EnhancedShareDialogDesktop: React.FC<EnhancedShareDialogProps> = ({ open, 
             </div>
 
             <div className="flex gap-2">
-              <Input value={shareLink} readOnly className="font-mono text-xs h-9" />
+              <Input value={shareLink} readOnly className="font-mono text-xs h-9 flex-1 min-w-0" />
               <Button onClick={copyToClipboard} size="sm" variant="outline" className="h-9 w-9 p-0">
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               </Button>

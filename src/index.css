@@ -25,24 +25,50 @@
     -ms-overflow-style: none;
   }
 
+  /* ── Unified SquidCloud scrollbar — replaces the native browser
+        scrollbar on every scrollable element (desktop + mobile) ── */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted) / 0.6);
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+    transition: background 0.25s ease, width 0.25s ease;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.75);
+  }
+  *::-webkit-scrollbar-thumb:active {
+    background: hsl(var(--muted-foreground) / 0.9);
+  }
+
+  /* Reserve a consistent gutter on desktop so layout never shifts */
   @media (hover: hover) and (pointer: fine) {
     html {
       overflow-y: scroll;
     }
-    html::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+  }
+
+  /* Thinner, unobtrusive scrollbar on touch devices */
+  @media (hover: none) and (pointer: coarse) {
+    *::-webkit-scrollbar {
+      width: 3px;
+      height: 3px;
     }
-    html::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    html::-webkit-scrollbar-thumb {
-      background: hsl(var(--muted));
-      border-radius: 3px;
-      transition: background 0.2s ease;
-    }
-    html::-webkit-scrollbar-thumb:hover {
-      background: hsl(var(--muted-foreground));
+    *::-webkit-scrollbar-thumb {
+      background: hsl(var(--muted) / 0.4);
+      border-radius: 2px;
     }
   }
 

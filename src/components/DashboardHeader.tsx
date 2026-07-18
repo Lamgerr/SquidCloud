@@ -1,9 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { GlassButton } from '@/components/ui/glasscn/glass-button';
-import { GlassInput } from '@/components/ui/glasscn/glass-input';
-import { GlassCard } from '@/components/ui/glasscn/glass-card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Search, Bell } from '@/lib/icon-map';
 import { Gamepad2 } from 'lucide-react';
 import { springs, staggerContainer, riseItem } from '@/lib/motion';
@@ -64,7 +63,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           transition={springs.soft}
           whileTap={{ scale: 0.98 }}
         >
-          <GlassButton
+          <Button
             variant="ghost"
             size="sm"
             onClick={onGamesClick}
@@ -72,13 +71,13 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           >
             <Gamepad2 className="h-4 w-4" />
             Games?
-          </GlassButton>
+          </Button>
         </motion.div>
 
         {onSearchChange && (
           <div className="group relative max-w-md flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground" />
-            <GlassInput
+            <Input
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
@@ -88,13 +87,13 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         )}
 
         <motion.div whileTap={{ scale: 0.94 }} transition={springs.snappy}>
-          <GlassButton
+          <Button
             variant="ghost"
             size="sm"
             className="h-9 w-9 rounded-lg border border-white/10 p-0 hover:text-foreground"
           >
             <Bell className="h-4 w-4 text-muted-foreground" />
-          </GlassButton>
+          </Button>
         </motion.div>
       </div>
 
@@ -111,7 +110,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               key={idx}
               variants={riseItem}
             >
-              <GlassCard className="group relative overflow-hidden rounded-xl border border-white/10 px-4 py-3">
+              <div className="group relative overflow-hidden rounded-xl border border-white/10 px-4 py-3">
                 <div className="flex items-center gap-3">
                   <div
                     className={cn(
@@ -130,7 +129,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     </p>
                   </div>
                 </div>
-              </GlassCard>
+              </div>
             </motion.div>
           ))}
         </motion.div>

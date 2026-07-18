@@ -4,22 +4,9 @@ import { formatBytes } from '@/lib/api';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { 
-  Upload, 
-  CheckCircle2, 
-  XCircle, 
-  ChevronUp, 
-  ChevronDown,
-  X,
-  FileIcon,
-  Image,
-  Video,
-  Music,
-  FileText,
-  Archive,
-  Pause,
-  Play,
-  RotateCcw
-} from '@/lib/icon-map';
+  Upload, CheckCircle2, XCircle, ChevronUp, ChevronDown, X,
+  FileIcon, Image, Video, Music, FileText, Archive, Pause, Play, RotateCcw
+} from '@/lib/icon-map'; // or lucide-react
 
 const MobileUploadNotification: React.FC = () => {
   const isMobile = useIsMobile();
@@ -27,52 +14,53 @@ const MobileUploadNotification: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isScrolledDown, setIsScrolledDown] = useState(false);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      if (currentY > lastY + 2) {
+        setIsScrolledDown(true);
+        setIsExpanded(false); // Auto-collapse so it resets nicely
+      } else if (currentY < lastY - 2 || currentY < 10) {
+        setIsScrolledDown(false);
+      }
+      lastY = currentY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = backgroundUploadService.subscribe((newTasks) => {
       setTasks(newTasks);
-      
-      // Show notification when new uploads start
       if (newTasks.some(task => task.status === 'uploading' || task.status === 'pending')) {
         setIsDismissed(false);
       }
     });
-
     return unsubscribe;
   }, []);
 
-  // Calculate aggregate stats
   const stats = useMemo(() => {
     const active = tasks.filter(t => t.status === 'uploading' || t.status === 'pending');
     const completed = tasks.filter(t => t.status === 'completed');
     const failed = tasks.filter(t => t.status === 'failed');
     
-    // Calculate overall progress
     let totalProgress = 0;
-    active.forEach(task => {
-      totalProgress += task.progress;
-    });
-    const averageProgress = active.length > 0 ? totalProgress / active.length : 0;
-    
-    // Calculate total size being uploaded
-    const totalSize = active.reduce((acc, task) => acc + task.file.size, 0);
-    const uploadedSize = active.reduce((acc, task) => acc + (task.file.size * task.progress / 100), 0);
+    active.forEach(task => { totalProgress += task.progress; });
     
     return {
-      active,
-      completed,
-      failed,
-      total: tasks.length,
-      averageProgress,
-      totalSize,
-      uploadedSize,
+      active, completed, failed, total: tasks.length,
+      averageProgress: active.length > 0 ? totalProgress / active.length : 0,
+      totalSize: active.reduce((acc, task) => acc + task.file.size, 0),
+      uploadedSize: active.reduce((acc, task) => acc + (task.file.size * task.progress / 100), 0),
       isUploading: active.length > 0,
       allCompleted: tasks.length > 0 && active.length === 0 && failed.length === 0,
       hasFailed: failed.length > 0
     };
   }, [tasks]);
 
-  // Auto-dismiss when all uploads complete
   useEffect(() => {
     if (stats.allCompleted && tasks.length > 0) {
       const timer = setTimeout(() => {
@@ -83,7 +71,6 @@ const MobileUploadNotification: React.FC = () => {
     }
   }, [stats.allCompleted, tasks.length]);
 
-  // Get file icon based on type
   const getFileIcon = (file: File) => {
     const type = file.type;
     if (type.startsWith('image/')) return <Image className="w-4 h-4" />;
@@ -94,247 +81,100 @@ const MobileUploadNotification: React.FC = () => {
     return <FileIcon className="w-4 h-4" />;
   };
 
-  const handlePauseResume = () => {
-    if (isPaused) {
-      backgroundUploadService.resumeAll();
-      setIsPaused(false);
-    } else {
-      backgroundUploadService.pauseAll();
-      setIsPaused(true);
-    }
-  };
-
-  const handleRetry = () => {
-    backgroundUploadService.retryFailed();
-  };
-
-  const handleDismiss = () => {
-    backgroundUploadService.clearCompleted();
-    backgroundUploadService.clearFailed();
-    setIsDismissed(true);
-  };
-
-  // Don't show if on desktop, no tasks, or dismissed
-  if (!isMobile || tasks.length === 0 || isDismissed) {
-    return null;
-  }
+  if (!isMobile || tasks.length === 0 || isDismissed) return null;
 
   return (
     <div 
       className={cn(
-        "fixed left-4 right-4 z-[55] transition-all duration-300 ease-spring",
-        isExpanded 
-          ? "bottom-[calc(5rem+env(safe-area-inset-bottom))]" 
-          : "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
+        "fixed left-4 right-4 z-[55] transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        isScrolledDown ? "translate-y-12 opacity-0 pointer-events-none scale-95" : "translate-y-0 opacity-100 scale-100",
+        isExpanded ? "bottom-[calc(5rem+env(safe-area-inset-bottom))]" : "bottom-[calc(6.5rem+env(safe-area-inset-bottom))]"
       )}
     >
-      {/* Main notification pill */}
-      <div 
-        className={cn(
-          "bg-[#0d1117]/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-blue-500/20 overflow-hidden",
-          "transition-all duration-300"
-        )}
-      >
-        {/* Collapsed View - Pill notification */}
+      {/* MONOCHROMATIC BENTO CONTAINER */}
+      <div className="bg-[#121212]/95 backdrop-blur-2xl rounded-[2rem] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.5)] border border-zinc-800/80 overflow-hidden">
+        
         <div 
-          className="flex items-center gap-3 p-3 cursor-pointer active:bg-white/5"
+          className="flex items-center gap-3 p-4 cursor-pointer active:bg-white/5 transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          {/* Progress Ring or Status Icon */}
-          <div className="relative flex-shrink-0 w-10 h-10">
+          {/* Progress Ring */}
+          <div className="relative flex-shrink-0 w-10 h-10 flex items-center justify-center">
             {stats.isUploading ? (
               <>
-                {/* Background ring */}
-                <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-                  <circle
-                    className="text-white/10"
-                    strokeWidth="3"
-                    stroke="currentColor"
-                    fill="none"
-                    r="15.5"
-                    cx="18"
-                    cy="18"
-                  />
-                  <circle
-                    className="text-blue-500 transition-all duration-300"
-                    strokeWidth="3"
-                    strokeDasharray={`${stats.averageProgress}, 100`}
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    r="15.5"
-                    cx="18"
-                    cy="18"
-                  />
+                <svg className="w-10 h-10 -rotate-90 absolute inset-0" viewBox="0 0 36 36">
+                  <circle className="text-zinc-800" strokeWidth="3" stroke="currentColor" fill="none" r="15.5" cx="18" cy="18" />
+                  <circle className="text-white transition-all duration-300" strokeWidth="3" strokeDasharray={`${stats.averageProgress}, 100`} strokeLinecap="round" stroke="currentColor" fill="none" r="15.5" cx="18" cy="18" />
                 </svg>
-                {/* Center icon */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Upload className="w-4 h-4 text-white" />
-                </div>
+                <Upload className="w-4 h-4 text-white" />
               </>
             ) : stats.allCompleted ? (
-              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-black" />
               </div>
             ) : stats.hasFailed ? (
-              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                <XCircle className="w-5 h-5 text-red-500" />
+              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-red-400" />
               </div>
             ) : null}
           </div>
 
-          {/* Status Text */}
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-medium truncate">
-              {stats.isUploading ? (
-                <>Uploading {stats.active.length} file{stats.active.length > 1 ? 's' : ''}</>
-              ) : stats.allCompleted ? (
-                <>Upload complete</>
-              ) : stats.hasFailed ? (
-                <>{stats.failed.length} upload{stats.failed.length > 1 ? 's' : ''} failed</>
-              ) : null}
+            <p className="text-white text-sm font-semibold truncate">
+              {stats.isUploading ? `Uploading ${stats.active.length} file${stats.active.length > 1 ? 's' : ''}` : stats.allCompleted ? "Upload complete" : `${stats.failed.length} failed`}
             </p>
-            <p className="text-white/60 text-xs truncate">
-              {stats.isUploading ? (
-                <>{Math.round(stats.averageProgress)}% • {formatBytes(stats.uploadedSize)} of {formatBytes(stats.totalSize)}</>
-              ) : stats.allCompleted ? (
-                <>{stats.completed.length} file{stats.completed.length > 1 ? 's' : ''} uploaded successfully</>
-              ) : stats.hasFailed ? (
-                <>Tap to retry or dismiss</>
-              ) : null}
+            <p className="text-zinc-400 text-xs font-medium truncate mt-0.5">
+              {stats.isUploading ? `${Math.round(stats.averageProgress)}% • ${formatBytes(stats.uploadedSize)} of ${formatBytes(stats.totalSize)}` : stats.allCompleted ? `${stats.completed.length} files saved` : "Tap to retry"}
             </p>
           </div>
 
-          {/* Action Button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             {stats.isUploading && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handlePauseResume(); }}
-                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-transform"
-              >
+              <button onClick={(e) => { e.stopPropagation(); isPaused ? backgroundUploadService.resumeAll() : backgroundUploadService.pauseAll(); setIsPaused(!isPaused); }} className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center active:scale-90 transition-transform">
                 {isPaused ? <Play className="w-4 h-4 text-white" /> : <Pause className="w-4 h-4 text-white" />}
               </button>
             )}
-            {stats.hasFailed && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleRetry(); }}
-                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-transform"
-              >
-                <RotateCcw className="w-4 h-4 text-white" />
-              </button>
-            )}
-            <button
-              onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
-              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-transform"
-            >
-              <X className="w-4 h-4 text-white/70" />
+            <button onClick={(e) => { e.stopPropagation(); backgroundUploadService.clearCompleted(); setIsDismissed(true); }} className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center active:scale-90 transition-transform">
+              <X className="w-4 h-4 text-zinc-300" />
             </button>
-            <div className="w-6 h-6 flex items-center justify-center">
-              {isExpanded ? (
-                <ChevronDown className="w-4 h-4 text-white/50" />
-              ) : (
-                <ChevronUp className="w-4 h-4 text-white/50" />
-              )}
+            <div className="w-8 h-8 flex items-center justify-center">
+              {isExpanded ? <ChevronDown className="w-5 h-5 text-zinc-500" /> : <ChevronUp className="w-5 h-5 text-zinc-500" />}
             </div>
           </div>
         </div>
 
-        {/* Expanded File List */}
+        {/* EXPANDED FILE LIST */}
         {isExpanded && (
-          <div className="border-t border-blue-500/20 max-h-64 overflow-y-auto overscroll-contain">
-            {tasks.map((task, index) => (
-              <div 
-                key={task.id}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3",
-                  index !== tasks.length - 1 && "border-b border-blue-500/10"
-                )}
-              >
-                {/* File Icon */}
-                <div className={cn(
-                  "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
-                  task.status === 'completed' ? "bg-green-500/20 text-green-400" :
-                  task.status === 'failed' ? "bg-red-500/20 text-red-400" :
-                  "bg-blue-500/20 text-blue-400"
-                )}>
-                  {getFileIcon(task.file)}
-                </div>
-
-                {/* File Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">
-                    {task.file.name}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/50 text-xs">
-                      {formatBytes(task.file.size)}
-                    </span>
+           <div className="border-t border-zinc-800/60 max-h-64 overflow-y-auto overscroll-contain bg-zinc-950/30">
+             {tasks.map((task, index) => (
+                <div key={task.id} className={cn("flex items-center gap-3 px-4 py-3.5", index !== tasks.length - 1 && "border-b border-zinc-800/40")}>
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", 
+                    task.status === 'completed' ? "bg-white text-black" :
+                    task.status === 'failed' ? "bg-red-500/10 text-red-400" : "bg-zinc-800 text-white"
+                  )}>
+                    {getFileIcon(task.file)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{task.file.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-zinc-500 text-xs font-medium">{formatBytes(task.file.size)}</span>
+                      {task.status === 'uploading' && <><span className="text-zinc-700">•</span><span className="text-white text-xs font-bold">{task.progress}%</span></>}
+                      {task.status === 'failed' && task.error && <><span className="text-zinc-700">•</span><span className="text-red-400 text-xs font-medium truncate">{task.error}</span></>}
+                    </div>
                     {task.status === 'uploading' && (
-                      <>
-                        <span className="text-white/30">•</span>
-                        <span className="text-blue-400 text-xs font-medium">
-                          {task.progress}%
-                        </span>
-                      </>
-                    )}
-                    {task.status === 'failed' && task.error && (
-                      <>
-                        <span className="text-white/30">•</span>
-                        <span className="text-red-400 text-xs truncate">
-                          {task.error}
-                        </span>
-                      </>
+                      <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-white rounded-full transition-all duration-300" style={{ width: `${task.progress}%` }} />
+                      </div>
                     )}
                   </div>
-                  
-                  {/* Progress bar for uploading files */}
-                  {task.status === 'uploading' && (
-                    <div className="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                        style={{ width: `${task.progress}%` }}
-                      />
-                    </div>
-                  )}
+                  <div className="shrink-0 ml-2">
+                    {task.status === 'completed' && <CheckCircle2 className="w-5 h-5 text-zinc-400" />}
+                    {task.status === 'failed' && <button onClick={() => backgroundUploadService.retryFailed()} className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center"><RotateCcw className="w-4 h-4 text-white" /></button>}
+                    {task.status === 'uploading' && <div className="w-4 h-4 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />}
+                  </div>
                 </div>
-
-                {/* Status Icon */}
-                <div className="flex-shrink-0">
-                  {task.status === 'completed' && (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  )}
-                  {task.status === 'failed' && (
-                    <button
-                      onClick={() => backgroundUploadService.retryFailed()}
-                      className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center active:scale-90 transition-transform"
-                    >
-                      <RotateCcw className="w-4 h-4 text-red-400" />
-                    </button>
-                  )}
-                  {task.status === 'uploading' && (
-                    <div className="w-5 h-5 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                  )}
-                  {task.status === 'pending' && (
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                      {task.queuePosition > 0 && (
-                        <span className="text-[10px] text-yellow-400 font-medium">
-                          #{task.queuePosition}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {task.status === 'pending' && task.queuePosition > 1 && (
-                    <div className="mt-1">
-                      <span className="text-[10px] text-yellow-400/70">
-                        Position {task.queuePosition} in queue
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+           </div>
         )}
       </div>
     </div>

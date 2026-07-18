@@ -50,6 +50,12 @@ const Auth = () => {
   }, [searchParams]);
 
   useEffect(() => {
+    if (searchParams.get('tab') === 'signup') {
+      setIsLogin(false);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (user) {
       const target = getRedirectTarget();
       localStorage.removeItem('squid_auth_next');

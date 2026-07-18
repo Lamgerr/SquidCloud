@@ -102,7 +102,7 @@ const CbCode = () => {
   const [sessionHydrated, setSessionHydrated] = useState(false);
 
   const monacoOptions = useMemo(() => ({
-    fontFamily: "'JetBrains Mono', 'SF Mono', 'Monaco', 'Consolas', monospace",
+    fontFamily: "'Geist Mono', 'JetBrains Mono', 'SF Mono', 'Monaco', 'Consolas', monospace",
     automaticLayout: true,
     ...toMonacoOptions(idePreferences),
   }), [idePreferences]);

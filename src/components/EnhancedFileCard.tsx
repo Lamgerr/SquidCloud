@@ -1,8 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-import { GlassCard } from '@/components/ui/glasscn/glass-card';
-import { GlassBadge } from '@/components/ui/glasscn/glass-badge';
+import { Badge } from '@/components/ui/badge';
 import { formatFileSize } from '@/lib/utils';
 import FileCardMenu from '@/components/FileCardMenu';
 import { cn } from '@/lib/utils';
@@ -90,8 +89,7 @@ const EnhancedFileCard: React.FC<EnhancedFileCardProps> = ({
       transition={springs.soft}
       className="mono-sheen rounded-2xl"
     >
-      <GlassCard
-        glassVariant="liquid-refract"
+      <div
         data-view-mode={viewMode}
         className={cnCard(viewMode)}
         onClick={(e) => {
@@ -154,19 +152,19 @@ const EnhancedFileCard: React.FC<EnhancedFileCardProps> = ({
           {viewMode === 'grid' && (
             <div className="flex items-center gap-1.5 pt-0.5 text-[10px] text-muted-foreground">
               {file.encrypted && (
-                <GlassBadge variant="secondary" className="h-4 rounded-md px-1.5 py-0 text-[10px] font-normal">
+                <Badge variant="secondary" className="h-4 rounded-md px-1.5 py-0 text-[10px] font-normal">
                   Encrypted
-                </GlassBadge>
+                </Badge>
               )}
               {file.shared && (
-                <GlassBadge variant="outline" className="h-4 rounded-md border-white/15 px-1.5 py-0 text-[10px] font-normal">
+                <Badge variant="outline" className="h-4 rounded-md border-white/15 px-1.5 py-0 text-[10px] font-normal">
                   Shared
-                </GlassBadge>
+                </Badge>
               )}
             </div>
           )}
         </div>
-      </GlassCard>
+      </div>
     </motion.div>
   );
 };

@@ -5,7 +5,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { GlassButton } from "@/components/ui/glasscn/glass-button";
+import { Button } from "@/components/ui/button";
 import { 
   FileQuestion, 
   FolderOpen, 
@@ -65,22 +65,22 @@ const EmptyState: React.FC<EmptyStateProps> = ({
       {(action || secondaryAction) && (
         <div className="flex items-center gap-3 mt-2">
           {action && (
-            <GlassButton 
+            <Button
               onClick={action.onClick}
               variant={action.variant || "default"}
               className="gap-2"
             >
               {action.label}
-            </GlassButton>
+            </Button>
           )}
           {secondaryAction && (
-            <GlassButton 
+            <Button
               onClick={secondaryAction.onClick}
               variant="ghost"
               className="text-muted-foreground"
             >
               {secondaryAction.label}
-            </GlassButton>
+            </Button>
           )}
         </div>
       )}

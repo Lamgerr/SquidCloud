@@ -9,6 +9,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
+import { AlertTriangle, Info } from "@/lib/icon-map"
 import { cn } from "@/lib/utils"
 
 export function Toaster() {
@@ -35,23 +36,37 @@ export function Toaster() {
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
-        const { className, duration, ...toastProps } = props
+        const { className, duration, variant, ...toastProps } = props
         const resolvedDuration = duration ?? (isMobile ? 3600 : 5600)
         const resolvedClassName = cn(
           "touch-pan-y",
           isMobile
-            ? "w-full max-w-[min(92vw,360px)]"
-            : "w-full max-w-[360px]",
+            ? "w-full max-w-[min(92vw,380px)]"
+            : "w-full max-w-[380px]",
           className
         )
+
+        const Icon =
+          variant === "destructive"
+            ? AlertTriangle
+            : Info
 
         return (
           <Toast
             key={id}
             {...toastProps}
+            variant={variant}
             duration={resolvedDuration}
             className={resolvedClassName}
           >
+            <Icon
+              className={cn(
+                "mt-0.5 h-5 w-5 shrink-0",
+                variant === "destructive"
+                  ? "text-zinc-100"
+                  : "text-zinc-400"
+              )}
+            />
             <div className="grid gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (

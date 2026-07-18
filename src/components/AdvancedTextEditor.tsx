@@ -938,7 +938,7 @@ const AdvancedTextEditor: React.FC<AdvancedTextEditorProps> = ({
               style={{
                 fontSize: `${settings.fontSize}px`,
                 tabSize: settings.tabSize,
-                fontFamily: 'JetBrains Mono, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                fontFamily: '"Geist Mono", "JetBrains Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
               }}
               onTouchStart={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}

@@ -17,8 +17,5 @@
     "ui": "@/components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"
-  },
-  "registries": {
-    "@glasscn": "https://glasscn-components.vercel.app/r/{name}.json"
   }
 }

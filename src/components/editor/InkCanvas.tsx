@@ -1,4 +1,9 @@
+ /**
+ * 🚨 REQUIRED DEPENDENCY: npm install perfect-freehand
+ * This powers the precise, pressure-sensitive, tapered strokes used by Excalidraw.
+ */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { getStroke } from 'perfect-freehand';
 import { uid, type InkStroke, type Point, type BrushType } from './sqd';
 
 interface InkCanvasProps {
@@ -13,221 +18,179 @@ interface InkCanvasProps {
   readOnly?: boolean;
 }
 
-function midpoint(a: Point, b: Point): Point {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
-
-function catmullRomPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return {
-    x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
-    y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
-  };
-}
-
-function getBrushConfig(brush: BrushType, pressure: number, baseSize: number) {
-  const p = Math.max(0.1, Math.min(1, pressure));
-  switch (brush) {
-    case 'pencil':
-      return {
-        lineWidth: baseSize * (0.15 + 0.35 * p),
-        opacity: 0.6 + 0.3 * p,
-        compositeOp: 'source-over' as CanvasComposition,
-        lineCap: 'round' as CanvasLineCap,
-        texture: true,
-      };
-    case 'brush':
-      return {
-        lineWidth: baseSize * (0.4 + 0.9 * p),
-        opacity: 0.7 + 0.25 * p,
-        compositeOp: 'source-over' as CanvasComposition,
-        lineCap: 'round' as CanvasLineCap,
-        texture: false,
-      };
-    case 'marker':
-      return {
-        lineWidth: baseSize * (0.6 + 0.5 * p),
-        opacity: 0.35 + 0.15 * p,
-        compositeOp: 'source-over' as CanvasComposition,
-        lineCap: 'square' as CanvasLineCap,
-        texture: false,
-      };
-    case 'pen':
-    default:
-      return {
-        lineWidth: baseSize * (0.2 + 0.8 * p),
-        opacity: 1,
-        compositeOp: 'source-over' as CanvasComposition,
-        lineCap: 'round' as CanvasLineCap,
-        texture: false,
-      };
-  }
-}
-
-function drawStroke(ctx: CanvasRenderingContext2D, stroke: InkStroke, dpr: number) {
-  const pts = stroke.points;
-  if (pts.length === 0) return;
-  
-  const brush = stroke.brush || 'pen';
-  
-  if (pts.length === 1) {
-    const cfg = getBrushConfig(brush, pts[0].p ?? 0.5, stroke.size);
-    const r = Math.max(0.5, cfg.lineWidth * 0.5 * dpr);
-    ctx.save();
-    ctx.globalAlpha = cfg.opacity;
-    ctx.fillStyle = stroke.color;
-    ctx.beginPath();
-    ctx.arc(pts[0].x * dpr, pts[0].y * dpr, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    return;
-  }
-
-  ctx.save();
-  ctx.lineCap = getBrushConfig(brush, 0.5, stroke.size).lineCap;
-  ctx.lineJoin = 'round';
-
-  if (pts.length === 2) {
-    const a = pts[0], b = pts[1];
-    const p = ((b.p ?? 0.5) + (a.p ?? 0.5)) / 2;
-    const cfg = getBrushConfig(brush, p, stroke.size);
-    ctx.globalAlpha = cfg.opacity;
-    ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = Math.max(0.5, cfg.lineWidth * dpr);
-    ctx.beginPath();
-    ctx.moveTo(a.x * dpr, a.y * dpr);
-    ctx.lineTo(b.x * dpr, b.y * dpr);
-    ctx.stroke();
-    ctx.restore();
-    return;
-  }
-
-  for (let i = 0; i < pts.length; i++) {
-    const p0 = pts[Math.max(0, i - 1)];
-    const p1 = pts[i];
-    const p2 = pts[Math.min(pts.length - 1, i + 1)];
-    const p3 = pts[Math.min(pts.length - 1, i + 2)];
-
-    const pressure = p1.p ?? 0.5;
-    const cfg = getBrushConfig(brush, pressure, stroke.size);
-    
-    ctx.globalAlpha = cfg.opacity;
-    ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = Math.max(0.5, cfg.lineWidth * dpr);
-
-    const steps = i < pts.length - 1 ? 6 : 3;
-    ctx.beginPath();
-    
-    const startX = catmullRomPoint(p0, p1, p2, p3, 0);
-    ctx.moveTo(startX.x * dpr, startX.y * dpr);
-    
-    for (let s = 1; s <= steps; s++) {
-      const t = s / steps;
-      const pt = catmullRomPoint(p0, p1, p2, p3, t);
-      ctx.lineTo(pt.x * dpr, pt.y * dpr);
-    }
-    ctx.stroke();
-  }
-
-  if (brush === 'pencil') {
-    const last = pts[pts.length - 1];
-    const cfg = getBrushConfig(brush, last.p ?? 0.5, stroke.size);
-    ctx.globalAlpha = cfg.opacity * 0.3;
-    ctx.fillStyle = stroke.color;
-    for (let i = 0; i < pts.length; i += 3) {
-      const p = pts[i];
-      const r = cfg.lineWidth * 0.3 * dpr * (0.5 + Math.random() * 0.5);
-      ctx.beginPath();
-      ctx.arc(p.x * dpr, p.y * dpr, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  ctx.restore();
-}
-
 interface ViewTransform {
   offsetX: number;
   offsetY: number;
   scale: number;
 }
 
-const InkCanvas: React.FC<InkCanvasProps> = ({ strokes, onStrokesChange, active, tool, brush, color, size, penOnly, readOnly }) => {
+/**
+ * Converts the perimeter points from perfect-freehand into a smooth SVG path.
+ */
+function getSvgPathFromStroke(stroke: number[][]) {
+  if (!stroke.length) return '';
+  const d = stroke.reduce(
+    (acc, [x0, y0], i, arr) => {
+      const [x1, y1] = arr[(i + 1) % arr.length];
+      acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+      return acc;
+    },
+    ['M', ...stroke[0], 'Q']
+  );
+  d.push('Z');
+  return d.join(' ');
+}
+
+/**
+ * Draws a single perfect-freehand stroke onto a Canvas2D context.
+ */
+function drawStroke(ctx: CanvasRenderingContext2D, stroke: InkStroke, isComplete: boolean) {
+  if (stroke.points.length === 0) return;
+
+  const brush = stroke.brush || 'pen';
+  
+  // Excalidraw-like configuration physics
+  let options = {
+    size: stroke.size * 2.5,
+    thinning: 0.6,
+    smoothing: 0.5,
+    streamline: 0.5,
+    simulatePressure: true,
+    last: isComplete,
+  };
+
+    // Adjust physics based on brush type
+    if (brush === 'brush') {
+      options.size = stroke.size * 4.0;
+      options.thinning = 0.5;
+      options.smoothing = 0.6;
+      options.streamline = 0.6;
+      options.simulatePressure = true;
+    } else if (brush === 'marker') {
+      options.size = stroke.size * 6;
+      options.thinning = -0.2;
+      ctx.globalAlpha = 0.4;
+    } else if (brush === 'pencil') {
+      options.size = stroke.size * 1.5;
+      options.thinning = 0.1;
+      ctx.globalAlpha = 0.85;
+    } else {
+      ctx.globalAlpha = 1.0; // standard pen
+    }
+
+  // Map our {x,y,p} to perfect-freehand's [x,y,pressure]
+  const pointsArray = stroke.points.map(p => [p.x, p.y, p.p ?? 0.5]);
+  const outline = getStroke(pointsArray, options);
+  
+  const pathData = getSvgPathFromStroke(outline);
+  const path = new Path2D(pathData);
+
+  ctx.fillStyle = stroke.color;
+  ctx.fill(path);
+  ctx.globalAlpha = 1.0; // reset
+}
+
+const InkCanvas: React.FC<InkCanvasProps> = ({ 
+  strokes, onStrokesChange, active, tool, brush, color, size, penOnly, readOnly 
+}) => {
+  // Dual-Canvas Architecture for 120fps zero-latency
   const wrapRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const offRef = useRef<HTMLCanvasElement | null>(null);
+  const staticCanvasRef = useRef<HTMLCanvasElement>(null); // Baked, finished strokes
+  const dynamicCanvasRef = useRef<HTMLCanvasElement>(null); // Active stroke being drawn
+
   const dims = useRef({ w: 0, h: 0, dpr: 1 });
   const drawing = useRef(false);
   const current = useRef<InkStroke | null>(null);
-  const strokesRef = useRef(strokes);
-  strokesRef.current = strokes;
-  const toolRef = useRef(tool);
-  toolRef.current = tool;
-  const brushRef = useRef(brush);
-  brushRef.current = brush;
-  const colorRef = useRef(color);
-  colorRef.current = color;
-  const sizeRef = useRef(size);
-  sizeRef.current = size;
-  const penOnlyRef = useRef(penOnly);
-  penOnlyRef.current = penOnly;
+  const currentPointerIdRef = useRef<number | null>(null);
 
+  // State Refs
+  const strokesRef = useRef(strokes); strokesRef.current = strokes;
+  const toolRef = useRef(tool); toolRef.current = tool;
+  const brushRef = useRef(brush); brushRef.current = brush;
+  const colorRef = useRef(color); colorRef.current = color;
+  const sizeRef = useRef(size); sizeRef.current = size;
+  const penOnlyRef = useRef(penOnly); penOnlyRef.current = penOnly;
+
+  // Viewport/Camera
   const [viewTransform, setViewTransform] = useState<ViewTransform>({ offsetX: 0, offsetY: 0, scale: 1 });
-  const viewTransformRef = useRef(viewTransform);
-  viewTransformRef.current = viewTransform;
+  const viewTransformRef = useRef(viewTransform); viewTransformRef.current = viewTransform;
   
+  // Gestures
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const lastPinchDistRef = useRef<number>(0);
   const lastPanRef = useRef<{ x: number; y: number } | null>(null);
   const gestureStartRef = useRef<'pan' | 'pinch' | null>(null);
 
-  const renderVisible = useCallback(() => {
-    const canvas = canvasRef.current;
-    const off = offRef.current;
-    if (!canvas || !off) return;
+  // 1. Render all finished strokes
+  const renderStatic = useCallback(() => {
+    const canvas = staticCanvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     const vt = viewTransformRef.current;
+    const dpr = dims.current.dpr;
+
     ctx.save();
-    ctx.translate(vt.offsetX * dims.current.dpr, vt.offsetY * dims.current.dpr);
-    ctx.scale(vt.scale, vt.scale);
-    ctx.drawImage(off, 0, 0);
-    if (current.current) drawStroke(ctx, current.current, 1);
+    ctx.translate(vt.offsetX * dpr, vt.offsetY * dpr);
+    ctx.scale(vt.scale * dpr, vt.scale * dpr);
+
+    strokesRef.current.forEach(s => drawStroke(ctx, s, true));
+
     ctx.restore();
   }, []);
 
-  const renderAll = useCallback(() => {
-    const off = offRef.current;
-    if (!off) return;
-    const octx = off.getContext('2d');
-    if (!octx) return;
-    octx.clearRect(0, 0, off.width, off.height);
-    const dpr = dims.current.dpr;
-    strokesRef.current.forEach((s) => drawStroke(octx, s, dpr));
-    renderVisible();
-  }, [renderVisible]);
+  // 2. Render only the active 120Hz stroke
+  const renderDynamic = useCallback(() => {
+    const canvas = dynamicCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!current.current) return;
+
+    const vt = viewTransformRef.current;
+    const dpr = dims.current.dpr;
+
+    ctx.save();
+    ctx.translate(vt.offsetX * dpr, vt.offsetY * dpr);
+    ctx.scale(vt.scale * dpr, vt.scale * dpr);
+
+    drawStroke(ctx, current.current, false);
+
+    ctx.restore();
+  }, []);
+
+  // Window sizing & High DPI setup
   const setupSize = useCallback(() => {
     const wrap = wrapRef.current;
-    const canvas = canvasRef.current;
-    if (!wrap || !canvas) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const sCanvas = staticCanvasRef.current;
+    const dCanvas = dynamicCanvasRef.current;
+    if (!wrap || !sCanvas || !dCanvas) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const w = wrap.clientWidth || 1;
     const h = wrap.clientHeight || 1;
     dims.current = { w, h, dpr };
-    canvas.width = Math.max(1, Math.floor(w * dpr));
-    canvas.height = Math.max(1, Math.floor(h * dpr));
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
-    if (!offRef.current) offRef.current = document.createElement('canvas');
-    const off = offRef.current;
-    off.width = canvas.width;
-    off.height = canvas.height;
-    renderAll();
-  }, [renderAll]);
+
+    const pw = w + 'px';
+    const ph = h + 'px';
+    const cw = Math.max(1, Math.floor(w * dpr));
+    const ch = Math.max(1, Math.floor(h * dpr));
+
+    sCanvas.width = cw; sCanvas.height = ch;
+    sCanvas.style.width = pw; sCanvas.style.height = ph;
+    
+    dCanvas.width = cw; dCanvas.height = ch;
+    dCanvas.style.width = pw; dCanvas.style.height = ph;
+
+    renderStatic();
+    renderDynamic();
+  }, [renderStatic, renderDynamic]);
 
   useEffect(() => {
     setupSize();
@@ -236,17 +199,20 @@ const InkCanvas: React.FC<InkCanvasProps> = ({ strokes, onStrokesChange, active,
     return () => ro.disconnect();
   }, [setupSize]);
 
+  // Redraw when strokes array or view camera changes
   useEffect(() => {
-    if (!drawing.current) renderAll();
-  }, [strokes, renderAll]);
+    if (!drawing.current) renderStatic();
+  }, [strokes, renderStatic]);
 
   useEffect(() => {
-    renderVisible();
-  }, [viewTransform, renderVisible]);
+    renderStatic();
+    renderDynamic();
+  }, [viewTransform, renderStatic, renderDynamic]);
 
+  // Coordinate mapping
   const toCanvasPt = useCallback((clientX: number, clientY: number): Point => {
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
+    const wrap = wrapRef.current!;
+    const rect = wrap.getBoundingClientRect();
     const vt = viewTransformRef.current;
     return {
       x: (clientX - rect.left - vt.offsetX) / vt.scale,
@@ -255,57 +221,84 @@ const InkCanvas: React.FC<InkCanvasProps> = ({ strokes, onStrokesChange, active,
     };
   }, []);
 
+  // Eraser Logic
   const eraseAt = (pt: Point) => {
-    const threshold = Math.max(10, sizeRef.current * 3 + 6);
+    const threshold = Math.max(10, (sizeRef.current * 3 + 6) / viewTransformRef.current.scale);
     const next = strokesRef.current.filter((s) => !s.points.some((q) => Math.hypot(q.x - pt.x, q.y - pt.y) <= threshold));
     if (next.length !== strokesRef.current.length) {
       strokesRef.current = next;
       onStrokesChange(() => next);
-      renderAll();
+      renderStatic();
     }
   };
 
+  // --- Interaction Handlers ---
   const onPointerDown = (e: React.PointerEvent) => {
     if (!active || readOnly) return;
     
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     
+    // Two-finger Pan/Zoom override
     if (pointersRef.current.size === 2) {
+      drawing.current = false;
+      current.current = null;
+      renderDynamic();
       const pts = Array.from(pointersRef.current.values());
       lastPinchDistRef.current = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
       lastPanRef.current = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
       gestureStartRef.current = 'pinch';
-      drawing.current = false;
-      current.current = null;
       return;
     }
     
-    if (pointersRef.current.size === 1 && toolRef.current === 'off' && !penOnlyRef.current) {
+    // Palm Rejection & Tool Mapping
+    if (penOnlyRef.current && e.pointerType === 'touch') {
+      if (toolRef.current === 'off') {
+        gestureStartRef.current = 'pan';
+        lastPanRef.current = { x: e.clientX, y: e.clientY };
+      }
+      return;
+    }
+    if (toolRef.current === 'off') {
       gestureStartRef.current = 'pan';
       lastPanRef.current = { x: e.clientX, y: e.clientY };
       return;
     }
-
-    if (penOnlyRef.current && e.pointerType === 'touch') return;
-    if (toolRef.current === 'off') return;
     
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.setPointerCapture(e.pointerId);
+    // Start Drawing
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    // Capture on the element that actually owns the pointer handlers
+    // (the inner interaction surface), NOT the outer wrapper — otherwise
+    // move/up events are redirected to the wrapper and never reach
+    // the handlers, leaving only the initial down-point (a "dot").
+    e.currentTarget.setPointerCapture(e.pointerId);
+
     drawing.current = true;
+    currentPointerIdRef.current = e.pointerId;
+    
     const pt = toCanvasPt(e.clientX, e.clientY);
     pt.p = e.pressure && e.pressure > 0 ? e.pressure : 0.5;
+    
     if (toolRef.current === 'eraser') {
       eraseAt(pt);
       return;
     }
-    current.current = { id: uid('s'), color: colorRef.current, size: sizeRef.current, points: [pt], brush: brushRef.current };
-    renderVisible();
+    
+    current.current = { 
+      id: uid('s'), 
+      color: colorRef.current, 
+      size: sizeRef.current, 
+      points: [pt], 
+      brush: brushRef.current 
+    };
+    
+    renderDynamic();
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     
+    // Pan & Zoom gestures
     if (pointersRef.current.size === 2 && gestureStartRef.current === 'pinch') {
       const pts = Array.from(pointersRef.current.values());
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
@@ -330,7 +323,6 @@ const InkCanvas: React.FC<InkCanvasProps> = ({ strokes, onStrokesChange, active,
           };
         });
       }
-      
       lastPinchDistRef.current = dist;
       lastPanRef.current = center;
       return;
@@ -339,30 +331,46 @@ const InkCanvas: React.FC<InkCanvasProps> = ({ strokes, onStrokesChange, active,
     if (pointersRef.current.size === 1 && gestureStartRef.current === 'pan') {
       const dx = e.clientX - (lastPanRef.current?.x ?? e.clientX);
       const dy = e.clientY - (lastPanRef.current?.y ?? e.clientY);
-      setViewTransform((prev) => ({
-        ...prev,
-        offsetX: prev.offsetX + dx,
-        offsetY: prev.offsetY + dy,
-      }));
+      setViewTransform((prev) => ({ ...prev, offsetX: prev.offsetX + dx, offsetY: prev.offsetY + dy }));
       lastPanRef.current = { x: e.clientX, y: e.clientY };
       return;
     }
 
-    if (!drawing.current) return;
+    // Active Drawing
+    if (!drawing.current || e.pointerId !== currentPointerIdRef.current) return;
+    
+    // High-performance coalesced events for 120Hz iPad Pro tracking
     const native = e.nativeEvent;
     const events: PointerEvent[] = typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : [native];
     if (events.length === 0) events.push(native);
+    
     if (toolRef.current === 'eraser') {
       events.forEach((ev) => eraseAt(toCanvasPt(ev.clientX, ev.clientY)));
       return;
     }
+    
     if (!current.current) return;
+    
+    let strokeUpdated = false;
     events.forEach((ev) => {
       const pt = toCanvasPt(ev.clientX, ev.clientY);
       pt.p = ev.pressure && ev.pressure > 0 ? ev.pressure : 0.5;
+      
+      // Optimization: Drop overlapping points to keep polygon rendering ultra-fast
+      const lastPt = current.current!.points[current.current!.points.length - 1];
+      if (lastPt) {
+        const dist = Math.hypot(pt.x - lastPt.x, pt.y - lastPt.y);
+        if (dist < 1.0 / viewTransformRef.current.scale) return; 
+      }
+      
       current.current!.points.push(pt);
+      strokeUpdated = true;
     });
-    renderVisible();
+
+    // We only update the dynamic canvas to hit true 120fps rendering
+    if (strokeUpdated) {
+      renderDynamic();
+    }
   };
 
   const finish = (e: React.PointerEvent) => {
@@ -374,20 +382,20 @@ const InkCanvas: React.FC<InkCanvasProps> = ({ strokes, onStrokesChange, active,
       gestureStartRef.current = null;
     }
     
-    if (!drawing.current) return;
+    if (!drawing.current || e.pointerId !== currentPointerIdRef.current) return;
+    
     drawing.current = false;
-    try { canvasRef.current?.releasePointerCapture(e.pointerId); } catch {}
+    currentPointerIdRef.current = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    
     if (toolRef.current !== 'eraser' && current.current) {
       const s = current.current;
       current.current = null;
-      const off = offRef.current;
-      if (off) {
-        const octx = off.getContext('2d');
-        if (octx) drawStroke(octx, s, dims.current.dpr);
-      }
-      onStrokesChange((prev) => [...prev, s]);
+      
+      // Commit stroke
+      renderDynamic(); // Clear dynamic canvas
+      onStrokesChange((prev) => [...prev, s]); 
     }
-    renderVisible();
   };
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -415,28 +423,33 @@ const InkCanvas: React.FC<InkCanvasProps> = ({ strokes, onStrokesChange, active,
     }
   }, []);
 
-  const resetView = useCallback(() => {
-    setViewTransform({ offsetX: 0, offsetY: 0, scale: 1 });
-  }, []);
+  const resetView = useCallback(() => setViewTransform({ offsetX: 0, offsetY: 0, scale: 1 }), []);
 
   return (
     <div ref={wrapRef} className="absolute inset-0" style={{ pointerEvents: active ? 'auto' : 'none' }}>
-      <canvas
-        ref={canvasRef}
+      
+      {/* Layer 1: Static baked drawings */}
+      <canvas ref={staticCanvasRef} className="absolute inset-0 pointer-events-none" />
+      
+      {/* Layer 2: Active 120fps fluid drawing layer */}
+      <canvas ref={dynamicCanvasRef} className="absolute inset-0 pointer-events-none" />
+      
+      {/* Interaction Surface */}
+      <div
         className="absolute inset-0"
         style={{ touchAction: 'none', cursor: tool === 'eraser' ? 'cell' : tool === 'off' ? 'grab' : 'crosshair', pointerEvents: active ? 'auto' : 'none' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={finish}
         onPointerCancel={finish}
-        onPointerLeave={finish}
         onWheel={handleWheel}
       />
+      
       {active && (viewTransform.scale !== 1 || viewTransform.offsetX !== 0 || viewTransform.offsetY !== 0) && (
         <button
           onClick={resetView}
-          className="absolute bottom-3 right-3 z-10 px-2 py-1 rounded bg-black/60 text-white/80 text-[10px] font-mono backdrop-blur-sm hover:bg-black/80 transition-colors"
-          title="Reset view (100%)"
+          className="absolute bottom-6 right-6 z-10 px-3 py-1.5 rounded-full bg-zinc-900/90 text-zinc-300 text-xs font-semibold border border-zinc-800 backdrop-blur-md shadow-xl hover:bg-zinc-800 hover:text-white transition-all active:scale-95"
+          title="Reset view"
         >
           {Math.round(viewTransform.scale * 100)}% — Reset
         </button>
@@ -446,3 +459,4 @@ const InkCanvas: React.FC<InkCanvasProps> = ({ strokes, onStrokesChange, active,
 };
 
 export default InkCanvas;
+
