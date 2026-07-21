@@ -1618,7 +1618,7 @@ export async function handleUserAPI(
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, full_name, email, created_at, storage_used')
+    .select('id, full_name, email, created_at')
     .eq('id', userId)
     .single();
 
@@ -1629,6 +1629,17 @@ export async function handleUserAPI(
     .eq('user_id', userId)
     .single();
 
+  const { data: files, error: filesError } = await supabase
+    .from('files')
+    .select('size')
+    .eq('user_id', userId)
+    .is('is_deleted', false);
+
+  if (filesError) throw filesError;
+
+  const totalFiles = files?.length || 0;
+  const totalSize = (files || []).reduce((sum: number, f: any) => sum + (f.size || 0), 0);
+
   if (profileError) {
     const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(userId);
     if (authError) throw authError;
@@ -1637,6 +1648,8 @@ export async function handleUserAPI(
       id: authUser.user.id,
       email: authUser.user.email,
       created_at: authUser.user.created_at,
+      storage_used: totalSize,
+      total_files: totalFiles,
       credits: {
         remaining: credits?.credits_remaining ?? 1000,
         used_today: credits?.credits_used_today ?? 0,
@@ -1651,7 +1664,8 @@ export async function handleUserAPI(
     email: profile.email,
     full_name: profile.full_name,
     created_at: profile.created_at,
-    storage_used: profile.storage_used,
+    storage_used: totalSize,
+    total_files: totalFiles,
     credits: {
       remaining: credits?.credits_remaining ?? 1000,
       used_today: credits?.credits_used_today ?? 0,
