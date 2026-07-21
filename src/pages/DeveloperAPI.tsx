@@ -6,6 +6,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
@@ -19,6 +20,8 @@ import {
   Key,
   Loader2,
   Play,
+  Settings2,
+  Sliders,
   XCircle,
 } from '@/lib/icon-map';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +33,15 @@ import ApiRequestLogs from '@/components/ApiRequestLogs';
 import DeveloperAPIMobile from '@/components/DeveloperAPIMobile';
 import { supabase } from '@/integrations/supabase/client';
 import { toast as sonnerToast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 type Endpoint = {
   method: 'GET' | 'POST' | 'DELETE';
@@ -218,11 +230,248 @@ const endpoints: Endpoint[] = [
     statusPath: '/health',
     example: `curl -X GET ${BASE_URL}/health`,
     sampleResponse: `{
-  "status": "healthy",
-  "version": "2.2.0",
+  "status": "ok",
+  "version": "4.0",
   "timestamp": "...",
   "success": true
 }`,
+  },
+  {
+    method: 'POST',
+    path: '/files/upload/init',
+    description: 'Initialize a chunked upload — get signed B2 URLs for direct upload',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/files/upload/init \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"video.mp4","type":"video/mp4","size":10485760}'`,
+    sampleResponse: `{
+  "upload_id": "uuid",
+  "urls": [{"index":0,"upload_url":"https://...","path":"..."}],
+  "chunk_size": 1048576,
+  "total_chunks": 10,
+  "success": true
+}`,
+  },
+  {
+    method: 'POST',
+    path: '/files/upload/complete',
+    description: 'Complete a chunked upload — verify chunks and register file in database',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/files/upload/complete \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"upload_id":"uuid","file_id":"uuid","chunks":[{"index":0,"path":"...","sha256":"..."}]}'`,
+    sampleResponse: `{
+  "file": {"id":"...","name":"video.mp4","size":10485760},
+  "message": "Upload completed",
+  "success": true
+}`,
+  },
+  {
+    method: 'PUT',
+    path: '/files/:id/rename',
+    description: 'Rename a file',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X PUT ${BASE_URL}/files/FILE_ID/rename \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"new-name.pdf"}'`,
+  },
+  {
+    method: 'POST',
+    path: '/files/:id/restore',
+    description: 'Restore a soft-deleted file from trash',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/files/FILE_ID/restore \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'POST',
+    path: '/files/:id/move',
+    description: 'Move a file to a different folder',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/files/FILE_ID/move \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"folder_id":"TARGET_FOLDER_ID"}'`,
+  },
+  {
+    method: 'POST',
+    path: '/files/copy',
+    description: 'Copy a file within the same workspace',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/files/copy \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"file_id":"SOURCE_FILE_ID","new_name":"copy-name.pdf"}'`,
+  },
+  {
+    method: 'GET',
+    path: '/cdn/list',
+    description: 'List all files published to SquidCDN',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/cdn/list \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'GET',
+    path: '/cdn/:file_id',
+    description: 'Get CDN publish info for a specific file',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/cdn/FILE_ID \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'DELETE',
+    path: '/cdn/:file_id',
+    description: 'Unpublish a file from SquidCDN',
+    scopes: ['delete'],
+    statusPath: null,
+    example: `curl -X DELETE ${BASE_URL}/cdn/FILE_ID \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'POST',
+    path: '/batch/restore',
+    description: 'Batch restore multiple files from trash by ID',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/batch/restore \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"file_ids":["ID1","ID2"]}'`,
+  },
+  {
+    method: 'POST',
+    path: '/batch/copy',
+    description: 'Batch copy files to a different folder',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/batch/copy \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"file_ids":["ID1","ID2"],"folder_id":"TARGET_FOLDER_ID"}'`,
+  },
+  {
+    method: 'GET',
+    path: '/stats/credits',
+    description: 'Get detailed credit usage log with pagination',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/stats/credits?page=1&per_page=50 \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'GET',
+    path: '/stats/storage',
+    description: 'Get storage breakdown by file type and encryption status',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/stats/storage \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'GET',
+    path: '/user',
+    description: 'Get user profile with credit balance and storage usage',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/user \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+    sampleResponse: `{
+  "id": "uuid",
+  "email": "user@example.com",
+  "credits": {"remaining": 850, "used_today": 150, "daily_limit": 1000},
+  "success": true
+}`,
+  },
+  {
+    method: 'POST',
+    path: '/keys',
+    description: 'Create a new API key with optional scopes and expiration',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/keys \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"My Key","scopes":["*"]}'`,
+    sampleResponse: `{
+  "key": {"id":"...","name":"My Key","key_prefix":"cb_..."},
+  "raw_key": "cb_...",
+  "message": "Save the raw key — it will not be shown again.",
+  "success": true
+}`,
+  },
+  {
+    method: 'PUT',
+    path: '/keys/:id',
+    description: 'Update API key name, scopes, or active status',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X PUT ${BASE_URL}/keys/KEY_ID \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"Updated Key","is_active":false}'`,
+  },
+  {
+    method: 'DELETE',
+    path: '/keys/:id',
+    description: 'Permanently delete an API key',
+    scopes: ['delete'],
+    statusPath: null,
+    example: `curl -X DELETE ${BASE_URL}/keys/KEY_ID \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'PUT',
+    path: '/keys/:id/limits',
+    description: 'Set per-key custom daily limit and rate limit (supporter+ only)',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X PUT ${BASE_URL}/keys/KEY_ID/limits \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"custom_daily_limit":5000,"custom_rate_limit_rps":100}'`,
+  },
+  {
+    method: 'POST',
+    path: '/secrets',
+    description: 'Create an encrypted secret stored in SquidVeil vault',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/secrets \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"db-password","value":"s3cret!"}'`,
+  },
+  {
+    method: 'GET',
+    path: '/secrets',
+    description: 'List all stored secrets (values not returned)',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/secrets \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'POST',
+    path: '/squidshake/handshake',
+    description: 'Initiate a SquidShake handshake for ephemeral session',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/squidshake/handshake \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"device_fingerprint":"device-id","project_id":"my-app"}'`,
   },
 ];
 
@@ -254,9 +503,15 @@ const DeveloperAPI = () => {
   const [operationCosts, setOperationCosts] = useState<any[]>([]);
   const [costFilter, setCostFilter] = useState('');
   const [costsOpen, setCostsOpen] = useState(false);
+  const [usageStats, setUsageStats] = useState<any>(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
   const [apiKeys, setApiKeys] = useState<any[]>([]);
   const [customLimits, setCustomLimits] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [configKey, setConfigKey] = useState<any>(null);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [configForm, setConfigForm] = useState<Record<string, any>>({});
+  const [savingConfig, setSavingConfig] = useState(false);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -326,41 +581,27 @@ const DeveloperAPI = () => {
 
       setLoadingCredits(true);
       try {
-        const { data: keysData } = await supabase
-          .from('api_keys')
-          .select('key')
-          .eq('user_id', user.id)
-          .limit(1);
+        const apiKey = user.email || '';
+        const [userRes, usageRes] = await Promise.allSettled([
+          fetch(`${BASE_URL}/user`, { headers: { 'X-SquidCloud-Key': apiKey } }),
+          fetch(`${BASE_URL}/stats/usage`, { headers: { 'X-SquidCloud-Key': apiKey } }),
+        ]);
 
-        if (keysData && keysData.length > 0) {
-          const apiKey = keysData[0].key;
-          const res = await fetch(`${BASE_URL}/storage`, {
-            headers: { 'X-SquidCloud-Key': apiKey },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (isMounted && data.credits) {
-              setCreditInfo(data.credits);
-            }
+        if (userRes.status === 'fulfilled' && userRes.value.ok) {
+          const data = await userRes.value.json();
+          if (isMounted && data.credits) {
+            setCreditInfo(data.credits);
           }
+        }
+        if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
+          const data = await usageRes.value.json();
+          if (isMounted) setUsageStats(data.usage || data);
         }
       } catch {
       } finally {
         if (isMounted) setLoadingCredits(false);
       }
-    };
 
-    fetchUserAndCredits();
-    return () => { isMounted = false; };
-  }, []);
-
-  useEffect(() => {
-    if (profile?.tier !== 'supporter-plus') return;
-    let isMounted = true;
-
-    const fetchKeys = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
       const { data: keysData } = await supabase
         .from('api_keys')
         .select('*')
@@ -374,9 +615,9 @@ const DeveloperAPI = () => {
       }
     };
 
-    fetchKeys();
+    fetchUserAndCredits();
     return () => { isMounted = false; };
-  }, [profile?.tier]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -474,7 +715,7 @@ const DeveloperAPI = () => {
           </button>
           <div>
             <h1 className="text-lg font-bold">Developer API</h1>
-            <p className="text-[12px] text-muted-foreground/70">Build with SquidCloud API v2.2</p>
+            <p className="text-[12px] text-muted-foreground/70">Build with SquidCloud API v4.0</p>
           </div>
         </div>
 
@@ -500,8 +741,8 @@ const DeveloperAPI = () => {
             <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-3">
               <div className="flex items-center gap-2.5">
                 <Code className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">SquidCloud API v2.2</span>
-                <span className="text-[11px] text-muted-foreground/50">Secure file API with optional caller-provided encryption keys</span>
+                <span className="text-[13px] font-medium">SquidCloud API v4.0</span>
+                <span className="text-[11px] text-muted-foreground/50">Credit-based file API with CDN streaming, secrets vault, and workspace collaboration</span>
               </div>
               <div className="h-px bg-border/40" />
               <div className="flex gap-2">
@@ -575,58 +816,124 @@ const DeveloperAPI = () => {
               )}
             </div>
 
-            {profile?.tier === 'supporter-plus' && (
+            {apiKeys.length > 0 && (
               <div className="rounded-2xl border border-border/50 bg-card/50 p-6 space-y-3">
                 <div className="flex items-center gap-2.5">
-                  <Key className="w-4 h-4 text-muted-foreground/70" />
-                  <span className="text-[13px] font-medium">Custom API Limits</span>
+                  <Sliders className="w-4 h-4 text-muted-foreground/70" />
+                  <span className="text-[13px] font-medium">Per-Key Configuration</span>
                 </div>
-                <p className="text-[12px] text-muted-foreground/60">Set custom daily limits per API key</p>
+                <p className="text-[12px] text-muted-foreground/60">Configure limits, rate limits, and security per API key</p>
                 <div className="space-y-2">
                   {apiKeys.map((key) => (
-                    <div key={key.id} className="flex items-center gap-2">
-                      <code className="text-[11px] text-muted-foreground/80 flex-1 truncate">{key.key_preview || key.key?.substring(0, 12) + '...'}</code>
-                      <input
-                        className="flex h-8 w-24 rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        type="number"
-                        min="0"
-                        placeholder="Limit"
-                        value={customLimits[key.id] || ''}
-                        onChange={(e) => setCustomLimits(prev => ({ ...prev, [key.id]: e.target.value }))}
-                      />
-                      <button
-                        className="inline-flex items-center justify-center gap-1 h-7 rounded-md px-2 text-[11px] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50"
-                        disabled={savingKey === key.id}
-                        onClick={async () => {
-                          setSavingKey(key.id);
-                          try {
-                            const res = await fetch(`${BASE_URL}/keys/${key.id}/limits`, {
-                              method: 'PATCH',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                'X-SquidCloud-Key': key.key,
-                              },
-                              body: JSON.stringify({ custom_daily_limit: parseInt(customLimits[key.id]) || 0 }),
-                            });
-                            if (res.ok) {
-                              sonnerToast.success('Limit updated');
-                            } else {
-                              sonnerToast.error('Failed to update limit');
-                            }
-                          } catch {
-                            sonnerToast.error('Failed to update limit');
-                          } finally {
-                            setSavingKey(null);
-                          }
-                        }}
-                      >
-                        {savingKey === key.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
-                      </button>
+                    <div key={key.id} className="flex items-center justify-between h-9 px-2.5 rounded-lg hover:bg-accent/20 transition-colors">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Key className="w-3.5 h-3.5 text-muted-foreground/50 flex-shrink-0" />
+                        <code className="text-[12px] text-muted-foreground/80 truncate">{key.name || key.key_prefix || key.key?.substring(0, 12)}</code>
+                      </div>
+                      <Dialog open={configDialogOpen && configKey?.id === key.id} onOpenChange={(open) => { setConfigDialogOpen(open); if (open) { setConfigKey(key); setConfigForm({ custom_daily_limit: String(key.custom_daily_limit ?? ''), custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''), allow_hmac: key.allow_hmac ?? false, is_disabled: key.is_disabled ?? false }); } }}>
+                        <DialogTrigger asChild>
+                          <button
+                            className="inline-flex items-center gap-1 h-7 rounded-md px-2 text-[11px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40"
+                            onClick={() => { setConfigKey(key); setConfigForm({ custom_daily_limit: String(key.custom_daily_limit ?? ''), custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''), allow_hmac: key.allow_hmac ?? false, is_disabled: key.is_disabled ?? false }); }}
+                          >
+                            <Settings2 className="w-3 h-3" />
+                            Configure
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Key Configuration</DialogTitle>
+                            <DialogDescription>
+                              Configure limits and security for <code className="text-xs">{key.name || key.key_prefix}</code>
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-2">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] text-muted-foreground/70">Daily Credit Limit</Label>
+                                <Input
+                                  className="h-8 text-xs"
+                                  type="number" min="0"
+                                  placeholder="Default"
+                                  value={configForm.custom_daily_limit}
+                                  onChange={(e) => setConfigForm(p => ({ ...p, custom_daily_limit: e.target.value }))}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] text-muted-foreground/70">Rate Limit (req/s)</Label>
+                                <Input
+                                  className="h-8 text-xs"
+                                  type="number" min="0"
+                                  placeholder="Default"
+                                  value={configForm.custom_rate_limit_rps}
+                                  onChange={(e) => setConfigForm(p => ({ ...p, custom_rate_limit_rps: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
+                              <Label className="text-[12px] text-muted-foreground/80">Require HMAC Request Signing</Label>
+                              <Switch
+                                checked={configForm.allow_hmac}
+                                onCheckedChange={(v) => setConfigForm(p => ({ ...p, allow_hmac: v }))}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
+                              <Label className="text-[12px] text-foreground/80">Disable This Key</Label>
+                              <Switch
+                                checked={configForm.is_disabled}
+                                onCheckedChange={(v) => setConfigForm(p => ({ ...p, is_disabled: v }))}
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <button
+                              className="inline-flex items-center justify-center gap-1 h-8 rounded-md px-3 text-[12px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40"
+                              onClick={() => setConfigDialogOpen(false)}
+                            >Cancel</button>
+                            <button
+                              className="inline-flex items-center justify-center gap-1 h-8 rounded-md px-3 text-[12px] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50"
+                              disabled={savingConfig}
+                              onClick={async () => {
+                                setSavingConfig(true);
+                                try {
+                                  const body: Record<string, any> = {};
+                                  if (configForm.custom_daily_limit) body.custom_daily_limit = parseInt(configForm.custom_daily_limit) || 0;
+                                  if (configForm.custom_rate_limit_rps) body.custom_rate_limit_rps = parseInt(configForm.custom_rate_limit_rps) || 0;
+                                  body.allow_hmac = !!configForm.allow_hmac;
+                                  body.is_disabled = !!configForm.is_disabled;
+
+                                  const res = await supabase
+                                    .from('api_key_limits')
+                                    .upsert({
+                                      api_key_id: configKey.id,
+                                      custom_daily_limit: body.custom_daily_limit || null,
+                                      custom_rate_limit_rps: body.custom_rate_limit_rps || null,
+                                      is_disabled: body.is_disabled,
+                                    });
+
+                                  if (configKey.allow_hmac !== body.allow_hmac) {
+                                    await supabase
+                                      .from('api_keys')
+                                      .update({ allow_hmac: body.allow_hmac })
+                                      .eq('id', configKey.id);
+                                  }
+
+                                  setConfigDialogOpen(false);
+                                  sonnerToast.success('Key configuration saved');
+                                } catch {
+                                  sonnerToast.error('Failed to save configuration');
+                                } finally {
+                                  setSavingConfig(false);
+                                }
+                              }}
+                            >
+                              {savingConfig ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
+                            </button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   ))}
-                  {apiKeys.length === 0 && (
-                    <p className="text-[12px] text-muted-foreground/50">No API keys found</p>
-                  )}
                 </div>
               </div>
             )}
@@ -694,6 +1001,48 @@ const DeveloperAPI = () => {
           </TabsContent>
 
           <TabsContent value="status" className="space-y-3 mt-0">
+            {usageStats && (
+              <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <Activity className="w-4 h-4 text-muted-foreground/70" />
+                  <span className="text-[13px] font-medium">Credit Usage</span>
+                  {loadingUsage && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
+                    <div className="text-lg font-semibold tabular-nums">{usageStats?.today?.credits_used ?? 0}</div>
+                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Today</div>
+                  </div>
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
+                    <div className="text-lg font-semibold tabular-nums">{usageStats?.this_week?.credits_used ?? 0}</div>
+                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">This Week</div>
+                  </div>
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
+                    <div className="text-lg font-semibold tabular-nums">{usageStats?.this_month?.credits_used ?? 0}</div>
+                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">This Month</div>
+                  </div>
+                </div>
+                {creditInfo && (
+                  <div>
+                    <div className="flex justify-between text-[12px] text-muted-foreground/70 mb-1">
+                      <span>Daily limit: {creditInfo.daily_limit}</span>
+                      <span>{creditInfo.remaining} remaining</span>
+                    </div>
+                    <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-500", {
+                          'bg-green-500': (creditInfo.remaining / creditInfo.daily_limit) > 0.5,
+                          'bg-yellow-500': (creditInfo.remaining / creditInfo.daily_limit) <= 0.5 && (creditInfo.remaining / creditInfo.daily_limit) >= 0.25,
+                          'bg-red-500': (creditInfo.remaining / creditInfo.daily_limit) < 0.25,
+                        })}
+                        style={{ width: `${(creditInfo.remaining / creditInfo.daily_limit) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
               <div className="flex items-center gap-2.5 pb-2">
                 <Activity className="w-4 h-4 text-muted-foreground/70" />
@@ -739,12 +1088,18 @@ const DeveloperAPI = () => {
                 <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
                   <code className="text-[11px] text-muted-foreground/80">X-SquidCloud-Encryption-Key: optional_user_encryption_key</code>
                 </div>
+                <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
+                  <code className="text-[11px] text-muted-foreground/80">X-Timestamp: 1700000000000 (Unix ms, ±5 min)</code>
+                </div>
+                <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
+                  <code className="text-[11px] text-muted-foreground/80">X-Signature: HMAC-SHA256(timestamp+nonce+body, apiKey)</code>
+                </div>
               </div>
               <div className="flex items-start gap-2.5 p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-[12px] font-medium text-amber-400/90">Security notes</p>
-                  <p className="text-[11px] text-amber-400/60 mt-0.5">Invalid encryption key format returns 400. Wrong key for encrypted download returns 422.</p>
+                  <p className="text-[11px] text-amber-400/60 mt-0.5">Invalid encryption key format returns 400. Wrong key for encrypted download returns 422. Opt-in HMAC signing prevents request tampering. Credit deduction info is included in every response.</p>
                 </div>
               </div>
             </div>
@@ -842,15 +1197,48 @@ const DeveloperAPI = () => {
 
             <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
               <div className="flex items-center gap-2.5 pb-1">
+                <span className="text-[13px] font-medium">Credit System</span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
+                  Every API call deducts credits based on the operation type and file size (where applicable).
+                  Credits reset daily at midnight UTC. The response headers include your remaining credit balance.
+                </p>
+                <div className="rounded-lg border border-border/30 bg-muted/20 p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground/70">Credit deduction response</span>
+                  </div>
+                  <code className="text-[11px] leading-relaxed text-muted-foreground/70 font-mono block">
+{`{
+  "...": "...",
+  "credits": {
+    "deducted": 1,
+    "remaining": 842,
+    "used_today": 158,
+    "daily_limit": 1000
+  }
+}`}
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
+              <div className="flex items-center gap-2.5 pb-1">
                 <span className="text-[13px] font-medium">HTTP Status Codes</span>
               </div>
               <div className="space-y-1">
                 {[
                   { code: '200 OK', desc: 'Request succeeded' },
+                  { code: '201 Created', desc: 'Resource created (upload, key, secret)' },
                   { code: '400 Bad Request', desc: 'Invalid input or encryption key format' },
                   { code: '401 Unauthorized', desc: 'Missing or invalid API key' },
-                  { code: '422 Unprocessable Entity', desc: 'Encryption key missing/mismatch for encrypted download' },
+                  { code: '402 Payment Required', desc: 'Insufficient credits or expired subscription' },
+                  { code: '403 Forbidden', desc: 'Key disabled or insufficient permissions' },
                   { code: '404 Not Found', desc: 'Resource not found' },
+                  { code: '409 Conflict', desc: 'Duplicate resource (secret name, CDN publish)' },
+                  { code: '422 Unprocessable Entity', desc: 'Encryption key missing/mismatch for encrypted download' },
+                  { code: '503 Service Unavailable', desc: 'API disabled for maintenance (global guard)' },
                   { code: '500 Server Error', desc: 'Internal server error' },
                 ].map(item => (
                   <div key={item.code} className="flex items-center justify-between h-7 px-2.5 rounded-lg hover:bg-accent/30 transition-colors">
