@@ -52,6 +52,7 @@ export const Command = P.Command as Icon;
 export const Contrast = P.CircleHalf as Icon;
 export const Copy = P.Copy as Icon;
 export const CornerDownLeft = P.ArrowBendLeftDown as Icon;
+export const CreditCard = P.CreditCard as Icon;
 export const Crown = P.Crown as Icon;
 export const Crosshair = P.Crosshair as Icon;
 export const Target = P.Crosshair as Icon;
