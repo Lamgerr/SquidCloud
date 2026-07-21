@@ -21,7 +21,7 @@ import {
   User, Mail, Key, Shield, Fingerprint, CheckCircle2, AlertCircle,
   Loader2, Plus, ArrowLeft, Lock, Settings, Trash2, HardDrive, Calendar, Code, Zap,
   FolderOpen, FileArchive, RefreshCw, Crown, Sparkles, Briefcase, TrendingUp,
-  Repeat, Book, LogOut,
+  Repeat, Book, LogOut, Smartphone,
 } from '@/lib/icon-map';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -33,6 +33,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import MigrationWizard from '@/components/MigrationWizard';
 import CancelSubscriptionFlow from '@/components/CancelSubscriptionFlow';
 import { cn } from '@/lib/utils';
+import { mfaService, MfaFactor } from '@/services/mfa-service';
 
 const ACCOUNT_PREFS_STORAGE_KEY = 'squid_account_settings_v3';
 
@@ -141,6 +142,20 @@ const AccountSettings = () => {
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [notifPrefs, setNotifPrefs] = useState({ email_enabled: true, popup_enabled: true, warning_lead_days: 7, do_not_contact: false });
 
+  // MFA state
+  const [mfaFactors, setMfaFactors] = useState<MfaFactor[]>([]);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaSetupMode, setMfaSetupMode] = useState(false);
+  const [mfaQrCode, setMfaQrCode] = useState('');
+  const [mfaSecret, setMfaSecret] = useState('');
+  const [mfaEnrollmentId, setMfaEnrollmentId] = useState('');
+  const [mfaVerifyCode, setMfaVerifyCode] = useState('');
+  const [mfaVerifying, setMfaVerifying] = useState(false);
+  const [showUnenrollDialog, setShowUnenrollDialog] = useState(false);
+  const [unenrollFactorId, setUnenrollFactorId] = useState('');
+  const [aalLevel, setAalLevel] = useState<{ currentLevel: string; nextLevel: string } | null>(null);
+  const [secretCopied, setSecretCopied] = useState(false);
+
   const contentRef = useRef<HTMLDivElement>(null);
   const [animating, setAnimating] = useState(false);
 
@@ -234,7 +249,82 @@ const AccountSettings = () => {
     fetchStorageStats();
     loadPreferences();
     fetchLatestMigration();
+    loadMfaFactors();
   }, [user]);
+
+  const loadMfaFactors = async () => {
+    const factors = await mfaService.listFactors();
+    setMfaFactors(factors);
+    const aal = await mfaService.getAalLevel();
+    setAalLevel(aal);
+  };
+
+  const handleEnrollMfa = async () => {
+    setMfaLoading(true);
+    // Remove any unverified factors from previous attempts
+    const existingFactors = await mfaService.listFactors();
+    for (const f of existingFactors) {
+      if (f.status === 'unverified') {
+        await mfaService.unenroll(f.id);
+      }
+    }
+    const enrollment = await mfaService.enroll('CloudBliss TOTP');
+    if (enrollment) {
+      setMfaQrCode(enrollment.totp.qr_code);
+      setMfaSecret(enrollment.totp.secret);
+      setMfaEnrollmentId(enrollment.id);
+      setMfaSetupMode(true);
+    } else {
+      toast({ title: 'Error', description: 'Failed to start MFA enrollment', variant: 'destructive' });
+    }
+    setMfaLoading(false);
+  };
+
+  const handleVerifyMfa = async () => {
+    if (!mfaVerifyCode || mfaVerifyCode.length !== 6 || !mfaEnrollmentId) return;
+    setMfaVerifying(true);
+    const challengeId = await mfaService.challenge(mfaEnrollmentId);
+    if (challengeId) {
+      const success = await mfaService.verify(mfaEnrollmentId, challengeId, mfaVerifyCode);
+      if (success) {
+        toast({ title: 'MFA Enabled', description: 'Two-factor authentication is now active' });
+        setMfaSetupMode(false);
+        setMfaVerifyCode('');
+        setMfaQrCode('');
+        setMfaSecret('');
+        setMfaEnrollmentId('');
+        loadMfaFactors();
+      } else {
+        toast({ title: 'Invalid Code', description: 'Please check the code and try again', variant: 'destructive' });
+      }
+    }
+    setMfaVerifying(false);
+  };
+
+  const handleUnenrollMfa = async () => {
+    if (!unenrollFactorId) return;
+    setMfaLoading(true);
+    const success = await mfaService.unenroll(unenrollFactorId);
+    if (success) {
+      toast({ title: 'MFA Disabled', description: 'Two-factor authentication has been removed' });
+      setShowUnenrollDialog(false);
+      setUnenrollFactorId('');
+      loadMfaFactors();
+    } else {
+      toast({ title: 'Error', description: 'Failed to disable MFA', variant: 'destructive' });
+    }
+    setMfaLoading(false);
+  };
+
+  const handleCopySecret = async () => {
+    try {
+      await navigator.clipboard.writeText(mfaSecret);
+      setSecretCopied(true);
+      setTimeout(() => setSecretCopied(false), 2000);
+    } catch {
+      toast({ title: 'Copy failed', description: 'Please copy the secret manually', variant: 'destructive' });
+    }
+  };
 
   useEffect(() => {
     if (!migrationJob?.id || ['completed', 'failed', 'cancelled'].includes(migrationJob.status)) return;
@@ -872,6 +962,127 @@ const AccountSettings = () => {
         {cardHeader(<Shield className="h-5 w-5 text-primary" />, 'Security', 'Protect your account')}
 
         <div className="space-y-4">
+          {/* MFA/TOTP Card */}
+          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Smartphone className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-semibold text-foreground">Two-Factor Authentication</h4>
+                  <p className="text-xs text-muted-foreground truncate">Add an extra layer of security with TOTP authenticator</p>
+                </div>
+              </div>
+              {aalLevel && (
+                <Badge className={cn('shrink-0', aalLevel.currentLevel === 'aal2' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-muted/50 text-muted-foreground border-border/30')}>
+                  {aalLevel.currentLevel === 'aal2' ? 'Active' : 'Disabled'}
+                </Badge>
+              )}
+            </div>
+
+            {!mfaSetupMode && mfaFactors.length === 0 && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Protect your account by requiring a verification code from your authenticator app when signing in.
+                </p>
+                <Button variant="outline" size={btnSize} onClick={handleEnrollMfa} disabled={mfaLoading} className="rounded-xl">
+                  {mfaLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Plus className="h-3 w-3 mr-1.5" />}
+                  Enable TOTP
+                </Button>
+              </div>
+            )}
+
+            {mfaSetupMode && (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border/40 bg-muted/30 p-4 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+                  </p>
+                  <div className="flex justify-center">
+                    <div
+                      className="bg-white p-2 rounded-lg"
+                      dangerouslySetInnerHTML={{ __html: mfaQrCode }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-muted-foreground">Manual entry key:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-xs font-mono bg-muted/50 p-2 rounded break-all text-foreground">{mfaSecret}</code>
+                      <button
+                        type="button"
+                        onClick={handleCopySecret}
+                        className="shrink-0 h-8 w-8 rounded-lg bg-muted/50 hover:bg-muted/80 flex items-center justify-center transition-colors"
+                        title="Copy secret"
+                      >
+                        {secretCopied ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : (
+                          <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Enter 6-digit code from authenticator</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={mfaVerifyCode}
+                    onChange={(e) => setMfaVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    className="h-11 rounded-xl bg-muted/20 border-border/40 font-mono text-center text-lg tracking-widest"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="ghost" size={btnSize} onClick={() => { setMfaSetupMode(false); setMfaVerifyCode(''); setMfaQrCode(''); setMfaSecret(''); setMfaEnrollmentId(''); }} className="rounded-xl">Cancel</Button>
+                  <Button size={btnSize} onClick={handleVerifyMfa} disabled={mfaVerifying || mfaVerifyCode.length !== 6} className="rounded-xl flex-1">
+                    {mfaVerifying ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : null}
+                    Verify & Enable
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!mfaSetupMode && mfaFactors.length > 0 && (
+              <div className="space-y-3">
+                {mfaFactors.map(factor => (
+                  <div key={factor.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border/40 bg-muted/30">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                        <Smartphone className="h-4 w-4 text-emerald-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{factor.friendly_name || 'Authenticator App'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Added {new Date(factor.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size={btnSize}
+                      onClick={() => { setUnenrollFactorId(factor.id); setShowUnenrollDialog(true); }}
+                      disabled={mfaLoading}
+                      className="rounded-xl shrink-0"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1.5" />Remove
+                    </Button>
+                  </div>
+                ))}
+                <Button variant="outline" size={btnSize} onClick={handleEnrollMfa} disabled={mfaLoading} className="rounded-xl">
+                  <Plus className="h-3 w-3 mr-1.5" /> Add Another
+                </Button>
+              </div>
+            )}
+          </div>
+
           <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1281,6 +1492,23 @@ const AccountSettings = () => {
           />
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showUnenrollDialog} onOpenChange={setShowUnenrollDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Two-Factor Authentication?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the authenticator app from your account. You will no longer need a verification code to sign in.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={mfaLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleUnenrollMfa} disabled={mfaLoading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {mfaLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Disabling...</> : 'Disable MFA'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -64,7 +64,7 @@ function ShareAnalyticsPanel({ shareId, isOpen }: { shareId: string; isOpen: boo
   }, [shareId, isOpen]);
 
   if (!isOpen) return null;
-  if (loading) return <div className="flex items-center justify-center py-6"><RefreshCw className="w-4 h-4 animate-spin text-[#768390]" /></div>;
+  if (loading) return <div className="flex items-center justify-center py-6"><RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" /></div>;
   if (!data) return null;
 
   const { logs = [], share } = data;
@@ -80,14 +80,14 @@ function ShareAnalyticsPanel({ shareId, isOpen }: { shareId: string; isOpen: boo
       {/* Stats row */}
       <div className="flex gap-2">
         {[
-          { label: 'Views', value: share?.share_views || 0, icon: Eye, color: 'text-[#58A6FF]' },
-          { label: 'Downloads', value: share?.download_count || 0, icon: DownloadIcon, color: 'text-[#3FB950]' },
-          { label: 'Events', value: logs.length, icon: Zap, color: 'text-[#D29922]' },
+          { label: 'Views', value: share?.share_views || 0, icon: Eye, color: 'text-primary' },
+          { label: 'Downloads', value: share?.download_count || 0, icon: DownloadIcon, color: 'text-emerald-400' },
+          { label: 'Events', value: logs.length, icon: Zap, color: 'text-amber-400' },
         ].map((stat, i) => (
-          <div key={i} className="flex-1 bg-[#161B22] rounded-xl p-3 text-center border border-[#2D333B]">
+          <div key={i} className="flex-1 bg-muted rounded-xl p-3 text-center border border-border">
             <stat.icon className={cn('w-4 h-4 mx-auto mb-1', stat.color)} />
-            <div className="text-[18px] font-bold text-[#E6EDF3]">{stat.value}</div>
-            <div className="text-[10px] text-[#768390] mt-0.5">{stat.label}</div>
+            <div className="text-[18px] font-bold text-foreground">{stat.value}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">{stat.label}</div>
           </div>
         ))}
       </div>
@@ -96,8 +96,8 @@ function ShareAnalyticsPanel({ shareId, isOpen }: { shareId: string; isOpen: boo
       {logs.some((l: any) => l.geo_country) && (
         <div className="flex flex-wrap gap-1.5">
           {[...new Set(logs.filter((l: any) => l.geo_country).map((l: any) => l.geo_country))].map(country => (
-            <span key={country} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#161B22] border border-[#2D333B] text-[#8B949E]">
-              <MapPin className="w-2.5 h-2.5 text-[#58A6FF]" /> {country}
+            <span key={country} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted border border-border text-muted-foreground">
+              <MapPin className="w-2.5 h-2.5 text-primary" /> {country}
             </span>
           ))}
         </div>
@@ -105,36 +105,36 @@ function ShareAnalyticsPanel({ shareId, isOpen }: { shareId: string; isOpen: boo
 
       {/* Event timeline grouped by day */}
       <div className="max-h-36 overflow-y-auto space-y-1 scrollbar-thin">
-        <div className="text-[11px] font-semibold text-[#8B949E] flex items-center gap-1.5 sticky top-0 bg-[#161B22] py-1 z-10">
+        <div className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5 sticky top-0 bg-background py-1 z-10">
           <History className="w-3 h-3" /> Activity
         </div>
         {Object.entries(dayBuckets).map(([day, dayLogs]) => (
           <div key={day}>
-            <div className="text-[10px] text-[#484F58] font-medium px-1 py-0.5">{day}</div>
+            <div className="text-[10px] text-muted-foreground/50 font-medium px-1 py-0.5">{day}</div>
             {dayLogs.slice(0, 10).map((log: any, i: number) => (
-              <div key={i} className="flex items-center justify-between py-1 px-2 rounded-lg hover:bg-[#1C2128] transition-colors">
+              <div key={i} className="flex items-center justify-between py-1 px-2 rounded-lg hover:bg-accent transition-colors">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className={cn(
                     'w-5 h-5 rounded-full flex items-center justify-center shrink-0',
-                    log.event_type === 'view' ? 'bg-[#58A6FF]/10' :
-                    log.event_type === 'download' ? 'bg-[#3FB950]/10' : 'bg-[#D29922]/10'
+                    log.event_type === 'view' ? 'bg-primary/10' :
+                    log.event_type === 'download' ? 'bg-emerald-500/10' : 'bg-amber-500/10'
                   )}>
-                    {log.event_type === 'view' ? <Eye className="w-2.5 h-2.5 text-[#58A6FF]" /> :
-                     log.event_type === 'download' ? <DownloadIcon className="w-2.5 h-2.5 text-[#3FB950]" /> :
-                     <ShieldAlert className="w-2.5 h-2.5 text-[#D29922]" />}
+                    {log.event_type === 'view' ? <Eye className="w-2.5 h-2.5 text-primary" /> :
+                     log.event_type === 'download' ? <DownloadIcon className="w-2.5 h-2.5 text-emerald-400" /> :
+                     <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />}
                   </div>
-                  <span className="text-[11px] text-[#E6EDF3] capitalize">{log.event_type}</span>
-                  {log.geo_country && <span className="text-[10px] text-[#768390]">{log.geo_country}</span>}
+                  <span className="text-[11px] text-foreground capitalize">{log.event_type}</span>
+                  {log.geo_country && <span className="text-[10px] text-muted-foreground">{log.geo_country}</span>}
                 </div>
-                <span className="text-[9px] text-[#484F58] shrink-0">
+                <span className="text-[9px] text-muted-foreground/50 shrink-0">
                   {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
             ))}
-            {dayLogs.length > 10 && <div className="text-[9px] text-[#484F58] px-2">+{dayLogs.length - 10} more</div>}
+            {dayLogs.length > 10 && <div className="text-[9px] text-muted-foreground/50 px-2">+{dayLogs.length - 10} more</div>}
           </div>
         ))}
-        {logs.length === 0 && <p className="text-[11px] text-[#484F58] text-center py-3">No activity yet</p>}
+        {logs.length === 0 && <p className="text-[11px] text-muted-foreground/50 text-center py-3">No activity yet</p>}
       </div>
     </div>
   );
@@ -153,54 +153,54 @@ function ShareRowCard({
   return (
     <div className={cn(
       'rounded-2xl border overflow-hidden transition-all duration-200',
-      canBeActive ? 'border-[#2D333B] bg-[#161B22]' : 'border-[#21262D] bg-[#161B22]/60',
-      isAlert && 'border-[#D29922]/40 shadow-[0_0_12px_rgba(210,153,34,0.08)]',
+      canBeActive ? 'border-border bg-muted' : 'border-border/60 bg-muted/60',
+      isAlert && 'border-amber-500/40 shadow-[0_0_12px_rgba(210,153,34,0.08)]',
     )}>
       {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3.5">
-        <div className="w-10 h-10 rounded-xl bg-[#1C2128] border border-[#2D333B] flex items-center justify-center shrink-0">
-          <FileText className="w-4 h-4 text-[#8B949E]" />
+        <div className="w-10 h-10 rounded-xl bg-accent border border-border flex items-center justify-center shrink-0">
+          <FileText className="w-4 h-4 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[14px] font-medium text-[#E6EDF3] truncate">{share.file.name}</span>
-            {isAlert && <ShieldAlert className="w-3 h-3 text-[#D29922] shrink-0 animate-pulse" />}
+            <span className="text-[14px] font-medium text-foreground truncate">{share.file.name}</span>
+            {isAlert && <ShieldAlert className="w-3 h-3 text-amber-400 shrink-0 animate-pulse" />}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[11px] text-[#768390]">{formatFileSize(share.file.size)}</span>
-            <span className="text-[10px] text-[#484F58]">·</span>
-            <span className="flex items-center gap-0.5 text-[11px] text-[#8B949E]">
+            <span className="text-[11px] text-muted-foreground">{formatFileSize(share.file.size)}</span>
+            <span className="text-[10px] text-muted-foreground/50">·</span>
+            <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
               <Eye className="w-2.5 h-2.5" /> {share.share_views || 0}
             </span>
-            <span className="text-[10px] text-[#484F58]">·</span>
-            <span className="flex items-center gap-0.5 text-[11px] text-[#8B949E]">
+            <span className="text-[10px] text-muted-foreground/50">·</span>
+            <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
               <DownloadIcon className="w-2.5 h-2.5" /> {share.download_count || 0}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-1">
           {share.burn_after_reading && (
-            <div className="w-7 h-7 rounded-lg bg-[#D29922]/10 flex items-center justify-center" title="Burn after reading">
-              <Flame className="w-3.5 h-3.5 text-[#D29922]" />
+            <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center" title="Burn after reading">
+              <Flame className="w-3.5 h-3.5 text-amber-400" />
             </div>
           )}
           {share.access_code && (
-            <div className="w-7 h-7 rounded-lg bg-[#58A6FF]/10 flex items-center justify-center" title="Password protected">
-              <Lock className="w-3.5 h-3.5 text-[#58A6FF]" />
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center" title="Password protected">
+              <Lock className="w-3.5 h-3.5 text-primary" />
             </div>
           )}
           {share.allowed_countries?.length ? (
-            <div className="w-7 h-7 rounded-lg bg-[#3FB950]/10 flex items-center justify-center" title="Geo-locked">
-              <Globe className="w-3.5 h-3.5 text-[#3FB950]" />
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center" title="Geo-locked">
+              <Globe className="w-3.5 h-3.5 text-emerald-400" />
             </div>
           ) : null}
           {share.device_fingerprint && (
-            <div className="w-7 h-7 rounded-lg bg-[#BC8CFF]/10 flex items-center justify-center" title="Device locked">
-              <Smartphone className="w-3.5 h-3.5 text-[#BC8CFF]" />
+            <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center" title="Device locked">
+              <Smartphone className="w-3.5 h-3.5 text-purple-400" />
             </div>
           )}
           <button onClick={onToggleExpand}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8B949E] hover:bg-[#1C2128] active:bg-[#2D333B] transition-colors">
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent active:bg-accent transition-colors">
             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </div>
@@ -210,22 +210,22 @@ function ShareRowCard({
       <div className="flex items-center justify-between px-4 pb-3">
         <div className="flex items-center gap-1.5">
           {canBeActive ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#3FB950]/10 text-[#3FB950] border border-[#3FB950]/20">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 className="w-2.5 h-2.5" /> Active
             </span>
           ) : isExpired ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F85149]/10 text-[#F85149] border border-[#F85149]/20">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-destructive/10 text-destructive border border-destructive/20">
               <AlertCircle className="w-2.5 h-2.5" /> Expired
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#484F58]/20 text-[#8B949E] border border-[#484F58]/30">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground border border-border">
               Inactive
             </span>
           )}
           {share.expires_at && (
             <span className={cn(
               'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border',
-              isExpired ? 'bg-[#F85149]/5 text-[#F85149] border-[#F85149]/15' : 'bg-[#D29922]/5 text-[#D29922] border-[#D29922]/15'
+              isExpired ? 'bg-destructive/5 text-destructive border-destructive/15' : 'bg-amber-500/5 text-amber-400 border-amber-500/15'
             )}>
               <Clock className="w-2.5 h-2.5" />
               {isExpired ? 'Expired' : new Date(share.expires_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
@@ -234,15 +234,15 @@ function ShareRowCard({
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => { haptics.light(); onCopy(); }}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-[#8B949E] hover:bg-[#1C2128] active:bg-[#2D333B] transition-colors">
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent active:bg-accent transition-colors">
             <Copy className="w-3.5 h-3.5" />
           </button>
           <button onClick={() => { haptics.light(); onOpen(); }}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-[#8B949E] hover:bg-[#1C2128] active:bg-[#2D333B] transition-colors">
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent active:bg-accent transition-colors">
             <ExternalLink className="w-3.5 h-3.5" />
           </button>
           <button onClick={onRevoke}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-[#F85149] hover:bg-[#F85149]/10 active:bg-[#F85149]/20 transition-colors">
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-destructive hover:bg-destructive/10 active:bg-destructive/20 transition-colors">
             <XCircle className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -253,7 +253,7 @@ function ShareRowCard({
         'overflow-hidden transition-all duration-300 ease-out',
         isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
       )}>
-        <div className="border-t border-[#2D333B] mx-4" />
+        <div className="border-t border-border mx-4" />
         <ShareAnalyticsPanel shareId={share.share_id} isOpen={isExpanded} />
       </div>
     </div>
@@ -268,18 +268,18 @@ const FileRequestCard: React.FC<{
   onCopy: () => void;
   onOpen: () => void;
 }> = ({ req, onToggle, onDelete, onCopy, onOpen }) => (
-  <div className="rounded-2xl border border-[#2D333B] bg-[#161B22] overflow-hidden">
+  <div className="rounded-2xl border border-border bg-muted overflow-hidden">
     <div className="px-4 py-3.5">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#D29922]/10 border border-[#D29922]/20 flex items-center justify-center shrink-0">
-          <Inbox className="w-4 h-4 text-[#D29922]" />
+        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+          <Inbox className="w-4 h-4 text-amber-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-medium text-[#E6EDF3] truncate">{req.title}</div>
+          <div className="text-[14px] font-medium text-foreground truncate">{req.title}</div>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[11px] text-[#768390]">/r/{req.slug}</span>
+            <span className="text-[11px] text-muted-foreground">/r/{req.slug}</span>
             {req.expires_at && (
-              <span className="text-[10px] text-[#D29922]">
+              <span className="text-[10px] text-amber-400">
                 Exp {new Date(req.expires_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
               </span>
             )}
@@ -289,8 +289,8 @@ const FileRequestCard: React.FC<{
           className={cn(
             'px-3 h-7 rounded-lg text-[11px] font-medium border transition-all',
             req.is_active
-              ? 'bg-[#3FB950]/10 text-[#3FB950] border-[#3FB950]/20'
-              : 'bg-[#484F58]/10 text-[#8B949E] border-[#484F58]/30'
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              : 'bg-muted text-muted-foreground border-border'
           )}>
           {req.is_active ? 'Active' : 'Paused'}
         </button>
@@ -299,16 +299,16 @@ const FileRequestCard: React.FC<{
     <div className="flex items-center justify-between px-4 pb-3.5">
       <div className="flex items-center gap-2">
         <button onClick={onCopy}
-          className="h-8 px-3 rounded-lg text-[11px] font-medium bg-[#1C2128] border border-[#2D333B] text-[#8B949E] hover:border-[#58A6FF]/30 flex items-center gap-1.5">
+          className="h-8 px-3 rounded-lg text-[11px] font-medium bg-accent border border-border text-muted-foreground hover:border-primary/30 flex items-center gap-1.5">
           <Copy className="w-3 h-3" /> Copy Link
         </button>
         <button onClick={onOpen}
-          className="h-8 px-3 rounded-lg text-[11px] font-medium bg-[#1C2128] border border-[#2D333B] text-[#8B949E] hover:border-[#58A6FF]/30 flex items-center gap-1.5">
+          className="h-8 px-3 rounded-lg text-[11px] font-medium bg-accent border border-border text-muted-foreground hover:border-primary/30 flex items-center gap-1.5">
           <ExternalLink className="w-3 h-3" /> Open
         </button>
       </div>
       <button onClick={onDelete}
-        className="h-8 w-8 rounded-lg flex items-center justify-center text-[#F85149] hover:bg-[#F85149]/10 transition-colors">
+        className="h-8 w-8 rounded-lg flex items-center justify-center text-destructive hover:bg-destructive/10 transition-colors">
         <Trash2 className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -443,31 +443,31 @@ export const MobileShareManagerContent: React.FC<MobileShareManagerContentProps>
   );
 
   return (
-    <div className="flex flex-col h-full bg-[#0D1117]">
+    <div className="flex flex-col h-full bg-background">
       {/* Search */}
       <div className="px-4 pt-3 pb-2">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[20px] font-bold text-[#E6EDF3]">Shares</h2>
+          <h2 className="text-[20px] font-bold text-foreground">Shares</h2>
           <div className="flex items-center gap-2">
-            <span className="text-[12px] text-[#768390] bg-[#161B22] px-2.5 py-1 rounded-full border border-[#2D333B]">
+            <span className="text-[12px] text-muted-foreground bg-muted px-2.5 py-1 rounded-full border border-border">
               {shares.filter(s => s.is_active).length} active
             </span>
             <button onClick={fetchData}
-              className="w-8 h-8 rounded-xl bg-[#161B22] border border-[#2D333B] flex items-center justify-center text-[#8B949E] active:bg-[#1C2128] transition-colors">
+              className="w-8 h-8 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground active:bg-accent transition-colors">
               <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
             </button>
           </div>
         </div>
 
         <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#484F58]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
           <input type="text" placeholder="Search shares..." value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-4 text-[14px] rounded-xl bg-[#161B22] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#484F58] focus:outline-none focus:border-[#58A6FF]/50 focus:ring-1 focus:ring-[#58A6FF]/20 transition-all" />
+            className="w-full h-10 pl-9 pr-4 text-[14px] rounded-xl bg-muted border border-border text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30 focus:ring-1 focus:ring-primary/20 transition-all" />
         </div>
 
         {/* Shares / Requests tabs */}
-        <div className="flex gap-1 p-0.5 rounded-xl bg-[#161B22] border border-[#2D333B] mb-3">
+        <div className="flex gap-1 p-0.5 rounded-xl bg-muted border border-border mb-3">
           {[
             { key: 'shares' as const, label: 'Shared Links', icon: LinkIcon },
             ...(profile?.is_premium ? [{ key: 'requests' as const, label: 'File Requests', icon: Inbox }] : []),
@@ -475,7 +475,7 @@ export const MobileShareManagerContent: React.FC<MobileShareManagerContentProps>
             <button key={t.key} onClick={() => { setTab(t.key); haptics.selection(); }}
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-medium transition-all duration-200',
-                tab === t.key ? 'bg-[#1C2128] text-[#E6EDF3] shadow-sm' : 'text-[#8B949E] hover:text-[#E6EDF3]'
+                tab === t.key ? 'bg-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               )}>
               <t.icon className="w-3.5 h-3.5" /> {t.label}
             </button>
@@ -489,7 +489,7 @@ export const MobileShareManagerContent: React.FC<MobileShareManagerContentProps>
               <button key={f} onClick={() => { setFilterTab(f); haptics.selection(); }}
                 className={cn(
                   'px-3 h-7 rounded-lg text-[11px] font-medium transition-all duration-200',
-                  filterTab === f ? 'bg-[#58A6FF] text-white' : 'bg-[#161B22] text-[#8B949E] border border-[#2D333B] hover:border-[#58A6FF]/30'
+                  filterTab === f ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'
                 )}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
@@ -504,24 +504,24 @@ export const MobileShareManagerContent: React.FC<MobileShareManagerContentProps>
         {loading && shares.length === 0 && tab === 'shares' && (
           <div className="flex flex-col items-center justify-center py-16 space-y-3">
             <div className="relative w-12 h-12">
-              <div className="absolute inset-0 rounded-full bg-[#58A6FF]/10 animate-ping" style={{ animationDuration: '2s' }} />
-              <div className="absolute inset-[3px] rounded-full bg-[#58A6FF]/20 animate-pulse" style={{ animationDuration: '1.5s' }} />
-              <div className="absolute inset-[6px] rounded-full bg-[#1C2128] border border-[#2D333B] flex items-center justify-center">
-                <Share2 className="w-5 h-5 text-[#58A6FF]" />
+              <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" style={{ animationDuration: '2s' }} />
+              <div className="absolute inset-[3px] rounded-full bg-primary/20 animate-pulse" style={{ animationDuration: '1.5s' }} />
+              <div className="absolute inset-[6px] rounded-full bg-accent border border-border flex items-center justify-center">
+                <Share2 className="w-5 h-5 text-primary" />
               </div>
             </div>
-            <p className="text-sm text-[#768390] animate-pulse" style={{ animationDuration: '1.5s' }}>Loading shares...</p>
+            <p className="text-sm text-muted-foreground animate-pulse" style={{ animationDuration: '1.5s' }}>Loading shares...</p>
           </div>
         )}
 
         {/* Empty shares */}
         {!loading && tab === 'shares' && filteredShares.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16">
-            <div className="w-16 h-16 rounded-2xl bg-[#161B22] border border-[#2D333B] flex items-center justify-center mb-4">
-              <Share2 className="w-7 h-7 text-[#484F58]" />
+            <div className="w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center mb-4">
+              <Share2 className="w-7 h-7 text-muted-foreground/50" />
             </div>
-            <p className="text-[15px] font-medium text-[#8B949E]">No shared files</p>
-            <p className="text-[12px] text-[#484F58] mt-1">Share a file to see it here</p>
+            <p className="text-[15px] font-medium text-muted-foreground">No shared files</p>
+            <p className="text-[12px] text-muted-foreground/50 mt-1">Share a file to see it here</p>
           </div>
         )}
 
@@ -542,11 +542,11 @@ export const MobileShareManagerContent: React.FC<MobileShareManagerContentProps>
         {/* Empty requests */}
         {!loading && tab === 'requests' && filteredRequests.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16">
-            <div className="w-16 h-16 rounded-2xl bg-[#161B22] border border-[#2D333B] flex items-center justify-center mb-4">
-              <Inbox className="w-7 h-7 text-[#484F58]" />
+            <div className="w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center mb-4">
+              <Inbox className="w-7 h-7 text-muted-foreground/50" />
             </div>
-            <p className="text-[15px] font-medium text-[#8B949E]">No file requests</p>
-            <p className="text-[12px] text-[#484F58] mt-1">Create one from the file manager</p>
+            <p className="text-[15px] font-medium text-muted-foreground">No file requests</p>
+            <p className="text-[12px] text-muted-foreground/50 mt-1">Create one from the file manager</p>
           </div>
         )}
 
@@ -580,12 +580,12 @@ export const MobileShareManagerSheet: React.FC<MobileShareManagerSheetProps> = (
     onOpenChange={onOpenChange}
     title={
       <div className="flex items-center gap-2.5 px-1">
-        <div className="w-9 h-9 rounded-xl bg-[#58A6FF]/10 flex items-center justify-center">
-          <Share2 className="w-4 h-4 text-[#58A6FF]" />
+        <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+          <Share2 className="w-4 h-4 text-foreground" />
         </div>
         <div>
-          <span className="text-[16px] font-semibold text-[#E6EDF3]">Share Manager</span>
-          <span className="text-[11px] text-[#768390] block -mt-0.5">Manage all shared links</span>
+          <span className="text-[16px] font-semibold text-foreground">Share Manager</span>
+          <span className="text-[11px] text-muted-foreground block -mt-0.5">Manage all shared links</span>
         </div>
       </div>
     }

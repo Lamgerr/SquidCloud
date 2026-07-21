@@ -95,7 +95,7 @@ export const GameSuggestionModal: React.FC<GameSuggestionModalProps> = ({
   // Global shortcut (Cmd/Ctrl + Shift + G) interceptor when popup is visible
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'g') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'b') {
         e.preventDefault();
         if (isOpen) handlePlayAction();
       }
@@ -234,7 +234,7 @@ export const GameSuggestionModal: React.FC<GameSuggestionModalProps> = ({
                 <div className="flex items-center gap-1.5 font-mono bg-white/5 border border-white/10 px-2.5 py-1 rounded-md text-[11px] text-neutral-300">
                   <Keyboard className="w-3 h-3 text-neutral-400" />
                   <span>Open anytime:</span>
-                  <kbd className="bg-white/10 px-1 rounded text-white font-bold">⌘/Ctrl + Shift + G</kbd>
+                  <kbd className="bg-white/10 px-1 rounded text-white font-bold">⌘/Ctrl + Shift + B</kbd>
                 </div>
               </div>
             )}

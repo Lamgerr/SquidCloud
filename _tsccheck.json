@@ -14,7 +14,6 @@
   },
   "include": [
     "src/vite-env.d.ts",
-    "src/components/editor/monacoTheme.ts",
     "src/components/editor/CodeEditor.tsx",
     "src/components/editor/ObjectLayer.tsx",
     "src/components/editor/sqd.ts",

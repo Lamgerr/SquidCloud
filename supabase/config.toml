@@ -166,6 +166,12 @@ verify_jwt = false
 [functions.video-stream-url]
 verify_jwt = false
 
+[functions.s3-storage]
+
+[functions.squidcloud-cluster]
+
+[functions.s3-usage-tracker]
+
 [functions.subscription-manager]
 verify_jwt = false
 # Run every hour

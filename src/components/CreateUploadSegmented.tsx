@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Plus, Upload, Folder } from '@/lib/icon-map';
+import { Plus, Upload, Folder, Github, GitBranch } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import UploadButton from '@/components/UploadButton';
 import {
@@ -20,6 +20,7 @@ interface CreateUploadSegmentedProps {
   onUploadStart?: (file: File, folder?: string) => void;
   onUploadProgress?: (fileName: string, progress: number) => void;
   onUploadError?: (error: any, fileName: string) => void;
+  onCloneFromGitHub?: () => void;
   className?: string;
   disabled?: boolean;
   onDisabledClick?: () => void;
@@ -32,6 +33,7 @@ const CreateUploadSegmented: React.FC<CreateUploadSegmentedProps> = ({
   onUploadStart,
   onUploadProgress,
   onUploadError,
+  onCloneFromGitHub,
   className,
   disabled = false,
   onDisabledClick,
@@ -175,6 +177,14 @@ const CreateUploadSegmented: React.FC<CreateUploadSegmentedProps> = ({
               <Folder className="w-4 h-4" />
               <span className="flex-1">New Folder</span>
               <kbd className="text-[10px] text-muted-foreground/50 font-mono">⌘N</kbd>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => { setCreateDropdownOpen(false); onCloneFromGitHub?.() }}
+              className="gap-2 cursor-pointer"
+            >
+              <Github className="w-4 h-4" />
+              <span className="flex-1">Clone from GitHub</span>
+              <GitBranch className="w-3 h-3 text-muted-foreground" />
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             

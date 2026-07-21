@@ -105,62 +105,62 @@ export function MobileCreateWebhookSheet({ open, onClose, onCreated }: MobileCre
   return (
     <Drawer open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
       <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
-        <div className="relative overflow-hidden rounded-t-[28px] bg-[#0A0E1A] max-h-[90vh] flex flex-col animate-fade-up-soft">
+        <div className="relative overflow-hidden rounded-t-[28px] bg-background max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="px-5 pt-5 pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#4FC3F7]/10 flex items-center justify-center">
-                  <Network className="w-5 h-5 text-[#4FC3F7]" />
+                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                  <Network className="w-5 h-5 text-foreground" />
                 </div>
                 <div>
-                  <h3 className="text-[16px] font-semibold text-white/90">Create Webhook</h3>
-                  <p className="text-[11px] text-[#768390]">Get POST notifications for events</p>
+                  <h3 className="text-[16px] font-semibold text-foreground">Create Webhook</h3>
+                  <p className="text-[11px] text-muted-foreground">Get POST notifications for events</p>
                 </div>
               </div>
               <button
                 onClick={handleClose}
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-[#768390] hover:text-white/70 hover:bg-white/[0.06] transition-all duration-200"
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-200"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
-          <div className="h-px bg-[#2D333B]" />
+          <div className="h-px bg-border" />
 
           {/* Form */}
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
             {/* URL Input */}
-            <div className="space-y-2 animate-fade-up-soft" style={{ animationDelay: '0.05s' }}>
-              <Label className="text-[12px] text-[#768390] font-medium">Endpoint URL</Label>
+            <div className="space-y-2">
+              <Label className="text-[12px] text-muted-foreground font-medium">Endpoint URL</Label>
               <Input
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder="https://your-server.com/webhook"
-                className="h-11 rounded-xl bg-white/[0.04] border-white/[0.08] text-white/80 text-sm font-mono placeholder:text-[#768390]/40 focus:border-[#4FC3F7]/30 focus:ring-[#4FC3F7]/10"
+                className="h-11 rounded-xl bg-muted border-border text-foreground text-sm font-mono placeholder:text-muted-foreground/40 focus:border-foreground/30 focus:ring-foreground/10"
               />
             </div>
 
             {/* Events */}
-            <div className="space-y-3 animate-fade-up-soft" style={{ animationDelay: '0.1s' }}>
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-[12px] text-[#768390] font-medium">Events</Label>
+                <Label className="text-[12px] text-muted-foreground font-medium">Events</Label>
                 <div className="flex items-center gap-3">
                   {selectedEvents.size > 0 && (
-                    <button onClick={clearAll} className="text-[11px] text-[#768390] hover:text-white/60 transition-colors">
+                    <button onClick={clearAll} className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">
                       Clear
                     </button>
                   )}
-                  <button onClick={selectAll} className="text-[11px] text-[#4FC3F7] hover:text-[#4FC3F7]/80 transition-colors">
+                  <button onClick={selectAll} className="text-[11px] text-foreground hover:text-foreground/80 transition-colors">
                     Select all
                   </button>
                 </div>
               </div>
 
               {selectedEvents.size > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#4FC3F7]/[0.06] border border-[#4FC3F7]/15 animate-scale-in-soft">
-                  <Check className="w-3.5 h-3.5 text-[#4FC3F7]" />
-                  <span className="text-[11px] text-[#4FC3F7]/80 font-medium">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-foreground/[0.05] border border-foreground/10">
+                  <Check className="w-3.5 h-3.5 text-foreground" />
+                  <span className="text-[11px] text-foreground/80 font-medium">
                     {selectedEvents.size} event{selectedEvents.size !== 1 ? 's' : ''} selected
                   </span>
                 </div>
@@ -168,8 +168,8 @@ export function MobileCreateWebhookSheet({ open, onClose, onCreated }: MobileCre
 
               <div className="space-y-4">
                 {AVAILABLE_EVENTS.map((group, gi) => (
-                  <div key={group.group} className="animate-fade-up-soft" style={{ animationDelay: `${0.1 + gi * 0.03}s` }}>
-                    <p className="text-[10px] font-semibold text-[#768390]/60 uppercase tracking-wider mb-2">
+                  <div key={group.group}>
+                    <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2">
                       {group.group}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -182,8 +182,8 @@ export function MobileCreateWebhookSheet({ open, onClose, onCreated }: MobileCre
                             className={cn(
                               'text-[11px] px-2.5 py-1.5 rounded-lg border font-mono transition-all duration-200',
                               isSelected
-                                ? 'bg-[#4FC3F7]/15 text-[#4FC3F7] border-[#4FC3F7]/25'
-                                : 'bg-white/[0.03] text-[#768390]/70 border-white/[0.08] hover:border-white/[0.15] hover:text-white/60',
+                                ? 'bg-foreground/10 text-foreground border-foreground/20'
+                                : 'bg-muted text-muted-foreground border-border hover:border-foreground/20 hover:text-foreground',
                             )}
                           >
                             {isSelected && <Check className="w-2.5 h-2.5 inline mr-1 -mt-0.5" />}
@@ -199,15 +199,15 @@ export function MobileCreateWebhookSheet({ open, onClose, onCreated }: MobileCre
           </div>
 
           {/* Footer */}
-          <div className="p-5 border-t border-[#2D333B]">
+          <div className="p-5 border-t border-border">
             <Button
               onClick={handleCreate}
               disabled={saving || !url.trim() || selectedEvents.size === 0}
-              className="w-full h-12 rounded-xl bg-[#4FC3F7] text-[#0A0E1A] font-semibold hover:bg-[#4FC3F7]/90 transition-all duration-200 disabled:opacity-40"
+              className="w-full h-12 rounded-xl bg-foreground text-background font-semibold hover:bg-foreground/90 transition-all duration-200 disabled:opacity-40"
             >
               {saving ? (
                 <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-[#0A0E1A]/30 border-t-[#0A0E1A] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
                   Creating...
                 </span>
               ) : (

@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/reset-credits",
+      "schedule": "5 0 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/v1/:path*",
@@ -7,6 +13,10 @@
     {
       "source": "/api/serve/:path*",
       "destination": "/api/serve/[...path]"
+    },
+    {
+      "source": "/api/epub-proxy",
+      "destination": "/api/epub-proxy"
     },
     {
       "source": "/(.*)",
@@ -20,6 +30,13 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET, POST, DELETE, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "X-SquidCloud-Key, X-SquidCloud-Encryption-Key, Content-Type" }
+      ]
+    },
+    {
+      "source": "/api/epub-proxy(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, OPTIONS" }
       ]
     },
     {

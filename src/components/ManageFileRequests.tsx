@@ -12,6 +12,7 @@ import { Inbox, Copy, ExternalLink, Trash2, Eye, Download, Move, Loader2, Calend
 import { formatDistanceToNow } from 'date-fns';
 import { formatBytes } from '@/lib/api';
 import EnhancedInstantPreviewModal from './EnhancedInstantPreviewModal';
+import DeepReadReader from './DeepReadReader';
 import { MoveToFolderDialog } from './MoveToFolderDialog';
 
 interface FileRequestItem {
@@ -40,6 +41,7 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [previewFile, setPreviewFile] = useState<any>(null);
+  const [readingEpubFile, setReadingEpubFile] = useState<any>(null);
   const [moveFileIds, setMoveFileIds] = useState<string[]>([]);
   const { toast } = useToast();
 
@@ -306,6 +308,15 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
               toast({ title: 'Download failed', description: err.message, variant: 'destructive' });
             }
           }}
+          onOpenEpubReader={() => { setPreviewFile(null); setReadingEpubFile(previewFile); }}
+        />
+      )}
+      {readingEpubFile && (
+        <DeepReadReader
+          file={{ id: readingEpubFile.file_id, name: readingEpubFile.file_name, type: readingEpubFile.file?.type || '' }}
+          source="local"
+          isOpen={!!readingEpubFile}
+          onClose={() => setReadingEpubFile(null)}
         />
       )}
       <MoveToFolderDialog

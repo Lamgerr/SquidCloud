@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import EnhancedMarkdownPreview from './EnhancedMarkdownPreview';
+import CodeEditor from './editor/CodeEditor';
 import InkCanvas from './editor/InkCanvas';
 import ObjectLayer from './editor/ObjectLayer';
 import { backgroundCss } from './editor/backgrounds';
@@ -9,39 +10,16 @@ import {
   isSqdName, serializeDoc, defaultBackground,
   type EditorMode, type BackgroundConfig, type SqdObject, type InkStroke, type BrushType,
 } from './editor/sqd';
-import { defineMonoThemes, MONO_DARK_ID } from './editor/monacoTheme';
-import './editor/monaco-mono.css';
-
 import {
-  FileText, Settings, Save, Maximize, Minimize,
-  Command, Code, PenTool, Eraser, Hand, Layers,
-  Square, Circle, Minus, ArrowRight, Type, Trash2,
-  Copy, ArrowUp, ArrowDown, Bold, Italic, Strikethrough,
-  List, ListOrdered, CheckSquare, Link as LinkIcon, Loader2, MousePointer2,
-  Brush, Pencil, Highlighter, X, SlidersHorizontal, WrapText,
-  CaseSensitive, Eye, Palette
+  FileText, Save, Maximize, Minimize,
+  Code, PenTool, Eraser, Hand,
+  Square, Circle, Minus, ArrowRight, Type,
+  Bold, Italic, Strikethrough,
+  List, ListOrdered, CheckSquare, Link as LinkIcon,
+  Loader2, MousePointer2, X, Settings2,
+  Palette, Command, Eye, WrapText,
+  Undo2, Redo2, Download,
 } from 'lucide-react';
-
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
-import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
-import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
-import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-
-let monacoEnvSet = false;
-function ensureMonacoEnv() {
-  if (monacoEnvSet || typeof window === 'undefined') return;
-  (window as any).MonacoEnvironment = {
-    getWorker(_: unknown, label: string) {
-      if (label === 'json') return new JsonWorker();
-      if (label === 'css' || label === 'scss' || label === 'less') return new CssWorker();
-      if (label === 'html' || label === 'handlebars' || label === 'razor') return new HtmlWorker();
-      if (label === 'typescript' || label === 'javascript') return new TsWorker();
-      return new EditorWorker();
-    },
-  };
-  monacoEnvSet = true;
-}
 
 const EXT_LANG: Record<string, string> = {
   js: 'javascript', ts: 'typescript', jsx: 'javascript', tsx: 'typescript',
@@ -58,6 +36,7 @@ function detectLang(name?: string): string {
 
 const MD_EXTS = new Set(['md', 'markdown', 'mdx']);
 const isMarkdown = (name?: string) => !!name && MD_EXTS.has(name.toLowerCase().split('.').pop()!);
+const isSqdExt = (name?: string) => !!name && name.toLowerCase().endsWith('.sqd');
 
 interface EnhancedTextEditorProps {
   file: { name?: string; id?: string; size?: number };
@@ -66,152 +45,137 @@ interface EnhancedTextEditorProps {
   readonly?: boolean;
   fullscreen?: boolean;
   onFullscreenChange?: (fs: boolean) => void;
+  onDownload?: () => void;
+  onShare?: () => void;
 }
+
+type CanvasTool = 'select' | BrushType | 'eraser'
+  | 'rect' | 'ellipse' | 'line' | 'arrow' | 'textbox';
+
+const BRUSH_CONFIG: Record<BrushType, { icon: React.FC<any>; label: string; category: string }> = {
+  pen:         { icon: PenTool,     label: 'Pen',         category: 'Drawing' },
+  pencil:      { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="m17 3-4 14-3-5-5-3 14-4z"/><path d="m7.5 13.5 5 5"/></svg>, label: 'Pencil',      category: 'Drawing' },
+  brush:       { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-4 h-4"><path d="M18.37 2.63a2.12 2.12 0 0 1 3 3L14 13l-4 1 1-4Z"/><path d="M9 15c-3 1-5 3-5 6 3 0 5-2 6-5l-1-1Z"/></svg>, label: 'Brush',       category: 'Drawing' },
+  marker:      { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M12 2v8"/><rect x="8" y="10" width="8" height="12" rx="1"/><path d="M8 10h8"/></svg>, label: 'Marker',      category: 'Drawing' },
+  'felt-tip':  { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="m18 2 4 4-8 8-4-4Z"/><path d="m10 10-2 6 6-2 8-8-4-4Z"/></svg>, label: 'Felt-tip',    category: 'Drawing' },
+  calligraphy:{ icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="m15 4 6 6-9 9-6-6Z"/><path d="M4 20c2-4 6-4 8-2"/><path d="M15.5 6.5 18 4"/></svg>, label: 'Calligraphy', category: 'Drawing' },
+  spray:       { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4"><circle cx="7" cy="5" r="1"/><circle cx="12" cy="3" r="1"/><circle cx="17" cy="5" r="1"/><circle cx="5" cy="9" r="1"/><circle cx="10" cy="8" r="1"/><circle cx="15" cy="8" r="1"/><circle cx="19" cy="9" r="1"/><rect x="8" y="11" width="8" height="11" rx="2"/></svg>, label: 'Spray',       category: 'Effects' },
+  neon:        { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2v1"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h1"/><path d="m19.07 10.93-1.41 1.41"/><path d="M21 18h1"/><path d="m15 6-4 8"/><path d="m9 6 4 8"/></svg>, label: 'Neon',        category: 'Effects' },
+  charcoal:    { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M4 20h16"/><path d="M8 16V8a4 4 0 0 1 8 0v8"/><path d="M12 4v4"/></svg>, label: 'Charcoal',    category: 'Texture' },
+  highlighter: { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>, label: 'Highlighter', category: 'Texture' },
+  gel:         { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>, label: 'Gel',         category: 'Ink' },
+  fountain:    { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="m18 2 4 4-8 8-4-4Z"/><path d="M4 20c2-4 6-4 8-2"/><path d="M15.5 6.5 18 4"/></svg>, label: 'Fountain',    category: 'Ink' },
+  technical:   { icon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M2 12h6"/><path d="M22 12h-6"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>, label: 'Technical',   category: 'Ink' },
+};
 
 export default function EnhancedTextEditor({
   file, decodedBlob, onSave, readonly = false, fullscreen: fullscreenProp, onFullscreenChange,
+  onDownload, onShare,
 }: EnhancedTextEditorProps) {
   const isMobile = useIsMobile();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<any>(null);
-  const monacoRef = useRef<any>(null);
-  
+
   const contentRef = useRef<string>('');
+  const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  
+
   const [view, setView] = useState<'edit' | 'split' | 'preview'>('edit');
   const [fullscreen, setFullscreen] = useState(fullscreenProp || false);
   const [lang, setLang] = useState('plaintext');
-  
-  // ---- Editor preferences (persisted) ----
+  const [previewContent, setPreviewContent] = useState('');
+
   interface EditorPrefs {
     fontSize: number;
-    lineHeight: number; // multiplier of fontSize
+    lineHeight: number;
     wordWrap: boolean;
-    minimap: boolean;
-    lineNumbers: boolean;
     fontFamily: string;
+    tabSize: number;
   }
   const DEFAULT_PREFS: EditorPrefs = {
     fontSize: isMobile ? 14 : 13,
     lineHeight: 1.6,
     wordWrap: true,
-    minimap: !isMobile,
-    lineNumbers: true,
     fontFamily: "'Geist Mono', 'JetBrains Mono', Menlo, monospace",
+    tabSize: 2,
   };
   const loadPrefs = (): EditorPrefs => {
-    try {
-      const raw = localStorage.getItem('ete-prefs');
-      if (raw) return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
-    } catch { /* ignore */ }
+    try { const r = localStorage.getItem('ete-prefs'); if (r) return { ...DEFAULT_PREFS, ...JSON.parse(r) }; } catch {}
     return DEFAULT_PREFS;
   };
   const [prefs, setPrefs] = useState<EditorPrefs>(loadPrefs);
-  const { fontSize, lineHeight, wordWrap, minimap, lineNumbers, fontFamily } = prefs;
+  const { fontSize, lineHeight, wordWrap, fontFamily } = prefs;
   const updatePref = (p: Partial<EditorPrefs>) =>
-    setPrefs((prev) => {
+    setPrefs(prev => {
       const next = { ...prev, ...p };
-      try { localStorage.setItem('ete-prefs', JSON.stringify(next)); } catch { /* ignore */ }
+      try { localStorage.setItem('ete-prefs', JSON.stringify(next)); } catch {}
       return next;
     });
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [commandOpen, setCommandOpen] = useState(false);
-  
-  // Hybrid Workspace State
-  const [mode, setMode] = useState<EditorMode>('text'); // 'text', 'write' (hybrid), 'draw'
-  const [tool, setTool] = useState<'off' | 'pen' | 'brush' | 'pencil' | 'marker' | 'eraser' | 'select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'textbox'>('off');
+  const [mode, setMode] = useState<EditorMode>('text');
+  const [tool, setTool] = useState<CanvasTool>('pen');
   const [brushType, setBrushType] = useState<BrushType>('pen');
   const [inkColor, setInkColor] = useState('#e0e0e0');
   const [penSize, setPenSize] = useState(3);
-  const [penOnly, setPenOnly] = useState(true); // Palm Rejection
-  
+  const [penOnly, setPenOnly] = useState(true);
+
   const [strokes, setStrokes] = useState<InkStroke[]>([]);
   const [objects, setObjects] = useState<SqdObject[]>([]);
   const [background] = useState<BackgroundConfig>(defaultBackground());
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
 
-  const [previewContent, setPreviewContent] = useState('');
+  const [brushDropdownOpen, setBrushDropdownOpen] = useState(false);
+  const brushDropdownRef = useRef<HTMLDivElement>(null);
+
   const fileName = file?.name || 'Untitled';
   const markdown = isMarkdown(fileName);
+  const isSqd = isSqdExt(fileName);
 
-  // Derived Canvas Activity
   const overlayShown = mode !== 'text';
-  const inkActive = overlayShown && (tool === 'pen' || tool === 'brush' || tool === 'pencil' || tool === 'marker' || tool === 'eraser');
-  const objActive = overlayShown && !inkActive && tool !== 'off';
+  const isInkTool = overlayShown && (
+    tool === 'pen' || tool === 'pencil' || tool === 'brush' || tool === 'marker' ||
+    tool === 'felt-tip' || tool === 'calligraphy' || tool === 'spray' || tool === 'neon' ||
+    tool === 'charcoal' || tool === 'highlighter' || tool === 'gel' || tool === 'fountain' ||
+    tool === 'technical' || tool === 'eraser'
+  );
+  const objActive = overlayShown && !isInkTool && tool !== 'select';
 
   const saveTimer = useRef<number | null>(null);
   const previewTimer = useRef<number | null>(null);
 
-  // Initialize Monaco
+  const ALL_BRUSH_TYPES: BrushType[] = [
+    'pen', 'pencil', 'brush', 'marker', 'felt-tip', 'calligraphy',
+    'spray', 'neon', 'charcoal', 'highlighter', 'gel', 'fountain', 'technical',
+  ];
+
   useEffect(() => {
-    let disposed = false;
-    const init = async () => {
-      if (!containerRef.current) return;
-      try {
-        ensureMonacoEnv();
-        const monaco = (await import('monaco-editor')).default ?? (await import('monaco-editor'));
-        if (disposed) return;
-        monacoRef.current = monaco;
+    const detected = detectLang(fileName);
+    setLang(detected);
+    if (markdown && !isMobile) setView('split');
+  }, [isMobile, fileName, markdown]);
 
-        defineMonoThemes(monaco);
-        const detected = detectLang(fileName);
-        setLang(detected);
-
-        // Load actual file content from the decoded blob
-        let initialVal = '';
-        if (decodedBlob) {
-          try { initialVal = await decodedBlob.text(); } catch { /* ignore */ }
-        }
-        contentRef.current = initialVal;
-
-        const ed = monaco.editor.create(containerRef.current, {
-          value: initialVal, language: detected, theme: MONO_DARK_ID,
-          fontSize, fontFamily: fontFamily,
-          fontLigatures: true, lineHeight: Math.round(fontSize * lineHeight), minimap: { enabled: minimap },
-          automaticLayout: true, wordWrap: wordWrap ? 'on' : 'off',
-          lineNumbers: lineNumbers ? 'on' : 'off',
-          padding: { top: 24, bottom: 24 }, scrollbar: { useShadows: false },
-          readOnly: readonly,
-        });
-        
-        editorRef.current = ed;
-        
-        ed.onDidChangeModelContent(() => {
-          const v = ed.getValue();
-          contentRef.current = v;
-          if (!readonly) { setIsDirty(true); scheduleAutosave(); }
-          if (previewTimer.current) window.clearTimeout(previewTimer.current);
-          previewTimer.current = window.setTimeout(() => setPreviewContent(v), 250);
-        });
-
-        if (markdown && !isMobile) setView('split');
-        if (!disposed) setLoading(false);
-      } catch (err) {
-        console.error('Monaco init failed:', err);
-        if (!disposed) setLoading(false);
-      }
-    };
-    init();
-    return () => { disposed = true; editorRef.current?.dispose(); };
-  }, [isMobile, fileName, readonly]);
-
-  // Apply editor preferences live (no editor re-create)
   useEffect(() => {
-    const ed = editorRef.current;
-    if (!ed) return;
-    ed.updateOptions({
-      fontSize,
-      lineHeight: Math.round(fontSize * lineHeight),
-      wordWrap: wordWrap ? 'on' : 'off',
-      minimap: { enabled: minimap },
-      lineNumbers: lineNumbers ? 'on' : 'off',
-      fontFamily,
-    });
-  }, [fontSize, lineHeight, wordWrap, minimap, lineNumbers, fontFamily]);
+    let cancelled = false;
+    if (decodedBlob) {
+      decodedBlob.text().then(t => {
+        if (cancelled) return;
+        contentRef.current = t;
+        setPreviewContent(t);
+        setReady(true);
+        setLoading(false);
+      }).catch(() => {
+        if (cancelled) return;
+        setReady(true);
+        setLoading(false);
+      });
+    } else {
+      contentRef.current = '';
+      setReady(true);
+      setLoading(false);
+    }
+    return () => { cancelled = true; };
+  }, [decodedBlob, fileName]);
 
   const scheduleAutosave = useCallback(() => {
     if (!onSave || readonly) return;
@@ -223,20 +187,18 @@ export default function EnhancedTextEditor({
     if (!onSave || readonly || saving) return;
     setSaving(true);
     try {
-      const isSqd = isSqdName(fileName) || strokes.length > 0 || objects.length > 0 || mode !== 'text';
+      const shouldSqd = isSqd || strokes.length > 0 || objects.length > 0 || mode !== 'text';
       let blob: Blob;
       let name = fileName;
-      
-      if (isSqd) {
+      if (shouldSqd) {
         blob = serializeDoc({
           kind: 'sqd', version: 1, text: contentRef.current, language: lang,
-          background, strokes, objects, meta: { mode }
+          background, strokes, objects, meta: { mode },
         });
-        if (!isSqdName(fileName)) name = (fileName.replace(/\.[^.]+$/, '') || fileName) + '.sqd';
+        if (!isSqd) name = (fileName.replace(/\.[^.]+$/, '') || fileName) + '.sqd';
       } else {
         blob = new Blob([contentRef.current], { type: 'text/plain' });
       }
-      
       await onSave(blob, name);
       setIsDirty(false);
     } catch (e) {
@@ -244,332 +206,460 @@ export default function EnhancedTextEditor({
     } finally {
       setSaving(false);
     }
-  }, [onSave, readonly, saving, fileName, strokes, objects, mode, lang, background]);
+  }, [onSave, readonly, saving, fileName, strokes, objects, mode, lang, background, isSqd]);
 
-  const markDirtyNotes = useCallback(() => { if (!readonly) { setIsDirty(true); scheduleAutosave(); } }, [readonly, scheduleAutosave]);
+  const markDirty = useCallback(() => {
+    if (!readonly) { setIsDirty(true); scheduleAutosave(); }
+  }, [readonly, scheduleAutosave]);
+
+  const handleCodeChange = useCallback((val: string) => {
+    contentRef.current = val;
+    if (!readonly) setIsDirty(true);
+    if (previewTimer.current) window.clearTimeout(previewTimer.current);
+    previewTimer.current = window.setTimeout(() => setPreviewContent(val), 250);
+  }, [readonly]);
+
+  const handleBrushSelect = useCallback((b: BrushType) => {
+    setBrushType(b);
+    setTool(b);
+    setMode('draw');
+    setBrushDropdownOpen(false);
+  }, []);
+
+  const handleToolSelect = useCallback((t: CanvasTool) => {
+    if (ALL_BRUSH_TYPES.includes(t as BrushType)) {
+      setBrushType(t as BrushType);
+      setTool(t);
+      setMode('draw');
+    } else if (t === 'eraser' || t === 'select') {
+      setTool(t);
+      if (t === 'select') setMode('write');
+    } else {
+      setTool(t);
+      setMode('write');
+    }
+  }, []);
+
+  const colorPresets = [
+    '#e0e0e0', '#ef4444', '#3b82f6', '#10b981',
+    '#f59e0b', '#a855f7', '#ec4899', '#06b6d4',
+  ];
+
+  const currentBrushConfig = BRUSH_CONFIG[brushType];
+  const CurrentBrushIcon = currentBrushConfig?.icon || PenTool;
+
+  const brushCategories = useMemo(() => {
+    const cats: Record<string, BrushType[]> = {};
+    for (const b of ALL_BRUSH_TYPES) {
+      const cat = BRUSH_CONFIG[b].category;
+      if (!cats[cat]) cats[cat] = [];
+      cats[cat].push(b);
+    }
+    return cats;
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (brushDropdownRef.current && !brushDropdownRef.current.contains(e.target as Node)) {
+        setBrushDropdownOpen(false);
+      }
+    };
+    if (brushDropdownOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [brushDropdownOpen]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col w-full h-full bg-[#09090b] text-white items-center justify-center gap-4">
+        <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
+        <span className="text-xs text-zinc-500 tracking-wide">Loading...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className={cn("flex flex-col w-full h-full bg-[#0A0A0A] text-white font-sans overflow-hidden relative", fullscreen && "fixed inset-0 z-[9999]")}>
-      
-      {/* LOADING OVERLAY */}
-      {loading && (
-        <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-[#0A0A0A] gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-zinc-500" />
-          <span className="text-sm font-medium text-zinc-400">Loading IDE…</span>
-        </div>
-      )}
+    <div className={cn(
+      "flex flex-col w-full h-full bg-[#09090b] text-white font-sans overflow-hidden select-none",
+      fullscreen && "fixed inset-0 z-[9999]"
+    )}>
 
-      {/* HEADER: File Info & Core Settings */}
-      <header className="flex items-center justify-between px-5 h-16 bg-[#121212] border-b border-zinc-800/80 shrink-0 z-30 select-none">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 shadow-sm">
-            <FileText className="w-5 h-5" />
+      <header className="flex items-center justify-between px-4 h-12 bg-[#0f0f11] border-b border-white/[0.06] shrink-0 z-30">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
+            <FileText className="w-3.5 h-3.5 text-zinc-400" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-bold tracking-tight">{fileName}</span>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">{lang}</span>
-              {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="Unsaved changes" />}
-            </div>
+          <div className="min-w-0 flex items-center gap-2">
+            <span className="text-[13px] font-semibold truncate">{fileName}</span>
+            <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-mono shrink-0">{lang}</span>
+            {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-500/80 shrink-0" />}
           </div>
         </div>
 
-        {/* WORKSPACE MODE SWITCHER */}
-        <div className="hidden md:flex items-center p-1 bg-zinc-900 border border-zinc-800 rounded-xl shadow-inner">
-          {[
-            { id: 'text', label: 'Code', icon: Code },
-            { id: 'write', label: 'Hybrid', icon: Layers },
-            { id: 'draw', label: 'Canvas', icon: PenTool }
-          ].map(m => {
-            const isActive = m.id === mode || (m.id === 'write' && mode !== 'text' && mode !== 'draw');
-            return (
+        <div className="flex items-center gap-1">
+          <div className="flex items-center p-0.5 bg-white/[0.03] border border-white/[0.06] rounded-lg mr-2">
+            {([
+              { id: 'text' as const, label: 'Code', icon: Code },
+              { id: 'write' as const, label: 'Hybrid', icon: Layers },
+              { id: 'draw' as const, label: 'Canvas', icon: PenTool },
+            ]).map(m => (
               <button
                 key={m.id}
                 onClick={() => {
-                  setMode(m.id as EditorMode);
-                  if (m.id === 'text') setTool('off');
+                  setMode(m.id);
+                  if (m.id === 'text') setTool('select');
                   if (m.id === 'write') setTool('select');
-                  if (m.id === 'draw') setTool('pen');
+                  if (m.id === 'draw') { setTool(brushType); }
                 }}
-                className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all", isActive ? "bg-white text-black shadow-md" : "text-zinc-500 hover:text-white")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-150",
+                  (m.id === mode || (m.id === 'write' && mode !== 'text' && mode !== 'draw'))
+                    ? "bg-white text-black shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+                )}
               >
-                <m.icon className="w-4 h-4" /> {m.label}
+                <m.icon className="w-3.5 h-3.5" />
+                {m.label}
               </button>
-            )
-          })}
-        </div>
+            ))}
+          </div>
 
-        {/* ACTIONS & VIEW SWITCHER */}
-        <div className="flex items-center gap-2">
           {markdown && (
-            <div className="flex items-center mr-2 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
-              <button onClick={() => setView('edit')} className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", view === 'edit' ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-white")}>Edit</button>
-              <button onClick={() => setView('split')} className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", view === 'split' ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-white")}>Split</button>
-              <button onClick={() => setView('preview')} className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", view === 'preview' ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-white")}>View</button>
+            <div className="flex items-center mr-1 p-0.5 bg-white/[0.03] border border-white/[0.06] rounded-lg">
+              {(['edit', 'split', 'preview'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all",
+                    view === v ? "bg-white/10 text-white" : "text-zinc-600 hover:text-zinc-400"
+                  )}
+                >
+                  {v === 'edit' ? 'Edit' : v === 'split' ? 'Split' : 'View'}
+                </button>
+              ))}
             </div>
           )}
-          
-          <button onClick={() => { setCommandOpen(o => !o); setSettingsOpen(false); }} className={cn("w-9 h-9 rounded-xl flex items-center justify-center transition-colors", commandOpen ? "bg-white text-black" : "text-zinc-400 hover:bg-zinc-900 hover:text-white")} title="Commands"><Command className="w-4 h-4" /></button>
-          <button onClick={() => { setSettingsOpen(o => !o); setCommandOpen(false); }} className={cn("w-9 h-9 rounded-xl flex items-center justify-center transition-colors", settingsOpen ? "bg-white text-black" : "text-zinc-400 hover:bg-zinc-900 hover:text-white")} title="Editor settings"><Settings className="w-4 h-4" /></button>
-          
+
+          <button onClick={() => setSettingsOpen(o => !o)} className={cn("w-8 h-8 rounded-lg flex items-center justify-center transition-colors", settingsOpen ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]")}>
+            <Settings2 className="w-4 h-4" />
+          </button>
+
           {!readonly && onSave && (
-            <button onClick={doSave} disabled={!isDirty || saving} className={cn("ml-2 flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm", isDirty ? "bg-white text-black hover:bg-zinc-200 hover:scale-105 active:scale-95" : "bg-zinc-900 text-zinc-600 border border-zinc-800")}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <button onClick={doSave} disabled={!isDirty || saving} className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all",
+              isDirty ? "bg-white text-black hover:bg-zinc-200" : "text-zinc-600 bg-white/[0.03] border border-white/[0.06]"
+            )}>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               Save
             </button>
           )}
-          <button onClick={() => { setFullscreen(!fullscreen); onFullscreenChange?.(!fullscreen); }} className="ml-1 w-9 h-9 rounded-xl flex items-center justify-center text-zinc-400 hover:bg-zinc-900 hover:text-white transition-colors">
+
+          <button onClick={() => { setFullscreen(!fullscreen); onFullscreenChange?.(!fullscreen); }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] transition-colors">
             {fullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
         </div>
       </header>
 
-      {/* MARKDOWN CONTEXTUAL TOOLBAR */}
       {markdown && view !== 'preview' && mode === 'text' && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1.5 bg-[#121212]/95 backdrop-blur-2xl border border-zinc-800 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-          <FormatBtn icon={Bold} />
-          <FormatBtn icon={Italic} />
-          <FormatBtn icon={Strikethrough} />
-          <div className="w-px h-6 bg-zinc-800 mx-1" />
-          <FormatBtn icon={List} />
-          <FormatBtn icon={ListOrdered} />
-          <FormatBtn icon={CheckSquare} />
-          <div className="w-px h-6 bg-zinc-800 mx-1" />
-          <FormatBtn icon={Code} />
-          <FormatBtn icon={LinkIcon} />
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-0.5 p-1 bg-[#18181b]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl">
+          {[
+            { icon: Bold, action: () => {} },
+            { icon: Italic, action: () => {} },
+            { icon: Strikethrough, action: () => {} },
+            null,
+            { icon: List, action: () => {} },
+            { icon: ListOrdered, action: () => {} },
+            { icon: CheckSquare, action: () => {} },
+            null,
+            { icon: Code, action: () => {} },
+            { icon: LinkIcon, action: () => {} },
+          ].map((item, i) => item === null ? (
+            <div key={i} className="w-px h-5 bg-white/[0.08] mx-0.5" />
+          ) : (
+            <button key={i} onClick={item.action} className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.08] transition-colors">
+              <item.icon className="w-3.5 h-3.5" />
+            </button>
+          ))}
         </div>
       )}
 
-      {/* MAIN WORKSPACE GRID */}
       <div className="flex flex-1 relative overflow-hidden">
-        
-        {/* Monaco / Canvas Layer */}
         {view !== 'preview' && (
-          <div className={cn("relative flex flex-1 h-full overflow-hidden bg-[#0A0A0A]", view === 'split' && "border-r border-zinc-800/80")}>
-            
-            {/* Editor stays at z-0, handles text input when canvas is transparent/off */}
-            <div ref={containerRef} className="absolute inset-0 z-0" style={{ pointerEvents: inkActive || objActive ? 'none' : 'auto' }} />
-            
-            {/* InkCanvas & ObjectLayer overlay */}
+          <div className={cn("relative flex flex-1 h-full overflow-hidden", view === 'split' && "border-r border-white/[0.06]")}>
+            <div className="absolute inset-0 z-0" style={{ pointerEvents: isInkTool || objActive ? 'none' : 'auto' }}>
+              {ready ? (
+                <CodeEditor
+                  key={`${file?.id}-${lang}`}
+                  value={contentRef.current}
+                  language={lang}
+                  onChange={handleCodeChange}
+                  options={{
+                    fontSize,
+                    fontFamily,
+                    lineHeight,
+                    wordWrap,
+                    readOnly: readonly,
+                    placeholder: 'Start typing...',
+                  }}
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-zinc-600 text-xs">Loading editor...</div>
+              )}
+            </div>
+
             {overlayShown && (
               <div className="absolute inset-0 z-10" style={{ pointerEvents: 'none', ...backgroundCss(background) }}>
-                {/* 🚨 Uses the NEW ultra-smooth perfect-freehand InkCanvas 🚨 */}
                 <InkCanvas
-                  active={inkActive} tool={tool as any} brush={brushType} color={inkColor} size={penSize}
-                  penOnly={penOnly} strokes={strokes} onStrokesChange={(u) => { setStrokes(u); markDirtyNotes(); }} readOnly={readonly}
+                  active={isInkTool}
+                  tool={tool as any}
+                  brush={brushType}
+                  color={inkColor}
+                  size={penSize}
+                  penOnly={penOnly}
+                  strokes={strokes}
+                  onStrokesChange={(u) => { setStrokes(u); markDirty(); }}
+                  readOnly={readonly}
                 />
-                
-                {/* Object/Shape Layer */}
                 <ObjectLayer
-                  active={objActive} tool={tool} color={inkColor} objects={objects}
-                  onObjectsChange={(u) => { setObjects(u); markDirtyNotes(); }} selectedId={selectedObjectId}
-                  onSelect={setSelectedObjectId} readOnly={readonly} snap={true}
+                  active={objActive}
+                  tool={tool}
+                  color={inkColor}
+                  objects={objects}
+                  onObjectsChange={(u) => { setObjects(u); markDirty(); }}
+                  selectedId={selectedObjectId}
+                  onSelect={setSelectedObjectId}
+                  readOnly={readonly}
+                  snap={true}
                 />
               </div>
             )}
           </div>
         )}
 
-        {/* Live Preview Pane */}
         {(view === 'preview' || view === 'split') && (
-          <div className="flex-1 h-full overflow-y-auto p-10 bg-[#0A0A0A] custom-scrollbar">
+          <div className="flex-1 h-full overflow-y-auto p-10 bg-[#09090b] custom-scrollbar">
             <EnhancedMarkdownPreview content={previewContent} />
           </div>
         )}
       </div>
 
-      {/* ═══ EXCALIDRAW-STYLE FLOATING CANVAS TOOLBAR ═══ */}
       {overlayShown && !readonly && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 flex items-center p-2.5 bg-[#121214]/95 backdrop-blur-2xl border border-zinc-800/80 rounded-[2rem] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)] gap-1">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 p-1.5 bg-[#18181b]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-[0_16px_48px_-8px_rgba(0,0,0,0.5)]">
 
-          <ToolBtn icon={MousePointer2} active={tool === 'select'} onClick={() => setTool('select')} title="Select / Move" />
-          <div className="w-px h-8 bg-zinc-800 mx-2" />
+          <ToolBtn icon={MousePointer2} active={tool === 'select'} onClick={() => handleToolSelect('select')} title="Select" />
 
-          {/* Pens: Pen / Brush / Pencil / Marker — each maps to its brush physics */}
-          {[
-            { id: 'pen', label: 'Pen', icon: PenTool, brush: 'pen' as BrushType },
-            { id: 'brush', label: 'Brush', icon: Brush, brush: 'brush' as BrushType },
-            { id: 'pencil', label: 'Pencil', icon: Pencil, brush: 'pencil' as BrushType },
-            { id: 'marker', label: 'Marker', icon: Highlighter, brush: 'marker' as BrushType },
-          ].map(t => (
-            <ToolBtn
-              key={t.id}
-              icon={t.icon}
-              active={tool === t.id}
-              onClick={() => { setMode('draw'); setTool(t.id); setBrushType(t.brush); }}
-              title={t.label}
-            />
-          ))}
+          <div className="w-px h-6 bg-white/[0.08] mx-1" />
 
-          <ToolBtn icon={Eraser} active={tool === 'eraser'} onClick={() => setTool('eraser')} title="Eraser" />
+          <div ref={brushDropdownRef} className="relative">
+            <button
+              onClick={() => setBrushDropdownOpen(o => !o)}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 h-9 rounded-xl text-xs font-medium transition-all",
+                isInkTool && tool !== 'eraser'
+                  ? "bg-white text-black shadow-sm" : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
+              )}
+              title={currentBrushConfig?.label || 'Brush'}
+            >
+              <CurrentBrushIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">{currentBrushConfig?.label}</span>
+              <svg className={cn("w-3 h-3 transition-transform", brushDropdownOpen && "rotate-180")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
 
-          {/* Palm Rejection Toggle */}
-          <button onClick={() => setPenOnly(!penOnly)} className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-all ml-1", penOnly ? "text-emerald-400 bg-emerald-400/10 border border-emerald-400/20" : "text-zinc-500 hover:text-white hover:bg-zinc-800")} title="Palm Rejection">
+            {brushDropdownOpen && (
+              <div className="absolute bottom-full mb-2 left-0 w-56 p-1.5 bg-[#18181b] border border-white/[0.08] rounded-xl shadow-2xl max-h-[360px] overflow-y-auto custom-scrollbar">
+                {Object.entries(brushCategories).map(([cat, brushes]) => (
+                  <div key={cat} className="mb-1.5 last:mb-0">
+                    <div className="px-2 py-1 text-[10px] text-zinc-600 uppercase tracking-widest font-semibold">{cat}</div>
+                    {brushes.map(b => {
+                      const cfg = BRUSH_CONFIG[b];
+                      const Icon = cfg.icon;
+                      return (
+                        <button
+                          key={b}
+                          onClick={() => handleBrushSelect(b)}
+                          className={cn(
+                            "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all",
+                            brushType === b
+                              ? "bg-white text-black" : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
+                          )}
+                        >
+                          <Icon className="w-4 h-4" />
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <ToolBtn icon={Eraser} active={tool === 'eraser'} onClick={() => handleToolSelect('eraser')} title="Eraser" />
+
+          <button
+            onClick={() => setPenOnly(p => !p)}
+            className={cn(
+              "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+              penOnly ? "text-emerald-400 bg-emerald-400/10 border border-emerald-400/20" : "text-zinc-500 hover:text-white hover:bg-white/[0.06]"
+            )}
+            title="Palm Rejection"
+          >
             <Hand className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-8 bg-zinc-800 mx-2" />
+          <div className="w-px h-6 bg-white/[0.08] mx-1" />
 
-          {/* Shapes */}
-          <ToolBtn icon={Square} active={tool === 'rect'} onClick={() => setTool('rect')} title="Rectangle" />
-          <ToolBtn icon={Circle} active={tool === 'ellipse'} onClick={() => setTool('ellipse')} title="Ellipse" />
-          <ToolBtn icon={Minus} active={tool === 'line'} onClick={() => setTool('line')} title="Line" />
-          <ToolBtn icon={ArrowRight} active={tool === 'arrow'} onClick={() => setTool('arrow')} title="Arrow" />
-          <ToolBtn icon={Type} active={tool === 'textbox'} onClick={() => setTool('textbox')} title="Text" />
+          {([
+            { id: 'rect' as const, icon: Square, label: 'Rectangle' },
+            { id: 'ellipse' as const, icon: Circle, label: 'Ellipse' },
+            { id: 'line' as const, icon: Minus, label: 'Line' },
+            { id: 'arrow' as const, icon: ArrowRight, label: 'Arrow' },
+            { id: 'textbox' as const, icon: Type, label: 'Text' },
+          ]).map(s => (
+            <ToolBtn key={s.id} icon={s.icon} active={tool === s.id} onClick={() => handleToolSelect(s.id)} title={s.label} />
+          ))}
 
-          <div className="w-px h-8 bg-zinc-800 mx-2" />
+          <div className="w-px h-6 bg-white/[0.08] mx-1" />
 
-          {/* Color: picker + quick presets */}
-          <div className="flex items-center gap-2 px-2">
-            <label
-              className="relative w-8 h-8 rounded-full border-2 border-white/30 overflow-hidden cursor-pointer flex items-center justify-center shadow-[0_0_12px_rgba(0,0,0,0.4)]"
-              style={{ backgroundColor: inkColor }}
-              title="Pick color"
-            >
-              <Palette className="w-3.5 h-3.5 text-white/80 mix-blend-overlay" />
-              <input
-                type="color"
-                value={inkColor}
-                onChange={(e) => setInkColor(e.target.value)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
+          <div className="flex items-center gap-1.5 px-1.5">
+            <label className="relative w-7 h-7 rounded-full border-2 border-white/20 overflow-hidden cursor-pointer flex items-center justify-center shrink-0" style={{ backgroundColor: inkColor }}>
+              <Palette className="w-3 h-3 text-white/60 mix-blend-overlay" />
+              <input type="color" value={inkColor} onChange={e => setInkColor(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
             </label>
-            {['#e0e0e0', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#a855f7'].map(c => (
+            {colorPresets.map(c => (
               <button
                 key={c}
                 onClick={() => setInkColor(c)}
-                className={cn("w-5 h-5 rounded-full border-2 transition-all", inkColor === c ? "border-white scale-110 shadow-[0_0_12px_rgba(255,255,255,0.4)]" : "border-transparent hover:scale-110")}
+                className={cn(
+                  "w-5 h-5 rounded-full border-2 transition-all shrink-0",
+                  inkColor === c ? "border-white scale-110" : "border-transparent hover:scale-110"
+                )}
                 style={{ backgroundColor: c }}
               />
             ))}
           </div>
-        </div>
-      )}
 
-      {/* FLOATING ACTION MENU FOR SELECTED OBJECTS */}
-      {selectedObjectId && overlayShown && (
-        <div className="absolute top-24 right-8 z-30 flex flex-col gap-2 p-2.5 bg-[#121214]/95 backdrop-blur-2xl border border-zinc-800 rounded-[1.5rem] shadow-2xl">
-          <ToolBtn icon={Copy} active={false} onClick={() => {
-            const obj = objects.find(o => o.id === selectedObjectId);
-            if (!obj) return;
-            const copy = { ...obj, id: uid('o') } as SqdObject;
-            setObjects(prev => [...prev, copy]);
-            setSelectedObjectId(copy.id);
-            markDirtyNotes();
-          }} title="Duplicate" />
-          <ToolBtn icon={ArrowUp} active={false} onClick={() => {
-            setObjects(prev => {
-              const i = prev.findIndex(o => o.id === selectedObjectId);
-              if (i < 0 || i === prev.length - 1) return prev;
-              const next = [...prev];
-              [next[i], next[i + 1]] = [next[i + 1], next[i]];
-              return next;
-            });
-          }} title="Bring Forward" />
-          <ToolBtn icon={ArrowDown} active={false} onClick={() => {
-            setObjects(prev => {
-              const i = prev.findIndex(o => o.id === selectedObjectId);
-              if (i <= 0) return prev;
-              const next = [...prev];
-              [next[i], next[i - 1]] = [next[i - 1], next[i]];
-              return next;
-            });
-          }} title="Send Backward" />
-          <div className="h-px w-full bg-zinc-800 my-1" />
-          <button onClick={() => { setObjects(o => o.filter(x => x.id !== selectedObjectId)); setSelectedObjectId(null); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-red-400 hover:bg-red-400/10 transition-colors">
-            <Trash2 className="w-5 h-5" />
-          </button>
-        </div>
-      )}
+          <div className="w-px h-6 bg-white/[0.08] mx-1" />
 
-      {/* SETTINGS POPOVER (persisted preferences) */}
-      {settingsOpen && (
-        <div className="absolute top-20 right-4 z-50 w-72 p-4 bg-[#121214]/95 backdrop-blur-2xl border border-zinc-800 rounded-2xl shadow-2xl text-zinc-200">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold flex items-center gap-2"><SlidersHorizontal className="w-4 h-4" /> Editor Settings</span>
-            <button onClick={() => setSettingsOpen(false)} className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-800 hover:text-white"><X className="w-4 h-4" /></button>
-          </div>
-
-          <div className="mb-3">
-            <div className="flex items-center justify-between text-xs mb-1"><span>Font size</span><span className="text-zinc-400">{fontSize}px</span></div>
-            <input type="range" min={10} max={22} value={fontSize} onChange={e => updatePref({ fontSize: Number(e.target.value) })} className="w-full accent-white" />
-          </div>
-
-          <div className="mb-3">
-            <div className="flex items-center justify-between text-xs mb-1"><span>Line height</span><span className="text-zinc-400">{lineHeight.toFixed(2)}×</span></div>
-            <input type="range" min={1.2} max={2.4} step={0.05} value={lineHeight} onChange={e => updatePref({ lineHeight: Number(e.target.value) })} className="w-full accent-white" />
-          </div>
-
-          <div className="mb-3">
-            <div className="text-xs mb-1">Font</div>
-            <div className="grid grid-cols-3 gap-1">
-              {[
-                { id: 'geist', label: 'Geist', fam: "'Geist Mono', 'JetBrains Mono', Menlo, monospace" },
-                { id: 'jb', label: 'JetBrains', fam: "'JetBrains Mono', Menlo, monospace" },
-                { id: 'sys', label: 'System', fam: "ui-monospace, Menlo, monospace" },
-              ].map(f => (
-                <button key={f.id} onClick={() => updatePref({ fontFamily: f.fam })} className={cn("px-2 py-1.5 rounded-lg text-xs font-bold transition-all", fontFamily === f.fam ? "bg-white text-black" : "bg-zinc-900 text-zinc-400 hover:text-white")}>{f.label}</button>
+          <div className="flex items-center gap-1 px-1">
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 5, 8].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setPenSize(s)}
+                  className={cn(
+                    "flex items-center justify-center w-7 h-7 rounded-lg transition-all",
+                    penSize === s ? "bg-white/10 text-white" : "text-zinc-600 hover:text-zinc-400"
+                  )}
+                  title={`${s}px`}
+                >
+                  <div className="rounded-full bg-current" style={{ width: Math.min(s * 2 + 2, 14), height: Math.min(s * 2 + 2, 14) }} />
+                </button>
               ))}
             </div>
           </div>
-
-          <div className="flex flex-col gap-2">
-            {[
-              { label: 'Word wrap', on: wordWrap, set: (v: boolean) => updatePref({ wordWrap: v }) },
-              { label: 'Minimap', on: minimap, set: (v: boolean) => updatePref({ minimap: v }) },
-              { label: 'Line numbers', on: lineNumbers, set: (v: boolean) => updatePref({ lineNumbers: v }) },
-            ].map(t => (
-              <button key={t.label} onClick={() => t.set(!t.on)} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-zinc-800/60">
-                <span>{t.label}</span>
-                <span className={cn("w-8 h-4 rounded-full relative transition-colors", t.on ? "bg-white" : "bg-zinc-700")}>
-                  <span className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-black transition-all", t.on ? "right-0.5" : "left-0.5")} />
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <button onClick={() => { try { localStorage.removeItem('ete-prefs'); } catch {} setPrefs(DEFAULT_PREFS); }} className="mt-3 w-full py-2 rounded-lg text-xs font-bold bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Reset to defaults</button>
         </div>
       )}
 
-      {/* COMMAND MENU */}
-      {commandOpen && (
-        <div className="absolute top-20 right-4 z-50 w-64 p-2 bg-[#121214]/95 backdrop-blur-2xl border border-zinc-800 rounded-2xl shadow-2xl text-zinc-200">
-          <div className="flex items-center justify-between px-2 py-1.5 mb-1">
-            <span className="text-xs font-bold flex items-center gap-2"><Command className="w-3.5 h-3.5" /> Commands</span>
-            <button onClick={() => setCommandOpen(false)} className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-800 hover:text-white"><X className="w-3.5 h-3.5" /></button>
-          </div>
+      {selectedObjectId && overlayShown && (
+        <div className="absolute top-16 right-4 z-30 flex flex-col gap-1 p-1.5 bg-[#18181b]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl">
           {[
-            { label: 'Save', icon: Save, run: () => doSave() },
-            { label: 'Toggle preview', icon: Eye, run: () => setView(view === 'preview' ? 'edit' : 'preview') },
-            { label: 'Toggle word wrap', icon: WrapText, run: () => updatePref({ wordWrap: !wordWrap }) },
-            { label: 'Toggle minimap', icon: CaseSensitive, run: () => updatePref({ minimap: !minimap }) },
-            { label: 'Toggle line numbers', icon: CaseSensitive, run: () => updatePref({ lineNumbers: !lineNumbers }) },
-            { label: 'Zoom in', icon: ArrowUp, run: () => updatePref({ fontSize: Math.min(22, fontSize + 1) }) },
-            { label: 'Zoom out', icon: ArrowDown, run: () => updatePref({ fontSize: Math.max(10, fontSize - 1) }) },
-          ].map(c => (
-            <button key={c.label} onClick={() => { c.run(); }} className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs hover:bg-zinc-800/60 transition-colors">
-              <c.icon className="w-4 h-4 text-zinc-400" /> {c.label}
+            { title: 'Duplicate', action: () => {
+              const obj = objects.find(o => o.id === selectedObjectId);
+              if (!obj) return;
+              const copy = { ...obj, id: 'o' + Math.random().toString(36).slice(2, 9) } as SqdObject;
+              setObjects(p => [...p, copy]); setSelectedObjectId(copy.id); markDirty();
+            }, icon: () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> },
+            { title: 'Bring Forward', action: () => setObjects(p => { const i = p.findIndex(o => o.id === selectedObjectId); if (i < 0 || i === p.length - 1) return p; const n = [...p]; [n[i], n[i+1]] = [n[i+1], n[i]]; return n; }), icon: () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m18 9-6 6-6-6"/></svg> },
+            { title: 'Send Backward', action: () => setObjects(p => { const i = p.findIndex(o => o.id === selectedObjectId); if (i <= 0) return p; const n = [...p]; [n[i], n[i-1]] = [n[i-1], n[i]]; return n; }), icon: () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 15 6-6 6 6"/></svg> },
+            null,
+            { title: 'Delete', action: () => { setObjects(o => o.filter(x => x.id !== selectedObjectId)); setSelectedObjectId(null); }, icon: () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>, danger: true },
+          ].map((item, i) => item === null ? (
+            <div key={i} className="h-px bg-white/[0.08] my-0.5" />
+          ) : (
+            <button key={i} onClick={item.action} className={cn(
+              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+              item.danger ? "text-red-400 hover:bg-red-400/10" : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
+            )} title={item.title}>
+              <item.icon />
             </button>
           ))}
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="absolute top-14 right-4 z-50 w-64 p-3 bg-[#18181b]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" /> Editor</span>
+            <button onClick={() => setSettingsOpen(false)} className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/[0.06]">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                <span className="text-zinc-400">Size</span>
+                <span className="text-zinc-600 font-mono">{fontSize}px</span>
+              </div>
+              <input type="range" min={10} max={22} value={fontSize} onChange={e => updatePref({ fontSize: +e.target.value })} className="w-full accent-white h-1" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                <span className="text-zinc-400">Line height</span>
+                <span className="text-zinc-600 font-mono">{lineHeight.toFixed(2)}</span>
+              </div>
+              <input type="range" min={1.2} max={2.4} step={0.05} value={lineHeight} onChange={e => updatePref({ lineHeight: +e.target.value })} className="w-full accent-white h-1" />
+            </div>
+
+            <div>
+              <span className="text-[11px] text-zinc-400 mb-1.5 block">Font</span>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { id: 'geist', label: 'Geist', fam: "'Geist Mono','JetBrains Mono',Menlo,monospace" },
+                  { id: 'jb', label: 'JetBrains', fam: "'JetBrains Mono',Menlo,monospace" },
+                  { id: 'sys', label: 'System', fam: "ui-monospace,Menlo,monospace" },
+                ].map(f => (
+                  <button key={f.id} onClick={() => updatePref({ fontFamily: f.fam })}
+                    className={cn("px-2 py-1.5 rounded-md text-[11px] font-semibold transition-all",
+                      fontFamily === f.fam ? "bg-white text-black" : "bg-white/[0.04] text-zinc-500 hover:text-white"
+                    )}>{f.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={() => { try { localStorage.removeItem('ete-prefs'); } catch {} setPrefs(DEFAULT_PREFS); }}
+              className="w-full py-1.5 rounded-lg text-[11px] font-semibold bg-white/[0.04] text-zinc-500 hover:text-white hover:bg-white/[0.08] transition-colors">
+              Reset defaults
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function FormatBtn({ icon: Icon }: { icon: any }) {
+function Layers(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <button className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
-      <Icon className="w-4 h-4" />
-    </button>
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+      <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
+      <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
+    </svg>
   );
 }
 
-function ToolBtn({ icon: Icon, active, onClick, title }: any) {
+function ToolBtn({ icon: Icon, active, onClick, title }: { icon: any; active?: boolean; onClick?: () => void; title?: string }) {
   return (
-    <button onClick={onClick} title={title} className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-all", active ? "bg-white text-black shadow-md scale-105" : "text-zinc-400 hover:text-white hover:bg-zinc-800")}>
-      <Icon className="w-5 h-5" />
+    <button onClick={onClick} title={title} className={cn(
+      "w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150",
+      active ? "bg-white text-black shadow-sm" : "text-zinc-500 hover:text-white hover:bg-white/[0.06]"
+    )}>
+      <Icon className="w-4 h-4" />
     </button>
   );
 }

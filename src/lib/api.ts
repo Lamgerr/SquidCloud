@@ -243,6 +243,48 @@ async function uploadFileToTebi(
   return inserted as FileItem;
 }
 
+async function uploadFileToS3Storage(
+  file: File,
+  folderPath: string,
+  workspaceId: string | null,
+  providerId: string,
+  onProgress?: (progress: number, stage?: string, details?: any) => void
+): Promise<FileItem> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Authentication required');
+
+  onProgress?.(5, 'preparing', { provider: 's3' });
+
+  const { id } = await uploadFileWithRes54(file, (p, stage, details) => {
+    onProgress?.(p, stage, details);
+  }, providerId);
+
+  // Update parent folder and workspace
+  if (folderPath || workspaceId) {
+    const updatePayload: Record<string, unknown> = {};
+    if (folderPath) updatePayload.parent_folder = folderPath;
+    if (workspaceId) updatePayload.workspace_id = workspaceId;
+
+    const { error: updateError } = await supabase
+      .from('files')
+      .update(updatePayload as any)
+      .eq('id', id);
+
+    if (updateError) {
+      console.error("Error updating file metadata:", updateError);
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('files')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  return data as FileItem;
+}
+
 function parseTebiEncryptedMetadata(tags: unknown): TebiEncryptedFileMetadata | null {
   if (!Array.isArray(tags) || tags.length === 0 || typeof tags[0] !== 'string') {
     return null;
@@ -635,7 +677,12 @@ export const uploadFile = async (
 
     const activeProvider = activeProviderType as ActiveProviderType;
 
-    // External provider routes (Tebi) upload directly to provider object storage.
+    // External provider routes via s3-storage (unified S3 gateway)
+    if (activeProvider !== 'squidcloud' && activeProviderId) {
+      return await uploadFileToS3Storage(file, folderPath, activeWorkspaceId, activeProviderId, onProgress);
+    }
+
+    // Tebi legacy support
     if (activeProvider === 'tebi') {
       if (!activeProviderId) {
         throw new Error('Selected provider is not configured. Please complete provider setup first.');
@@ -1324,12 +1371,10 @@ export async function initializeRepos(count: number, password?: string): Promise
     if (!user) throw new Error("Authentication required");
     
     // Use the supabase edge function to create repos
-    const response = await supabase.functions.invoke('github-storage', {
+    const response = await supabase.functions.invoke('create-repos', {
       body: { 
-        action: 'create-repos', 
-        count, 
-        userId: user.id,
-        password
+        action: 'create', 
+        count
       }
     });
 
@@ -1337,11 +1382,11 @@ export async function initializeRepos(count: number, password?: string): Promise
       throw new Error(response.error.message || 'Failed to create repositories');
     }
 
-    if (!response.data?.repos) {
+    if (!response.data?.repositories) {
       throw new Error('Invalid response from server');
     }
 
-    return response.data.repos.map((repo: any) => repo.name) || [];
+    return response.data.repositories.map((repo: any) => repo.name) || [];
   } catch (error: any) {
     console.error('Error initializing repos:', error);
     throw new Error(error.message || 'Failed to initialize secure repositories');

@@ -17,7 +17,7 @@ interface MobileFileInfoSheetProps {
 }
 
 function getTypeIcon(mimeType: string) {
-  if (!mimeType) return <FileText className="w-5 h-5 text-[#768390]" />;
+  if (!mimeType) return <FileText className="w-5 h-5 text-muted-foreground" />;
   if (mimeType.startsWith('image/')) return <ImageIcon className="w-5 h-5 text-green-500" />;
   if (mimeType.startsWith('video/')) return <Video className="w-5 h-5 text-red-500" />;
   if (mimeType.startsWith('audio/')) return <Music className="w-5 h-5 text-purple-500" />;
@@ -25,7 +25,7 @@ function getTypeIcon(mimeType: string) {
   if (mimeType.includes('zip') || mimeType.includes('archive')) return <Archive className="w-5 h-5 text-orange-500" />;
   if (mimeType.includes('json')) return <FileJson className="w-5 h-5 text-yellow-500" />;
   if (mimeType.includes('javascript') || mimeType.includes('typescript')) return <Code className="w-5 h-5 text-blue-500" />;
-  return <FileText className="w-5 h-5 text-[#768390]" />;
+  return <FileText className="w-5 h-5 text-muted-foreground" />;
 }
 
 function getTypeCategory(mimeType: string) {
@@ -50,19 +50,19 @@ function getSizeCategory(size: number) {
 }
 
 const InfoCard: React.FC<{ icon: React.ReactNode; label: string; value: string; sub?: string }> = ({ icon, label, value, sub }) => (
-  <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
+  <div className="p-3 rounded-[10px] bg-muted border border-border">
     <div className="flex items-center gap-2 mb-1.5">
-      <span className="text-[#768390]">{icon}</span>
-      <span className="text-[12px] font-medium text-[#8B949E]">{label}</span>
+      <span className="text-muted-foreground">{icon}</span>
+      <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
     </div>
-    <div className="text-[15px] font-semibold text-[#E6EDF3]">{value}</div>
-    {sub && <div className="text-[11px] text-[#768390]">{sub}</div>}
+    <div className="text-[15px] font-semibold text-foreground">{value}</div>
+    {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
   </div>
 );
 
 const InfoRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div>
-    <p className="text-[12px] font-medium text-[#8B949E] mb-1">{label}</p>
+    <p className="text-[12px] font-medium text-muted-foreground mb-1">{label}</p>
     {children}
   </div>
 );
@@ -79,12 +79,12 @@ const MobileFileInfoSheet: React.FC<MobileFileInfoSheetProps> = ({ open, onClose
       onOpenChange={onClose}
       title={
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[10px] bg-[#2D333B] border border-[#373E47] flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-[10px] bg-muted border border-border flex items-center justify-center shrink-0">
             {getTypeIcon(file.type)}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-[15px] font-semibold text-[#E6EDF3] truncate">{file.name}</h3>
-            <p className="text-[12px] text-[#768390]">{getTypeCategory(file.type)}</p>
+            <h3 className="text-[15px] font-semibold text-foreground truncate">{file.name}</h3>
+            <p className="text-[12px] text-muted-foreground">{getTypeCategory(file.type)}</p>
           </div>
         </div>
       }
@@ -97,94 +97,94 @@ const MobileFileInfoSheet: React.FC<MobileFileInfoSheetProps> = ({ open, onClose
           <InfoCard icon={<Clock className="w-3.5 h-3.5" />} label="Created" value={fmtRel(file.created_at)} sub={new Date(file.created_at).toLocaleDateString()} />
         </div>
 
-        <div className="h-px bg-[#2D333B]" />
+        <div className="h-px bg-border" />
 
         <div>
-          <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3 flex items-center gap-2">
-            <FileText className="w-3.5 h-3.5 text-[#768390]" />
+          <h4 className="text-[13px] font-semibold text-foreground mb-3 flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
             Basic Information
           </h4>
           <div className="space-y-3">
             <InfoRow label="File Name">
-              <p className="text-[13px] break-all p-2.5 rounded-[8px] bg-[#2D333B] border border-[#373E47] text-[#E6EDF3]">{file.name}</p>
+              <p className="text-[13px] break-all p-2.5 rounded-[8px] bg-muted border border-border text-foreground">{file.name}</p>
             </InfoRow>
             <InfoRow label="MIME Type">
-              <p className="text-[12px] font-mono bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] text-[#E6EDF3]">{file.type || 'Unknown'}</p>
+              <p className="text-[12px] font-mono bg-muted border border-border p-2.5 rounded-[8px] text-foreground">{file.type || 'Unknown'}</p>
             </InfoRow>
             <InfoRow label="File Size">
-              <div className="bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px]">
-                <p className="text-[13px] text-[#E6EDF3]">{formatBytes(file.size || 0)}</p>
-                <p className="text-[11px] text-[#768390]">{(file.size || 0).toLocaleString()} bytes</p>
+              <div className="bg-muted border border-border p-2.5 rounded-[8px]">
+                <p className="text-[13px] text-foreground">{formatBytes(file.size || 0)}</p>
+                <p className="text-[11px] text-muted-foreground">{(file.size || 0).toLocaleString()} bytes</p>
               </div>
             </InfoRow>
             {file.parent_folder && (
               <InfoRow label="Location">
-                <div className="flex items-center gap-2 bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px]">
-                  <Folder className="w-3.5 h-3.5 text-[#58A6FF]" />
-                  <p className="text-[12px] font-mono truncate text-[#E6EDF3]">{file.parent_folder}</p>
+                <div className="flex items-center gap-2 bg-muted border border-border p-2.5 rounded-[8px]">
+                  <Folder className="w-3.5 h-3.5 text-foreground" />
+                  <p className="text-[12px] font-mono truncate text-foreground">{file.parent_folder}</p>
                 </div>
               </InfoRow>
             )}
           </div>
         </div>
 
-        <div className="h-px bg-[#2D333B]" />
+        <div className="h-px bg-border" />
 
         <div>
-          <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3 flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5 text-[#768390]" />
+          <h4 className="text-[13px] font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
             Timestamps
           </h4>
           <div className="grid grid-cols-2 gap-2.5">
-            <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-              <p className="text-[12px] font-medium text-[#8B949E] mb-1">Created</p>
-              <p className="text-[13px] text-[#E6EDF3]">{fmtDate(file.created_at)}</p>
-              <p className="text-[11px] text-[#768390]">{fmtRel(file.created_at)}</p>
+            <div className="p-3 rounded-[10px] bg-muted border border-border">
+              <p className="text-[12px] font-medium text-muted-foreground mb-1">Created</p>
+              <p className="text-[13px] text-foreground">{fmtDate(file.created_at)}</p>
+              <p className="text-[11px] text-muted-foreground">{fmtRel(file.created_at)}</p>
             </div>
             {file.updated_at && (
-              <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-                <p className="text-[12px] font-medium text-[#8B949E] mb-1">Modified</p>
-                <p className="text-[13px] text-[#E6EDF3]">{fmtDate(file.updated_at)}</p>
-                <p className="text-[11px] text-[#768390]">{fmtRel(file.updated_at)}</p>
+              <div className="p-3 rounded-[10px] bg-muted border border-border">
+                <p className="text-[12px] font-medium text-muted-foreground mb-1">Modified</p>
+                <p className="text-[13px] text-foreground">{fmtDate(file.updated_at)}</p>
+                <p className="text-[11px] text-muted-foreground">{fmtRel(file.updated_at)}</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="h-px bg-[#2D333B]" />
+        <div className="h-px bg-border" />
 
         <div>
-          <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3 flex items-center gap-2">
-            <Database className="w-3.5 h-3.5 text-[#768390]" />
+          <h4 className="text-[13px] font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Database className="w-3.5 h-3.5 text-muted-foreground" />
             Storage & Security
           </h4>
           <div className="space-y-3">
-            <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-              <p className="text-[12px] font-medium text-[#8B949E] mb-1.5 flex items-center gap-2">
+            <div className="p-3 rounded-[10px] bg-muted border border-border">
+              <p className="text-[12px] font-medium text-muted-foreground mb-1.5 flex items-center gap-2">
                 <Hash className="w-3 h-3" />
                 File ID
               </p>
-              <p className="text-[11px] font-mono bg-[#1C2128] p-2 rounded-[6px] break-all text-[#8B949E]">{file.id}</p>
+              <p className="text-[11px] font-mono bg-accent p-2 rounded-[6px] break-all text-muted-foreground">{file.id}</p>
             </div>
             {(file.encrypted || file.shared || file.is_public || file.preview_available) && (
               <div className="flex flex-wrap gap-2">
                 {file.encrypted && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1A3A5C] border border-[#58A6FF]/30 text-[#58A6FF] text-[11px] font-medium">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted border border-border text-muted-foreground text-[11px] font-medium">
                     <Shield className="w-3 h-3" /> Encrypted
                   </span>
                 )}
                 {file.shared && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#2D333B] border border-[#373E47] text-[#8B949E] text-[11px] font-medium">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted border border-border text-muted-foreground text-[11px] font-medium">
                     <Link className="w-3 h-3" /> Shared
                   </span>
                 )}
                 {file.is_public && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#2D333B] border border-[#373E47] text-[#8B949E] text-[11px] font-medium">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted border border-border text-muted-foreground text-[11px] font-medium">
                     <Eye className="w-3 h-3" /> Public
                   </span>
                 )}
                 {file.preview_available && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#2D333B] border border-[#373E47] text-[#8B949E] text-[11px] font-medium">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted border border-border text-muted-foreground text-[11px] font-medium">
                     <Monitor className="w-3 h-3" /> Preview
                   </span>
                 )}
@@ -195,26 +195,26 @@ const MobileFileInfoSheet: React.FC<MobileFileInfoSheetProps> = ({ open, onClose
 
         {(file.processor || file.storage_path || file.user_id) && (
           <>
-            <div className="h-px bg-[#2D333B]" />
+            <div className="h-px bg-border" />
             <div>
-              <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3 flex items-center gap-2">
-                <Code className="w-3.5 h-3.5 text-[#768390]" />
+              <h4 className="text-[13px] font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Code className="w-3.5 h-3.5 text-muted-foreground" />
                 Technical Details
               </h4>
               <div className="space-y-3">
                 {file.processor && (
                   <InfoRow label="Processor">
-                    <p className="text-[12px] font-mono bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] text-[#E6EDF3]">{file.processor}</p>
+                    <p className="text-[12px] font-mono bg-muted border border-border p-2.5 rounded-[8px] text-foreground">{file.processor}</p>
                   </InfoRow>
                 )}
                 {file.storage_path && (
                   <InfoRow label="Storage Path">
-                    <p className="text-[11px] font-mono bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] break-all text-[#E6EDF3]">{file.storage_path}</p>
+                    <p className="text-[11px] font-mono bg-muted border border-border p-2.5 rounded-[8px] break-all text-foreground">{file.storage_path}</p>
                   </InfoRow>
                 )}
                 {file.user_id && (
                   <InfoRow label="Owner ID">
-                    <p className="text-[11px] font-mono bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] break-all text-[#E6EDF3]">{file.user_id}</p>
+                    <p className="text-[11px] font-mono bg-muted border border-border p-2.5 rounded-[8px] break-all text-foreground">{file.user_id}</p>
                   </InfoRow>
                 )}
               </div>

@@ -340,6 +340,8 @@ export interface ChunkMetadata {
   repo?: string;
   path?: string;
   accountId?: number;
+  clusterId?: string;
+  providerId?: string;
 }
 
 interface Res54FileMetadata {
@@ -521,7 +523,8 @@ async function processChunksInParallel<T>(
 
 export const uploadFileWithRes54 = async (
   file: File,
-  progressCallback?: (progress: number, stage: string, details?: any) => void
+  progressCallback?: (progress: number, stage: string, details?: any) => void,
+  providerId?: string
 ): Promise<{ id: string, metadata: Res54FileMetadata, encryptionKey: string }> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Authentication required");
@@ -529,6 +532,38 @@ export const uploadFileWithRes54 = async (
   const accessToken = session?.access_token;
   if (!accessToken) throw new Error('Authentication required');
   const supabaseUrl = SUPABASE_URL;
+
+  const getUploadUrls = async (chunks: { path: string; index: number }[]) => {
+    if (providerId) {
+      const { data, error } = await supabase.functions.invoke('s3-storage', {
+        body: { action: 'get-upload-urls', providerId, chunks }
+      });
+      if (error || !data?.success) throw new Error(`Storage Error: ${error?.message || data?.error || 'Failed to get upload URLs'}`);
+      const urls = data.urls.map((u: any) => ({ ...u, providerId }));
+      return { urls, clusterCount: 1 };
+    }
+    const urlResponse = await fetch(`${supabaseUrl}/functions/v1/squidcloud-cluster`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, chunks })
+    });
+    const responseData = await urlResponse.json();
+    if (!urlResponse.ok || responseData.error) {
+      throw new Error(`Storage Error: ${responseData.error || 'Failed to get upload URLs'}`);
+    }
+    if (!responseData.urls || !Array.isArray(responseData.urls)) {
+      throw new Error('Storage Error: Server did not return valid upload URLs.');
+    }
+    return { urls: responseData.urls, clusterCount: responseData.clusterCount || 1 };
+  };
+
+  const assignChunkMeta = (u: any) => {
+    if (u.providerId) {
+      metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0, providerId: u.providerId };
+    } else {
+      metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0, clusterId: u.clusterId };
+    }
+  };
 
   if (file.size === 0) throw new Error('File is empty');
   if (file.size > LARGE_FILE_THRESHOLD) progressCallback?.(0, 'preparing', { message: 'Preparing large file upload strategy' });
@@ -582,28 +617,8 @@ export const uploadFileWithRes54 = async (
         return { path: getChunkStoragePath(user.id, chunkId), index: chunk.index };
       });
 
-      // --- ROBUST ERROR HANDLING FOR STREAMING UPLOAD ---
-      const urlResponse = await fetch(`${supabaseUrl}/functions/v1/github-storage`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, chunks: urlPaths })
-      });
-      
-      const responseData = await urlResponse.json();
-      
-      if (!urlResponse.ok || responseData.error) {
-        throw new Error(`Storage Error: ${responseData.error || 'Failed to get upload URLs'}`);
-      }
-      
-      const { urls } = responseData;
-      if (!urls || !Array.isArray(urls)) {
-        throw new Error('Storage Error: Server did not return valid upload URLs.');
-      }
-      // ------------------------------------------------
-
-      urls.forEach((u: any) => {
-        metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0 };
-      });
+      const { urls } = await getUploadUrls(urlPaths);
+      urls.forEach(assignChunkMeta);
 
       await Promise.all(encryptedBatch.map(async (chunk) => {
         const targetUrl = urls.find((u: any) => u.index === chunk.index).uploadUrl;
@@ -649,28 +664,8 @@ export const uploadFileWithRes54 = async (
       return { path: getChunkStoragePath(user.id, chunkId), index };
     });
 
-    // --- ROBUST ERROR HANDLING FOR STANDARD UPLOAD ---
-    const urlResponse = await fetch(`${supabaseUrl}/functions/v1/github-storage`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, chunks: urlPaths })
-    });
-    
-    const responseData = await urlResponse.json();
-    
-    if (!urlResponse.ok || responseData.error) {
-      throw new Error(`Storage Error: ${responseData.error || 'Failed to get upload URLs'}`);
-    }
-    
-    const { urls } = responseData;
-    if (!urls || !Array.isArray(urls)) {
-      throw new Error('Storage Error: Server did not return valid upload URLs.');
-    }
-    // ------------------------------------------------
-
-    urls.forEach((u: any) => {
-      metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0 };
-    });
+    const { urls } = await getUploadUrls(urlPaths);
+    urls.forEach(assignChunkMeta);
 
     const uploadChunkBinary = async (chunkWrap: any): Promise<any> => {
       const targetUrl = urls.find((u: any) => u.index === chunkWrap.index).uploadUrl;
@@ -715,7 +710,7 @@ export const uploadFileWithRes54 = async (
   });
 
   const activeWorkspaceId = getActiveWorkspaceId();
-  const fileRecord = {
+  const fileRecord: Record<string, any> = {
     name: file.name,
     type: file.type,
     size: file.size,
@@ -726,7 +721,8 @@ export const uploadFileWithRes54 = async (
     encryption_key: dbEncryptionKey,
     tags: [metadataString] as string[],
     processor: "res54",
-    ...(activeWorkspaceId ? { workspace_id: activeWorkspaceId } : {})
+    ...(activeWorkspaceId ? { workspace_id: activeWorkspaceId } : {}),
+    ...(providerId ? { storage_provider_id: providerId } : {})
   };
 
   const { data: dbFile, error: dbError } = await supabase.from('files').insert(fileRecord).select().single();
@@ -762,38 +758,56 @@ export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?
   for (let attempt = _attempt; attempt <= MAX_RETRIES; attempt++) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await supabase.functions.invoke('github-storage', {
-        body: { 
-          action: 'download', 
-          path: chunk.path, 
-          repo: chunk.repo,
-          ...(shareId ? { shareId } : { userId: session?.user?.id }),
-          nodeId: chunk.accountId ? (chunk.accountId - 1) : undefined
+      let downloadUrl: string;
+
+      // Custom provider (S3-compatible via s3-storage)
+      if (chunk.providerId) {
+        const { data, error } = await supabase.functions.invoke('s3-storage', {
+          body: { action: 'get-download-url', providerId: chunk.providerId, path: chunk.path }
+        });
+        if (error || !data?.success) throw new Error(`S3 download error: ${error?.message || data?.error}`);
+        downloadUrl = data.downloadUrl;
+      }
+      // Legacy GitHub repo path
+      else if (chunk.repo && chunk.repo !== 'b2') {
+        const { data, error } = await supabase.functions.invoke('squidcloud-cluster', {
+          body: {
+            action: 'download', path: chunk.path, repo: chunk.repo,
+            ...(shareId ? { shareId } : { userId: session?.user?.id }),
+            nodeId: chunk.accountId ? (chunk.accountId - 1) : undefined
+          }
+        });
+        if (error) throw new Error(`Download error: ${error.message}`);
+        const responseData = typeof data === 'string' ? JSON.parse(data) : data;
+        if (responseData.legacy) {
+          const decodedContent = atob(responseData.content.replace(/\s/g, ''));
+          const parsedChunk = JSON.parse(decodedContent);
+          if (parsedChunk.v === '2.3') return { index: parsedChunk.i, data: parsedChunk.d };
+          return { index: parsedChunk.chunkIndex, data: parsedChunk.chunkData };
         }
-      });
-
-      if (response.error) throw new Error(`Download error: ${response.error.message}`);
-      const responseData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-
-      // Legacy GitHub Base64 JSON Decoder
-      if (responseData.legacy) {
-        const decodedContent = atob(responseData.content.replace(/\s/g, ''));
-        const parsedChunk = JSON.parse(decodedContent);
-        
-        if (parsedChunk.v === '2.3') return { index: parsedChunk.i, data: parsedChunk.d };
-        return { index: parsedChunk.chunkIndex, data: parsedChunk.chunkData };
+        downloadUrl = responseData.downloadUrl;
+      }
+      // B2 via squidcloud-cluster
+      else {
+        const { data, error } = await supabase.functions.invoke('squidcloud-cluster', {
+          body: {
+            action: 'download', path: chunk.path, repo: chunk.repo,
+            clusterId: chunk.clusterId,
+            ...(shareId ? { shareId } : { userId: session?.user?.id }),
+          }
+        });
+        if (error) throw new Error(`Download error: ${error.message}`);
+        const responseData = typeof data === 'string' ? JSON.parse(data) : data;
+        downloadUrl = responseData.downloadUrl;
       }
 
-      // New Backblaze Direct CDN Download
-      if (!responseData.legacy && responseData.downloadUrl) {
-        const b2Response = await fetch(responseData.downloadUrl);
-        if (!b2Response.ok) throw new Error('Failed to fetch from B2 CDN');
-        
-        // Convert to Base64 to maintain compatibility with your existing decryption system
-        const arrayBuffer = await b2Response.arrayBuffer();
-        return { index: chunk.index, data: arrayBufferToBase64(arrayBuffer) };
-      }
+      if (!downloadUrl) throw new Error('No download URL received');
+
+      const b2Response = await fetch(downloadUrl);
+      if (!b2Response.ok) throw new Error('Failed to fetch from CDN');
+      
+      const arrayBuffer = await b2Response.arrayBuffer();
+      return { index: chunk.index, data: arrayBufferToBase64(arrayBuffer) };
       
     } catch (error: any) {
       lastError = error;

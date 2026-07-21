@@ -76,7 +76,7 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
     return (
       <Drawer open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
         <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
-          <div className="relative overflow-hidden rounded-t-[28px] bg-[#0A0E1A] flex flex-col animate-fade-up-soft">
+          <div className="relative overflow-hidden rounded-t-[28px] bg-background flex flex-col">
             {/* Header */}
             <div className="px-5 pt-5 pb-3">
               <div className="flex items-center justify-between">
@@ -85,45 +85,43 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
                     <Check className="w-5 h-5 text-emerald-400" />
                   </div>
                   <div>
-                    <h3 className="text-[16px] font-semibold text-white/90">Key Generated</h3>
-                    <p className="text-[11px] text-[#768390]">Copy and store it securely</p>
+                    <h3 className="text-[16px] font-semibold text-foreground">Key Generated</h3>
+                    <p className="text-[11px] text-muted-foreground">Copy and store it securely</p>
                   </div>
                 </div>
                 <button
                   onClick={handleClose}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl text-[#768390] hover:text-white/70 hover:bg-white/[0.06] transition-all duration-200"
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-200"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <div className="h-px bg-[#2D333B]" />
+            <div className="h-px bg-border" />
 
             <div className="px-5 py-5 space-y-4">
               {/* Key display */}
-              <div className="animate-scale-in-soft">
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] text-[#768390] font-medium uppercase tracking-wider">Your API Key</span>
-                    <button
-                      onClick={() => setShowKey(!showKey)}
-                      className="flex items-center gap-1 text-[11px] text-[#768390] hover:text-white/60 transition-colors"
-                    >
-                      {showKey ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                      {showKey ? 'Hide' : 'Show'}
-                    </button>
-                  </div>
-                  <code className={cn(
-                    'block text-sm font-mono break-all leading-relaxed',
-                    showKey ? 'text-white/80' : 'text-[#768390]/40',
-                  )}>
-                    {showKey ? generatedKey : '••••••••••••••••••••••••••••••••'}
-                  </code>
+              <div className="rounded-xl bg-muted border border-border p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Your API Key</span>
+                  <button
+                    onClick={() => setShowKey(!showKey)}
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showKey ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    {showKey ? 'Hide' : 'Show'}
+                  </button>
                 </div>
+                <code className={cn(
+                  'block text-sm font-mono break-all leading-relaxed',
+                  showKey ? 'text-foreground' : 'text-muted-foreground/40',
+                )}>
+                  {showKey ? generatedKey : '••••••••••••••••••••••••••••••••'}
+                </code>
               </div>
 
               {/* Warning */}
-              <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/15 animate-fade-up-soft" style={{ animationDelay: '0.1s' }}>
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
                 <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <p className="text-[12px] text-amber-400/70 leading-relaxed">
                   This is the only time you'll see this key. Copy it now and store it securely.
@@ -132,10 +130,10 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
             </div>
 
             {/* Footer */}
-            <div className="p-5 border-t border-[#2D333B] space-y-2">
+            <div className="p-5 border-t border-border space-y-2">
               <Button
                 onClick={handleCopy}
-                className="w-full h-12 rounded-xl bg-[#4FC3F7] text-[#0A0E1A] font-semibold hover:bg-[#4FC3F7]/90 transition-all duration-200"
+                className="w-full h-12 rounded-xl bg-foreground text-background font-semibold hover:bg-foreground/90 transition-all duration-200"
               >
                 {copied ? (
                   <span className="flex items-center gap-2">
@@ -152,7 +150,7 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
               <Button
                 onClick={handleClose}
                 variant="ghost"
-                className="w-full h-10 rounded-xl text-[#768390] hover:text-white/70 hover:bg-white/[0.04]"
+                className="w-full h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent"
               >
                 Done
               </Button>
@@ -167,38 +165,38 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
   return (
     <Drawer open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
       <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
-        <div className="relative overflow-hidden rounded-t-[28px] bg-[#0A0E1A] flex flex-col animate-fade-up-soft">
+        <div className="relative overflow-hidden rounded-t-[28px] bg-background flex flex-col">
           {/* Header */}
           <div className="px-5 pt-5 pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#4FC3F7]/10 flex items-center justify-center">
-                  <Key className="w-5 h-5 text-[#4FC3F7]" />
+                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                  <Key className="w-5 h-5 text-foreground" />
                 </div>
                 <div>
-                  <h3 className="text-[16px] font-semibold text-white/90">Generate API Key</h3>
-                  <p className="text-[11px] text-[#768390]">Create a new key for API access</p>
+                  <h3 className="text-[16px] font-semibold text-foreground">Generate API Key</h3>
+                  <p className="text-[11px] text-muted-foreground">Create a new key for API access</p>
                 </div>
               </div>
               <button
                 onClick={handleClose}
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-[#768390] hover:text-white/70 hover:bg-white/[0.06] transition-all duration-200"
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-200"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
-          <div className="h-px bg-[#2D333B]" />
+          <div className="h-px bg-border" />
 
           {/* Form */}
           <div className="px-5 py-5 space-y-5">
-            <div className="space-y-2 animate-fade-up-soft" style={{ animationDelay: '0.05s' }}>
-              <Label className="text-[12px] text-[#768390] font-medium">Key Name</Label>
+            <div className="space-y-2">
+              <Label className="text-[12px] text-muted-foreground font-medium">Key Name</Label>
               <Input
                 value={keyName}
                 onChange={e => setKeyName(e.target.value)}
                 placeholder="e.g., Production API, Mobile App"
-                className="h-11 rounded-xl bg-white/[0.04] border-white/[0.08] text-white/80 text-sm placeholder:text-[#768390]/40 focus:border-[#4FC3F7]/30 focus:ring-[#4FC3F7]/10"
+                className="h-11 rounded-xl bg-muted border-border text-foreground text-sm placeholder:text-muted-foreground/40 focus:border-foreground/30 focus:ring-foreground/10"
                 autoFocus
                 onKeyDown={e => {
                   if (e.key === 'Enter' && keyName.trim()) {
@@ -209,25 +207,25 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
               />
             </div>
 
-            <div className="animate-fade-up-soft" style={{ animationDelay: '0.1s' }}>
-              <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-                <p className="text-[11px] text-[#768390] leading-relaxed">
-                  Your API key will have <span className="text-white/60 font-medium">read, write, and delete</span> permissions. Use it with the <code className="text-[#4FC3F7]/70 bg-[#4FC3F7]/[0.06] px-1 py-0.5 rounded text-[10px]">X-SquidCloud-Key</code> header.
+            <div>
+              <div className="rounded-xl bg-muted border border-border/60 p-3">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Your API key will have <span className="text-foreground font-medium">read, write, and delete</span> permissions. Use it with the <code className="text-foreground bg-foreground/[0.06] px-1 py-0.5 rounded text-[10px]">X-SquidCloud-Key</code> header.
                 </p>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="p-5 border-t border-[#2D333B]">
+          <div className="p-5 border-t border-border">
             <Button
               onClick={handleGenerate}
               disabled={creating || !keyName.trim()}
-              className="w-full h-12 rounded-xl bg-[#4FC3F7] text-[#0A0E1A] font-semibold hover:bg-[#4FC3F7]/90 transition-all duration-200 disabled:opacity-40"
+              className="w-full h-12 rounded-xl bg-foreground text-background font-semibold hover:bg-foreground/90 transition-all duration-200 disabled:opacity-40"
             >
               {creating ? (
                 <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-[#0A0E1A]/30 border-t-[#0A0E1A] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
                   Generating...
                 </span>
               ) : (

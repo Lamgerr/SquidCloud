@@ -175,7 +175,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
       >
         <div
           className={cn(
-            'pointer-events-auto flex items-center p-1.5 overflow-hidden',
+            'pointer-events-auto flex items-center justify-center p-1.5 overflow-hidden',
             'rounded-full bg-background/85 backdrop-blur-2xl border border-border/40',
             'shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)]',
             'transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)]',
@@ -205,7 +205,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
             onClick={() => activate('home', () => { haptic(10); if (window.location.pathname !== '/') window.location.href = '/'; })}
             className={cn(
               "flex items-center justify-center rounded-full shrink-0 transition-all duration-400",
-              isMorphed ? "w-11 h-11 bg-muted/40 text-foreground hover:bg-muted/60 opacity-100" : "w-0 h-11 opacity-0"
+              isMorphed ? "w-11 h-11 bg-muted/40 text-foreground hover:bg-muted/60 opacity-100" : "hidden"
             )}
           >
              <Home className="w-5 h-5 shrink-0" strokeWidth={2} />
@@ -235,7 +235,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
           <div 
             className={cn(
               "flex items-center justify-between rounded-full bg-muted/30 transition-all duration-400 overflow-hidden",
-              isMorphed ? "flex-1 h-11 px-3 opacity-100" : "w-0 h-11 opacity-0 p-0 border-0"
+              isMorphed ? "flex-1 h-11 px-3 opacity-100" : "hidden"
             )}
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -284,7 +284,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
             onClick={() => handleTabClick('account')}
             className={cn(
               "flex items-center justify-center rounded-full shrink-0 transition-all duration-400",
-              isMorphed ? "w-11 h-11 bg-muted/40 text-foreground hover:bg-muted/60 opacity-100" : "w-0 h-11 opacity-0"
+              isMorphed ? "w-11 h-11 bg-muted/40 text-foreground hover:bg-muted/60 opacity-100" : "hidden"
             )}
           >
              <User className="w-5 h-5 shrink-0" strokeWidth={2} />

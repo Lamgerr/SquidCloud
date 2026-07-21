@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useKeyboardShortcutsContext } from '@/components/KeyboardShortcuts';
 import {
-  FileStack, Users, Trash2, Activity,
+  FileStack, Users, Trash2, Activity, Book,
   Settings2, PanelLeftClose, PanelLeft, Star, Folder,
   Keyboard, ChevronsUpDown, LogOut, User, Key,
   Inbox, Zap, Lock, Crown, Sparkles, ArrowUpRight,
@@ -39,6 +40,7 @@ const TOOLS_NAV = [
   { id: 'secrets', label: 'Secrets', icon: Lock },
   { id: 'scripts', label: 'SquidActions', icon: Zap },
   { id: 'file-requests', label: 'File Requests', icon: Inbox },
+  { id: 'books', label: 'Books', icon: Book },
 ];
 
 export const EnterpriseSidebar: React.FC<SidebarProps> = ({
@@ -47,6 +49,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
   currentFolder: _currentFolder, onNavigateToFolder,
 }) => {
   const navigate = useNavigate();
+  const { setOverlayOpen } = useKeyboardShortcutsContext();
   const collapsed = sidebarCollapsed;
   const [switchOpen, setSwitchOpen] = useState(false);
 
@@ -218,7 +221,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
             <DropdownMenuItem className="gap-2.5 py-2 cursor-pointer text-sm text-muted-foreground focus:text-foreground rounded-md" onClick={() => navigate('/developer-api')}>
               <Key className="h-4 w-4" /><span>API Keys</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2.5 py-2 cursor-pointer text-sm text-muted-foreground focus:text-foreground rounded-md">
+            <DropdownMenuItem className="gap-2.5 py-2 cursor-pointer text-sm text-muted-foreground focus:text-foreground rounded-md" onClick={() => setOverlayOpen(true)}>
               <Keyboard className="h-4 w-4" /><span>Shortcuts</span>
               <kbd className="ml-auto text-[9px] bg-muted/50 px-1.5 py-0.5 rounded border border-border/30">⌘/</kbd>
             </DropdownMenuItem>

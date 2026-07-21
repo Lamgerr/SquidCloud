@@ -46,6 +46,8 @@ import { SettingsCard, SettingsDivider } from '@/components/SettingsRow';
 import FileItem from '@/components/FileItem';
 import FileInfoModal from '@/components/FileInfoModal';
 import EnhancedInstantPreviewModal from '@/components/EnhancedInstantPreviewModal';
+import DeepReadCatalog from '@/components/DeepReadCatalog';
+import DeepReadReader from '@/components/DeepReadReader';
 import BackgroundUploadPanel from '@/components/BackgroundUploadPanel';
 import TrashTab from '@/components/TrashTab';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
@@ -60,7 +62,7 @@ import { AppStartupBiometricCheck } from '@/components/AppStartupBiometricCheck'
 import DragDropUpload from '@/components/DragDropUpload';
 import BulkActionsToolbar from '@/components/BulkActionsToolbar';
 import { useBiometricAuthContext } from '@/contexts/BiometricAuthContext';
-import ProviderSetupModal from '@/components/ui/ProviderSetupModal';
+import StorageProviderManager from '@/components/StorageProviderManager';
 import WorkspaceCollaboratorsModal, { WorkspaceRole } from '@/components/WorkspaceCollaboratorsModal';
 import { WorkspaceSettingsModal } from '@/components/WorkspaceSettingsModal';
 import { useSubscriptionNotifications } from '@/hooks/useSubscriptionNotifications';
@@ -84,6 +86,7 @@ import { EnhancedShareDialog } from '@/components/EnhancedShareDialog';
 import SharedView from '@/components/SharedView';
 import SquidVeilSecrets from '@/components/SquidVeilSecrets';
 import SquidVeilSecretsMobile from '@/components/SquidVeilSecretsMobile';
+import GitHubRepoCloneDialog from '@/components/GitHubRepoCloneDialog';
 // Icons
 import {
   Search, Grid3X3, List, RefreshCw, ChevronLeft, ChevronRight,
@@ -91,7 +94,7 @@ import {
   Star, CheckSquare, X, Plus, SlidersHorizontal, Trash2, BarChart3,
   FileText, Image, Video, Music, Archive, Code,
   AlertCircle, Shield, Lock, ChevronsUpDown, Check, Briefcase,
-  FileStack, Users, Activity, Database, Settings2, Cloud, Inbox,
+  FileStack, Users, Activity, Book, Database, Settings2, Cloud, Inbox,
   LogOut, Key, User, Clock, Loader2, Crown
 } from '@/lib/icon-map';
 
@@ -114,13 +117,7 @@ interface WorkspaceItem {
   member_limit?: number | null;
 }
 
-type ProviderType = 'squidcloud' | 'r2' | 'tebi';
-
-interface StorageProviderRecord {
-  id: string;
-  provider_type: string;
-  is_default?: boolean | null;
-}
+type ProviderType = string;
 
 const ACTIVE_WORKSPACE_STORAGE_KEY = 'squid_active_workspace_id';
 const ACTIVE_PROVIDER_TYPE_STORAGE_KEY = 'squid_active_provider_type';
@@ -293,9 +290,21 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [previewFile, setPreviewFile]   = useState<FileItemType | null>(null);
+  const [readingFile, setReadingFile]   = useState<FileItemType | null>(null);
+  const [readingSource, setReadingSource] = useState<'local' | 'remote'>('local');
   const [fileInfoFile, setFileInfoFile] = useState<FileItemType | null>(null);
   const handleViewInfo = (f: FileItemType) => setFileInfoFile(f);
+  const handleBookOpen = useCallback((f: FileItemType, source?: 'local' | 'remote') => {
+    const isPdf = f.name?.toLowerCase().endsWith('.pdf');
+    if (isPdf) {
+      setPreviewFile(f);
+    } else {
+      setReadingSource(source || 'local');
+      setReadingFile(f);
+    }
+  }, []);
   const [shareFile, setShareFile] = useState<FileItemType | null>(null);
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
   const [moveDialogFile, setMoveDialogFile] = useState<{ ids: string[] } | null>(null);
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
   const [showVaultAuth, setShowVaultAuth] = useState(false);
@@ -305,21 +314,18 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
   const [sortBy, setSortBy] = useState('date-desc');
   const [repoCount, setRepoCount]       = useState(0);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [fileRequestOpen, setFileRequestOpen] = useState(false);
   const [showFileRequests, setShowFileRequests] = useState(false);
   const [fileRequestsRefreshToken, setFileRequestsRefreshToken] = useState(0);
-  const [setupProvider, setSetupProvider] = useState<ProviderType | null>(null);
+  const [isStorageManagerOpen, setIsStorageManagerOpen] = useState(false);
   const [notesPanel, setNotesPanel] = useState<{ entityId: string; entityType: 'file' | 'folder'; entityName: string } | null>(null);
   const [embedModal, setEmbedModal] = useState<{ entityId: string; entityType: 'file' | 'folder'; entityName: string } | null>(null);
   const [noteCounts, setNoteCounts] = useState<Map<string, number>>(new Map());
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const [configuredProviders, setConfiguredProviders] = useState<string[]>(['squidcloud']);
-  const [providerRecords, setProviderRecords] = useState<StorageProviderRecord[]>([]);
   const [activeProviderType, setActiveProviderType] = useState<ProviderType>(() => {
     if (typeof window === 'undefined') return 'squidcloud';
     const saved = localStorage.getItem(ACTIVE_PROVIDER_TYPE_STORAGE_KEY);
-    return saved === 'tebi' ? 'tebi' : 'squidcloud';
+    return saved || 'squidcloud';
   });
   const [activeProviderId, setActiveProviderId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -688,7 +694,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
     }
   }, [user?.id, toast]);
 
-  const persistActiveProvider = useCallback((providerType: ProviderType, providerId: string | null) => {
+  const persistActiveProvider = useCallback((providerType: string, providerId: string | null) => {
     setActiveProviderType(providerType);
     setActiveProviderId(providerId);
 
@@ -707,40 +713,9 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
     setSelectionMode(false);
   }, []);
 
-  const activeProviderLabel = useMemo(() => {
-    if (activeProviderType === 'r2') return 'Cloudflare R2 (Coming Soon)';
-    if (activeProviderType === 'tebi') return 'Tebi.io';
-    return 'SquidCloud';
-  }, [activeProviderType]);
-
-  const handleProviderSelection = useCallback((providerType: ProviderType) => {
-    if (providerType === 'r2') {
-      toast({
-        title: 'Coming soon',
-        description: 'Cloudflare R2 frontend integration is coming soon. Use Tebi.io for BYOS today.',
-      });
-      return;
-    }
-
-    if (providerType === 'squidcloud') {
-      persistActiveProvider('squidcloud', null);
-      toast({ title: 'Provider switched', description: 'Now showing SquidCloud storage' });
-      return;
-    }
-
-    const matchedProvider = providerRecords.find(provider => provider.provider_type === providerType);
-    if (!matchedProvider) {
-      setSetupProvider(providerType);
-      setIsProviderModalOpen(true);
-      return;
-    }
-
-    persistActiveProvider(providerType, matchedProvider.id);
-    toast({
-      title: 'Provider switched',
-      description: providerType === 'r2' ? 'Now showing Cloudflare R2 storage' : 'Now showing Tebi.io storage',
-    });
-  }, [persistActiveProvider, providerRecords, toast]);
+  const handleProviderSelect = useCallback((providerType: string, providerId: string | null) => {
+    persistActiveProvider(providerType || 'squidcloud', providerId);
+  }, [persistActiveProvider]);
 
   // ── Data fetching ────────────────────────────────────────
   const fetchFiles = useCallback(async () => {
@@ -763,18 +738,11 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
         .select('id, provider_type, is_default')
         .eq('user_id', user.id);
 
-      const providerData = (providersData || []) as StorageProviderRecord[];
-      setProviderRecords(providerData);
-      setConfiguredProviders(['squidcloud', ...Array.from(new Set(providerData.map(provider => provider.provider_type)))]);
-
       let effectiveProviderType: ProviderType = activeProviderType;
       let effectiveProviderId: string | null = activeProviderId;
 
-      if (effectiveProviderType !== 'squidcloud') {
-        const matchedProvider = providerData.find(provider => (
-          provider.provider_type === effectiveProviderType
-          && (!effectiveProviderId || provider.id === effectiveProviderId)
-        )) || providerData.find(provider => provider.provider_type === effectiveProviderType);
+      if (effectiveProviderType !== 'squidcloud' && effectiveProviderId) {
+        const matchedProvider = (providersData || []).find((p: any) => p.id === effectiveProviderId && p.is_enabled !== false);
 
         if (!matchedProvider) {
           effectiveProviderType = 'squidcloud';
@@ -784,14 +752,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
           if (typeof window !== 'undefined') {
             localStorage.setItem(ACTIVE_PROVIDER_TYPE_STORAGE_KEY, 'squidcloud');
             localStorage.removeItem(ACTIVE_PROVIDER_ID_STORAGE_KEY);
-          }
-        } else {
-          effectiveProviderId = matchedProvider.id;
-          if (effectiveProviderId !== activeProviderId) {
-            setActiveProviderId(effectiveProviderId);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem(ACTIVE_PROVIDER_ID_STORAGE_KEY, effectiveProviderId);
-            }
           }
         }
       }
@@ -1459,6 +1419,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   onViewInfo={handleViewInfo}
                 />
               )}
+              {activeTab === 'books' && (
+                <DeepReadCatalog
+                  files={files}
+                  onBookOpen={handleBookOpen}
+                />
+              )}
 
               {activeTab === 'settings' && (
                 <SettingsCard>
@@ -1514,6 +1480,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                       {[
                         { id: 'files', label: 'Files', icon: FileStack },
                         { id: 'shared', label: 'Shared', icon: Users },
+                        { id: 'books', label: 'Books', icon: Book },
                         { id: 'trash', label: 'Trash', icon: Trash2 },
                         { id: 'file-requests', label: 'File Requests', icon: Inbox },
                       ].map((item) => {
@@ -1577,52 +1544,19 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                       <div className="mb-2 px-1">
                         <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Storage provider</p>
                       </div>
-                      <div className="space-y-1.5">
-                        <button
-                          onClick={() => {
-                            handleProviderSelection('squidcloud');
-                            setMobileSidebarOpen(false);
-                          }}
-                          className={cn(
-                            'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-150 active:scale-[0.97]',
-                            activeProviderType === 'squidcloud'
-                              ? 'bg-primary/10 text-primary'
-                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                          )}
-                        >
-                          <span className="truncate">SquidCloud</span>
-                          {activeProviderType === 'squidcloud' && <Check className="h-3.5 w-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleProviderSelection('tebi');
-                            setMobileSidebarOpen(false);
-                          }}
-                          className={cn(
-                            'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-150 active:scale-[0.97]',
-                            activeProviderType === 'tebi'
-                              ? 'bg-primary/10 text-primary'
-                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                          )}
-                        >
-                          <span className="truncate">Tebi.io</span>
-                          <div className="flex items-center gap-2">
-                            {activeProviderType === 'tebi' ? (
-                              <Check className="h-3.5 w-3.5" />
-                            ) : !configuredProviders.includes('tebi') ? (
-                              <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Setup</span>
-                            ) : null}
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          disabled
-                          className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm text-muted-foreground/60 opacity-80 transition-all duration-150"
-                        >
-                          <span className="truncate">Cloudflare R2</span>
-                          <span className="text-[10px] uppercase tracking-[0.08em]">Soon</span>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => {
+                          setIsStorageManagerOpen(true);
+                          setMobileSidebarOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-150 active:scale-[0.97] bg-primary/5 text-primary"
+                      >
+                        <div className="flex items-center gap-2">
+                          <HardDrive className="h-3.5 w-3.5" />
+                          <span className="truncate">Manage Providers</span>
+                        </div>
+                        <span className="text-[10px]">{activeProviderType === 'squidcloud' ? 'Default' : 'Custom'}</span>
+                      </button>
                     </div>
 
                     <div className="mt-4">
@@ -1724,6 +1658,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                 const selected = filteredFiles.find(f => f.id === target.id);
                 if (selected) setPreviewFile(selected);
               }}
+              onOpenEpubReader={(f) => { setPreviewFile(null); setReadingFile(f); }}
             />
           )}
 
@@ -1749,27 +1684,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
             selectedFilesCount={selectedFiles.size}
           />
 
-          <ProviderSetupModal
-            isOpen={isProviderModalOpen}
-            onClose={() => setIsProviderModalOpen(false)}
-            provider={setupProvider || 'tebi'}
-            onSuccess={(providerInfo) => {
-              if (providerInfo) {
-                const providerType = providerInfo.providerType as ProviderType;
-                setProviderRecords(prev => {
-                  const next = prev.filter(item => item.id !== providerInfo.id);
-                  next.push({ id: providerInfo.id, provider_type: providerInfo.providerType });
-                  return next;
-                });
-                setConfiguredProviders(prev => (
-                  prev.includes(providerInfo.providerType)
-                    ? prev
-                    : [...prev, providerInfo.providerType]
-                ));
-                persistActiveProvider(providerType, providerInfo.id);
-              }
-              fetchFiles();
-            }}
+          <StorageProviderManager
+            isOpen={isStorageManagerOpen}
+            onClose={() => setIsStorageManagerOpen(false)}
+            activeProviderType={activeProviderType}
+            activeProviderId={activeProviderId}
+            onProviderSelect={handleProviderSelect}
           />
 
           <WorkspaceCollaboratorsModal
@@ -1852,6 +1772,14 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
             onDismiss={dismissNotification}
           />
         ))}
+        {readingFile && (
+          <DeepReadReader
+            file={readingFile}
+            source={readingSource}
+            isOpen={true}
+            onClose={() => setReadingFile(null)}
+          />
+        )}
       </AppStartupBiometricCheck>
       </FileViewInfoContext.Provider>
     );
@@ -1905,43 +1833,21 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
             <div className="sticky top-0 z-20 border-b border-muted/30 bg-card/40 backdrop-blur-2xl">
               <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between px-6 lg:px-8">
                 <div className="flex items-center gap-2.5">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="inline-flex h-9 items-center gap-2.5 rounded-full bg-accent/50 border border-border/50 px-3.5 text-left transition-all duration-200 hover:bg-accent/80 hover:border-border active:scale-[0.98]">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary">
-                          <Cloud className="h-3.5 w-3.5" />
-                        </span>
-                        <div className="leading-tight">
-                          <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-medium">Provider</p>
-                          <p className="max-w-[180px] truncate text-sm font-medium text-foreground">
-                            {activeProviderLabel}
-                          </p>
-                        </div>
-                        <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="lg-dropdown w-56 p-1.5">
-                      <DropdownMenuItem className="flex justify-between items-center cursor-pointer rounded-lg py-2" onSelect={() => handleProviderSelection('squidcloud')}>
-                        <span>SquidCloud</span>
-                        {activeProviderType === 'squidcloud' && <Check className="h-4 w-4 text-primary" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem disabled className="opacity-50 rounded-lg py-2">
-                        <div className="flex justify-between items-center w-full">
-                          <span>Cloudflare R2</span>
-                          <span className="text-xs uppercase tracking-wide text-muted-foreground">Soon</span>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="cursor-pointer rounded-lg py-2" onSelect={() => { setTimeout(() => handleProviderSelection('tebi'), 150); }}>
-                        <div className="flex justify-between items-center w-full">
-                          <span>Tebi.io</span>
-                          {activeProviderType === 'tebi' && <Check className="h-4 w-4 text-primary" />}
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-border/50" />
-                      <DropdownMenuItem disabled className="opacity-40 rounded-lg py-2"><span>AWS S3</span></DropdownMenuItem>
-                      <DropdownMenuItem disabled className="opacity-40 rounded-lg py-2"><span>GCP</span></DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <button
+                    onClick={() => setIsStorageManagerOpen(true)}
+                    className="inline-flex h-9 items-center gap-2.5 rounded-full bg-accent/50 border border-border/50 px-3.5 text-left transition-all duration-200 hover:bg-accent/80 hover:border-border active:scale-[0.98]"
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      <HardDrive className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="leading-tight">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-medium">Storage</p>
+                      <p className="max-w-[180px] truncate text-sm font-medium text-foreground">
+                        {activeProviderType === 'squidcloud' ? 'SquidCloud' : activeProviderId ? 'Custom Bucket' : 'SquidCloud'}
+                      </p>
+                    </div>
+                    <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />
+                  </button>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -2060,6 +1966,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                     onCreateFolder={handleCreateFolder}
                     onNotes={handleOpenNotes}
                     onEmbed={handleOpenEmbed}
+                    onCloneFromGitHub={() => setCloneDialogOpen(true)}
                   />
               )}
 
@@ -2081,6 +1988,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
               {activeTab === 'secrets'   && <SquidVeilSecrets />}
               {activeTab === 'storage'   && <StorageTab />}
               {activeTab === 'scripts'   && <Scripts />}
+              {activeTab === 'books' && (
+                <DeepReadCatalog
+                  files={files}
+                  onBookOpen={handleBookOpen}
+                />
+              )}
 
               {activeTab === 'file-requests' && (
                 profile?.is_premium ? (
@@ -2181,6 +2094,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
               const selected = filteredFiles.find(f => f.id === target.id);
               if (selected) setPreviewFile(selected);
             }}
+            onOpenEpubReader={(f) => { setPreviewFile(null); setReadingFile(f); }}
           />
         )}
 
@@ -2233,27 +2147,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
           currentFolder={currentFolder}
         />
 
-        <ProviderSetupModal
-          isOpen={isProviderModalOpen}
-          onClose={() => setIsProviderModalOpen(false)}
-          provider={setupProvider || 'tebi'}
-          onSuccess={(providerInfo) => {
-            if (providerInfo) {
-              const providerType = providerInfo.providerType as ProviderType;
-              setProviderRecords(prev => {
-                const next = prev.filter(item => item.id !== providerInfo.id);
-                next.push({ id: providerInfo.id, provider_type: providerInfo.providerType });
-                return next;
-              });
-              setConfiguredProviders(prev => (
-                prev.includes(providerInfo.providerType)
-                  ? prev
-                  : [...prev, providerInfo.providerType]
-              ));
-              persistActiveProvider(providerType, providerInfo.id);
-            }
-            fetchFiles();
-          }}
+        <StorageProviderManager
+          isOpen={isStorageManagerOpen}
+          onClose={() => setIsStorageManagerOpen(false)}
+          activeProviderType={activeProviderType}
+          activeProviderId={activeProviderId}
+          onProviderSelect={handleProviderSelect}
         />
 
         <BackgroundUploadPanel />
@@ -2353,6 +2252,21 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
           onDismiss={dismissNotification}
         />
       ))}
+      {readingFile && (
+        <DeepReadReader
+          file={readingFile}
+          source={readingSource}
+          isOpen={true}
+          onClose={() => setReadingFile(null)}
+        />
+      )}
+
+      <GitHubRepoCloneDialog
+        open={cloneDialogOpen}
+        onOpenChange={setCloneDialogOpen}
+        workspaceId={activeWorkspaceId}
+        onCloneComplete={fetchFiles}
+      />
     </AppStartupBiometricCheck>
     </FileViewInfoContext.Provider>
   );
@@ -2408,6 +2322,7 @@ interface FilesViewProps {
   onCreateFolder?: () => void;
   onNotes?: (f: FileItemType) => void;
   onEmbed?: (f: FileItemType) => void;
+  onCloneFromGitHub?: () => void;
 }
 
 const FilesView: React.FC<FilesViewProps> = ({
@@ -2425,6 +2340,7 @@ const FilesView: React.FC<FilesViewProps> = ({
   onFileCreated, onUploadComplete,
   createDisabled, onCreateBlocked, onCreateFolder,
   onNotes, onEmbed,
+  onCloneFromGitHub,
 }) => {
   const [filesCollapsed, setFilesCollapsed] = useState(false);
   const showFolders = filteredFolders.length > 0 || !currentFolder;
@@ -2551,6 +2467,7 @@ const FilesView: React.FC<FilesViewProps> = ({
             onUploadComplete={onUploadComplete}
             disabled={!!createDisabled}
             onDisabledClick={onCreateBlocked}
+            onCloneFromGitHub={onCloneFromGitHub}
           />
         </div>
       </div>

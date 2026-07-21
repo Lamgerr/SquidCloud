@@ -1,4 +1,6 @@
-// Simple CSV parser for spreadsheet viewer
+// @deprecated Use the new spreadsheet engine from '@/lib/spreadsheet-engine' instead
+// Simple CSV parser for legacy support
+
 export function parseCSV(csvText: string): string[][] {
   const lines = csvText.split('\n');
   const result: string[][] = [];

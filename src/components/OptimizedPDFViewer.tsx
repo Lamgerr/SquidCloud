@@ -257,6 +257,8 @@ export default function OptimizedPDFViewer({
   const [loupePos, setLoupePos] = useState({ x: 0, y: 0 });
   const [pageTransitionDir, setPageTransitionDir] = useState<'prev' | 'next' | null>(null);
 
+  const SPRING_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
   const pageCacheRef = useRef<Map<string, PageCacheItem>>(new Map());
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
   const [undoStack, setUndoStack] = useState<Annotation[][]>([]);
@@ -273,8 +275,18 @@ export default function OptimizedPDFViewer({
   const [lastTouchCenter, setLastTouchCenter] = useState({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const lastTap = useRef<number>(0);
+  const mobileTapRef = useRef(false);
+  const panVelocityRef = useRef({ x: 0, y: 0 });
+  const momentumFrameRef = useRef<number>(0);
+  const lastPanPositions = useRef<{ x: number; y: number; t: number }[]>([]);
 
   useEffect(() => { savePrefs({ theme, sidebarOpen, layout, transition, sidebarWidth, themeWarmth, themeBrightness, blueLightFilter, autoNightMode, annotationColor, annotationOpacity, fontSmoothing }); }, [theme, sidebarOpen, layout, transition, sidebarWidth, themeWarmth, themeBrightness, blueLightFilter, autoNightMode, annotationColor, annotationOpacity, fontSmoothing]);
+
+  useEffect(() => {
+    if (!pageTransitionDir) return;
+    const t = setTimeout(() => setPageTransitionDir(null), 300);
+    return () => clearTimeout(t);
+  }, [pageTransitionDir]);
 
   useEffect(() => {
     if (!pdfDoc) return;
@@ -320,6 +332,10 @@ export default function OptimizedPDFViewer({
       clearTimeout(timeout);
     };
   }, [isFullscreen]);
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(momentumFrameRef.current);
+  }, []);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
@@ -697,25 +713,31 @@ export default function OptimizedPDFViewer({
   useEffect(() => {
     if (!pdfDoc || !sidebarOpen || isMobile || sidebarTab !== 'thumbnails') return;
     let active = true;
-    const generate = async () => {
-      const maxToRender = Math.min(totalPages, 50);
-      for (let i = 1; i <= maxToRender; i++) {
-        if (!active) break;
-        if (thumbnails[i]) continue;
-        try {
-          const page = await pdfDoc.getPage(i);
-          const viewport = page.getViewport({ scale: 0.2 });
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) continue;
+    let rafId: number;
+    let idx = 1;
+    const maxToRender = Math.min(totalPages, 50);
+
+    const generateNext = () => {
+      if (!active || idx > maxToRender) return;
+      if (thumbnails[idx]) { idx++; generateNext(); return; }
+
+      pdfDoc.getPage(idx).then(async (page) => {
+        if (!active) return;
+        const viewport = page.getViewport({ scale: 0.2 });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
           canvas.width = viewport.width; canvas.height = viewport.height;
           await page.render({ canvasContext: ctx, viewport }).promise;
-          if (active) setThumbnails(p => ({ ...p, [i]: canvas.toDataURL('image/jpeg', 0.6) }));
-        } catch {}
-      }
+          if (active) setThumbnails(p => ({ ...p, [idx]: canvas.toDataURL('image/jpeg', 0.6) }));
+        }
+        idx++;
+        rafId = requestAnimationFrame(generateNext);
+      }).catch(() => { idx++; rafId = requestAnimationFrame(generateNext); });
     };
-    generate();
-    return () => { active = false; };
+
+    rafId = requestAnimationFrame(generateNext);
+    return () => { active = false; cancelAnimationFrame(rafId); };
   }, [pdfDoc, sidebarOpen, totalPages, thumbnails, isMobile, sidebarTab]);
 
   const handleSearch = async (query: string, mode: SearchMode = searchMode) => {
@@ -961,11 +983,11 @@ export default function OptimizedPDFViewer({
       setIsPinching(true); setIsDragging(false);
       setLastTouchDistance(getTouchDistance(touches));
       setLastTouchCenter(getTouchCenter(touches));
-    } else if (touches.length === 1 && touchPinchZoom > 1) {
+    } else if (touches.length === 1 && scale * touchPinchZoom > 1.05) {
       setIsDragging(true);
       setDragStart({ x: touches[0].clientX - touchPan.x, y: touches[0].clientY - touchPan.y });
     }
-  }, [touchPinchZoom, touchPan]);
+  }, [touchPinchZoom, touchPan, scale]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     const touches = e.touches;
@@ -977,21 +999,81 @@ export default function OptimizedPDFViewer({
       setTouchPan(prev => ({ x: prev.x + (newCenter.x - lastTouchCenter.x), y: prev.y + (newCenter.y - lastTouchCenter.y) }));
       setLastTouchDistance(newDistance);
       setLastTouchCenter(newCenter);
-    } else if (isDragging && touches.length === 1 && touchPinchZoom > 1) {
-      setTouchPan({ x: touches[0].clientX - dragStart.x, y: touches[0].clientY - dragStart.y });
+    } else if (isDragging && touches.length === 1) {
+      const px = touches[0].clientX - dragStart.x;
+      const py = touches[0].clientY - dragStart.y;
+      setTouchPan({ x: px, y: py });
+      const now = Date.now();
+      const prev = lastPanPositions.current;
+      prev.push({ x: px, y: py, t: now });
+      if (prev.length > 5) prev.shift();
+      if (prev.length >= 2) {
+        const last = prev[prev.length - 1];
+        const first = prev[0];
+        const dt = last.t - first.t;
+        if (dt > 10) {
+          panVelocityRef.current = { x: (last.x - first.x) / dt * 16, y: (last.y - first.y) / dt * 16 };
+        }
+      }
     }
-  }, [isPinching, isDragging, lastTouchDistance, lastTouchCenter, dragStart, touchPinchZoom]);
+  }, [isPinching, isDragging, lastTouchDistance, lastTouchCenter, dragStart]);
+
+  const commitZoom = useCallback((zoom: number) => {
+    const newScale = Math.min(Math.max(scale * zoom, 0.5), 4.5);
+    setZoomMode('custom');
+    setScale(newScale);
+    setTouchPinchZoom(1);
+    setTouchPan({ x: 0, y: 0 });
+  }, [scale]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (isPinching) { setIsPinching(false); if (touchPinchZoom < 1.05) { setTouchPinchZoom(1); setTouchPan({ x: 0, y: 0 }); } return; }
+    if (isPinching) {
+      setIsPinching(false);
+      if (touchPinchZoom > 1.05) {
+        commitZoom(touchPinchZoom);
+      } else {
+        setTouchPinchZoom(1);
+        setTouchPan({ x: 0, y: 0 });
+      }
+      return;
+    }
     const now = Date.now();
     if (now - lastTap.current < 280 && e.changedTouches.length === 1) {
-      if (touchPinchZoom > 1) { setTouchPinchZoom(1); setTouchPan({ x: 0, y: 0 }); }
-      else { setTouchPinchZoom(2.2); }
+      const effectiveZoom = scale * touchPinchZoom;
+      if (effectiveZoom > 1.2) {
+        setZoomMode('auto');
+        if (containerRef.current) {
+          const s = fitToContainer('auto');
+          if (s !== null) { setScale(s); setTouchPinchZoom(1); setTouchPan({ x: 0, y: 0 }); }
+        } else {
+          setScale(Math.max(0.5, scale / 2.2));
+          setTouchPinchZoom(1);
+          setTouchPan({ x: 0, y: 0 });
+        }
+      } else {
+        commitZoom(2.2);
+      }
     }
     lastTap.current = now;
+    if (isDragging) {
+      const vel = panVelocityRef.current;
+      if (Math.abs(vel.x) > 0.3 || Math.abs(vel.y) > 0.3) {
+        let mx = vel.x * 8, my = vel.y * 8;
+        let decay = 0.95;
+        const animate = () => {
+          mx *= decay; my *= decay;
+          setTouchPan(prev => ({ x: prev.x + mx, y: prev.y + my }));
+          if (Math.abs(mx) > 0.1 || Math.abs(my) > 0.1) {
+            momentumFrameRef.current = requestAnimationFrame(animate);
+          }
+        };
+        momentumFrameRef.current = requestAnimationFrame(animate);
+      }
+    }
     setIsDragging(false);
-  }, [isPinching, touchPinchZoom]);
+    lastPanPositions.current = [];
+    panVelocityRef.current = { x: 0, y: 0 };
+  }, [isPinching, touchPinchZoom, isDragging, commitZoom, scale, fitToContainer]);
 
   const saveProgress = () => {
     try {
@@ -1017,9 +1099,9 @@ export default function OptimizedPDFViewer({
   const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0;
   const canvasFilter = getEffectiveCanvasFilter();
   const transitionClass = transition === 'fade' && pageTransitionDir
-    ? 'animate-in fade-in duration-200'
+    ? `animate-in fade-in duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)]`
     : transition === 'slide' && pageTransitionDir
-    ? `animate-in ${pageTransitionDir === 'next' ? 'slide-in-from-right' : 'slide-in-from-left'} duration-200`
+    ? `animate-in ${pageTransitionDir === 'next' ? 'slide-in-from-right' : 'slide-in-from-left'} duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)]`
     : '';
 
   // ───────────────── ERROR ─────────────────
@@ -1042,7 +1124,13 @@ export default function OptimizedPDFViewer({
   if (isMobile) {
     return (
       <div ref={containerRef} className="flex flex-col w-full h-full bg-background text-foreground select-none overflow-hidden font-sans" style={{ filter: blueLightFilter ? `brightness(${themeBrightness / 100})` : 'none' }}>
-        <header className="flex items-center justify-between px-3 h-12 bg-card/95 backdrop-blur-sm border-b border-border/80 shrink-0 z-30">
+        <div className="absolute top-0 left-0 right-0 h-0.5 z-[60] bg-border/40 pointer-events-none">
+          <div style={{ width: `${progress}%`, transition: `width 400ms ${SPRING_EASE}` }} className="h-full bg-primary/80" />
+        </div>
+        <header style={{ transition: `all 500ms ${SPRING_EASE}` }} className={cn(
+          "flex items-center justify-between px-3 h-12 bg-card/95 backdrop-blur-sm border-b border-border/80 shrink-0 z-30",
+          isFullscreen && !fsUiVisible ? "-translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+        )}>
           <div className="flex items-center gap-2 min-w-0">
             <FileText className="w-4 h-4 text-primary shrink-0" />
             <span className="text-xs font-semibold truncate max-w-[140px]">{file.name}</span>
@@ -1052,12 +1140,18 @@ export default function OptimizedPDFViewer({
             <Button variant="ghost" size="icon" onClick={() => toggleBookmark()} className="h-8 w-8 text-muted-foreground active:scale-90 transition-transform">
               <Bookmark className={cn("w-4 h-4", bookmarks.some(b => b.page === currentPage) ? "fill-primary text-primary" : "")} />
             </Button>
+            <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-8 w-8 text-muted-foreground active:scale-90 transition-transform">
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </Button>
             {onDownload && <Button variant="ghost" size="icon" onClick={onDownload} className="h-8 w-8 text-muted-foreground active:scale-90 transition-transform"><Download className="w-4 h-4" /></Button>}
           </div>
         </header>
 
         {showSearch && (
-          <div className="bg-card/95 backdrop-blur-sm border-b border-border p-2 flex items-center gap-2 z-30 animate-in slide-in-from-top-1 fade-in duration-150">
+          <div className={cn(
+            "bg-card/95 backdrop-blur-sm border-b border-border p-2 flex items-center gap-2 z-30 animate-in slide-in-from-top-1 fade-in duration-150",
+            isFullscreen && !fsUiVisible ? "hidden" : ""
+          )}>
             <Search className="w-4 h-4 text-muted-foreground shrink-0" />
             <Input placeholder="Search..." value={searchQuery} onChange={e => handleSearch(e.target.value)} className="h-8 text-xs flex-1" />
             <span className="text-[11px] font-mono text-muted-foreground shrink-0 tabular-nums">{searchMatches > 0 ? `${searchMatches}` : ''}</span>
@@ -1066,8 +1160,19 @@ export default function OptimizedPDFViewer({
         )}
 
         <main
-          className={cn("flex-1 overflow-hidden flex items-center justify-center p-2 relative transition-colors duration-500", themeStyle.bg)}
-          onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+          className={cn("flex-1 overflow-hidden flex items-center justify-center relative transition-colors duration-500", themeStyle.bg)}
+          onTouchStart={(e) => {
+            mobileTapRef.current = true;
+            handleTouchStart(e);
+          }}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onClick={() => {
+            if (!mobileTapRef.current && !isPinching && scale * touchPinchZoom <= 1.05) {
+              setFsUiVisible(prev => !prev);
+            }
+            mobileTapRef.current = false;
+          }}
           onMouseUp={handleTextSelect}
         >
           {loading ? (
@@ -1077,11 +1182,15 @@ export default function OptimizedPDFViewer({
             </div>
           ) : (
             <div
-              className="relative inline-block shadow-2xl rounded-sm will-change-transform"
+              className={cn(
+                "relative inline-block shadow-2xl rounded-sm will-change-transform",
+                transitionClass,
+                pageRendering && "opacity-90"
+              )}
               style={{
                 filter: canvasFilter,
                 transform: `translate3d(${touchPan.x}px, ${touchPan.y}px, 0px) scale3d(${touchPinchZoom}, ${touchPinchZoom}, 1)`,
-                transition: isPinching || isDragging ? 'none' : 'transform 0.15s ease-out'
+                transition: isPinching || isDragging ? 'none' : `transform 0.4s ${SPRING_EASE}, opacity 0.35s ${SPRING_EASE}`
               }}
             >
               <canvas ref={activeCanvasRef} className="block rounded-sm bg-white" />
@@ -1089,19 +1198,42 @@ export default function OptimizedPDFViewer({
               <canvas ref={annotationCanvasRef} className="absolute inset-0 pointer-events-none rounded-sm" />
             </div>
           )}
+
+          {/* Zoom level indicator */}
+          {touchPinchZoom > 1.05 && (
+            <div className="absolute top-4 right-4 z-20 pointer-events-none">
+              <div className="bg-black/70 text-white text-xs font-mono px-3 py-1.5 rounded-full backdrop-blur-sm tabular-nums">
+                {Math.round(touchPinchZoom * scale * 100)}%
+              </div>
+            </div>
+          )}
         </main>
 
-        <div className="absolute bottom-6 inset-x-0 flex justify-center z-30 pointer-events-none">
-          <div className="bg-card/90 backdrop-blur-md border border-border/80 rounded-full shadow-2xl px-3 py-1.5 flex items-center gap-2 pointer-events-auto">
-            <Button variant="ghost" size="icon" disabled={currentPage <= 1} onClick={() => changePage(currentPage - 1)} className="h-8 w-8 rounded-full active:scale-90 transition-transform disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></Button>
-            <span className="text-xs font-mono font-semibold tabular-nums px-1">{currentPage} / {totalPages || '-'}</span>
-            <Button variant="ghost" size="icon" disabled={currentPage >= totalPages} onClick={() => changePage(currentPage + 1)} className="h-8 w-8 rounded-full active:scale-90 transition-transform disabled:opacity-30"><ChevronRight className="w-4 h-4" /></Button>
-            <div className="h-4 w-px bg-border/60 mx-1" />
-            <button onClick={() => setTheme(t => t === 'normal' ? 'dark' : 'dark' ? 'sepia' : 'forest' ? 'forest' : 'normal')} className="h-7 px-2.5 rounded-full text-[10px] font-semibold bg-secondary/80 text-foreground active:scale-90 transition-transform">
+        {/* Floating bottom toolbar — compact */}
+        <div style={{ transition: `all 500ms ${SPRING_EASE}` }} className={cn(
+          "absolute bottom-5 inset-x-0 flex justify-center z-30 pointer-events-none",
+          isFullscreen && !fsUiVisible ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
+        )}>
+          <div className="bg-card/85 backdrop-blur-lg border border-border/70 rounded-full shadow-2xl px-2 py-1 flex items-center gap-0.5 pointer-events-auto">
+            <button onClick={() => commitZoom(touchPinchZoom / 1.25)} className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground active:scale-90 transition-transform hover:bg-accent/50"><ZoomOut className="w-3.5 h-3.5" /></button>
+            <span className="text-[9px] font-mono font-semibold tabular-nums min-w-[28px] text-center">{Math.round(scale * touchPinchZoom * 100)}%</span>
+            <button onClick={() => commitZoom(touchPinchZoom * 1.25)} className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground active:scale-90 transition-transform hover:bg-accent/50"><ZoomIn className="w-3.5 h-3.5" /></button>
+
+            <div className="h-3.5 w-px bg-border/40 mx-0.5" />
+
+            <button disabled={currentPage <= 1} onClick={() => changePage(currentPage - 1)} className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground active:scale-90 transition-transform hover:bg-accent/50 disabled:opacity-25"><ChevronLeft className="w-3.5 h-3.5" /></button>
+            <span className="text-[9px] font-mono tabular-nums min-w-[32px] text-center">{currentPage}/{totalPages || '-'}</span>
+            <button disabled={currentPage >= totalPages} onClick={() => changePage(currentPage + 1)} className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground active:scale-90 transition-transform hover:bg-accent/50 disabled:opacity-25"><ChevronRight className="w-3.5 h-3.5" /></button>
+
+            <div className="h-3.5 w-px bg-border/40 mx-0.5" />
+
+            <button onClick={() => setTheme(t => t === 'normal' ? 'dark' : 'dark' ? 'sepia' : 'forest' ? 'forest' : 'normal')} className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground active:scale-90 transition-transform hover:bg-accent/50">
               {theme === 'dark' ? <Moon className="w-3 h-3" /> : theme === 'sepia' ? <BookOpen className="w-3 h-3" /> : <Sun className="w-3 h-3" />}
             </button>
-            <div className="h-4 w-px bg-border/60 mx-1" />
-            <Button variant="ghost" size="icon" onClick={() => setActiveTool(activeTool === 'highlight' ? 'select' : 'highlight')} className={cn("h-7 w-7 rounded-full", activeTool === 'highlight' ? 'text-primary bg-primary/20' : 'text-muted-foreground')}><Highlighter className="w-3.5 h-3.5" /></Button>
+
+            <button onClick={toggleFullscreen} className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground active:scale-90 transition-transform hover:bg-accent/50">
+              {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+            </button>
           </div>
         </div>
 
@@ -1123,15 +1255,14 @@ export default function OptimizedPDFViewer({
   return (
     <div ref={containerRef} className={cn("flex flex-col w-full h-full bg-background text-foreground select-none overflow-hidden font-sans", focusMode && "cursor-none")} style={{ filter: blueLightFilter ? `brightness(${themeBrightness / 100})` : 'none' }}>
       {!focusMode && <div className="absolute top-0 left-0 right-0 h-0.5 z-[60] bg-border/40 pointer-events-none">
-        <div className="h-full bg-primary/80 transition-all duration-300 ease-out" style={{ width: `${progress}%` }} />
+        <div style={{ width: `${progress}%`, transition: `width 400ms ${SPRING_EASE}` }} className="h-full bg-primary/80" />
       </div>}
 
-      <header className={cn(
-        "flex items-center justify-between px-4 h-14 bg-card/95 backdrop-blur-md border-b border-border/80 shrink-0 gap-3 z-40 shadow-sm",
-        "transition-all duration-300 ease-in-out",
-        isFullscreen && !fsUiVisible ? "-translate-y-full opacity-0" : "translate-y-0 opacity-100",
-        focusMode && "hidden"
-      )}>
+        <header style={{ transition: `all 500ms ${SPRING_EASE}` }} className={cn(
+          "flex items-center justify-between px-4 h-14 bg-card/95 backdrop-blur-md border-b border-border/80 shrink-0 gap-3 z-40 shadow-sm",
+          isFullscreen && !fsUiVisible ? "-translate-y-full opacity-0" : "translate-y-0 opacity-100",
+          focusMode && "hidden"
+        )}>
         <div className="flex items-center gap-2 min-w-0">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)} className="h-8 w-8 text-muted-foreground hover:text-foreground transition-transform active:scale-90" title="Toggle Sidebar (T)"><LayoutGrid className="w-4 h-4" /></Button>
           <div className="flex items-center gap-2 min-w-0">
@@ -1187,7 +1318,7 @@ export default function OptimizedPDFViewer({
 
       {/* Annotation Toolbar */}
       {showAnnotationTools && (
-        <div className="absolute top-16 left-4 z-50 bg-card border border-border shadow-2xl rounded-xl p-2 animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute top-16 left-4 z-50 bg-card border border-border shadow-2xl rounded-xl p-2 animate-in fade-in slide-in-from-top-2 duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)]">
           <div className="flex items-center gap-1 mb-1.5 pb-1.5 border-b border-border/60">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Annotate</span>
             <div className="flex-1" />
@@ -1443,10 +1574,10 @@ export default function OptimizedPDFViewer({
       {/* Main layout */}
       <div className={cn("flex flex-1 relative overflow-hidden", focusMode && "cursor-none")}>
         {/* Sidebar */}
-        <aside className={cn(
-          "bg-card/95 border-r border-border/80 flex flex-col shrink-0 transition-all duration-200 ease-in-out",
+        <aside style={{ width: sidebarOpen ? sidebarWidth : 0, transition: `all 350ms ${SPRING_EASE}` }} className={cn(
+          "bg-card/95 border-r border-border/80 flex flex-col shrink-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full w-0 border-r-0 overflow-hidden"
-        )} style={{ width: sidebarOpen ? sidebarWidth : 0 }}>
+        )}>
           <div className="flex items-center border-b border-border/80 p-1 bg-muted/30">
             {(['thumbnails', 'outline', 'bookmarks', 'annotations', 'stats'] as SidebarTab[]).map(tab => (
               <button key={tab} onClick={() => setSidebarTab(tab)} className={cn("flex-1 py-1.5 text-[10px] font-medium rounded-md flex items-center justify-center gap-1 transition-colors", sidebarTab === tab ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground")}>
@@ -1529,7 +1660,7 @@ export default function OptimizedPDFViewer({
                   </div>
                 ))}
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
-                  <div className="h-full bg-primary transition-all duration-300 rounded-full" style={{ width: `${progress}%` }} />
+                  <div style={{ width: `${progress}%`, transition: `width 400ms ${SPRING_EASE}` }} className="h-full bg-primary rounded-full" />
                 </div>
               </div>
             )}
@@ -1548,7 +1679,7 @@ export default function OptimizedPDFViewer({
         </aside>
 
         {/* Main canvas */}
-        <main className={cn("flex-1 overflow-auto relative transition-colors duration-500", themeStyle.bg)}>
+        <main style={{ transition: `background-color 600ms ${SPRING_EASE}` }} className={cn("flex-1 overflow-auto relative", themeStyle.bg)}>
           {loading ? (
             <div className="flex items-center justify-center min-h-full">
               <div className="flex flex-col items-center gap-3">
@@ -1574,7 +1705,7 @@ export default function OptimizedPDFViewer({
                 onMouseUpCapture={handleTextSelect}
                 style={{
                   transform: layout === 'dual' ? 'scale(0.85)' : 'none',
-                  transition: 'transform 0.3s ease-out'
+                  transition: `transform 0.4s ${SPRING_EASE}, opacity 0.35s ${SPRING_EASE}`
                 }}
               >
                 <canvas ref={activeCanvasRef} className="block rounded-sm bg-white" style={{ filter: canvasFilter }} />
@@ -1585,13 +1716,6 @@ export default function OptimizedPDFViewer({
           )}
         </main>
       </div>
-
-      {/* Fullscreen hint */}
-      {isFullscreen && !fsUiVisible && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none opacity-60">
-          <div className="bg-black/60 text-white text-[10px] px-3 py-1.5 rounded-full backdrop-blur-sm">Move mouse to show controls</div>
-        </div>
-      )}
 
       {/* Focus mode floating mini-controls */}
       {focusMode && (

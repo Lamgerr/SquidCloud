@@ -6,6 +6,7 @@ import FileCardMenu from './FileCardMenu';
 import MobileFileActionSheet from './MobileFileActionSheet';
 import MobilePreviewModal from './MobilePreviewModal';
 import EnhancedInstantPreviewModal from './EnhancedInstantPreviewModal';
+import DeepReadReader from './DeepReadReader';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import { getFileShareId } from '@/lib/api';
@@ -45,6 +46,7 @@ const FileCard: React.FC<FileCardProps> = ({
   const [isShared, setIsShared] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [readingEpubFile, setReadingEpubFile] = useState<any>(null);
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
@@ -281,6 +283,7 @@ const FileCard: React.FC<FileCardProps> = ({
                 onClose={() => setPreviewOpen(false)}
                 onDownload={onDownload}
                 onShare={onShare} onShareChange={onShareChange}
+                onOpenEpubReader={() => { setPreviewOpen(false); setReadingEpubFile(file); }}
               />
             )}
           </>
@@ -430,6 +433,7 @@ const FileCard: React.FC<FileCardProps> = ({
               onClose={() => setPreviewOpen(false)}
               onDownload={onDownload}
               onShare={onShare} onShareChange={onShareChange}
+              onOpenEpubReader={() => { setPreviewOpen(false); setReadingEpubFile(file); }}
             />
           )}
         </>
@@ -450,6 +454,15 @@ const FileCard: React.FC<FileCardProps> = ({
           onFavorite={handleFavoriteFile}
           onArchive={handleArchiveFile}
           onDelete={onDelete}
+        />
+      )}
+
+      {readingEpubFile && (
+        <DeepReadReader
+          file={readingEpubFile}
+          source="local"
+          isOpen={!!readingEpubFile}
+          onClose={() => setReadingEpubFile(null)}
         />
       )}
     </>

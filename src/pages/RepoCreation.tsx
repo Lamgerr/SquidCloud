@@ -31,19 +31,17 @@ const createReposWithRetry = async (
 
     // Only proceed with creation if no repos exist
     console.log('No existing repos found, creating new ones...');
-    const { data, error } = await supabase.functions.invoke('github-storage', {
+    const { data, error } = await supabase.functions.invoke('create-repos', {
       body: {
-        action: 'create-repos',
-        count,
-        userId: session.user.id
+        action: 'create',
+        count
       }
     });
 
     if (error) throw error;
-    if (!data?.repos) throw new Error('Invalid response format');
+    if (!data?.repositories) throw new Error('Invalid response format');
 
-    // No need to insert into database as the Edge Function handles that
-    return data.repos;
+    return data.repositories;
   } catch (error) {
     console.error('Repository creation/fetch error:', error);
     throw error;
@@ -102,28 +100,6 @@ const RepoCreation = () => {
         );
 
         setProgress(60);
-
-        // Store in Supabase with simplified retry
-        for (let attempt = 0; attempt < 3; attempt++) {
-          try {
-            const { error: dbError } = await supabase
-              .from('repositories')
-              .insert(
-                createdRepos.map(repo => ({
-                  repo_name: repo.name || repo.repo_name,
-                  user_id: sessionData.session.user.id,
-                  status: 'active',
-                  created_at: new Date().toISOString()
-                }))
-              );
-
-            if (!dbError) break; // Success
-            throw dbError;
-          } catch (error) {
-            if (attempt === 2) throw error; // Last attempt failed
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
-          }
-        }
 
         // Update repo count and onboarding status
         await supabase

@@ -1,4 +1,4 @@
-import { FolderOpen, Share2, Command, Smartphone, Boxes, Users } from '@/lib/icon-map';
+import { FolderOpen, Share2, Command, Smartphone, Boxes, Users, HardDrive } from '@/lib/icon-map';
 import type { DocArticle } from './types';
 
 export const guideArticles: DocArticle[] = [
@@ -183,5 +183,112 @@ triggerRun(id)     // run a script now
 listRuns(id)       // view run history and logs
 \`\`\`
 `,
+  },
+  {
+    id: 'bring-your-own-storage',
+    title: 'Bring Your Own Storage (BYOS)',
+    description: 'Connect your own S3-compatible storage buckets to the platform.',
+    icon: HardDrive,
+    category: 'guides',
+    tags: ['byos', 'storage', 's3', 'backblaze', 'r2', 'wasabi', 'tebi', 'gcp', 'aws'],
+    updated: '2026-07-20',
+    content: `# Bring Your Own Storage (BYOS)
+
+BYOS lets you connect your own cloud storage buckets to the platform. Instead of relying solely on the built-in storage, you can use buckets from AWS S3, Backblaze B2, Cloudflare R2, Google Cloud Storage, Wasabi, Tebi, or any S3-compatible service.
+
+---
+
+## Supported Providers
+
+| Provider | Type | Notes |
+|---|---|---|
+| **AWS S3** | \`s3\` | Any AWS region; use IAM credentials |
+| **Backblaze B2** | \`backblaze\` / \`b2\` | Application Key ID + Key (not master) |
+| **Cloudflare R2** | \`r2\` | Account ID required; region: auto |
+| **Google Cloud Storage** | \`gcp\` | HMAC key created via GCP Console |
+| **Tebi** | \`tebi\` | Endpoint: \`https://s3.tebi.io\` |
+| **Wasabi** | \`wasabi\` | Region-specific endpoint |
+| **Azure Blob** | \`azure\` | S3-compatible mode |
+| **Custom S3-Compatible** | \`custom\` | Any service implementing the S3 API |
+
+---
+
+## Adding a Bucket
+
+1. Open the **Storage Providers** dialog from the sidebar.
+2. Click **Add Storage Bucket**.
+3. Select your provider.
+4. Enter the credentials and bucket details.
+5. The system verifies the connection and adds it to your list.
+
+Credentials are encrypted at rest and never exposed client-side. All transfers use time-limited presigned URLs.
+
+---
+
+## Managing Buckets
+
+Each bucket shows:
+- **Health status** — healthy, unknown, or error
+- **Storage usage** — current usage vs limit (if set)
+- **Read/Write toggles** — independent controls per bucket
+- **Last health check** — when it was last verified
+
+### Read & Write Permissions
+
+Every bucket has independent read and write toggles:
+
+- **Read ON** — Files on this bucket can be downloaded and viewed.
+- **Read OFF** — Downloads from this bucket are blocked. Existing shares stop working.
+- **Write ON** — New uploads can be stored on this bucket.
+- **Write OFF** — The bucket stops accepting new uploads. Existing files remain readable.
+
+Toggling a permission off shows a confirmation warning explaining the impact.
+
+---
+
+## Storage Settings
+
+The **Settings** panel in the Storage Providers dialog lets you configure:
+
+### Fallback Behavior
+Controls what happens when no custom provider is selected:
+- **SquidCloud only** — Always use built-in storage
+- **My buckets only** — Only use your connected buckets
+- **SquidCloud first, fallback to mine** — Default to built-in, use buckets as backup
+- **My buckets first, fallback to SquidCloud** — Use your buckets when available
+
+### Upload Distribution
+When multiple buckets are connected:
+- **Round-robin** — Even distribution across all active buckets
+- **Least used first** — Fill the bucket with the most free space
+- **Primary bucket only** — Always use the selected active bucket
+
+### Public Sharing
+Mark a bucket as public to make it available for the network's donation storage system. This is entirely optional.
+
+---
+
+## Limits
+
+- Maximum **20 buckets** per account
+- No per-bucket file size or count limits (enforced by your provider)
+- Optional per-bucket storage limit you set when adding a bucket
+- Connecting your own storage is **free** — you only pay your provider
+
+---
+
+## Troubleshooting
+
+**"Bucket not accessible"** — Verify credentials, bucket name, region, and that permissions include \`s3:ListBucket\`, \`s3:GetObject\`, \`s3:PutObject\`, \`s3:DeleteObject\`.
+
+**"Read access is disabled"** — Open the Storage Providers dialog, find the bucket, and toggle Read back to ON.
+
+**"Write access is disabled"** — Same steps, toggle Write back to ON.
+
+**Uploads fail** — Check write access is enabled, verify the bucket has space, and check your provider's status.
+
+**Downloads fail** — Check read access is enabled and the file still exists in your provider's bucket.
+
+For further help, open the **BYOS Guide** from the Storage Providers dialog or contact support.`,
   },
 ];

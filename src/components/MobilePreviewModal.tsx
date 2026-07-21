@@ -7,10 +7,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
 import CBVideoPlayer from './cbVideoPlayer';
 import AdvancedImageViewer from './AdvancedImageViewer';
-import SpreadsheetViewer from './SpreadsheetViewer';
+import SpreadsheetViewer from './spreadsheet/SpreadsheetViewer';
 import EnhancedTextEditor from './EnhancedTextEditor';
 import MobilePDFViewer from './MobilePDFViewer';
-import { spreadsheetToCSV } from '@/lib/spreadsheet-utils';
 
 interface MobilePreviewModalProps {
   file: any;
@@ -160,41 +159,7 @@ const MobilePreviewModal: React.FC<MobilePreviewModalProps> = ({
       );
     }
 
-    if (isSpreadsheet) {
-      return (
-        <SpreadsheetViewer
-          src={blobUrl}
-          fileName={file.name}
-          onDownload={handleDownload}
-          onSave={async (data) => {
-            try {
-              const csvContent = spreadsheetToCSV(data);
-              const blob = new Blob([csvContent], { type: 'text/csv' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `modified_${file.name}`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-              
-              toast({
-                title: "Spreadsheet saved",
-                description: "Modified spreadsheet has been downloaded"
-              });
-            } catch (error) {
-              console.error('Save failed:', error);
-              toast({
-                title: "Save failed",
-                description: "Failed to save spreadsheet modifications",
-                variant: "destructive"
-              });
-            }
-          }}
-        />
-      );
-    }
+    if (isSpreadsheet) return null; // handled at top level
 
     if (isText) {
       return (
@@ -228,6 +193,15 @@ const MobilePreviewModal: React.FC<MobilePreviewModalProps> = ({
       </div>
     );
   };
+
+  const isSpreadsheet = file?.type?.includes('spreadsheet') ||
+                        file?.type?.includes('csv') ||
+                        file?.name?.endsWith('.csv') ||
+                        file?.name?.endsWith('.xlsx');
+
+  if (isSpreadsheet && blobUrl) {
+    return <SpreadsheetViewer src={blobUrl} fileName={file.name} onClose={onClose} onDownload={handleDownload} />;
+  }
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>

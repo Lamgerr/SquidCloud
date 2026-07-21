@@ -5,78 +5,70 @@ import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_
 Deno.serve(async (req) => {
   return withPrelGateway(req, { functionId: 'verify-provider', operation: 'default' }, async (ctx: PrelContext) => {
     try {
-      const { accountId, accessKeyId, secretAccessKey, bucketName, providerType } = await req.json();
+      const { accountId, accessKeyId, secretAccessKey, bucketName, providerType, endpoint, region } = await req.json();
 
-      // Validate required fields
       if (!accessKeyId || !secretAccessKey || !bucketName) {
         return jsonResponse({ success: false, error: "Missing required fields" }, 400);
       }
 
-      // Set endpoint based on provider type
-      let endpoint = undefined;
-      if (providerType === 'r2') {
-        if (!accountId) {
-          return jsonResponse({ success: false, error: "Account ID is required for R2" }, 400);
+      // Determine endpoint based on provider type
+      let resolvedEndpoint = endpoint;
+      if (!resolvedEndpoint) {
+        switch (providerType) {
+          case 'r2':
+            if (!accountId) return jsonResponse({ success: false, error: "Account ID is required for R2" }, 400);
+            resolvedEndpoint = `https://${accountId}.r2.cloudflarestorage.com`;
+            break;
+          case 'tebi':
+            resolvedEndpoint = 'https://s3.tebi.io';
+            break;
+          case 'wasabi':
+            resolvedEndpoint = `https://s3.${region || 'us-east-2'}.wasabisys.com`;
+            break;
+          case 'backblaze':
+          case 'b2':
+            resolvedEndpoint = `https://s3.${region || 'us-east-0'}.backblazeb2.com`;
+            break;
+          default:
+            return jsonResponse({ success: false, error: "Unknown provider type. Provide a custom endpoint." }, 400);
         }
-        endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
-      } else if (providerType === 'tebi') {
-        endpoint = `https://s3.tebi.io`;
       }
 
-      // Verify that the authenticated user owns this provider
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      const { data: existingProvider } = await supabase
-        .from("storage_providers")
-        .select("id")
-        .eq("user_id", ctx.userId)
-        .eq("provider_type", providerType)
-        .maybeSingle();
-
-      if (!existingProvider) {
-        return jsonResponse({ success: false, error: "Provider not found for this user" }, 404);
-      }
-
-      // Create S3 client with provided credentials
       const s3Client = new S3Client({
-        region: "auto",
-        endpoint,
-        credentials: {
-          accessKeyId,
-          secretAccessKey,
-        },
+        region: region || "auto",
+        endpoint: resolvedEndpoint,
+        credentials: { accessKeyId, secretAccessKey },
       });
 
-      // Try HeadBucket first (most efficient)
       try {
-        await s3Client.send(
-          new HeadBucketCommand({ Bucket: bucketName })
-        );
-
-        return jsonResponse({ success: true });
-      } catch (headError) {
-        console.error("HeadBucket error:", headError.message);
-
-        // Fallback to ListBuckets
+        await s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
+        return jsonResponse({
+          success: true,
+          provider: providerType,
+          bucket: bucketName,
+          endpoint: resolvedEndpoint,
+        });
+      } catch (headError: any) {
         try {
           const listResult = await s3Client.send(new ListBucketsCommand({}));
           const bucketExists = listResult.Buckets?.some((b) => b.Name === bucketName);
 
           if (bucketExists) {
-            return jsonResponse({ success: true });
-          } else {
-            return jsonResponse({ success: false, error: `Bucket ${bucketName} not found` }, 404);
+            return jsonResponse({
+              success: true,
+              provider: providerType,
+              bucket: bucketName,
+              endpoint: resolvedEndpoint,
+            });
           }
-        } catch (listError) {
-          console.error("ListBuckets error:", listError.message);
+
+          return jsonResponse({ success: false, error: `Bucket "${bucketName}" not found` }, 404);
+        } catch (listError: any) {
           return jsonResponse({ success: false, error: "Invalid credentials or bucket does not exist" }, 401);
         }
       }
-    } catch (error) {
-      console.error("Error:", error.message);
-      return jsonResponse({ success: false, error: "Internal server error" }, 500);
+    } catch (error: any) {
+      return jsonResponse({ success: false, error: error.message }, 500);
     }
   });
 });

@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   Crown,
   Target,
+  HardDrive,
 } from '@/lib/icon-map';
 import { toast } from 'sonner';
 import AnalyticsTab from '@/components/admin/AnalyticsTab';
@@ -34,6 +35,8 @@ import EnterpriseSupabaseControlTab from '@/components/admin/EnterpriseSupabaseC
 import KZADashboardTab from '@/components/admin/KZADashboardTab';
 import SubscriptionsTab from '@/components/admin/SubscriptionsTab';
 import SubscriptionAnalyticsTab from '@/components/admin/SubscriptionAnalyticsTab';
+import APIControlTab from '@/components/admin/APIControlTab';
+import B2ClusterManager from '@/components/admin/B2ClusterManager';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const AdminDashboard = () => {
@@ -171,7 +174,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
         <Tabs defaultValue="supabase" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 gap-1 rounded-2xl border border-border/50 bg-card/70 p-1.5 lg:grid-cols-11">
+          <TabsList className="grid w-full grid-cols-4 gap-1 rounded-2xl border border-border/50 bg-card/70 p-1.5 lg:grid-cols-12">
             <TabsTrigger value="supabase" className="flex items-center gap-2 rounded-xl">
               <Database className="h-4 w-4" />
               Supabase
@@ -187,6 +190,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="repos" className="flex items-center gap-2">
               <FolderGit2 className="h-4 w-4" />
               Repositories
+            </TabsTrigger>
+            <TabsTrigger value="storage" className="flex items-center gap-2">
+              <HardDrive className="h-4 w-4" />
+              Storage
             </TabsTrigger>
             <TabsTrigger value="tools" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -216,6 +223,10 @@ const AdminDashboard = () => {
               <ShieldAlert className="h-4 w-4" />
               KZA Live
             </TabsTrigger>
+            <TabsTrigger value="api" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              API Control
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="supabase" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">
@@ -232,6 +243,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="repos" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">
             <RepoManagerTab />
+          </TabsContent>
+
+          <TabsContent value="storage" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">
+            <B2ClusterManager />
           </TabsContent>
 
           <TabsContent value="tools" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">
@@ -261,6 +276,11 @@ const AdminDashboard = () => {
           <TabsContent value="kza" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">
             <ErrorBoundary>
               <KZADashboardTab />
+            </ErrorBoundary>
+          </TabsContent>
+          <TabsContent value="api" className="rounded-2xl border border-border/50 bg-card/50 p-4 sm:p-6">
+            <ErrorBoundary>
+              <APIControlTab />
             </ErrorBoundary>
           </TabsContent>
         </Tabs>

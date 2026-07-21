@@ -4,10 +4,15 @@ import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_
 
 type ProviderPayload = {
   providerType: string;
+  label?: string;
   accountId?: string;
   accessKeyId?: string;
   secretAccessKey?: string;
   bucketName?: string;
+  bucketRegion?: string;
+  bucketEndpoint?: string;
+  isPublic?: boolean;
+  storageLimitBytes?: number;
 };
 
 serve(async (req) => {
@@ -40,8 +45,19 @@ serve(async (req) => {
       return jsonResponse({ success: false, error: "Account ID is required for R2" }, 400);
     }
 
-    const credentials = {
-      accountId: payload.accountId,
+    // Check bucket limit
+    const { count: bucketCount } = await supabase
+      .from("storage_providers")
+      .select("*", { count: 'exact', head: true })
+      .eq("user_id", ctx.userId)
+      .eq("is_enabled", true);
+
+    if (bucketCount && bucketCount >= 20) {
+      return jsonResponse({ success: false, error: "Maximum 20 buckets allowed" }, 400);
+    }
+
+    const credentials: Record<string, string> = {
+      accountId: payload.accountId || '',
       accessKeyId: payload.accessKeyId,
       secretAccessKey: payload.secretAccessKey,
       bucketName: payload.bucketName,
@@ -70,47 +86,29 @@ serve(async (req) => {
       version: 1,
     });
 
-    const { data: existingProvider } = await supabase
+    // Insert new provider record (no longer unique constraint, each call = new bucket)
+    const { data, error } = await supabase
       .from("storage_providers")
-      .select("id")
-      .eq("user_id", ctx.userId)
-      .eq("provider_type", providerType)
-      .maybeSingle();
+      .insert({
+        user_id: ctx.userId,
+        provider_type: providerType,
+        label: payload.label || `${providerType} - ${payload.bucketName}`,
+        encrypted_credentials: encryptedPayload,
+        bucket_name: payload.bucketName,
+        bucket_region: payload.bucketRegion || 'auto',
+        bucket_endpoint: payload.bucketEndpoint || null,
+        is_default: false,
+        is_enabled: true,
+        is_public: payload.isPublic || false,
+        storage_limit_bytes: payload.storageLimitBytes || null,
+      })
+      .select("id, provider_type, label")
+      .single();
 
-    let storedProvider;
-    if (existingProvider?.id) {
-      const { data, error } = await supabase
-        .from("storage_providers")
-        .update({
-          encrypted_credentials: encryptedPayload,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingProvider.id)
-        .select("id, provider_type")
-        .single();
-
-      if (error) {
-        return jsonResponse({ success: false, error: error.message }, 500);
-      }
-      storedProvider = data;
-    } else {
-      const { data, error } = await supabase
-        .from("storage_providers")
-        .insert({
-          user_id: ctx.userId,
-          provider_type: providerType,
-          encrypted_credentials: encryptedPayload,
-          is_default: false,
-        })
-        .select("id, provider_type")
-        .single();
-
-      if (error) {
-        return jsonResponse({ success: false, error: error.message }, 500);
-      }
-      storedProvider = data;
+    if (error) {
+      return jsonResponse({ success: false, error: error.message }, 500);
     }
 
-    return jsonResponse({ success: true, provider: storedProvider });
+    return jsonResponse({ success: true, provider: data });
   });
 });

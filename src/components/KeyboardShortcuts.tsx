@@ -3,19 +3,20 @@
  * Global keyboard navigation for SquidCloud
  */
 
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Upload, FolderPlus, Search, Download, Trash2, Edit3,
   Share2, Globe, X, Keyboard, ArrowUp, ArrowDown,
-  CornerDownLeft, Command,
+  CornerDownLeft, Command, Maximize, Gamepad2,
 } from '@/lib/icon-map';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { GameSuggestionModal } from '@/components/games/GameSuggestionModal';
 
 // ── Shortcut Definition ────────────────────────────────────────
 
@@ -41,6 +42,8 @@ const SHORTCUTS: ShortcutDef[] = [
   { key: 'command-palette', label: 'Command Palette', description: 'Open command palette', icon: <Command className="w-4 h-4" />, category: 'navigation', keys: ['Ctrl', 'K'] },
   { key: 'escape', label: 'Close Modal', description: 'Close active modal or panel', icon: <X className="w-4 h-4" />, category: 'general', keys: ['Esc'] },
   { key: 'shortcuts', label: 'Show Shortcuts', description: 'Open keyboard shortcut reference', icon: <Keyboard className="w-4 h-4" />, category: 'general', keys: ['?'] },
+  { key: 'fullscreen', label: 'Toggle Fullscreen', description: 'Enter or exit native fullscreen', icon: <Maximize className="w-4 h-4" />, category: 'general', keys: ['Ctrl', 'Alt', 'Shift', 'J'] },
+  { key: 'game-modal', label: 'Arcade Lounge', description: 'Open the game suggestions modal', icon: <Gamepad2 className="w-4 h-4" />, category: 'general', keys: ['Ctrl', 'Shift', 'B'] },
 ];
 
 // ── Context ────────────────────────────────────────────────────
@@ -67,63 +70,89 @@ export function useKeyboardShortcutsContext() {
 
 export function KeyboardShortcutsProvider({ children }: { children: React.ReactNode }) {
   const [overlayOpen, setOverlayOpen] = useState(false);
-  const [handlers, setHandlers] = useState<Map<string, Set<() => void>>>(new Map());
+  const [gameModalOpen, setGameModalOpen] = useState(false);
+  const handlersRef = useRef<Map<string, Set<() => void>>>(new Map());
 
   const on = useCallback((key: string, handler: () => void) => {
-    setHandlers(prev => {
-      const next = new Map(prev);
-      const set = new Set(next.get(key) || []);
-      set.add(handler);
-      next.set(key, set);
-      return next;
-    });
+    const map = handlersRef.current;
+    const set = map.get(key) || new Set();
+    set.add(handler);
+    map.set(key, set);
     return () => {
-      setHandlers(prev => {
-        const next = new Map(prev);
-        const set = next.get(key);
-        if (set) set.delete(handler);
-        return next;
-      });
+      set.delete(handler);
+      if (set.size === 0) map.delete(key);
     };
   }, []);
 
   const triggerAction = useCallback((key: string) => {
-    const set = handlers.get(key);
+    const set = handlersRef.current.get(key);
     if (set) {
-      for (const handler of set) {
-        try { handler(); } catch { /* ignore */ }
+      for (const fn of set) {
+        try { fn(); } catch { /* ignore */ }
       }
     }
-  }, [handlers]);
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't fire if user is typing in an input
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return;
       }
 
-      // ? key to open shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerAction('game-modal');
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.shiftKey && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.documentElement.requestFullscreen();
+        }
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault();
+        e.stopPropagation();
+        setOverlayOpen(true);
+        return;
+      }
       if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
+        e.stopPropagation();
         setOverlayOpen(true);
         return;
       }
 
-      // Escape to close overlays
       if (e.key === 'Escape') {
         setOverlayOpen(false);
       }
     };
 
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [triggerAction]);
+
+  useEffect(() => on('game-modal', () => setGameModalOpen(true)), [on]);
 
   return (
     <KeyboardShortcutsContext.Provider value={{ overlayOpen, setOverlayOpen, triggerAction, on }}>
       {children}
+      <GameSuggestionModal
+        isOpen={gameModalOpen}
+        onClose={() => setGameModalOpen(false)}
+        onPlayNow={() => {
+          setGameModalOpen(false);
+          window.open('/games', '_blank')?.focus();
+        }}
+      />
     </KeyboardShortcutsContext.Provider>
   );
 }

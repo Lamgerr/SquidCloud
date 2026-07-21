@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Search, ArrowLeft, Sparkles, Book } from '@/lib/icon-map';
+import { Search, ArrowLeft, Sparkles, Book, HardDrive } from '@/lib/icon-map';
 import EnhancedMarkdownPreview from '@/components/EnhancedMarkdownPreview';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileScrollToTop from '@/components/MobileScrollToTop';
@@ -230,6 +230,33 @@ const Documentation = () => {
                   </div>
                   <Button variant="outline" size="sm">
                     View Patch Notes
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
+
+            <Card
+              className="mb-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/50"
+              onClick={() => navigate('/help/docs/bring-your-own-storage')}
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-lg bg-primary/10">
+                      <HardDrive className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        Bring Your Own Storage
+                        <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">New</Badge>
+                      </CardTitle>
+                      <CardDescription>
+                        Connect your own S3-compatible buckets — AWS, Backblaze, R2, Wasabi, and more
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    Read Guide
                   </Button>
                 </div>
               </CardHeader>

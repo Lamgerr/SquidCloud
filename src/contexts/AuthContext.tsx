@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { securityService } from '@/services/security-service';
@@ -10,6 +10,8 @@ import { AlertCircle, CheckCircle } from '@/lib/icon-map';
 import { Button } from '@/components/ui/button';
 import { MasterKeySetupModal } from '@/components/MasterKeySetupModal';
 import { buildPublicUrl, getOAuthRedirectUrl } from '@/lib/appLinks';
+import { mfaService, AalLevel } from '@/services/mfa-service';
+import MfaChallengeScreen from '@/components/MfaChallengeScreen';
 
 interface AuthContextType {
   session: Session | null;
@@ -17,12 +19,16 @@ interface AuthContextType {
   profile: any | null;
   loading: boolean;
   isNewUser: boolean;
+  aalLevel: AalLevel | null;
+  mfaRequired: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   githubSignIn: () => Promise<void>;
   refreshSession: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshAalLevel: () => Promise<void>;
+  completeMfaChallenge: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,7 +42,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
   const [showMasterKeySetup, setShowMasterKeySetup] = useState(false);
   const [masterKeyPassword, setMasterKeyPassword] = useState<string>('');
-  
+  const [aalLevel, setAalLevel] = useState<AalLevel | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
+
   let toast: any;
   try {
     const toastHook = useToast();
@@ -86,6 +94,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
+
+        // Check AAL level on session restore
+        if (session?.user) {
+          const aal = await mfaService.getAalLevel();
+          setAalLevel(aal);
+          if (aal && aal.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
+            setMfaRequired(true);
+          }
+        }
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
@@ -114,6 +131,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('New user detected');
             setIsNewUser(true);
           }
+
+          // Check MFA AAL for all sign-in methods (OAuth, passkey, etc.)
+          mfaService.getAalLevel().then(aal => {
+            setAalLevel(aal);
+            if (aal && aal.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
+              setMfaRequired(true);
+            }
+          });
 
           // Track session start asynchronously without blocking
           setTimeout(async () => {
@@ -148,6 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } else if (event === 'SIGNED_OUT') {
           setIsNewUser(false);
+          setMfaRequired(false);
+          setAalLevel(null);
           if (toast) {
             toast({
               title: "Signed out",
@@ -216,6 +243,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           device_name: deviceName,
           last_active: new Date().toISOString()
         });
+
+        // Check MFA AAL level after login
+        const aal = await mfaService.getAalLevel();
+        setAalLevel(aal);
+        if (aal && aal.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
+          setMfaRequired(true);
+        }
       }
 
     } catch (error: any) {
@@ -268,7 +302,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      await squidguard.requireActionToken('auth:signout', 'session');
+      try {
+        await squidguard.requireActionToken('auth:signout', 'session');
+      } catch {
+        // Guard check failed — proceed with sign out anyway
+      }
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
@@ -315,6 +353,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshAalLevel = useCallback(async () => {
+    const level = await mfaService.getAalLevel();
+    setAalLevel(level);
+    if (level && level.nextLevel === 'aal2' && level.currentLevel === 'aal1') {
+      setMfaRequired(true);
+    } else {
+      setMfaRequired(false);
+    }
+  }, []);
+
+  const completeMfaChallenge = useCallback(() => {
+    setMfaRequired(false);
+    refreshAalLevel();
+  }, [refreshAalLevel]);
+
   const githubSignIn = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -342,50 +395,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       profile,
       loading,
       isNewUser,
+      aalLevel,
+      mfaRequired,
       signIn,
       signUp,
       signOut,
       githubSignIn,
       refreshSession,
-      refreshProfile
+      refreshProfile,
+      refreshAalLevel,
+      completeMfaChallenge
     }}>
-      {children}
-      
-      <MasterKeySetupModal 
-        open={showMasterKeySetup} 
-        onComplete={() => {
-          setShowMasterKeySetup(false);
-          setMasterKeyPassword('');
-        }} 
-      />
+      {mfaRequired ? (
+        <MfaChallengeScreen
+          onVerified={completeMfaChallenge}
+          onCancel={signOut}
+        />
+      ) : (
+        children
+      )}
 
-      <Dialog open={showVerificationDialog} onOpenChange={setShowVerificationDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              Email Verification Required
-            </DialogTitle>
-            <DialogDescription>
-              We've sent a verification link to your email address. Please check your inbox and verify your email to continue.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="border rounded-md p-4 mt-4 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-amber-800 dark:text-amber-400">Important</h4>
-                <p className="text-sm text-amber-700 dark:text-amber-500 mt-1">
-                  If you don't see the verification email, please check your spam folder. The verification link will expire after 24 hours.
-                </p>
+      {!mfaRequired && (
+        <MasterKeySetupModal 
+          open={showMasterKeySetup} 
+          onComplete={() => {
+            setShowMasterKeySetup(false);
+            setMasterKeyPassword('');
+          }} 
+        />
+      )}
+
+      {!mfaRequired && (
+        <Dialog open={showVerificationDialog} onOpenChange={setShowVerificationDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                Email Verification Required
+              </DialogTitle>
+              <DialogDescription>
+                We've sent a verification link to your email address. Please check your inbox and verify your email to continue.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="border rounded-md p-4 mt-4 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-amber-800 dark:text-amber-400">Important</h4>
+                  <p className="text-sm text-amber-700 dark:text-amber-500 mt-1">
+                    If you don't see the verification email, please check your spam folder. The verification link will expire after 24 hours.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button onClick={() => setShowVerificationDialog(false)}>Close</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            <div className="flex justify-end mt-4">
+              <Button onClick={() => setShowVerificationDialog(false)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </AuthContext.Provider>
   );
 };

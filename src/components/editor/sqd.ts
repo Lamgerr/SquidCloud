@@ -1,6 +1,9 @@
 export type Point = { x: number; y: number; p?: number };
 
-export type BrushType = 'pen' | 'pencil' | 'brush' | 'marker';
+export type BrushType =
+  | 'pen' | 'pencil' | 'brush' | 'marker'
+  | 'felt-tip' | 'calligraphy' | 'spray' | 'neon' | 'charcoal'
+  | 'highlighter' | 'gel' | 'fountain' | 'technical';
 
 export interface InkStroke {
   id: string;

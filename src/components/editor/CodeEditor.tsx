@@ -1,165 +1,211 @@
-import React, { useEffect, useRef } from 'react';
-import type { editor as MonacoEditorNS } from 'monaco-editor';
-import { defineMonoThemes, MONO_DARK_ID, MONO_LIGHT_ID } from './monacoTheme';
-import './monaco-mono.css';
+import React, { useEffect, useRef, useCallback } from 'react'
+import { EditorView, keymap, placeholder } from '@codemirror/view'
+import { EditorState, Compartment } from '@codemirror/state'
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { oneDark } from '@codemirror/theme-one-dark'
 
 interface CodeEditorProps {
-  value: string;
-  language: string;
-  theme?: 'dark' | 'light';
-  onChange?: (value: string) => void;
-  options?: MonacoEditorNS.IStandaloneEditorConstructionOptions;
-  className?: string;
+  value: string
+  language: string
+  onChange?: (value: string) => void
+  options?: {
+    fontSize?: number
+    fontFamily?: string
+    lineHeight?: number
+    wordWrap?: boolean
+    lineNumbers?: boolean
+    readOnly?: boolean
+    placeholder?: string
+  }
+  className?: string
+  onMount?: (view: EditorView) => void
+  onLanguageLoad?: (lang: string) => Promise<import('@codemirror/language').LanguageSupport | null>
 }
 
-/**
- * Polished, monochrome Monaco wrapper.
- * - Theme is the typed `monoTheme` (one cool-grayscale ramp; syntax via
- *   luminance + weight + italics, never hue).
- * - CSS overrides (selection, scrollbars, context menu, widgets) live in
- *   ./monaco-mono.css and are injected once via the import above.
- * - Custom context menu is Monaco's menu, RESTYLED via CSS — see note in
- *   the design summary (a true from-scratch menu is out of scope).
- */
+const themeCompartment = new Compartment()
+const languageCompartment = new Compartment()
+const optionsCompartment = new Compartment()
+
+function squidTheme(dark: boolean) {
+  const bg = dark ? '#0a0a0c' : '#fbfbfc'
+  const fg = dark ? '#c7ccd6' : '#2a2c33'
+  const gutterBg = dark ? '#121214' : '#f0f0f2'
+  const gutterFg = dark ? '#3a3d47' : '#b6b9c2'
+  const activeLineBg = dark ? 'rgba(199,204,214,0.045)' : 'rgba(42,44,51,0.04)'
+  const selectionBg = dark ? 'rgba(161,161,170,0.20)' : 'rgba(75,93,128,0.18)'
+  const cursorCol = dark ? '#a1a1aa' : '#4b5d80'
+  const borderCol = dark ? '#1a1a1d' : '#e3e5ea'
+
+  return EditorView.theme(
+    {
+      '&': { background: bg, color: fg, height: '100%', fontSize: '14px' },
+      '.cm-scroller': { fontFamily: '"Geist Mono","JetBrains Mono",Menlo,monospace', lineHeight: '1.6' },
+      '.cm-content': { caretColor: cursorCol, padding: '20px 0' },
+      '.cm-cursor': { borderLeftColor: cursorCol, borderLeftWidth: '1.4px' },
+      '.cm-selectionBackground': { background: selectionBg },
+      '.cm-activeLine': { background: activeLineBg },
+      '&.cm-focused .cm-selectionBackground': { background: selectionBg },
+      '.cm-gutters': { background: gutterBg, border: 'none', borderRight: `1px solid ${borderCol}` },
+      '.cm-lineNumbers .cm-gutterElement': { color: gutterFg, padding: '0 12px 0 4px', fontSize: '12px' },
+      '.cm-activeLineGutter': { background: activeLineBg, color: fg },
+      '.cm-matchingBracket': { background: dark ? 'rgba(199,204,214,0.12)' : 'rgba(42,44,51,0.09)', outline: 'none' },
+      '.cm-selectionMatch': { background: dark ? 'rgba(199,204,214,0.10)' : 'rgba(42,44,51,0.09)' },
+      '.cm-searchMatch': { background: dark ? 'rgba(161,161,170,0.28)' : 'rgba(75,93,128,0.24)' },
+      '&.cm-focused': { outline: 'none' },
+      '.cm-foldPlaceholder': { background: 'transparent', color: dark ? '#565b69' : '#8b919e' },
+      '.cm-tooltip': { background: dark ? '#121214' : '#ffffff', border: `1px solid ${borderCol}`, borderRadius: '8px' },
+      '.cm-scroller::-webkit-scrollbar': { width: '8px', height: '8px' },
+      '.cm-scroller::-webkit-scrollbar-thumb': { background: dark ? 'rgba(199,204,214,0.10)' : 'rgba(42,44,51,0.12)', borderRadius: '4px' },
+      '.cm-scroller::-webkit-scrollbar-track': { background: 'transparent' },
+    },
+    { dark }
+  )
+}
+
+function getLanguageExtensions(lang: string) {
+  switch (lang) {
+    case 'javascript': case 'js': case 'jsx':
+      return import('@codemirror/lang-javascript').then(m => m.javascript())
+    case 'typescript': case 'ts': case 'tsx':
+      return import('@codemirror/lang-javascript').then(m => m.javascript({ typescript: true }))
+    case 'json':
+      return import('@codemirror/lang-json').then(m => m.json())
+    case 'css': case 'scss': case 'less':
+      return import('@codemirror/lang-css').then(m => m.css())
+    case 'html':
+      return import('@codemirror/lang-html').then(m => m.html())
+    case 'markdown': case 'md': case 'mdx':
+      return import('@codemirror/lang-markdown').then(m => m.markdown())
+    case 'python': case 'py':
+      return import('@codemirror/lang-python').then(m => m.python())
+    case 'sql':
+      return import('@codemirror/lang-sql').then(m => m.sql())
+    case 'rust': case 'rs':
+      return import('@codemirror/lang-rust').then(m => m.rust())
+    case 'java':
+      return import('@codemirror/lang-java').then(m => m.java())
+    case 'cpp': case 'c': case 'c++':
+      return import('@codemirror/lang-cpp').then(m => m.cpp())
+    case 'xml':
+      return import('@codemirror/lang-xml').then(m => m.xml())
+    case 'yaml': case 'yml':
+      return import('@codemirror/lang-yaml').then(m => m.yaml())
+    case 'php':
+      return import('@codemirror/lang-php').then(m => m.php())
+    case 'go':
+      return import('@codemirror/lang-go').then(m => m.go())
+    default:
+      return Promise.resolve(null)
+  }
+}
+
 const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   language,
-  theme = 'dark',
   onChange,
   options = {},
   className,
+  onMount,
+  onLanguageLoad,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<MonacoEditorNS.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null)
+  const viewRef = useRef<EditorView | null>(null)
+  const onChangeRef = useRef(onChange)
+  const prevValueRef = useRef(value)
 
-  // ---- full, commented editor configuration ----
-  const baseOptions: MonacoEditorNS.IStandaloneEditorConstructionOptions = {
-    fontSize: 14,
-    // Monospace pairing: Geist Mono (bundled) > JetBrains Mono > SF Mono > Monaco/Consolas.
-    // Geist Mono is the primary, high-legibility face.
-    fontFamily:
-      '"Geist Mono","JetBrains Mono","SF Mono","Berkeley Mono","Monaco","Inconsolata","Roboto Mono","Consolas",monospace',
-    fontLigatures: true, // enables liga + calt (e.g. =>, !=, ==)
-    fontWeight: '400',
-    lineHeight: 23, // generous, comfortable breathing room
-    letterSpacing: 0.3,
-    cursorBlinking: 'smooth', // smooth (not instant) blink
-    cursorSmoothCaretAnimation: 'on', // animated caret glide
-    cursorWidth: 1.4, // thin, restrained cursor
-    cursorSurroundingLines: 8,
-    cursorSurroundingLinesStyle: 'all',
-    scrollPredominantAxis: true, // trackpad-friendly, no diagonal j:ump
-    renderLineHighlight: 'all', // subtle FULL-WIDTH tint, not a border box
-    renderLineHighlightOnlyWhenFocus: true,
-    roundedSelection: false,
-    smoothScrolling: true,
-    mouseWheelScrollSensitivity: 1.1,
-    fastScrollSensitivity: 6,
-    scrollBeyondLastLine: false,
-    scrollbar: {
-      vertical: 'auto',
-      horizontal: 'auto',
-      useShadows: false,
-      verticalScrollbarSize: 10,
-      horizontalScrollbarSize: 10,
-      arrowSize: 0,
-      handleMouseWheel: true,
-    },
-    minimap: { enabled: false }, // removed — barely-there is still clutter
-    padding: { top: 20, bottom: 20 }, // generous, comfortable margins
-    guides: {
-      indentation: true, // single subtle shade
-      bracketPairs: true, // subtle horizontal guide
-      bracketPairsHorizontal: true,
-      highlightActiveIndentation: true,
-    },
-    bracketPairColorization: { enabled: true }, // kept monochrome via theme
-    renderWhitespace: 'none',
-    wordWrap: 'off',
-    wrappingStrategy: 'advanced',
-    tabSize: 2,
-    insertSpaces: true,
-    automaticLayout: true,
-    stickyScroll: { enabled: false }, // disable sticky-scroll clutter
-    folding: true,
-    showFoldingControls: 'mouseover', // minimal folding gutter
-    suggestFontSize: 12,
-    suggestLineHeight: 18,
-    mouseWheelZoom: false,
-    overviewRulerLanes: 0, // keep the overview ruler minimal
-    overviewRulerBorder: false,
-    hideCursorInOverviewRuler: true,
-    colorDecorators: false,
-    glyphMargin: false,
-    lineDecorationsWidth: 8,
-    lineNumbersMinChars: 3,
-    occurrencesHighlight: 'singleFile',
-    selectionHighlight: true,
-    matchBrackets: 'always',
-    contextmenu: true,
-    fixedOverflowWidgets: true,
-    ...options,
-  };
+  onChangeRef.current = onChange
 
   useEffect(() => {
-    let disposed = false;
-    (async () => {
-      if (!containerRef.current) return;
-      const monaco = await import('monaco-editor');
-      if (disposed) return;
-      monacoRef.current = monaco;
-      defineMonoThemes(monaco);
+    if (!containerRef.current) return
+    if (viewRef.current) return
 
-      const ed = monaco.editor.create(containerRef.current, {
-        value,
-        language,
-        theme: theme === 'dark' ? MONO_DARK_ID : MONO_LIGHT_ID,
-        ...baseOptions,
-      });
-      editorRef.current = ed;
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        onChangeRef.current?.(update.state.doc.toString())
+      }
+    })
 
-      ed.onDidChangeModelContent(() => onChange?.(ed.getValue()));
+    const opts = options
+    const state = EditorState.create({
+      doc: value,
+      extensions: [
+        keymap.of([...defaultKeymap, ...historyKeymap]),
+        history(),
+        updateListener,
+        squidTheme(true),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        optionsCompartment.of(optionsExtensions(opts)),
+        themeCompartment.of([]),
+        languageCompartment.of([]),
+        opts.readOnly ? EditorView.editable.of(false) : [],
+        opts.placeholder ? placeholder(opts.placeholder) : [],
+      ],
+    })
 
-      // focus ring on the shell is handled by CSS (`.mono-editor-shell:focus-within`)
-    })();
+    const view = new EditorView({ state, parent: containerRef.current })
+    viewRef.current = view
+    onMount?.(view)
+
+    loadLanguage(language)
 
     return () => {
-      disposed = true;
-      editorRef.current?.dispose();
-      editorRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      view.destroy()
+      viewRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
-    if (editorRef.current && monacoRef.current) {
-      monacoRef.current.editor.setTheme(theme === 'dark' ? MONO_DARK_ID : MONO_LIGHT_ID);
+    if (!viewRef.current) return
+    const current = viewRef.current.state.doc.toString()
+    if (current !== value && onChangeRef.current == null) {
+      viewRef.current.dispatch({
+        changes: { from: 0, to: current.length, insert: value },
+      })
+      prevValueRef.current = value
     }
-  }, [theme]);
+  }, [value])
 
   useEffect(() => {
-    if (editorRef.current && editorRef.current.getValue() !== value) {
-      editorRef.current.setValue(value);
+    if (viewRef.current) {
+      viewRef.current.dispatch({ effects: optionsCompartment.reconfigure(optionsExtensions(options)) })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }, [options.fontSize, options.fontFamily, options.lineHeight, options.wordWrap, options.lineNumbers, options.readOnly])
+
+  const loadLanguage = useCallback(async (lang: string) => {
+    if (!viewRef.current) return
+    let ext
+    if (onLanguageLoad) {
+      ext = await onLanguageLoad(lang)
+    }
+    if (!ext) {
+      try { ext = await getLanguageExtensions(lang) } catch { ext = null }
+    }
+    viewRef.current.dispatch({ effects: languageCompartment.reconfigure(ext ? [ext] : []) })
+  }, [onLanguageLoad])
+
+  useEffect(() => { loadLanguage(language) }, [language, loadLanguage])
 
   useEffect(() => {
-    if (editorRef.current && monacoRef.current) {
-      const model = editorRef.current.getModel();
-      if (model) monacoRef.current.editor.setModelLanguage(model, language);
+    if (viewRef.current) {
+      viewRef.current.dispatch({ effects: themeCompartment.reconfigure(squidTheme(true)) })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [language]);
+  }, [])
 
   return (
     <div
       ref={containerRef}
-      className={`mono-editor-shell ${className ?? ''}`}
-      style={{ minHeight: 200, width: '100%', height: '100%' }}
+      className={className}
+      style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)' }}
     />
-  );
-};
+  )
+}
 
-export default CodeEditor;
+function optionsExtensions(opts: CodeEditorProps['options']) {
+  if (!opts) return []
+  const exts: import('@codemirror/state').Extension[] = []
+  if (opts.wordWrap) exts.push(EditorView.lineWrapping)
+  return exts
+}
+
+export default CodeEditor

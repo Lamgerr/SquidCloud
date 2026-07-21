@@ -1,93 +1,140 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+};
 
 serve(async (req) => {
-  return await withPrelGateway(req, { functionId: 'create-repos', operation: 'default' }, async (ctx: PrelContext) => {
-    let body: any;
-    
-    try {
-      body = await req.json();
-    } catch {
-      return jsonResponse({ error: "Invalid request body" }, 400);
-    }
-    
-    const { action } = body;
-    
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return jsonResponse({ error: "Server configuration error" }, 500);
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    const apiKey = Deno.env.get("GEMINI_API_KEY") || "";
-    
-    try {
-      const { data: repos, error: fetchError } = await supabase
-        .from("repositories")
-        .select("*")
-        .eq("user_id", ctx.userId);
-      
-      if (fetchError) {
-        return jsonResponse({ error: "Failed to fetch repositories" }, 500);
-      }
-      
-      if (action === "create") {
-        const count = body.count || 5;
-        const repoConfigurations = await generateCreativeRepoNames(count, apiKey);
-        
-        const createdRepos = [];
-        
-        for (let i = 0; i < repoConfigurations.length; i++) {
-          const repoName = repoConfigurations[i];
-          
-          const tagString = body.tags && Array.isArray(body.tags) 
-            ? body.tags.join(", ") 
-            : "";
-          
-          const { data: newRepo, error: createError } = await supabase
-            .from("repositories")
-            .insert({
-              name: repoName,
-              description: `Secure digital nexus for encrypted assets`,
-              user_id: ctx.userId,
-              tags: tagString,
-              storage_type: "github",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-          
-          if (createError) {
-            console.error("Error creating repository:", createError);
-            continue;
-          } else {
-            createdRepos.push(newRepo);
-          }
-        }
-        
-        return jsonResponse({
-          success: true,
-          repositories: createdRepos
-        });
-      }
-      
-      return jsonResponse({
-        success: true,
-        repositories: repos
-      });
-      
-    } catch (error) {
-      console.error('Error in create-repos function:', error);
-      
-      return jsonResponse({ error: error.message || 'An error occurred while creating vaults' }, 500);
-    }
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: "Server configuration error" }), {
+      status: 500,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
+  }
+
+  // Verify JWT from Authorization header
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Authorization required" }), {
+      status: 401,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
   });
+
+  // Verify the JWT and get user
+  const token = authHeader.replace("Bearer ", "");
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+      status: 401,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
+  }
+
+  const userId = user.id;
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid request body" }), {
+      status: 400,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
+  }
+
+  const { action } = body;
+  const apiKey = Deno.env.get("GEMINI_API_KEY") || "";
+
+  try {
+    const { data: repos, error: fetchError } = await supabase
+      .from("repositories")
+      .select("*")
+      .eq("user_id", userId);
+
+    if (fetchError) {
+      return new Response(JSON.stringify({ error: "Failed to fetch repositories" }), {
+        status: 500,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "create") {
+      const count = body.count || 5;
+      const repoConfigurations = await generateCreativeRepoNames(count, apiKey);
+
+      const createdRepos = [];
+
+      for (let i = 0; i < repoConfigurations.length; i++) {
+        const repoName = repoConfigurations[i];
+
+        const tagString = body.tags && Array.isArray(body.tags)
+          ? body.tags.join(", ")
+          : "";
+
+        const { data: newRepo, error: createError } = await supabase
+          .from("repositories")
+          .insert({
+            name: repoName,
+            description: `Secure digital nexus for encrypted assets`,
+            user_id: userId,
+            tags: tagString,
+            storage_type: "github",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error("Error creating repository:", createError);
+          continue;
+        } else {
+          createdRepos.push(newRepo);
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        repositories: createdRepos
+      }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      repositories: repos
+    }), {
+      status: 200,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
+
+  } catch (error: any) {
+    console.error('Error in create-repos function:', error);
+
+    return new Response(JSON.stringify({ error: error.message || 'An error occurred while creating vaults' }), {
+      status: 500,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
+  }
 });
 
 // Helper function to generate creative repository names using Gemini API

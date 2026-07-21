@@ -15,8 +15,7 @@ import CBVideoPlayer from './cbVideoPlayer';
 import MobileVideoPlayer from './MobileVideoPlayer';
 import EnhancedTextEditor from './EnhancedTextEditor';
 import AdvancedImageViewer from '@/components/AdvancedImageViewer';
-import SpreadsheetViewer from '@/components/SpreadsheetViewer';
-import { spreadsheetToCSV } from '@/lib/spreadsheet-utils';
+import SpreadsheetViewer from '@/components/spreadsheet/SpreadsheetViewer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import OptimizedPDFViewer from '@/components/OptimizedPDFViewer';
 import ModelViewer from '@/components/ModelViewer';
@@ -55,6 +54,7 @@ interface EnhancedInstantPreviewModalProps {
   onDownload?: () => void; onShare?: () => void; onNext?: () => void;
   onPrevious?: () => void; hasNext?: boolean; hasPrevious?: boolean;
   currentIndex?: number; totalFiles?: number; shareId?: string;
+  onOpenEpubReader?: (file: any) => void;
 }
 
 const getFileTypeLabel = (file: any) => {
@@ -71,6 +71,7 @@ const getFileTypeLabel = (file: any) => {
 const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = ({
   file, isOpen, onClose, onDownload, onShare, onNext, onPrevious,
   hasNext = false, hasPrevious = false, currentIndex, totalFiles, shareId,
+  onOpenEpubReader,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -248,6 +249,15 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     load();
   }, [isOpen, file?.id]);
 
+  // Auto-handoff: if file is EPUB, close this modal and open DeepReadReader
+  const isEpub = file?.name?.toLowerCase().endsWith('.epub') || file?.type === 'application/epub+zip';
+  useEffect(() => {
+    if (isOpen && isEpub && onOpenEpubReader) {
+      onOpenEpubReader(file);
+      onClose();
+    }
+  }, [isOpen, isEpub, file, onOpenEpubReader, onClose]);
+
   const handleDownload = useCallback(async () => {
     if (onDownload) { onDownload(); return; }
     if (!decodedBlob && file?.id) {
@@ -299,6 +309,14 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
         </div>
       );
     }
+    if (isEpub) return (
+      <div className="grid h-full w-full place-items-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader size="lg" />
+          <p className="text-xs font-mono text-muted-foreground animate-pulse">Opening reader…</p>
+        </div>
+      </div>
+    );
     if (isStreamingVideo) return <div className="h-full w-full bg-black"><CBVideoPlayer file={file} shareId={shareId} autoPlay className="h-full w-full" /></div>;
     if (loading) return <div className="grid h-full w-full place-items-center bg-background"><div className="flex flex-col items-center gap-3"><Loader size="lg" /><p className="text-xs font-mono text-muted-foreground animate-pulse">Decrypting file stream...</p></div></div>;
     if (error) return <div className="flex h-full items-center justify-center px-6 bg-background"><div className="p-6 rounded-2xl bg-card border border-border text-center max-w-sm space-y-2"><p className="text-sm font-semibold text-destructive">Failed to render preview</p><p className="text-xs text-muted-foreground">{error}</p></div></div>;
@@ -309,7 +327,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     if (isPDF) return <div className="h-full w-full bg-background overflow-hidden"><OptimizedPDFViewer file={file} blobUrl={blobUrl} pdfBlob={decodedBlob} onClose={handleClose} onDownload={handleDownload} /></div>;
     if (isImage) return <AdvancedImageViewer src={blobUrl} alt={file.name} file={{ name: file.name, size: file.size, type: file.type }} onDownload={handleDownload} onShare={handleShare} />;
     if (isVideo) return isMobile ? <div className="h-full w-full bg-black"><MobileVideoPlayer file={file} blobUrl={blobUrl} onClose={handleClose} /></div> : <div className="h-full w-full bg-black flex items-center justify-center"><video src={blobUrl} controls className="max-h-full max-w-full" /></div>;
-    if (isSpreadsheet) return <SpreadsheetViewer src={blobUrl} fileName={file.name} onDownload={handleDownload} />;
+    if (isSpreadsheet) return <SpreadsheetViewer src={blobUrl} fileName={file.name} onClose={handleClose} onDownload={handleDownload} />;
     if (isText) return <div className="relative h-full w-full overflow-hidden bg-muted"><EnhancedTextEditor file={file} decodedBlob={decodedBlob} onSave={async () => {}} onDownload={handleDownload} onShare={handleShare} readonly={false} /></div>;
 
     return <div className="flex h-full items-center justify-center bg-background"><p className="text-sm text-muted-foreground">Preview not supported</p></div>;
