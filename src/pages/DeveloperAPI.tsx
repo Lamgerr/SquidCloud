@@ -1248,6 +1248,44 @@ const DeveloperAPI = () => {
                 ))}
               </div>
             </div>
+
+            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
+              <div className="flex items-center gap-2.5 pb-1">
+                <FileText className="w-4 h-4 text-muted-foreground/70" />
+                <span className="text-[13px] font-medium">Downloadable API Docs</span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
+                  Complete API documentation in Markdown format. Two versions available:
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-ai-agents.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border/40 bg-muted/20 hover:bg-accent/30 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-blue-400" />
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-medium text-foreground/80">AI Agent Guide</div>
+                      <div className="text-[10px] text-muted-foreground/50 truncate">Technical setup guide for AI agents</div>
+                    </div>
+                  </a>
+                  <a
+                    href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-humans.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border/40 bg-muted/20 hover:bg-accent/30 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-medium text-foreground/80">User Guide</div>
+                      <div className="text-[10px] text-muted-foreground/50 truncate">Simple English user-friendly guide</div>
+                    </div>
+                  </a>
+                </div>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
