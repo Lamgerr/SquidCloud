@@ -513,6 +513,12 @@ const DeveloperAPI = () => {
   const [configForm, setConfigForm] = useState<Record<string, any>>({});
   const [savingConfig, setSavingConfig] = useState(false);
 
+  const [statusApiKey, setStatusApiKey] = useState('');
+  const [statusData, setStatusData] = useState<any>(null);
+  const [statusUserData, setStatusUserData] = useState<any>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [resetCountdown, setResetCountdown] = useState('');
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: 'Copied!', description: 'Code copied to clipboard' });
@@ -699,6 +705,43 @@ const DeveloperAPI = () => {
       setPlaygroundLoading(false);
     }
   };
+
+  const fetchStatusData = async (key: string) => {
+    if (!key.trim()) return;
+    setStatusLoading(true);
+    try {
+      const headers = { 'X-SquidCloud-Key': key.trim() };
+      const [userRes, usageRes] = await Promise.allSettled([
+        fetch(`${BASE_URL}/user`, { headers }),
+        fetch(`${BASE_URL}/stats/usage`, { headers }),
+      ]);
+      if (userRes.status === 'fulfilled' && userRes.value.ok) {
+        setStatusUserData(await userRes.value.json());
+      }
+      if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
+        const data = await usageRes.value.json();
+        setStatusData(data.usage || data);
+      }
+    } catch {} finally {
+      setStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const calcCountdown = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setUTCHours(24, 0, 0, 0);
+      const diff = midnight.getTime() - now.getTime();
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setResetCountdown(`${h}h ${m}m ${s}s`);
+    };
+    calcCountdown();
+    const interval = setInterval(calcCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (isMobile) {
     return <DeveloperAPIMobile />;
@@ -1001,45 +1044,100 @@ const DeveloperAPI = () => {
           </TabsContent>
 
           <TabsContent value="status" className="space-y-3 mt-0">
-            {usageStats && (
+            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <Key className="w-4 h-4 text-muted-foreground/70" />
+                <span className="text-[13px] font-medium">API Key for Status</span>
+              </div>
+              <div className="h-px bg-border/40" />
+              <p className="text-[11px] text-muted-foreground/60">Enter your API key to view live credit usage, stats, and reset info</p>
+              <div className="flex gap-2">
+                <Input
+                  className="h-8 text-xs font-mono flex-1"
+                  type="password"
+                  value={statusApiKey}
+                  onChange={(e) => setStatusApiKey(e.target.value)}
+                  placeholder="cb_your_api_key"
+                />
+                <button
+                  onClick={() => fetchStatusData(statusApiKey)}
+                  disabled={statusLoading || !statusApiKey.trim()}
+                  className="inline-flex items-center justify-center gap-1 h-8 rounded-md px-3 text-[12px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+                >
+                  {statusLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
+                  Fetch
+                </button>
+              </div>
+            </div>
+
+            {(statusData || statusUserData) && (
               <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-3">
                 <div className="flex items-center gap-2.5">
                   <Activity className="w-4 h-4 text-muted-foreground/70" />
                   <span className="text-[13px] font-medium">Credit Usage</span>
-                  {loadingUsage && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />}
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="h-px bg-border/40" />
+                <div className="grid grid-cols-4 gap-2">
                   <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                    <div className="text-lg font-semibold tabular-nums">{usageStats?.today?.credits_used ?? 0}</div>
-                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Today</div>
+                    <div className="text-lg font-semibold tabular-nums">
+                      {statusUserData?.credits?.used_today ?? statusData?.today?.credits_used ?? 0}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Used Today</div>
                   </div>
                   <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                    <div className="text-lg font-semibold tabular-nums">{usageStats?.this_week?.credits_used ?? 0}</div>
+                    <div className="text-lg font-semibold tabular-nums">
+                      {statusUserData?.credits?.remaining ?? statusData?.credits_remaining ?? 0}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Left</div>
+                  </div>
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
+                    <div className="text-lg font-semibold tabular-nums">
+                      {statusUserData?.credits?.daily_limit ?? statusData?.today?.daily_limit ?? 0}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Daily Limit</div>
+                  </div>
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
+                    <div className="text-lg font-semibold tabular-nums">{statusData?.total_requests_today ?? 0}</div>
+                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Requests Today</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
+                    <div className="text-lg font-semibold tabular-nums">{statusData?.this_week?.credits_used ?? 0}</div>
                     <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">This Week</div>
                   </div>
                   <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                    <div className="text-lg font-semibold tabular-nums">{usageStats?.this_month?.credits_used ?? 0}</div>
+                    <div className="text-lg font-semibold tabular-nums">{statusData?.this_month?.credits_used ?? 0}</div>
                     <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">This Month</div>
                   </div>
-                </div>
-                {creditInfo && (
-                  <div>
-                    <div className="flex justify-between text-[12px] text-muted-foreground/70 mb-1">
-                      <span>Daily limit: {creditInfo.daily_limit}</span>
-                      <span>{creditInfo.remaining} remaining</span>
-                    </div>
-                    <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
-                      <div
-                        className={cn("h-full rounded-full transition-all duration-500", {
-                          'bg-green-500': (creditInfo.remaining / creditInfo.daily_limit) > 0.5,
-                          'bg-yellow-500': (creditInfo.remaining / creditInfo.daily_limit) <= 0.5 && (creditInfo.remaining / creditInfo.daily_limit) >= 0.25,
-                          'bg-red-500': (creditInfo.remaining / creditInfo.daily_limit) < 0.25,
-                        })}
-                        style={{ width: `${(creditInfo.remaining / creditInfo.daily_limit) * 100}%` }}
-                      />
-                    </div>
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
+                    <div className="text-lg font-semibold tabular-nums">{resetCountdown}</div>
+                    <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Until Reset</div>
                   </div>
-                )}
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[12px] text-muted-foreground/70 mb-1">
+                    <span>Credits remaining: {statusUserData?.credits?.remaining ?? statusData?.credits_remaining ?? 0} / {statusUserData?.credits?.daily_limit ?? statusData?.today?.daily_limit ?? 0}</span>
+                    <span>
+                      {Math.round(
+                        ((statusUserData?.credits?.remaining ?? statusData?.credits_remaining ?? 0) /
+                          (statusUserData?.credits?.daily_limit ?? statusData?.today?.daily_limit ?? 1)) * 100
+                      )}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 bg-muted/30 rounded-full overflow-hidden">
+                    <div
+                      className={cn("h-full rounded-full transition-all duration-500", {
+                        'bg-green-500': ((statusUserData?.credits?.remaining ?? statusData?.credits_remaining ?? 0) / (statusUserData?.credits?.daily_limit ?? statusData?.today?.daily_limit ?? 1)) > 0.5,
+                        'bg-yellow-500': ((statusUserData?.credits?.remaining ?? statusData?.credits_remaining ?? 0) / (statusUserData?.credits?.daily_limit ?? statusData?.today?.daily_limit ?? 1)) <= 0.5,
+                        'bg-red-500': ((statusUserData?.credits?.remaining ?? statusData?.credits_remaining ?? 0) / (statusUserData?.credits?.daily_limit ?? statusData?.today?.daily_limit ?? 1)) < 0.25,
+                      })}
+                      style={{ width: `${Math.min(100, ((statusUserData?.credits?.remaining ?? statusData?.credits_remaining ?? 0) / (statusUserData?.credits?.daily_limit ?? statusData?.today?.daily_limit ?? 1)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
