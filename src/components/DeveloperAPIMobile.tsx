@@ -34,11 +34,17 @@ type EndpointHealth = {
 const BASE_URL = 'https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/cloudbliss-api';
 
 const endpoints: Endpoint[] = [
+  { method: 'POST', path: '/upload', description: 'Initialize upload — get signed B2 URLs + encryption key (simple, recommended)', scopes: ['write'], example: `curl -X POST ${BASE_URL}/upload -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"name":"doc.pdf","type":"application/pdf","size":1024}'` },
+  { method: 'POST', path: '/upload/complete', description: 'Complete upload — just send upload_id, server verifies and registers file', scopes: ['write'], example: `curl -X POST ${BASE_URL}/upload/complete -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"upload_id":"uuid"}'` },
+  { method: 'GET', path: '/download/:id', description: 'Download file — auto-decrypts encrypted files, returns plaintext (simple, recommended)', scopes: ['read'], example: `curl -X GET ${BASE_URL}/download/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY" -o file.pdf` },
   { method: 'GET', path: '/files', description: 'List all files and folders', scopes: ['read'], example: `curl -X GET ${BASE_URL}/files -H "X-SquidCloud-Key: YOUR_API_KEY"`, sampleResponse: '{"files":[...],"success":true}' },
   { method: 'GET', path: '/files/:id/metadata', description: 'Get file metadata and encryption info', scopes: ['read'], example: `curl -X GET ${BASE_URL}/files/FILE_ID/metadata -H "X-SquidCloud-Key: YOUR_API_KEY"` },
-  { method: 'GET', path: '/files/:id/download', description: 'Download decrypted file', scopes: ['read'], example: `curl -X GET ${BASE_URL}/files/FILE_ID/download -H "X-SquidCloud-Key: YOUR_API_KEY" -o file.pdf` },
-  { method: 'POST', path: '/files/upload', description: 'Upload file with optional folder', scopes: ['write'], example: `curl -X POST ${BASE_URL}/files/upload -H "X-SquidCloud-Key: YOUR_API_KEY" -F "file=@document.pdf"`, sampleResponse: '{"file":{"id":"..."},"success":true}' },
+  { method: 'GET', path: '/files/:id/download', description: 'Download decrypted file (legacy)', scopes: ['read'], example: `curl -X GET ${BASE_URL}/files/FILE_ID/download -H "X-SquidCloud-Key: YOUR_API_KEY" -o file.pdf` },
+  { method: 'POST', path: '/files/upload/init', description: 'Legacy: Initialize chunked upload — get signed B2 URLs', scopes: ['write'], example: `curl -X POST ${BASE_URL}/files/upload/init -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"name":"doc.pdf","type":"application/pdf","size":1024}'` },
+  { method: 'POST', path: '/files/upload/complete', description: 'Legacy: Complete upload and register file', scopes: ['write'], example: `curl -X POST ${BASE_URL}/files/upload/complete -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"upload_id":"...","file_id":"...","chunks":[...]}'` },
   { method: 'DELETE', path: '/files/:id', description: 'Soft delete a file', scopes: ['delete'], example: `curl -X DELETE ${BASE_URL}/files/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY"` },
+  { method: 'POST', path: '/stream/init', description: 'Get short-lived streaming session token', scopes: ['write'], example: `curl -X POST ${BASE_URL}/stream/init -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"file_id":"FILE_ID"}'` },
+  { method: 'GET', path: '/stream', description: 'Stream encrypted file (Range proxy, server-side decrypt)', scopes: ['read'], example: `curl -X GET "${BASE_URL}/stream?id=FILE_ID&token=STREAM_TOKEN"` },
   { method: 'GET', path: '/keys', description: 'List your API keys', scopes: ['read'], example: `curl -X GET ${BASE_URL}/keys -H "X-SquidCloud-Key: YOUR_API_KEY"` },
   { method: 'GET', path: '/storage', description: 'Get storage usage and quota', scopes: ['read'], example: `curl -X GET ${BASE_URL}/storage -H "X-SquidCloud-Key: YOUR_API_KEY"` },
 ];
@@ -138,7 +144,7 @@ const DeveloperAPIMobile = () => {
           </button>
           <div className="flex-1">
             <h1 className="text-[15px] font-bold leading-tight">Developer API</h1>
-            <p className="text-[10px] text-muted-foreground/60">SquidCloud API v2.2</p>
+            <p className="text-[10px] text-muted-foreground/60">SquidCloud API v4.0</p>
           </div>
         </div>
         <div className="flex gap-1 px-3 pb-2 overflow-x-auto scrollbar-none">
@@ -166,7 +172,7 @@ const DeveloperAPIMobile = () => {
             <div className="rounded-2xl border border-border/50 bg-card/80 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <Code className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">SquidCloud API v2.2</span>
+                <span className="text-[13px] font-medium">SquidCloud API v4.0</span>
               </div>
               <div className="h-px bg-border/40" />
               <div className="grid grid-cols-3 gap-2">

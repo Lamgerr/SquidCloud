@@ -1,36 +1,123 @@
+// CloudBliss API v4.0 — API Handlers
+
 import {
-  jsonResponse, errorResponse, apiSuccess, apiError,
-  CORS_HEADERS, getOptionalEncryptionKey, validateEncryptionKeyFormat,
-  generateEncryptionKey, encryptData, decryptData, calculateSHA256, uint8ToBase64,
-  loadB2Clusters, signB2Url, ROLE_RANK,
-  requireWorkspaceRole, resolveWorkspaceId, encryptSecretValue, decryptSecretValue,
-  deriveAESKeyFromApiKey, logAudit
-} from './utils.ts';
+  jsonResponse, CORS_HEADERS, getOptionalEncryptionKey, validateEncryptionKeyFormat,
+  generateEncryptionKey, decryptData, uint8ToBase64, makeB2Client,
+  ROLE_RANK, requireWorkspaceRole, resolveWorkspaceId, encryptSecretValue, decryptSecretValue,
+  deriveAESKeyFromApiKey, logAudit, B2_ENDPOINT, B2_BUCKET, API_VERSION,
+  verifyStreamToken, StreamToken, signB2Url,
+} from './lib.ts'
 
-const B2_ENDPOINT = () => Deno.env.get('B2_ENDPOINT') ?? '';
-const B2_BUCKET = () => Deno.env.get('B2_BUCKET_NAME') ?? '';
-const B2_ACCESS_KEY = () => Deno.env.get('B2_ACCESS_KEY_ID') ?? '';
-const B2_SECRET = () => Deno.env.get('B2_SECRET_ACCESS_KEY') ?? '';
-const B2_REGION = () => Deno.env.get('B2_REGION') ?? 'us-west-000';
+// ============================================================
+// RES54 ENCRYPTION FORMAT (matches service-worker.js exactly)
+// ============================================================
+// Format v2: [4-byte JSON header len][JSON header][encrypted data]
+// JSON header: { version: 2, chunks: N, ivs: [base64...], chunkSize: N }
+// Each encrypted data block: AES-256-GCM(key, iv, plaintext)
 
-function uuidRegex(): RegExp {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function aesGcmDecrypt(iv: Uint8Array, encrypted: Uint8Array, keyStr: string, aad?: Uint8Array): Promise<ArrayBuffer> {
+  const keyBytes = new TextEncoder().encode(keyStr.slice(0, 32).padEnd(32, '0'))
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['decrypt'])
+  const opts: any = { name: 'AES-GCM', iv }
+  if (aad) opts.additionalData = aad
+  return crypto.subtle.decrypt(opts, key, encrypted)
 }
 
-function getIdFromPath(pathParts: string[], index: number): string | null {
-  const val = pathParts[index];
-  if (!val) return null;
-  return uuidRegex().test(val) ? val : null;
+async function aesGcmEncrypt(iv: Uint8Array, plaintext: Uint8Array, keyStr: string): Promise<Uint8Array> {
+  const keyBytes = new TextEncoder().encode(keyStr.slice(0, 32).padEnd(32, '0'))
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt'])
+  return new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext))
 }
 
-async function makeB2Client() {
-  const { AwsClient } = await import('npm:aws4fetch');
-  return new AwsClient({
-    accessKeyId: B2_ACCESS_KEY(),
-    secretAccessKey: B2_SECRET(),
-    region: B2_REGION(),
-    service: 's3',
-  });
+async function decryptStreamChunk(encryptedData: ArrayBuffer, key: string): Promise<ArrayBuffer> {
+  const bin = new Uint8Array(encryptedData)
+  if (bin.byteLength < 16) throw new Error('Encrypted chunk too small')
+
+  const dv = new DataView(bin.buffer, bin.byteOffset, bin.byteLength)
+  const first4 = dv.getUint32(0, true)
+
+  // Try v2 format: 4-byte header len + JSON header + encrypted sub-chunks
+  if (first4 > 0 && first4 < 1000 && first4 < bin.byteLength - 4) {
+    try {
+      const header = JSON.parse(new TextDecoder().decode(bin.slice(4, 4 + first4)))
+      if (header.version >= 2 && header.chunks > 0 && Array.isArray(header.ivs)) {
+        let offset = 4 + first4
+        const chunkSz = header.chunkSize || Math.ceil((bin.byteLength - offset) / header.chunks)
+        const parts: ArrayBuffer[] = []
+        for (let i = 0; i < header.chunks; i++) {
+          const iv = typeof header.ivs[i] === 'string'
+            ? Uint8Array.from(atob(header.ivs[i]), c => c.charCodeAt(0))
+            : new Uint8Array(header.ivs[i])
+          const end = Math.min(offset + chunkSz, bin.byteLength)
+          const decrypted = await aesGcmDecrypt(iv, bin.slice(offset, end), key)
+          parts.push(decrypted)
+          offset = end
+        }
+        const total = parts.reduce((s, p) => s + p.byteLength, 0)
+        const out = new Uint8Array(total)
+        let p = 0
+        for (const part of parts) { out.set(new Uint8Array(part), p); p += part.byteLength }
+        return out.buffer
+      }
+    } catch {}
+  }
+
+  // Try legacy format with AAD
+  try {
+    const aadLen = dv.getUint32(0, true)
+    const aad = bin.slice(4, 4 + aadLen)
+    const iv = bin.slice(4 + aadLen, 4 + aadLen + 12)
+    const enc = bin.slice(4 + aadLen + 12)
+    return await aesGcmDecrypt(iv, enc, key, aad)
+  } catch (e1) {
+    // Try simple format: IV (12) + ciphertext
+    try {
+      return await aesGcmDecrypt(bin.slice(0, 12), bin.slice(12), key)
+    } catch (e2) {
+      throw new Error('Decrypt failed: ' + (e1 instanceof Error ? e1.message : String(e1)))
+    }
+  }
+}
+
+// Encrypt a single chunk in v2 format (matches SW decrypt exactly)
+async function encryptChunkV2(plaintext: Uint8Array, keyStr: string): Promise<Uint8Array> {
+  // Split into 64KB sub-chunks for v2 format
+  const SUB_CHUNK = 64 * 1024
+  const numChunks = Math.ceil(plaintext.byteLength / SUB_CHUNK)
+  const ivs: Uint8Array[] = []
+  const encryptedParts: Uint8Array[] = []
+
+  for (let i = 0; i < numChunks; i++) {
+    const start = i * SUB_CHUNK
+    const end = Math.min(start + SUB_CHUNK, plaintext.byteLength)
+    const sub = plaintext.slice(start, end)
+    const iv = crypto.getRandomValues(new Uint8Array(12))
+    const enc = await aesGcmEncrypt(iv, sub, keyStr)
+    ivs.push(iv)
+    encryptedParts.push(enc)
+  }
+
+  // Build v2 header
+  const header = {
+    version: 2,
+    chunks: numChunks,
+    ivs: ivs.map(iv => btoa(String.fromCharCode(...iv))),
+    chunkSize: SUB_CHUNK,
+  }
+  const headerBytes = new TextEncoder().encode(JSON.stringify(header))
+
+  // [4-byte header len][header][encrypted sub-chunks...]
+  const totalSize = 4 + headerBytes.byteLength + encryptedParts.reduce((s, p) => s + p.byteLength, 0)
+  const result = new Uint8Array(totalSize)
+  new DataView(result.buffer, 0, 4).setUint32(0, headerBytes.byteLength, true)
+  result.set(headerBytes, 4)
+  let offset = 4 + headerBytes.byteLength
+  for (const part of encryptedParts) {
+    result.set(part, offset)
+    offset += part.byteLength
+  }
+
+  return result
 }
 
 // ============================================================
@@ -62,6 +149,625 @@ export async function handleFilesAPI(
 
   if (!viewerCheck.allowed) {
     return jsonResponse({ error: 'Insufficient workspace permissions', success: false, code: 403 }, 403);
+  }
+
+  // ============================================================
+  // SIMPLE UPLOAD — POST /upload
+  // One call: send file metadata, get back signed B2 upload URLs
+  // ============================================================
+  if (method === 'POST' && path === '/upload') {
+    if (!editorCheck.allowed) {
+      return jsonResponse({ error: 'Editor role required to upload files', success: false, code: 403 }, 403);
+    }
+
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch {
+      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
+    }
+
+    const name = (body.name as string || '').trim();
+    const type = (body.type as string) || 'application/octet-stream';
+    const size = parseInt(String(body.size || '0'), 10);
+    const folderId = (body.folder_id as string) || null;
+
+    if (!name || size <= 0) {
+      return jsonResponse({ error: 'name and size are required', success: false }, 400);
+    }
+
+    const fileId = crypto.randomUUID();
+    const uploadId = crypto.randomUUID();
+    const encryptionKey = await generateEncryptionKey();
+
+    let chunkSize = 512 * 1024;
+    if (size > 10 * 1024 * 1024) chunkSize = 1 * 1024 * 1024;
+    if (size > 50 * 1024 * 1024) chunkSize = 2 * 1024 * 1024;
+
+    const totalChunks = Math.ceil(size / chunkSize);
+    const b2Client = await makeB2Client();
+
+    const urls: Array<{ index: number; path: string; upload_url: string }> = [];
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
+      const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkPath}`);
+      const signedReq = await b2Client.sign(b2Url.toString(), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        aws: { signQuery: true },
+      });
+      urls.push({ index: i, path: chunkPath, upload_url: signedReq.url });
+    }
+
+    await supabase.from('upload_sessions').insert({
+      upload_id: uploadId,
+      encryption_key: encryptionKey,
+      user_id: userId,
+      file_name: name,
+      file_size: size,
+      total_chunks: totalChunks,
+      folder_id: folderId,
+      file_type: type,
+    });
+
+    return jsonResponse({
+      success: true,
+      upload_id: uploadId,
+      file_id: fileId,
+      encryption_key: encryptionKey,
+      urls,
+      chunk_size: chunkSize,
+      total_chunks: totalChunks,
+      name,
+      type,
+      size,
+    }, 201);
+  }
+
+  // ============================================================
+  // SIMPLE UPLOAD COMPLETE — POST /upload/complete
+  // Just send upload_id, server handles everything
+  // ============================================================
+  if (method === 'POST' && path === '/upload/complete') {
+    if (!editorCheck.allowed) {
+      return jsonResponse({ error: 'Editor role required to complete uploads', success: false, code: 403 }, 403);
+    }
+
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch {
+      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
+    }
+
+    const uploadId = (body.upload_id as string) || '';
+
+    if (!uploadId) {
+      return jsonResponse({ error: 'upload_id is required', success: false }, 400);
+    }
+
+    const { data: session, error: sessionError } = await supabase
+      .from('upload_sessions')
+      .select('*')
+      .eq('upload_id', uploadId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (sessionError || !session) {
+      return jsonResponse({ error: 'Upload session not found or expired', success: false }, 404);
+    }
+
+    const encryptionKey = session.encryption_key;
+    const fileId = crypto.randomUUID();
+    const b2Client = await makeB2Client();
+
+    // Verify all chunks exist
+    const verifiedChunks: Array<{ index: number; path: string; repo: string }> = [];
+    for (let i = 0; i < session.total_chunks; i++) {
+      const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
+      try {
+        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkPath}`);
+        const signedReq = await b2Client.sign(b2Url.toString(), {
+          method: 'HEAD',
+          aws: { signQuery: true },
+        });
+        const headResp = await fetch(signedReq.url, { method: 'HEAD' });
+        if (!headResp.ok) throw new Error(`Chunk ${i} not found`);
+        verifiedChunks.push({ index: i, path: chunkPath, repo: 'b2' });
+      } catch (err) {
+        return jsonResponse({
+          error: `Chunk ${i} verification failed: ${err instanceof Error ? err.message : String(err)}`,
+          success: false,
+        }, 400);
+      }
+    }
+
+    // Build metadata matching RES54 format
+    const metadata = {
+      fileId,
+      chunkSize: parseInt(String(body.chunk_size || '0'), 10) || 512 * 1024,
+      chunks: verifiedChunks,
+      encryptionKey,
+      created: new Date().toISOString(),
+      previewAvailable: false,
+    };
+
+    const { data: fileRecord, error: fileError } = await supabase
+      .from('files')
+      .insert({
+        id: fileId,
+        user_id: userId,
+        name: session.file_name,
+        type: session.file_type || 'application/octet-stream',
+        size: session.file_size,
+        storage_path: 'res54_distributed',
+        parent_folder: session.folder_id || null,
+        workspace_id: wsId,
+        encrypted: true,
+        encryption_key: encryptionKey,
+        tags: [JSON.stringify(metadata)],
+        is_deleted: false,
+      })
+      .select()
+      .single();
+
+    if (fileError) {
+      if (fileError.code === '23505') {
+        return jsonResponse({ error: 'File already exists', success: false }, 409);
+      }
+      throw fileError;
+    }
+
+    // Clean up upload session
+    await supabase.from('upload_sessions').delete().eq('upload_id', uploadId);
+
+    return jsonResponse({
+      success: true,
+      file: {
+        id: fileRecord.id,
+        name: fileRecord.name,
+        type: fileRecord.type,
+        size: fileRecord.size,
+        created_at: fileRecord.created_at,
+      },
+    }, 201);
+  }
+
+  // ============================================================
+  // SIMPLE DOWNLOAD — GET /download/:id
+  // Auto-detects format, decrypts server-side, returns plaintext
+  // ============================================================
+  if (method === 'GET' && pathParts.length === 2 && pathParts[0] === 'download') {
+    const fileId = pathParts[1];
+    const url = new URL(req.url);
+    const signed = url.searchParams.get('signed') === 'true';
+    const providedEncryptionKey = getOptionalEncryptionKey(req, url.searchParams);
+
+    if (providedEncryptionKey && !validateEncryptionKeyFormat(providedEncryptionKey)) {
+      return jsonResponse({ error: 'Invalid encryption key format', success: false, code: 400 }, 400);
+    }
+
+    const { data: file, error: fileError } = await supabase
+      .from('files')
+      .select('*')
+      .eq('id', fileId)
+      .eq('workspace_id', wsId)
+      .single();
+
+    if (fileError || !file) {
+      return jsonResponse({ error: 'File not found', success: false }, 404);
+    }
+    if (file.is_deleted) {
+      return jsonResponse({ error: 'File has been deleted', success: false }, 404);
+    }
+
+    // Non-encrypted file — direct Supabase Storage download
+    if (!file.encrypted || file.storage_path !== 'res54_distributed') {
+      const { data: fileData, error: downloadError } = await supabase
+        .storage.from('files').download(file.storage_path);
+      if (downloadError) throw downloadError;
+      return new Response(fileData, {
+        headers: {
+          ...CORS_HEADERS,
+          'Content-Type': file.type || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${file.name}"`,
+        },
+      });
+    }
+
+    // Encrypted RES54 file
+    let metadata: any;
+    try {
+      metadata = Array.isArray(file.tags) && file.tags.length > 0
+        ? JSON.parse(file.tags[0]) : null;
+    } catch {
+      return jsonResponse({ error: 'Invalid file metadata', success: false }, 500);
+    }
+    if (!metadata || !metadata.chunks) {
+      return jsonResponse({ error: 'File metadata missing', success: false }, 500);
+    }
+
+    const isBYOK =
+      metadata.encryptionKey === 'sha256:byok_encrypted' ||
+      metadata.encryptionKey === 'byok_encrypted' ||
+      metadata.encryptionKey === 'byok_protected';
+    if (isBYOK && !providedEncryptionKey) {
+      return jsonResponse({
+        error: 'BYOK file — provide encryption key via X-SquidCloud-Encryption-Key header or encryption_key query param',
+        success: false, code: 422,
+      }, 422);
+    }
+
+    const decryptionKey = providedEncryptionKey || metadata.encryptionKey || file.encryption_key;
+    if (!decryptionKey) {
+      return jsonResponse({ error: 'Encryption key missing', success: false, code: 422 }, 422);
+    }
+
+    // Signed mode: return B2 URLs for client-side decryption
+    if (signed) {
+      const b2Client = await makeB2Client();
+      const signedUrls: string[] = [];
+      for (const chunkMeta of metadata.chunks) {
+        if (chunkMeta.repo === 'b2') {
+          const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkMeta.path}`);
+          const signedReq = await b2Client.sign(b2Url.toString(), {
+            method: 'GET', aws: { signQuery: true },
+          });
+          signedUrls.push(signedReq.url);
+        }
+      }
+      return jsonResponse({
+        signed_urls: signedUrls,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        encryption_key: decryptionKey,
+        success: true,
+      });
+    }
+
+    // Server-side decrypt all chunks and return plaintext
+    const b2Client = await makeB2Client();
+    const decryptedChunks: ArrayBuffer[] = [];
+    for (const chunkMeta of metadata.chunks) {
+      try {
+        let encryptedBuffer: ArrayBuffer;
+        if (chunkMeta.repo === 'b2') {
+          const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkMeta.path}`);
+          const signedReq = await b2Client.sign(b2Url.toString(), {
+            method: 'GET', aws: { signQuery: true },
+          });
+          const b2Response = await fetch(signedReq.url);
+          if (!b2Response.ok) throw new Error(`B2 download failed (${b2Response.status})`);
+          encryptedBuffer = await b2Response.arrayBuffer();
+        } else {
+          return jsonResponse({ error: `Chunk ${chunkMeta.index} uses unsupported storage`, success: false }, 500);
+        }
+
+        const decrypted = await decryptStreamChunk(encryptedBuffer, decryptionKey);
+        decryptedChunks.push(decrypted);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('decrypt') || (error instanceof DOMException && error.name === 'OperationError')) {
+          return jsonResponse({ error: 'Decryption key mismatch', success: false, code: 422 }, 422);
+        }
+        return jsonResponse({ error: `Chunk ${chunkMeta.index} failed: ${msg}`, success: false }, 500);
+      }
+    }
+
+    const totalSize = decryptedChunks.reduce((s, c) => s + c.byteLength, 0);
+    const combined = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const chunk of decryptedChunks) {
+      combined.set(new Uint8Array(chunk), offset);
+      offset += chunk.byteLength;
+    }
+
+    return new Response(combined, {
+      headers: {
+        ...CORS_HEADERS,
+        'Content-Type': file.type || 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${file.name}"`,
+      },
+    });
+  }
+
+  // ============================================================
+  // ENCRYPTED UPLOAD — POST /upload/encrypted
+  // Client sends plaintext chunks, server encrypts and stores on B2
+  // ============================================================
+  if (method === 'POST' && path === '/upload/encrypted') {
+    if (!editorCheck.allowed) {
+      return jsonResponse({ error: 'Editor role required to upload files', success: false, code: 403 }, 403);
+    }
+
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch {
+      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
+    }
+
+    const name = (body.name as string || '').trim();
+    const type = (body.type as string) || 'application/octet-stream';
+    const size = parseInt(String(body.size || '0'), 10);
+    const folderId = (body.folder_id as string) || null;
+    const chunks = (body.chunks as Array<{ index: number; upload_url: string }>) || [];
+
+    if (!name || size <= 0) {
+      return jsonResponse({ error: 'name and size are required', success: false }, 400);
+    }
+    if (!chunks.length) {
+      return jsonResponse({ error: 'chunks array is required — get upload URLs from POST /upload first', success: false }, 400);
+    }
+
+    const fileId = crypto.randomUUID();
+    const encryptionKey = await generateEncryptionKey();
+    const b2Client = await makeB2Client();
+
+    const verifiedChunks: Array<{ index: number; path: string; repo: string }> = [];
+
+    for (const chunk of chunks) {
+      // For encrypted upload, client sends plaintext to the upload_url
+      // We need to download it, encrypt it, and re-upload to B2
+      try {
+        // Download the plaintext chunk from the upload URL
+        const uploadResp = await fetch(chunk.upload_url);
+        if (!uploadResp.ok) throw new Error(`Failed to download chunk ${chunk.index}`);
+        const plaintext = new Uint8Array(await uploadResp.arrayBuffer());
+
+        // Encrypt with RES54 v2 format
+        const encrypted = await encryptChunkV2(plaintext, encryptionKey);
+
+        // Generate B2 path for the encrypted chunk
+        const encPath = `${userId}/encrypted/${fileId}/${chunk.index}.bin`;
+        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${encPath}`);
+        const signedReq = await b2Client.sign(b2Url.toString(), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          aws: { signQuery: true },
+        });
+
+        // Upload encrypted data to B2
+        const b2Resp = await fetch(signedReq.url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: encrypted,
+        });
+        if (!b2Resp.ok) throw new Error(`B2 upload failed for chunk ${chunk.index}`);
+
+        verifiedChunks.push({ index: chunk.index, path: encPath, repo: 'b2' });
+      } catch (err) {
+        return jsonResponse({
+          error: `Chunk ${chunk.index} encryption failed: ${err instanceof Error ? err.message : String(err)}`,
+          success: false,
+        }, 400);
+      }
+    }
+
+    const metadata = {
+      fileId,
+      chunkSize: 512 * 1024,
+      chunks: verifiedChunks,
+      encryptionKey,
+      created: new Date().toISOString(),
+      previewAvailable: false,
+    };
+
+    const { data: fileRecord, error: fileError } = await supabase
+      .from('files')
+      .insert({
+        id: fileId,
+        user_id: userId,
+        name,
+        type,
+        size,
+        storage_path: 'res54_distributed',
+        parent_folder: folderId || null,
+        workspace_id: wsId,
+        encrypted: true,
+        encryption_key: encryptionKey,
+        tags: [JSON.stringify(metadata)],
+        is_deleted: false,
+      })
+      .select()
+      .single();
+
+    if (fileError) {
+      if (fileError.code === '23505') {
+        return jsonResponse({ error: 'File already exists', success: false }, 409);
+      }
+      throw fileError;
+    }
+
+    return jsonResponse({
+      success: true,
+      file: {
+        id: fileRecord.id,
+        name: fileRecord.name,
+        type: fileRecord.type,
+        size: fileRecord.size,
+        created_at: fileRecord.created_at,
+      },
+    }, 201);
+  }
+
+  // ============================================================
+  // LEGACY: POST /files/upload/init
+  // ============================================================
+  if (method === 'POST' && pathParts.length === 3 && pathParts[1] === 'upload' && pathParts[2] === 'init') {
+    if (!editorCheck.allowed) {
+      return jsonResponse({ error: 'Editor role required to upload files', success: false, code: 403 }, 403);
+    }
+
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch {
+      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
+    }
+
+    const name = (body.name as string) || '';
+    const type = (body.type as string) || 'application/octet-stream';
+    const size = parseInt(String(body.size || '0'), 10);
+    const folderId = (body.folder_id as string) || null;
+    const providedEncryptionKey = (body.encryption_key as string) || getOptionalEncryptionKey(req) || '';
+    const workspaceId = (body.workspace_id as string) || wsId;
+
+    if (!name || size <= 0) {
+      return jsonResponse({ error: 'File name and valid size are required', success: false }, 400);
+    }
+
+    if (providedEncryptionKey && !validateEncryptionKeyFormat(providedEncryptionKey)) {
+      return jsonResponse({ error: 'Invalid encryption key format', success: false, code: 400 }, 400);
+    }
+
+    const uploadId = crypto.randomUUID();
+    const encryptionKey = providedEncryptionKey || await generateEncryptionKey();
+
+    let chunkSize = 512 * 1024;
+    if (size > 10 * 1024 * 1024) chunkSize = 1 * 1024 * 1024;
+    if (size > 50 * 1024 * 1024) chunkSize = 2 * 1024 * 1024;
+
+    const totalChunks = Math.ceil(size / chunkSize);
+    const b2Client = await makeB2Client();
+
+    const urls: Array<{ path: string; upload_url: string; index: number }> = [];
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
+      const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkPath}`);
+      const signedReq = await b2Client.sign(b2Url.toString(), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        aws: { signQuery: true },
+      });
+      urls.push({ path: chunkPath, upload_url: signedReq.url, index: i });
+    }
+
+    const { error: sessionError } = await supabase.from('upload_sessions').insert({
+      upload_id: uploadId,
+      encryption_key: encryptionKey,
+      user_id: userId,
+      file_name: name,
+      file_size: size,
+      total_chunks: totalChunks,
+      folder_id: folderId,
+      file_type: type,
+    });
+    if (sessionError) {
+      console.error('Failed to store upload session:', sessionError);
+    }
+
+    return jsonResponse({
+      success: true,
+      upload_id: uploadId,
+      urls,
+      cluster_id: 'b2',
+      chunk_size: chunkSize,
+      total_chunks: totalChunks,
+      encryption: {
+        mode: providedEncryptionKey ? 'provided' : 'generated',
+        key_required_for_complete: false,
+      },
+    }, 201);
+  }
+
+  // POST /files/upload/complete — Complete upload, register file in DB
+  if (method === 'POST' && pathParts.length === 3 && pathParts[1] === 'upload' && pathParts[2] === 'complete') {
+    if (!editorCheck.allowed) {
+      return jsonResponse({ error: 'Editor role required to complete uploads', success: false, code: 403 }, 403);
+    }
+
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch {
+      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
+    }
+
+    const uploadId = (body.upload_id as string) || '';
+    const fileId = (body.file_id as string) || '';
+    const chunks = (body.chunks as Array<{ path: string; index: number; sha256: string }>) || [];
+    const providedEncryptionKey = (body.encryption_key as string) || '';
+
+    if (!uploadId || !fileId || !chunks.length) {
+      return jsonResponse({ error: 'upload_id, file_id, and chunks are required', success: false }, 400);
+    }
+
+    const url = new URL(req.url);
+    let initKey = url.searchParams.get('encryption_key') || providedEncryptionKey;
+    if (!initKey) {
+      const { data: session, error: sessionError } = await supabase
+        .from('upload_sessions')
+        .select('encryption_key, file_name, file_size, folder_id, file_type')
+        .eq('upload_id', uploadId)
+        .maybeSingle();
+      if (!sessionError && session?.encryption_key) {
+        initKey = session.encryption_key;
+      }
+    }
+    if (!initKey) {
+      return jsonResponse({ error: 'Encryption key missing. Provide it in the body as encryption_key.', success: false, code: 422 }, 422);
+    }
+
+    const b2Client = await makeB2Client();
+
+    const verifiedChunks: Array<{ index: number; path: string; sha256: string; repo: string }> = [];
+    for (const chunk of chunks) {
+      try {
+        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunk.path}`);
+        const signedReq = await b2Client.sign(b2Url.toString(), {
+          method: 'HEAD',
+          aws: { signQuery: true },
+        });
+        const headResp = await fetch(signedReq.url, { method: 'HEAD' });
+        if (!headResp.ok) {
+          throw new Error(`Chunk ${chunk.index} not found on storage`);
+        }
+        verifiedChunks.push({ ...chunk, repo: 'b2' });
+      } catch (err) {
+        return jsonResponse({
+          error: `Chunk ${chunk.index} verification failed: ${err instanceof Error ? err.message : String(err)}`,
+          success: false,
+        }, 400);
+      }
+    }
+
+    const encryptionKey = initKey;
+    const isBYOK = encryptionKey.startsWith('sha256:byok_encrypted') ||
+                   encryptionKey === 'byok_encrypted' ||
+                   encryptionKey === 'byok_protected';
+
+    const metadata = {
+      fileId: fileId,
+      chunkSize: chunks[0]?.path ? 0 : 0,
+      chunks: verifiedChunks,
+      encryptionKey: isBYOK ? encryptionKey : encryptionKey,
+      created: new Date().toISOString(),
+      previewAvailable: false,
+    };
+
+    const { data: fileRecord, error: fileError } = await supabase
+      .from('files')
+      .insert({
+        id: fileId,
+        user_id: userId,
+        name: body.name || 'unknown',
+        type: body.type || 'application/octet-stream',
+        size: body.file_size || 0,
+        storage_path: 'res54_distributed',
+        parent_folder: body.folder_id ? String(body.folder_id) : null,
+        workspace_id: wsId,
+        encrypted: true,
+        encryption_key: encryptionKey,
+        tags: [JSON.stringify(metadata)],
+        is_deleted: false,
+      })
+      .select()
+      .single();
+
+    if (fileError) {
+      if (fileError.code === '23505') {
+        return jsonResponse({ error: 'A file with this ID already exists', success: false }, 409);
+      }
+      throw fileError;
+    }
+
+    return jsonResponse({
+      success: true,
+      file: fileRecord,
+      message: 'Upload completed and file registered successfully',
+    }, 201);
   }
 
   // GET /files — List files and folders with pagination
@@ -201,7 +907,6 @@ export async function handleFilesAPI(
       }
 
       if (signed) {
-        // Return signed B2 URLs for direct download instead of proxying
         const b2Client = await makeB2Client();
         const signedUrls: string[] = [];
         for (const chunkMeta of metadata.chunks) {
@@ -241,27 +946,10 @@ export async function handleFilesAPI(
             if (!b2Response.ok) throw new Error(`B2 download failed (${b2Response.status})`);
             encryptedBuffer = await b2Response.arrayBuffer();
           } else {
-            const response = await supabase.functions.invoke('github-storage', {
-              body: { action: 'download', path: chunkMeta.path, repo: chunkMeta.repo, userId, nodeId: chunkMeta.accountId ?? 0 },
-            });
-            if (response.error) {
-              throw new Error(`Failed to download chunk ${chunkMeta.index}: ${typeof response.error === 'object' ? JSON.stringify(response.error) : response.error}`);
-            }
-            if (!response.data?.content) throw new Error(`Empty content from storage for chunk ${chunkMeta.index}`);
-            const cleanContent = response.data.content.replace(/\s/g, '');
-            encryptedBuffer = Uint8Array.from(atob(cleanContent), c => c.charCodeAt(0)).buffer;
+            return jsonResponse({ error: `Chunk ${chunkMeta.index} uses unsupported storage`, success: false }, 500);
           }
 
-          let encryptedB64: string;
-          try {
-            const text = new TextDecoder().decode(encryptedBuffer);
-            const parsed = JSON.parse(text);
-            encryptedB64 = parsed.chunkData || uint8ToBase64(new Uint8Array(encryptedBuffer));
-          } catch {
-            encryptedB64 = uint8ToBase64(new Uint8Array(encryptedBuffer));
-          }
-
-          const decryptedChunk = await decryptData(encryptedB64, decryptionKey);
+          const decryptedChunk = await decryptStreamChunk(encryptedBuffer, decryptionKey);
           chunks.push(decryptedChunk);
         } catch (error) {
           const errMsg = error instanceof Error ? error.message : String(error);
@@ -304,196 +992,6 @@ export async function handleFilesAPI(
         'Content-Disposition': `attachment; filename="${file.name}"`,
       },
     });
-  }
-
-  // POST /files/upload/init — Initialize upload with signed B2 URLs
-  if (method === 'POST' && pathParts.length === 3 && pathParts[1] === 'upload' && pathParts[2] === 'init') {
-    if (!editorCheck.allowed) {
-      return jsonResponse({ error: 'Editor role required to upload files', success: false, code: 403 }, 403);
-    }
-
-    let body: Record<string, unknown>;
-    try { body = await req.json(); } catch {
-      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
-    }
-
-    const name = (body.name as string) || '';
-    const type = (body.type as string) || 'application/octet-stream';
-    const size = parseInt(String(body.size || '0'), 10);
-    const folderId = (body.folder_id as string) || null;
-    const providedEncryptionKey = (body.encryption_key as string) || getOptionalEncryptionKey(req) || '';
-    const workspaceId = (body.workspace_id as string) || wsId;
-
-    if (!name || size <= 0) {
-      return jsonResponse({ error: 'File name and valid size are required', success: false }, 400);
-    }
-
-    if (providedEncryptionKey && !validateEncryptionKeyFormat(providedEncryptionKey)) {
-      return jsonResponse({ error: 'Invalid encryption key format', success: false, code: 400 }, 400);
-    }
-
-    const uploadId = crypto.randomUUID();
-    const encryptionKey = providedEncryptionKey || await generateEncryptionKey();
-
-    // Determine chunk size based on file size
-    let chunkSize = 512 * 1024;
-    if (size > 10 * 1024 * 1024) chunkSize = 1 * 1024 * 1024;
-    if (size > 50 * 1024 * 1024) chunkSize = 2 * 1024 * 1024;
-
-    const totalChunks = Math.ceil(size / chunkSize);
-    const b2Client = await makeB2Client();
-
-    const urls: Array<{ path: string; upload_url: string; index: number }> = [];
-    for (let i = 0; i < totalChunks; i++) {
-      const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
-      const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkPath}`);
-      const signedReq = await b2Client.sign(b2Url.toString(), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        aws: { signQuery: true },
-      });
-      urls.push({ path: chunkPath, upload_url: signedReq.url, index: i });
-    }
-
-    // Pre-register upload in metadata
-    const uploadMeta = {
-      upload_id: uploadId,
-      file_name: name,
-      file_type: type,
-      file_size: size,
-      chunk_size: chunkSize,
-      total_chunks: totalChunks,
-      folder_id: folderId,
-      encryption_key: providedEncryptionKey ? 'sha256:byok_encrypted' : encryptionKey,
-      workspace_id: workspaceId,
-      created_at: new Date().toISOString(),
-      user_id: userId,
-    };
-
-    await supabase.from('api_request_logs').insert({
-      api_key_id: null,
-      user_id: userId,
-      endpoint: '/files/upload/init',
-      method: 'POST',
-      ip_address: req.headers.get('x-forwarded-for') || null,
-      user_agent: req.headers.get('user-agent') || null,
-      status_code: 200,
-      error_message: null,
-      file_name: name,
-      file_size: size,
-      metadata: { upload_id: uploadId, total_chunks: totalChunks },
-    });
-
-    return jsonResponse({
-      success: true,
-      upload_id: uploadId,
-      urls,
-      cluster_id: 'b2',
-      chunk_size: chunkSize,
-      total_chunks: totalChunks,
-      encryption: {
-        mode: providedEncryptionKey ? 'provided' : 'generated',
-        key_required_for_complete: true,
-      },
-    }, 201);
-  }
-
-  // POST /files/upload/complete — Complete upload, register file in DB
-  if (method === 'POST' && pathParts.length === 3 && pathParts[1] === 'upload' && pathParts[2] === 'complete') {
-    if (!editorCheck.allowed) {
-      return jsonResponse({ error: 'Editor role required to complete uploads', success: false, code: 403 }, 403);
-    }
-
-    let body: Record<string, unknown>;
-    try { body = await req.json(); } catch {
-      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
-    }
-
-    const uploadId = (body.upload_id as string) || '';
-    const fileId = (body.file_id as string) || '';
-    const chunks = (body.chunks as Array<{ path: string; index: number; sha256: string }>) || [];
-    const providedEncryptionKey = (body.encryption_key as string) || '';
-
-    if (!uploadId || !fileId || !chunks.length) {
-      return jsonResponse({ error: 'upload_id, file_id, and chunks are required', success: false }, 400);
-    }
-
-    const url = new URL(req.url);
-    // Fetch upload metadata from init to get encryption key
-    const initKey = url.searchParams.get('encryption_key') || providedEncryptionKey;
-    if (!initKey) {
-      return jsonResponse({ error: 'Encryption key missing. Provide it in the body as encryption_key.', success: false, code: 422 }, 422);
-    }
-
-    const b2Client = await makeB2Client();
-
-    // Verify all chunks exist and have correct SHA256
-    const verifiedChunks: Array<{ index: number; path: string; sha256: string; repo: string }> = [];
-    for (const chunk of chunks) {
-      try {
-        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunk.path}`);
-        const signedReq = await b2Client.sign(b2Url.toString(), {
-          method: 'GET',
-          aws: { signQuery: true },
-        });
-        const headResp = await fetch(signedReq.url, { method: 'HEAD' });
-        if (!headResp.ok) {
-          throw new Error(`Chunk ${chunk.index} not found on storage`);
-        }
-        verifiedChunks.push({ ...chunk, repo: 'b2' });
-      } catch (err) {
-        return jsonResponse({
-          error: `Chunk ${chunk.index} verification failed: ${err instanceof Error ? err.message : String(err)}`,
-          success: false,
-        }, 400);
-      }
-    }
-
-    const encryptionKey = initKey;
-    const isBYOK = encryptionKey.startsWith('sha256:byok_encrypted') ||
-                   encryptionKey === 'byok_encrypted' ||
-                   encryptionKey === 'byok_protected';
-
-    const metadata = {
-      fileId: fileId,
-      chunkSize: chunks[0]?.path ? 0 : 0,
-      chunks: verifiedChunks,
-      encryptionKey: isBYOK ? encryptionKey : encryptionKey,
-      created: new Date().toISOString(),
-      previewAvailable: false,
-    };
-
-    const { data: fileRecord, error: fileError } = await supabase
-      .from('files')
-      .insert({
-        id: fileId,
-        user_id: userId,
-        name: body.name || 'unknown',
-        type: body.type || 'application/octet-stream',
-        size: body.file_size || 0,
-        storage_path: 'res54_distributed',
-        parent_folder: body.folder_id ? String(body.folder_id) : null,
-        workspace_id: wsId,
-        encrypted: true,
-        encryption_key: encryptionKey,
-        tags: [JSON.stringify(metadata)],
-        is_deleted: false,
-      })
-      .select()
-      .single();
-
-    if (fileError) {
-      if (fileError.code === '23505') {
-        return jsonResponse({ error: 'A file with this ID already exists', success: false }, 409);
-      }
-      throw fileError;
-    }
-
-    return jsonResponse({
-      success: true,
-      file: fileRecord,
-      message: 'Upload completed and file registered successfully',
-    }, 201);
   }
 
   // DELETE /files/:id — Soft delete
@@ -694,170 +1192,173 @@ export async function handleFilesAPI(
 }
 
 // ============================================================
-// HANDLER: handleCDNAPI
+// HANDLER: handleStreamAPI — Encrypted media streaming proxy
 // ============================================================
-export async function handleCDNAPI(
+export async function handleStreamAPI(
   req: Request,
   supabase: any,
   userId: string,
   path: string,
   pathParts: string[],
-  wsId?: string,
 ): Promise<Response> {
-  const method = req.method;
-
-  wsId = await resolveWorkspaceId(supabase, userId, wsId);
-  if (!wsId) {
-    return jsonResponse({ error: 'No workspace found', success: false }, 400);
+  if (req.method !== 'GET') {
+    return jsonResponse({ error: 'Method not allowed', success: false }, 405);
   }
 
-  const viewerCheck = await requireWorkspaceRole(supabase, wsId, userId, 'viewer');
-  const editorCheck = viewerCheck.allowed
-    ? { allowed: ROLE_RANK[(viewerCheck.role || 'viewer')] >= ROLE_RANK.editor, role: viewerCheck.role }
-    : { allowed: false, role: null };
+  const url = new URL(req.url);
+  const tokenStr = url.searchParams.get('token') || '';
+  const fileId = url.searchParams.get('id') || '';
 
-  if (!viewerCheck.allowed) {
-    return jsonResponse({ error: 'Insufficient workspace permissions', success: false, code: 403 }, 403);
+  if (!tokenStr || !fileId) {
+    return jsonResponse({ error: 'token and id query params required', success: false }, 400);
   }
 
-  // GET /cdn/list
-  if (method === 'GET' && path === '/cdn/list') {
-    const { data: cdnFiles, error } = await supabase
-      .from('squidcdn_files')
-      .select('*, files!inner(name, type, size)')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    return jsonResponse({ cdn_files: cdnFiles || [], success: true });
+  const streamSecret = Deno.env.get('STREAM_SESSION_SECRET') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const token = await verifyStreamToken(tokenStr, streamSecret);
+  if (!token) {
+    return jsonResponse({ error: 'Invalid or expired stream token', success: false, code: 'INVALID_TOKEN' }, 401);
+  }
+  if (token.fileId !== fileId || token.userId !== userId) {
+    return jsonResponse({ error: 'Token does not match requested file', success: false, code: 'TOKEN_MISMATCH' }, 403);
   }
 
-  // GET /cdn/:file_id — Get CDN info
-  if (method === 'GET' && pathParts.length === 2) {
-    const fileId = pathParts[1];
+  const { data: file, error: fileError } = await supabase
+    .from('files')
+    .select('*')
+    .eq('id', fileId)
+    .single();
 
-    const { data: cdnEntry, error } = await supabase
-      .from('squidcdn_files')
-      .select('*')
-      .eq('file_id', fileId)
-      .eq('user_id', userId)
-      .single();
+  if (fileError || !file) {
+    return jsonResponse({ error: 'File not found', success: false }, 404);
+  }
+  if (file.is_deleted) {
+    return jsonResponse({ error: 'File has been deleted', success: false }, 404);
+  }
 
-    if (error || !cdnEntry) {
-      return jsonResponse({ error: 'CDN entry not found', success: false }, 404);
+  if (!file.storage_path || file.storage_path !== 'res54_distributed' || !file.encrypted) {
+    return jsonResponse({ error: 'File is not an encrypted distributed file', success: false }, 400);
+  }
+
+  let metadata: any;
+  try {
+    metadata = Array.isArray(file.tags) && file.tags.length > 0
+      ? JSON.parse(file.tags[0])
+      : null;
+  } catch {
+    return jsonResponse({ error: 'Invalid file metadata', success: false }, 500);
+  }
+  if (!metadata || !metadata.chunks || !metadata.encryptionKey) {
+    return jsonResponse({ error: 'File chunk metadata missing', success: false }, 500);
+  }
+
+  const isBYOK =
+    metadata.encryptionKey === 'sha256:byok_encrypted' ||
+    metadata.encryptionKey === 'byok_encrypted' ||
+    metadata.encryptionKey === 'byok_protected';
+  if (isBYOK) {
+    return jsonResponse({ error: 'BYOK files cannot be streamed via /stream — use /files/:id/download with encryption key', success: false }, 400);
+  }
+
+  const encryptionKey = metadata.encryptionKey || file.encryption_key;
+  if (!encryptionKey) {
+    return jsonResponse({ error: 'Encryption key missing', success: false }, 500);
+  }
+
+  const chunks: Array<{ index: number; path: string; repo: string; offset?: number }> =
+    metadata.chunks.filter((c: any) => c.repo && c.path).sort((a: any, b: any) => a.index - b.index);
+  if (chunks.length === 0) {
+    return jsonResponse({ error: 'No chunks found for file', success: false }, 500);
+  }
+
+  const chunkSize = chunks.length > 1 && chunks[1].offset !== undefined && chunks[0].offset !== undefined
+    ? chunks[1].offset - chunks[0].offset
+    : Math.ceil(file.size / chunks.length);
+
+  const rangeHeader = req.headers.get('range') || '';
+  let startByte = 0;
+  let endByte = file.size - 1;
+
+  if (rangeHeader) {
+    const m = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+    if (m) {
+      startByte = parseInt(m[1], 10);
+      if (m[2]) endByte = parseInt(m[2], 10);
+      else endByte = Math.min(startByte + chunkSize - 1, file.size - 1);
     }
+  }
 
-    return jsonResponse({
-      cdn_info: {
-        id: cdnEntry.id,
-        file_id: cdnEntry.file_id,
-        cdn_path: cdnEntry.cdn_path,
-        content_type: cdnEntry.content_type,
-        views_count: cdnEntry.views_count,
-        is_active: cdnEntry.is_active,
-        created_at: cdnEntry.created_at,
-      },
-      cdn_url: `https://squidcloud.vercel.app/api/v1/cdn/play/${cdnEntry.cdn_path}`,
-      success: true,
+  if (startByte >= file.size) {
+    return new Response(null, {
+      status: 416,
+      headers: { ...CORS_HEADERS, 'Content-Range': `bytes */${file.size}` },
     });
   }
 
-  // POST /cdn/publish
-  if (method === 'POST' && path === '/cdn/publish') {
-    if (!editorCheck.allowed) {
-      return jsonResponse({ error: 'Editor role required to publish to CDN', success: false, code: 403 }, 403);
-    }
+  const startChunkIdx = Math.floor(startByte / chunkSize);
+  const endChunkIdx = Math.floor(endByte / chunkSize);
 
-    let body: Record<string, unknown>;
-    try { body = await req.json(); } catch {
-      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
-    }
+  const b2Client = await makeB2Client();
+  const decryptedParts: ArrayBuffer[] = [];
 
-    const fileId = (body.file_id as string) || '';
-    if (!fileId) {
-      return jsonResponse({ error: 'file_id is required', success: false }, 400);
-    }
-
-    const { data: file, error: fileError } = await supabase
-      .from('files')
-      .select('*')
-      .eq('id', fileId)
-      .eq('workspace_id', wsId)
-      .single();
-
-    if (fileError || !file) {
-      return jsonResponse({ error: 'File not found', success: false }, 404);
-    }
-
-    const cdnPath = `${crypto.randomUUID().split('-')[0]}-${file.name.toLowerCase().replace(/[^a-z0-9.]/g, '-')}`;
-
-    const { data: cdnEntry, error: cdnError } = await supabase
-      .from('squidcdn_files')
-      .insert({
-        file_id: fileId,
-        user_id: userId,
-        workspace_id: wsId,
-        cdn_path: cdnPath,
-        content_type: file.type || 'application/octet-stream',
-        file_size: file.size || 0,
-        is_active: true,
-      })
-      .select()
-      .single();
-
-    if (cdnError) {
-      if (cdnError.code === '23505') {
-        return jsonResponse({ error: 'File already published to CDN', success: false }, 409);
+  for (let ci = startChunkIdx; ci <= endChunkIdx && ci < chunks.length; ci++) {
+    const chunkMeta = chunks[ci];
+    try {
+      let encryptedBuffer: ArrayBuffer;
+      if (chunkMeta.repo === 'b2') {
+        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkMeta.path}`);
+        const signedReq = await b2Client.sign(b2Url.toString(), {
+          method: 'GET',
+          aws: { signQuery: true },
+        });
+        const b2Response = await fetch(signedReq.url);
+        if (!b2Response.ok) throw new Error(`B2 chunk ${ci} failed (${b2Response.status})`);
+        encryptedBuffer = await b2Response.arrayBuffer();
+      } else {
+        return jsonResponse({ error: `Chunk ${ci} uses unsupported storage backend: ${chunkMeta.repo}`, success: false }, 500);
       }
-      throw cdnError;
-    }
 
-    return jsonResponse({
-      success: true,
-      cdn_entry: cdnEntry,
-      cdn_url: `https://squidcloud.vercel.app/api/v1/cdn/play/${cdnPath}`,
-    }, 201);
+      const decrypted = await decryptStreamChunk(encryptedBuffer, encryptionKey);
+      decryptedParts.push(decrypted);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('decrypt') || (err instanceof DOMException && err.name === 'OperationError')) {
+        return jsonResponse({ error: 'Decryption failed — key mismatch', success: false, code: 422 }, 422);
+      }
+      return jsonResponse({ error: `Chunk ${ci} processing failed: ${msg}`, success: false }, 500);
+    }
   }
 
-  // DELETE /cdn/:file_id — Unpublish
-  if (method === 'DELETE' && pathParts.length === 2) {
-    const fileId = pathParts[1];
-
-    if (!editorCheck.allowed) {
-      return jsonResponse({ error: 'Editor role required to unpublish from CDN', success: false, code: 403 }, 403);
-    }
-
-    const { data: existing, error: fetchError } = await supabase
-      .from('squidcdn_files')
-      .select('id')
-      .eq('file_id', fileId)
-      .eq('user_id', userId)
-      .single();
-
-    if (fetchError || !existing) {
-      return jsonResponse({ error: 'CDN entry not found', success: false }, 404);
-    }
-
-    const { error: deleteError } = await supabase
-      .from('squidcdn_files')
-      .update({ is_active: false })
-      .eq('file_id', fileId)
-      .eq('user_id', userId);
-
-    if (deleteError) throw deleteError;
-
-    return jsonResponse({ success: true, message: 'File unpublished from CDN' });
+  const totalDecryptedSize = decryptedParts.reduce((s, p) => s + p.byteLength, 0);
+  const combined = new Uint8Array(totalDecryptedSize);
+  let pos = 0;
+  for (const part of decryptedParts) {
+    combined.set(new Uint8Array(part), pos);
+    pos += part.byteLength;
   }
 
-  return jsonResponse({ error: 'Endpoint not found', success: false }, 404);
+  const chunkStartOffset = startChunkIdx * chunkSize;
+  const localStart = startByte - chunkStartOffset;
+  const localEnd = Math.min(localStart + (endByte - startByte) + 1, combined.byteLength);
+  const sliced = combined.slice(localStart, localEnd);
+
+  const respEnd = startByte + sliced.byteLength - 1;
+  const contentRange = rangeHeader
+    ? `bytes ${startByte}-${respEnd}/${file.size}`
+    : `bytes ${startByte}-${respEnd}/${file.size}`;
+
+  return new Response(sliced, {
+    status: 206,
+    headers: {
+      ...CORS_HEADERS,
+      'Content-Type': file.type || 'application/octet-stream',
+      'Accept-Ranges': 'bytes',
+      'Content-Range': contentRange,
+      'Content-Length': String(sliced.byteLength),
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 }
-
-// GET /cdn/play/:cdn_path — Public streaming endpoint (no auth)
-// This endpoint is designed to be called without auth headers.
-// It returns a signed B2 URL for direct streaming.
-// Handle it as a special case in index.ts routing.
 
 // ============================================================
 // HANDLER: handleSearchAPI
@@ -993,7 +1494,7 @@ export async function handleBatchAPI(
     return jsonResponse({ error: 'Maximum 100 files per batch operation', success: false }, 400);
   }
 
-  const action = pathParts[1]; // delete, move, restore, copy
+  const action = pathParts[1];
   const results: Array<{ file_id: string; status: string; error?: string }> = [];
   let succeeded = 0;
   let failed = 0;
@@ -1333,7 +1834,7 @@ export async function handleHealthAPI(
 
     return jsonResponse({
       status: 'ok',
-      version: '4.0',
+      version: API_VERSION,
       timestamp: new Date().toISOString(),
       db: 'connected',
       uptime: Math.floor(performance.now() / 1000),
@@ -1342,7 +1843,7 @@ export async function handleHealthAPI(
   } catch (err) {
     return jsonResponse({
       status: 'degraded',
-      version: '4.0',
+      version: API_VERSION,
       timestamp: new Date().toISOString(),
       db: 'disconnected',
       uptime: Math.floor(performance.now() / 1000),
@@ -1373,7 +1874,6 @@ export async function handleKeysAPI(
 
     if (error) throw error;
 
-    // Include key limits if any
     const keyIds = (keys || []).map((k: any) => k.id);
     let limits: any[] = [];
     if (keyIds.length > 0) {
@@ -1513,14 +2013,6 @@ export async function handleKeysAPI(
       return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
     }
 
-    // Check user is supporter+ (has custom_daily_limit on profile or subscription)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', userId)
-      .single();
-
-    // Only admins or supporter plans can set custom limits; for now allow all users
     const limits: Record<string, unknown> = {};
     if (body.custom_daily_limit !== undefined) {
       limits.custom_daily_limit = parseInt(String(body.custom_daily_limit), 10);
@@ -1622,7 +2114,6 @@ export async function handleUserAPI(
     .eq('id', userId)
     .single();
 
-  // Get credit info
   const { data: credits } = await supabase
     .from('api_credits')
     .select('*')
@@ -2177,31 +2668,32 @@ export async function handleVeilRefAPI(
 // ============================================================
 // HANDLER: handleRootAPI
 // ============================================================
-export async function handleRootAPI(): Promise<Response> {
+export function handleRootAPI(): Response {
   return jsonResponse({
     name: 'SquidCloud CloudBliss API',
-    version: '4.0',
-    description: 'File operations, CDN streaming, secrets management, workspace collaboration',
+    version: API_VERSION,
+    description: 'File operations, encrypted media streaming, secrets management, workspace collaboration',
     docs_url: 'https://squidcloud.vercel.app/docs/api',
     endpoints: {
       files: {
         'GET /files': 'List files and folders (paginated, searchable)',
         'GET /files/:id/metadata': 'Get file metadata',
         'GET /files/:id/download': 'Download file (or signed B2 URL with ?signed=true)',
-        'POST /files/upload/init': 'Initialize upload with signed B2 URLs',
-        'POST /files/upload/complete': 'Complete upload and register file',
+        'GET /download/:id': 'Simple download (auto-decrypts, returns plaintext)',
+        'POST /upload': 'Initialize upload — returns signed B2 URLs + encryption key',
+        'POST /upload/complete': 'Complete upload — just send upload_id',
+        'POST /upload/encrypted': 'Upload plaintext, server encrypts and stores on B2',
+        'POST /files/upload/init': 'Legacy: Initialize upload with signed B2 URLs',
+        'POST /files/upload/complete': 'Legacy: Complete upload and register file',
         'DELETE /files/:id': 'Soft delete file',
         'POST /files/:id/restore': 'Restore file from trash',
         'PUT /files/:id/rename': 'Rename file',
         'POST /files/:id/move': 'Move file to folder',
         'POST /files/copy': 'Copy file',
       },
-      cdn: {
-        'GET /cdn/list': 'List CDN-published files',
-        'GET /cdn/:file_id': 'Get CDN file info',
-        'POST /cdn/publish': 'Publish file to SquidCDN',
-        'DELETE /cdn/:file_id': 'Unpublish from CDN',
-        'GET /cdn/play/:cdn_path': 'Public media streaming (no auth)',
+      stream: {
+        'POST /stream/init': 'Get a short-lived streaming session token for a file',
+        'GET /stream?id=<fileId>&token=<token>': 'Stream encrypted file (Range proxy, server-side decrypt)',
       },
       search: {
         'GET /search': 'Search files (q, type, folder_id, page, per_page)',
@@ -2261,13 +2753,20 @@ export async function handleRootAPI(): Promise<Response> {
 
 // ============================================================
 // HELPER: getOperationForPath
-// Maps method+path to an API operation string for credit lookup
 // ============================================================
-export function getOperationForPath(method: string, path: string): string {
+export function getOperationForPath(method: string, path: string, pathParts?: string[]): string {
   const methodUpper = method.toUpperCase();
-  const parts = path.split('/').filter(p => p.length > 0);
+  const parts = pathParts || path.split('/').filter(p => p.length > 0);
   const first = parts[0] || '';
   const second = parts[1] || '';
+
+  if (first === 'upload') {
+    if (methodUpper === 'POST' && second === 'complete') return 'files.upload.complete';
+    if (methodUpper === 'POST' && second === 'encrypted') return 'files.upload.complete';
+    return 'files.upload.init';
+  }
+
+  if (first === 'download') return 'files.download';
 
   if (first === 'files') {
     if (methodUpper === 'GET' && parts.length === 1) return 'files.list';
@@ -2283,12 +2782,9 @@ export function getOperationForPath(method: string, path: string): string {
     return 'files.list';
   }
 
-  if (first === 'cdn') {
-    if (methodUpper === 'POST' && second === 'publish') return 'cdn.publish';
-    if (methodUpper === 'DELETE') return 'cdn.unpublish';
-    if (methodUpper === 'GET' && (parts[2] === 'play')) return 'cdn.play';
-    if (methodUpper === 'GET') return 'cdn.info';
-    return 'cdn.info';
+  if (first === 'stream') {
+    if (methodUpper === 'POST' && second === 'init') return 'stream.init';
+    return 'stream.read';
   }
 
   if (first === 'search') return 'search';

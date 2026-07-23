@@ -1,22 +1,19 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// CloudBliss API v4.0 — Entry Point
+
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 import {
-  jsonResponse, errorResponse, apiSuccess, apiError, CORS_HEADERS,
-  getOptionalEncryptionKey, validateEncryptionKeyFormat,
-  verifyRequestSignature,
-  resolveWorkspaceId,
-} from './utils.ts'
+  CORS_HEADERS, jsonResponse, errorResponse, apiError, verifyRequestSignature,
+  ROLE_RANK, generateStreamToken, generateDeviceFingerprint,
+} from './lib.ts'
 
 import {
-  handleFilesAPI, handleCDNAPI, handleSearchAPI, handleBatchAPI,
-  handleStatsAPI, handleExportAPI, handleHealthAPI,
-  handleKeysAPI, handleStorageAPI, handleUserAPI,
-  handleSecretsAPI, handleSquidShakeAPI, handleVeilRefAPI,
-  handleRootAPI, getOperationForPath,
+  handleFilesAPI, handleSearchAPI, handleBatchAPI,
+  handleStatsAPI, handleExportAPI, handleHealthAPI, handleKeysAPI,
+  handleStorageAPI, handleUserAPI, handleSecretsAPI, handleSquidShakeAPI,
+  handleVeilRefAPI, handleRootAPI, handleStreamAPI, getOperationForPath,
 } from './handlers.ts'
-
-const API_VERSION = '4.0'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -27,7 +24,7 @@ serve(async (req) => {
   let supabase: any
   let keyData: any = null
   let apiResponse: Response
-  let apiError = ''
+  let lastError = ''
   const logMeta: { reqFileName: string | null; reqFileSize: number | null } = { reqFileName: null, reqFileSize: null }
 
   try {
@@ -41,7 +38,6 @@ serve(async (req) => {
       req.headers.get('X-SquidCloud-Key') ||
       req.headers.get('Authorization')?.replace('Bearer ', '')
 
-    // Health check is public
     const path = url.pathname
       .replace('/cloudbliss-api', '')
       .replace(/\/+/g, '/')
@@ -65,7 +61,6 @@ serve(async (req) => {
 
     const userId = keyData.user_id
 
-    // Update last used timestamp
     await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyData.id)
 
     // ===== GUARD LAYER =====
@@ -87,18 +82,21 @@ serve(async (req) => {
     const workspaceId = url.searchParams.get('workspace_id') || undefined
 
     let fileSize = 0
-    if (req.method === 'POST' && path === '/files/upload/init') {
+    if (req.method === 'POST' && (path === '/upload' || path === '/files/upload/init')) {
       try { const body = await req.clone().json(); fileSize = body.size || 0 } catch { /* ignore */ }
     }
-    if (req.method === 'POST' && path.match(/^\/files\/[a-f0-9-]+\/download$/)) {
-      const match = path.match(/^\/files\/([a-f0-9-]+)\/download/)
+    if (req.method === 'POST' && path === '/upload/complete') {
+      // Size is known from the session, use 0 for credit calc (same as init)
+      fileSize = 0
+    }
+    if (req.method === 'GET' && (path.startsWith('/download/') || path.match(/^\/files\/[a-f0-9-]+\/download$/))) {
+      const match = path.match(/\/([a-f0-9-]+)\/download$/) || path.match(/\/download\/([a-f0-9-]+)/)
       if (match) {
         const { data: f } = await supabase.from('files').select('size').eq('id', match[1]).maybeSingle()
         fileSize = f?.size || 0
       }
     }
 
-    // Deduct credits
     const { data: deductResult, error: deductError } = await supabase.rpc('deduct_api_credits', {
       p_user_id: userId,
       p_api_key_id: keyData.id,
@@ -115,11 +113,46 @@ serve(async (req) => {
     // ===== ROUTING LAYER =====
     try {
       switch (firstPathSegment) {
+        case 'upload':
+          // Simple upload endpoints: POST /upload, POST /upload/complete, POST /upload/encrypted
+          apiResponse = await handleFilesAPI(req, supabase, userId, path, pathParts, workspaceId, rawApiKey)
+          break
+        case 'download':
+          // Simple download: GET /download/:id
+          apiResponse = await handleFilesAPI(req, supabase, userId, path, pathParts, workspaceId, rawApiKey)
+          break
         case 'files':
           apiResponse = await handleFilesAPI(req, supabase, userId, path, pathParts, workspaceId, rawApiKey)
           break
-        case 'cdn':
-          apiResponse = await handleCDNAPI(req, supabase, userId, path, pathParts, workspaceId)
+        case 'stream':
+          if (req.method === 'POST' && path === '/stream/init') {
+            const body = await req.clone().json().catch(() => ({})) as Record<string, unknown>
+            const streamFileId = (body.file_id as string) || ''
+            if (!streamFileId) {
+              apiResponse = errorResponse('file_id is required', 400, 'MISSING_FILE_ID')
+              break
+            }
+            const { data: streamFile } = await supabase
+              .from('files')
+              .select('id, is_deleted')
+              .eq('id', streamFileId)
+              .single()
+            if (!streamFile || streamFile.is_deleted) {
+              apiResponse = errorResponse('File not found', 404, 'FILE_NOT_FOUND')
+              break
+            }
+            const streamSecret = Deno.env.get('STREAM_SESSION_SECRET') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+            const deviceFp = generateDeviceFingerprint(req)
+            const token = await generateStreamToken(streamFileId, userId, deviceFp, streamSecret, 120)
+            apiResponse = jsonResponse({
+              success: true,
+              token,
+              stream_url: `/stream?id=${streamFileId}&token=${encodeURIComponent(token)}`,
+              expires_in: 120,
+            })
+          } else {
+            apiResponse = await handleStreamAPI(req, supabase, userId, path, pathParts)
+          }
           break
         case 'search':
           apiResponse = await handleSearchAPI(req, supabase, userId, path, pathParts, workspaceId)
@@ -157,8 +190,8 @@ serve(async (req) => {
       }
     } catch (handlerError: any) {
       console.error('Handler error:', handlerError)
-      apiError = handlerError.message || 'Handler error'
-      apiResponse = errorResponse(apiError, 500, 'HANDLER_ERROR')
+      lastError = handlerError.message || 'Handler error'
+      apiResponse = errorResponse(lastError, 500, 'HANDLER_ERROR')
     }
 
     // ===== RESPONSE ENRICHMENT =====
@@ -170,8 +203,8 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('CloudBliss API Error:', error)
-    apiError = error.message || 'Internal server error'
-    return errorResponse(apiError, 500, 'INTERNAL_ERROR')
+    lastError = error.message || 'Internal server error'
+    return errorResponse(lastError, 500, 'INTERNAL_ERROR')
   } finally {
     // ===== AUDIT LOG =====
     try {
@@ -185,7 +218,7 @@ serve(async (req) => {
         user_agent: req.headers.get('user-agent') || null,
         status_code: statusCode,
         response_time_ms: Date.now() - startTime,
-        error_message: apiError || null,
+        error_message: lastError || null,
         file_name: logMeta.reqFileName,
         file_size: logMeta.reqFileSize,
       })
@@ -228,7 +261,6 @@ async function authenticateApiKey(supabase: any, apiKey: string): Promise<any | 
 }
 
 async function checkGuards(supabase: any, userId: string, keyId: string): Promise<{ allowed: boolean; reason?: string; status?: number; code?: string }> {
-  // 1. Global API disable
   const { data: globalConfig } = await supabase
     .from('api_admin_config')
     .select('value')
@@ -244,7 +276,6 @@ async function checkGuards(supabase: any, userId: string, keyId: string): Promis
     return { allowed: false, reason: msg?.value || 'API is temporarily disabled for maintenance', status: 503, code: 'API_DISABLED' }
   }
 
-  // 2. Per-user API disable
   const { data: profile } = await supabase
     .from('profiles')
     .select('api_disabled, tier')
@@ -255,7 +286,6 @@ async function checkGuards(supabase: any, userId: string, keyId: string): Promis
     return { allowed: false, reason: 'Your API access has been disabled', status: 403, code: 'USER_DISABLED' }
   }
 
-  // 3. Per-key disable
   const { data: keyLimit } = await supabase
     .from('api_key_limits')
     .select('is_disabled')
@@ -266,7 +296,6 @@ async function checkGuards(supabase: any, userId: string, keyId: string): Promis
     return { allowed: false, reason: 'This API key has been disabled', status: 403, code: 'KEY_DISABLED' }
   }
 
-  // 4. Subscription validity
   if (profile?.tier && profile.tier !== 'free') {
     const { data: subCheck } = await supabase.rpc('check_subscription_validity', { user_id: userId })
     if (subCheck && subCheck.valid === false && subCheck.reason === 'subscription_expired') {

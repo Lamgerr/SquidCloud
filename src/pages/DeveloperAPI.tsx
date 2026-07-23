@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/dialog';
 
 type Endpoint = {
-  method: 'GET' | 'POST' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   path: string;
   description: string;
   scopes: string[];
@@ -62,17 +62,73 @@ const BASE_URL = 'https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/cloudbli
 
 const endpoints: Endpoint[] = [
   {
+    method: 'POST',
+    path: '/upload',
+    description: 'Initialize upload — get signed B2 URLs + encryption key (simple, recommended)',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/upload \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"video.mp4","type":"video/mp4","size":10485760}'`,
+    sampleResponse: `{
+  "upload_id": "uuid",
+  "file_id": "uuid",
+  "encryption_key": "hex_string",
+  "urls": [{"index":0,"upload_url":"https://...","path":"..."}],
+  "chunk_size": 1048576,
+  "total_chunks": 10,
+  "success": true
+}`,
+  },
+  {
+    method: 'POST',
+    path: '/upload/complete',
+    description: 'Complete upload — just send upload_id, server verifies and registers file',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/upload/complete \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"upload_id":"uuid"}'`,
+    sampleResponse: `{
+  "file": {"id":"...","name":"video.mp4","size":10485760},
+  "success": true
+}`,
+  },
+  {
+    method: 'POST',
+    path: '/upload/encrypted',
+    description: 'Upload plaintext chunks, server encrypts with RES54 and stores on B2',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/upload/encrypted \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"photo.jpg","type":"image/jpeg","size":524288,"chunks":[{"index":0,"upload_url":"..."}]}'`,
+  },
+  {
+    method: 'GET',
+    path: '/download/:id',
+    description: 'Download file — auto-decrypts encrypted files, returns plaintext (simple, recommended)',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/download/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY" -o file.pdf`,
+  },
+  {
     method: 'GET',
     path: '/files',
-    description: 'List all files and folders for the authenticated user',
+    description: 'List all files and folders for the authenticated user (paginated, searchable)',
     scopes: ['read'],
     statusPath: '/files',
-    example: `curl -X GET ${BASE_URL}/files -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+    example: `curl -X GET ${BASE_URL}/files?page=1&per_page=50 -H "X-SquidCloud-Key: YOUR_API_KEY"`,
     sampleResponse: `{
   "files": [...],
   "folders": [...],
   "total_files": 50,
   "total_folders": 2,
+  "page": 1,
+  "per_page": 50,
   "success": true
 }`,
   },
@@ -87,188 +143,49 @@ const endpoints: Endpoint[] = [
   {
     method: 'GET',
     path: '/files/:id/download',
-    description:
-      'Download decrypted file. Optional encryption key header is supported; wrong key returns 422.',
+    description: 'Download decrypted file. Optional ?signed=true returns direct B2 URLs.',
     scopes: ['read'],
     statusPath: null,
-    example:
-      `curl -X GET ${BASE_URL}/files/FILE_ID/download ` +
-      `-H "X-SquidCloud-Key: YOUR_API_KEY" ` +
-      `-H "X-SquidCloud-Encryption-Key: OPTIONAL_USER_KEY" ` +
-      `-o downloaded-file.pdf`,
-  },
-  {
-    method: 'POST',
-    path: '/files/upload',
-    description:
-      'Upload file with optional folder and optional caller-provided encryption key.',
-    scopes: ['write'],
-    statusPath: null,
-    example:
-      `curl -X POST ${BASE_URL}/files/upload ` +
-      `-H "X-SquidCloud-Key: YOUR_API_KEY" ` +
-      `-H "X-SquidCloud-Encryption-Key: OPTIONAL_USER_KEY" ` +
-      `-F "file=@document.pdf" ` +
-      `-F "encryption_key=OPTIONAL_USER_KEY" ` +
-      `-F "folderId=FOLDER_ID"`,
-    sampleResponse: `{
-  "file": {
-    "id": "...",
-    "name": "My Document",
-    "size": 1024,
-    "created_at": "..."
-  },
-  "encryption": {
-    "mode": "provided",
-    "key_required_for_download": true
-  },
-  "success": true
-}`,
-  },
-  {
-    method: 'DELETE',
-    path: '/files/:id',
-    description: 'Soft delete a file',
-    scopes: ['delete'],
-    statusPath: null,
-    example: `curl -X DELETE ${BASE_URL}/files/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY"`,
-  },
-  {
-    method: 'GET',
-    path: '/keys',
-    description: 'List API keys for the authenticated user',
-    scopes: ['read'],
-    statusPath: null,
-    example: `curl -X GET ${BASE_URL}/keys -H "X-SquidCloud-Key: YOUR_API_KEY"`,
-  },
-  {
-    method: 'GET',
-    path: '/storage',
-    description: 'Get storage usage, quota stats, and API credit balance',
-    scopes: ['read'],
-    statusPath: '/storage',
-    example: `curl -X GET ${BASE_URL}/storage -H "X-SquidCloud-Key: YOUR_API_KEY"`,
-  },
-  {
-    method: 'POST',
-    path: '/cdn/publish',
-    description: 'Publish a file to the CDN for public access with optional TTL',
-    scopes: ['write'],
-    statusPath: null,
-    example: `curl -X POST ${BASE_URL}/cdn/publish -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"file_id":"FILE_ID","ttl":3600}'`,
-  },
-  {
-    method: 'GET',
-    path: '/cdn/play/*',
-    description: 'Stream or play a CDN-published media file directly in the browser',
-    scopes: ['read'],
-    statusPath: null,
-    example: `curl -X GET ${BASE_URL}/cdn/play/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY"`,
-  },
-  {
-    method: 'GET',
-    path: '/search',
-    description: 'Search files by name, type, or metadata with pagination',
-    scopes: ['read'],
-    statusPath: null,
-    example: `curl -X GET "${BASE_URL}/search?q=document&page=1&limit=20" -H "X-SquidCloud-Key: YOUR_API_KEY"`,
-    sampleResponse: `{
-  "results": [...],
-  "total": 10,
-  "page": 1,
-  "limit": 20,
-  "success": true
-}`,
-  },
-  {
-    method: 'POST',
-    path: '/batch/delete',
-    description: 'Batch delete multiple files by ID',
-    scopes: ['delete'],
-    statusPath: null,
-    example: `curl -X POST ${BASE_URL}/batch/delete -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"file_ids":["ID1","ID2"]}'`,
-    sampleResponse: `{
-  "deleted": 2,
-  "failed": 0,
-  "success": true
-}`,
-  },
-  {
-    method: 'POST',
-    path: '/batch/move',
-    description: 'Batch move files to a different folder',
-    scopes: ['write'],
-    statusPath: null,
-    example: `curl -X POST ${BASE_URL}/batch/move -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"file_ids":["ID1","ID2"],"target_folder_id":"FOLDER_ID"}'`,
-    sampleResponse: `{
-  "moved": 2,
-  "failed": 0,
-  "success": true
-}`,
-  },
-  {
-    method: 'GET',
-    path: '/stats/usage',
-    description: 'Get detailed API usage statistics including credits consumed',
-    scopes: ['read'],
-    statusPath: null,
-    example: `curl -X GET ${BASE_URL}/stats/usage -H "X-SquidCloud-Key: YOUR_API_KEY"`,
-  },
-  {
-    method: 'GET',
-    path: '/export/files',
-    description: 'Export file metadata as CSV or JSON for backup',
-    scopes: ['read'],
-    statusPath: null,
-    example: `curl -X GET "${BASE_URL}/export/files?format=csv" -H "X-SquidCloud-Key: YOUR_API_KEY"`,
-  },
-  {
-    method: 'GET',
-    path: '/health',
-    description: 'Health check endpoint returning server status and version',
-    scopes: ['read'],
-    statusPath: '/health',
-    example: `curl -X GET ${BASE_URL}/health`,
-    sampleResponse: `{
-  "status": "ok",
-  "version": "4.0",
-  "timestamp": "...",
-  "success": true
-}`,
+    example: `curl -X GET ${BASE_URL}/files/FILE_ID/download -H "X-SquidCloud-Key: YOUR_API_KEY" -o downloaded-file.pdf`,
   },
   {
     method: 'POST',
     path: '/files/upload/init',
-    description: 'Initialize a chunked upload — get signed B2 URLs for direct upload',
+    description: 'Legacy: Initialize a chunked upload — get signed B2 URLs',
     scopes: ['write'],
     statusPath: null,
     example: `curl -X POST ${BASE_URL}/files/upload/init \\
   -H "X-SquidCloud-Key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"name":"video.mp4","type":"video/mp4","size":10485760}'`,
-    sampleResponse: `{
-  "upload_id": "uuid",
-  "urls": [{"index":0,"upload_url":"https://...","path":"..."}],
-  "chunk_size": 1048576,
-  "total_chunks": 10,
-  "success": true
-}`,
   },
   {
     method: 'POST',
     path: '/files/upload/complete',
-    description: 'Complete a chunked upload — verify chunks and register file in database',
+    description: 'Legacy: Complete a chunked upload — verify chunks and register file',
     scopes: ['write'],
     statusPath: null,
     example: `curl -X POST ${BASE_URL}/files/upload/complete \\
   -H "X-SquidCloud-Key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"upload_id":"uuid","file_id":"uuid","chunks":[{"index":0,"path":"...","sha256":"..."}]}'`,
-    sampleResponse: `{
-  "file": {"id":"...","name":"video.mp4","size":10485760},
-  "message": "Upload completed",
-  "success": true
-}`,
+  },
+  {
+    method: 'DELETE',
+    path: '/files/:id',
+    description: 'Soft delete a file (moves to trash)',
+    scopes: ['delete'],
+    statusPath: null,
+    example: `curl -X DELETE ${BASE_URL}/files/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'POST',
+    path: '/files/:id/restore',
+    description: 'Restore a soft-deleted file from trash',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/files/FILE_ID/restore \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
   },
   {
     method: 'PUT',
@@ -280,15 +197,6 @@ const endpoints: Endpoint[] = [
   -H "X-SquidCloud-Key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"name":"new-name.pdf"}'`,
-  },
-  {
-    method: 'POST',
-    path: '/files/:id/restore',
-    description: 'Restore a soft-deleted file from trash',
-    scopes: ['write'],
-    statusPath: null,
-    example: `curl -X POST ${BASE_URL}/files/FILE_ID/restore \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
   },
   {
     method: 'POST',
@@ -313,31 +221,81 @@ const endpoints: Endpoint[] = [
   -d '{"file_id":"SOURCE_FILE_ID","new_name":"copy-name.pdf"}'`,
   },
   {
-    method: 'GET',
-    path: '/cdn/list',
-    description: 'List all files published to SquidCDN',
-    scopes: ['read'],
+    method: 'POST',
+    path: '/stream/init',
+    description: 'Get a short-lived streaming session token for encrypted media playback',
+    scopes: ['write'],
     statusPath: null,
-    example: `curl -X GET ${BASE_URL}/cdn/list \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+    example: `curl -X POST ${BASE_URL}/stream/init \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"file_id":"FILE_ID"}'`,
+    sampleResponse: `{
+  "token": "eyJmaWxl...",
+  "stream_url": "/stream?id=FILE_ID&token=eyJmaWxl...",
+  "expires_in": 120,
+  "success": true
+}`,
   },
   {
     method: 'GET',
-    path: '/cdn/:file_id',
-    description: 'Get CDN publish info for a specific file',
+    path: '/stream',
+    description: 'Stream encrypted file via server-side decrypting proxy (Range requests, seeking)',
     scopes: ['read'],
     statusPath: null,
-    example: `curl -X GET ${BASE_URL}/cdn/FILE_ID \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+    example: `curl -X GET "${BASE_URL}/stream?id=FILE_ID&token=STREAM_TOKEN" -o -`,
   },
   {
-    method: 'DELETE',
-    path: '/cdn/:file_id',
-    description: 'Unpublish a file from SquidCDN',
+    method: 'GET',
+    path: '/search',
+    description: 'Search files by name, type, or metadata with pagination',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET "${BASE_URL}/search?q=document&type=image&page=1&per_page=20" -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+    sampleResponse: `{
+  "files": [...],
+  "folders": [...],
+  "total": 10,
+  "page": 1,
+  "per_page": 20,
+  "success": true
+}`,
+  },
+  {
+    method: 'POST',
+    path: '/batch/delete',
+    description: 'Batch delete multiple files by ID (max 100)',
     scopes: ['delete'],
     statusPath: null,
-    example: `curl -X DELETE ${BASE_URL}/cdn/FILE_ID \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+    example: `curl -X POST ${BASE_URL}/batch/delete \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"file_ids":["ID1","ID2"]}'`,
+    sampleResponse: `{
+  "action": "delete",
+  "results": [...],
+  "succeeded": 2,
+  "failed": 0,
+  "success": true
+}`,
+  },
+  {
+    method: 'POST',
+    path: '/batch/move',
+    description: 'Batch move files to a different folder',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/batch/move \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"file_ids":["ID1","ID2"],"folder_id":"TARGET_FOLDER_ID"}'`,
+    sampleResponse: `{
+  "action": "move",
+  "results": [...],
+  "succeeded": 2,
+  "failed": 0,
+  "success": true
+}`,
   },
   {
     method: 'POST',
@@ -363,11 +321,29 @@ const endpoints: Endpoint[] = [
   },
   {
     method: 'GET',
+    path: '/stats/usage',
+    description: 'Get daily/weekly/monthly credit usage statistics',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/stats/usage -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+    sampleResponse: `{
+  "usage": {
+    "today": {"credits_used": 42, "daily_limit": 1000},
+    "this_week": {"credits_used": 210},
+    "this_month": {"credits_used": 840},
+    "total_requests_today": 42,
+    "credits_remaining": 958
+  },
+  "success": true
+}`,
+  },
+  {
+    method: 'GET',
     path: '/stats/credits',
     description: 'Get detailed credit usage log with pagination',
     scopes: ['read'],
     statusPath: null,
-    example: `curl -X GET ${BASE_URL}/stats/credits?page=1&per_page=50 \\
+    example: `curl -X GET "${BASE_URL}/stats/credits?page=1&per_page=50" \\
   -H "X-SquidCloud-Key: YOUR_API_KEY"`,
   },
   {
@@ -381,18 +357,19 @@ const endpoints: Endpoint[] = [
   },
   {
     method: 'GET',
-    path: '/user',
-    description: 'Get user profile with credit balance and storage usage',
+    path: '/export/files',
+    description: 'Export file metadata as CSV or JSON for backup',
     scopes: ['read'],
     statusPath: null,
-    example: `curl -X GET ${BASE_URL}/user \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
-    sampleResponse: `{
-  "id": "uuid",
-  "email": "user@example.com",
-  "credits": {"remaining": 850, "used_today": 150, "daily_limit": 1000},
-  "success": true
-}`,
+    example: `curl -X GET "${BASE_URL}/export/files?format=csv" -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'GET',
+    path: '/keys',
+    description: 'List API keys for the authenticated user',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/keys -H "X-SquidCloud-Key: YOUR_API_KEY"`,
   },
   {
     method: 'POST',
@@ -434,13 +411,57 @@ const endpoints: Endpoint[] = [
   {
     method: 'PUT',
     path: '/keys/:id/limits',
-    description: 'Set per-key custom daily limit and rate limit (supporter+ only)',
+    description: 'Set per-key custom daily limit and rate limit',
     scopes: ['write'],
     statusPath: null,
     example: `curl -X PUT ${BASE_URL}/keys/KEY_ID/limits \\
   -H "X-SquidCloud-Key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"custom_daily_limit":5000,"custom_rate_limit_rps":100}'`,
+  },
+  {
+    method: 'GET',
+    path: '/storage',
+    description: 'Get storage usage, file count, and total size',
+    scopes: ['read'],
+    statusPath: '/storage',
+    example: `curl -X GET ${BASE_URL}/storage -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'GET',
+    path: '/user',
+    description: 'Get user profile with credit balance and storage usage',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/user \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+    sampleResponse: `{
+  "id": "uuid",
+  "email": "user@example.com",
+  "full_name": "User Name",
+  "storage_used": 1048576,
+  "total_files": 42,
+  "credits": {"remaining": 850, "used_today": 150, "daily_limit": 1000},
+  "success": true
+}`,
+  },
+  {
+    method: 'GET',
+    path: '/whoami',
+    description: 'Alias for GET /user',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/whoami \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
+  },
+  {
+    method: 'GET',
+    path: '/secrets',
+    description: 'List all stored secrets (values not returned)',
+    scopes: ['read'],
+    statusPath: null,
+    example: `curl -X GET ${BASE_URL}/secrets \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY"`,
   },
   {
     method: 'POST',
@@ -451,15 +472,45 @@ const endpoints: Endpoint[] = [
     example: `curl -X POST ${BASE_URL}/secrets \\
   -H "X-SquidCloud-Key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"name":"db-password","value":"s3cret!"}'`,
+  -d '{"name":"db-password","value":"s3cret!","storage":"database"}'`,
+    sampleResponse: `{
+  "secret": {"id":"...","name":"db-password","storage_type":"database"},
+  "success": true
+}`,
   },
   {
-    method: 'GET',
-    path: '/secrets',
-    description: 'List all stored secrets (values not returned)',
-    scopes: ['read'],
+    method: 'POST',
+    path: '/secrets/:name/verify',
+    description: 'Verify if a candidate value matches a stored secret',
+    scopes: ['write'],
     statusPath: null,
-    example: `curl -X GET ${BASE_URL}/secrets \\
+    example: `curl -X POST ${BASE_URL}/secrets/db-password/verify \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"value":"s3cret!"}'`,
+    sampleResponse: `{
+  "matched": true,
+  "success": true
+}`,
+  },
+  {
+    method: 'PATCH',
+    path: '/secrets/:id/rename',
+    description: 'Rename a stored secret',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X PATCH ${BASE_URL}/secrets/SECRET_ID/rename \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"new-name"}'`,
+  },
+  {
+    method: 'DELETE',
+    path: '/secrets/:id',
+    description: 'Permanently delete a secret',
+    scopes: ['delete'],
+    statusPath: null,
+    example: `curl -X DELETE ${BASE_URL}/secrets/SECRET_ID \\
   -H "X-SquidCloud-Key: YOUR_API_KEY"`,
   },
   {
@@ -473,11 +524,73 @@ const endpoints: Endpoint[] = [
   -H "Content-Type: application/json" \\
   -d '{"device_fingerprint":"device-id","project_id":"my-app"}'`,
   },
+  {
+    method: 'POST',
+    path: '/squidshake/ref',
+    description: 'Issue a VeilRef for a secret within an active session',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/squidshake/ref \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"session_id":"...","secret_name":"db-password","device_fingerprint":"..."}'`,
+  },
+  {
+    method: 'POST',
+    path: '/squidshake/audit',
+    description: 'Log an audit entry for a SquidShake action',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/squidshake/audit \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"action":"resolve","project_id":"my-app","secret_name":"db-password","success":true}'`,
+  },
+  {
+    method: 'POST',
+    path: '/veilref/verify',
+    description: 'Verify a VeilRef is valid and not expired',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/veilref/verify \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"veil_ref_json":"..."}'`,
+  },
+  {
+    method: 'POST',
+    path: '/veilref/resolve',
+    description: 'Resolve a VeilRef to retrieve the underlying secret value',
+    scopes: ['write'],
+    statusPath: null,
+    example: `curl -X POST ${BASE_URL}/veilref/resolve \\
+  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"veil_ref_json":"..."}'`,
+  },
+  {
+    method: 'GET',
+    path: '/health',
+    description: 'Health check endpoint returning server status and version (no auth required)',
+    scopes: ['read'],
+    statusPath: '/health',
+    example: `curl -X GET ${BASE_URL}/health`,
+    sampleResponse: `{
+  "status": "ok",
+  "version": "4.0",
+  "timestamp": "...",
+  "db": "connected",
+  "uptime": 12345,
+  "success": true
+}`,
+  },
 ];
 
 const methodBadgeClass = (method: Endpoint['method']) => {
   if (method === 'GET') return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
   if (method === 'POST') return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+  if (method === 'PUT') return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+  if (method === 'PATCH') return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
   return 'bg-red-500/10 text-red-600 border-red-500/20';
 };
 
@@ -489,7 +602,7 @@ const DeveloperAPI = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [endpointStatus, setEndpointStatus] = useState<Record<string, EndpointHealth>>({});
 
-  const [playgroundMethod, setPlaygroundMethod] = useState<'GET' | 'POST' | 'DELETE'>('GET');
+  const [playgroundMethod, setPlaygroundMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'>('GET');
   const [playgroundEndpoint, setPlaygroundEndpoint] = useState('/files');
   const [playgroundApiKey, setPlaygroundApiKey] = useState('');
   const [playgroundEncryptionKey, setPlaygroundEncryptionKey] = useState('');
