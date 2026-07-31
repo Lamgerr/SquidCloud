@@ -1,162 +1,143 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
-  Lock, Plus, Pencil, Trash2, Key,
-  ChevronRight, ChevronDown, X, Loader2, AlertCircle, ExternalLink,
+  Lock, Plus, Trash2, KeyRound, RefreshCw, Activity, BarChart3,
+  Fingerprint, Copy, Eye, EyeOff, History, CheckCircle2, AlertTriangle,
+  ShieldAlert, Info, X, Loader2, ExternalLink, Ban, MoreVertical, Pencil,
+  ChevronDown,
 } from '@/lib/icon-map';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { SUPABASE_URL } from '@/lib/supabaseEnv';
+import {
+  squidveilFetch, getSquidVeilToken, setSquidVeilToken, clearSquidVeilToken,
+  type SquidVeilSecret, type SquidVeilToken, type StatsResponse, type MonitorResponse,
+} from '@/lib/squidveilClient';
 
-interface Secret {
-  id: string;
-  name: string;
-  scope: any;
-  created_at: string;
-  updated_at: string;
-}
-
-const BASE_URL = `${SUPABASE_URL}/functions/v1/cloudbliss-api`;
+type Tab = 'secrets' | 'tokens' | 'monitor';
 
 const SquidVeilSecretsMobile = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const [secrets, setSecrets] = useState<Secret[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(() => !!getSquidVeilToken());
+  const [pasteValue, setPasteValue] = useState('');
+  const [tab, setTab] = useState<Tab>('secrets');
+
+  const [secrets, setSecrets] = useState<SquidVeilSecret[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('squidveil_api_key') || '');
-  const [selectedKeyId, setSelectedKeyId] = useState(() => localStorage.getItem('squidveil_api_key_id') || '');
-  const [showApiKeyInput, setShowApiKeyInput] = useState(!apiKey);
+  const [tokens, setTokens] = useState<SquidVeilToken[]>([]);
+  const [loadingTokens, setLoadingTokens] = useState(false);
 
-  const [userApiKeys, setUserApiKeys] = useState<any[]>([]);
-  const [loadingKeys, setLoadingKeys] = useState(false);
-  const [keyPasteValue, setKeyPasteValue] = useState('');
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [monitor, setMonitor] = useState<MonitorResponse | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createValue, setCreateValue] = useState('');
-  const [creating, setCreating] = useState(false);
 
-  const [actionSecret, setActionSecret] = useState<Secret | null>(null);
-  const [actionOpen, setActionOpen] = useState(false);
+  const [tokenCreateOpen, setTokenCreateOpen] = useState(false);
+  const [creatingToken, setCreatingToken] = useState(false);
+  const [tokenName, setTokenName] = useState('');
+  const [tokenTtl, setTokenTtl] = useState('');
+  const [rawToken, setRawToken] = useState<string | null>(null);
 
-  const [renameMode, setRenameMode] = useState(false);
-  const [renameName, setRenameName] = useState('');
-  const [renaming, setRenaming] = useState(false);
+  const [actionSecret, setActionSecret] = useState<SquidVeilSecret | null>(null);
+  const [revealedValue, setRevealedValue] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const [secretVersions, setSecretVersions] = useState<any[]>([]);
 
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [rotatingToken, setRotatingToken] = useState<string | null>(null);
+  const [rotatedRaw, setRotatedRaw] = useState<string | null>(null);
+
+  const [deleteTokenId, setDeleteTokenId] = useState<string | null>(null);
+  const [deletingToken, setDeletingToken] = useState(false);
 
   const fetchSecrets = useCallback(async () => {
-    if (!apiKey) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE_URL}/secrets`, {
-        headers: { 'X-SquidCloud-Key': apiKey, 'Content-Type': 'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch secrets');
+      const data = await squidveilFetch<{ secrets: SquidVeilSecret[] }>('/v1/secrets');
       setSecrets(data.secrets || []);
     } catch (e: any) {
-      setError(e.message);
+      if (e.code === 'INVALID_TOKEN' || e.code === 'REVOKED' || e.status === 401) {
+        setConnected(false);
+        clearSquidVeilToken();
+      } else {
+        setError(e.message);
+      }
     } finally {
       setLoading(false);
     }
-  }, [apiKey]);
+  }, []);
 
-  useEffect(() => {
-    if (apiKey) fetchSecrets();
-  }, [apiKey, fetchSecrets]);
-
-  const fetchUserApiKeys = useCallback(async () => {
-    if (!user) return;
-    setLoadingKeys(true);
+  const fetchTokens = useCallback(async () => {
+    setLoadingTokens(true);
     try {
-      const { data, error } = await supabase
-        .from('api_keys')
-        .select('id, name, key_prefix, created_at')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setUserApiKeys(data || []);
+      const data = await squidveilFetch<{ tokens: SquidVeilToken[] }>('/v1/tokens');
+      setTokens(data.tokens || []);
     } catch (e: any) {
-      console.error('Failed to fetch API keys:', e);
+      if (e.status !== 403) toast({ title: 'Failed to load tokens', description: e.message, variant: 'destructive' });
     } finally {
-      setLoadingKeys(false);
+      setLoadingTokens(false);
     }
-  }, [user]);
+  }, [toast]);
+
+  const fetchMonitor = useCallback(async () => {
+    try {
+      const [statsData, monitorData] = await Promise.all([
+        squidveilFetch<StatsResponse>('/v1/stats?days=30&top=5'),
+        squidveilFetch<MonitorResponse>('/v1/monitor'),
+      ]);
+      setStats(statsData);
+      setMonitor(monitorData);
+    } catch (e: any) {
+      if (e.status !== 403) toast({ title: 'Failed to load monitor', description: e.message, variant: 'destructive' });
+    }
+  }, [toast]);
 
   useEffect(() => {
-    if (showApiKeyInput && user) fetchUserApiKeys();
-  }, [showApiKeyInput, user, fetchUserApiKeys]);
-
-  const handleSaveApiKey = (rawKey: string) => {
-    const trimmed = rawKey.trim();
-    if (!trimmed) { toast({ title: 'API key required', variant: 'destructive' }); return; }
-    localStorage.setItem('squidveil_api_key', trimmed);
-    if (selectedKeyId) {
-      localStorage.setItem('squidveil_api_key_id', selectedKeyId);
-      localStorage.setItem('squidveil_api_key_' + selectedKeyId, trimmed);
+    if (connected) {
+      fetchSecrets();
+      fetchTokens();
     }
-    setApiKey(trimmed);
-    setKeyPasteValue('');
-    setShowApiKeyInput(false);
+  }, [connected, fetchSecrets, fetchTokens]);
+
+  useEffect(() => {
+    if (connected && tab === 'monitor') fetchMonitor();
+  }, [connected, tab, fetchMonitor]);
+
+  const handleConnect = () => {
+    const trimmed = pasteValue.trim();
+    if (!trimmed) return;
+    setSquidVeilToken(trimmed);
+    setConnected(true);
+    setPasteValue('');
     fetchSecrets();
   };
 
-  const handleSelectKey = (keyId: string) => {
-    setSelectedKeyId(keyId);
-    const storedRaw = localStorage.getItem('squidveil_api_key_' + keyId);
-    if (storedRaw) {
-      localStorage.setItem('squidveil_api_key', storedRaw);
-      localStorage.setItem('squidveil_api_key_id', keyId);
-      setApiKey(storedRaw);
-      setShowApiKeyInput(false);
-      fetchSecrets();
-    } else {
-      setKeyPasteValue('');
-    }
-  };
-
-  const handleClearApiKey = () => {
-    setApiKey('');
-    setSelectedKeyId('');
-    localStorage.removeItem('squidveil_api_key');
-    localStorage.removeItem('squidveil_api_key_id');
+  const handleDisconnect = () => {
+    clearSquidVeilToken();
+    setConnected(false);
     setSecrets([]);
-    setShowApiKeyInput(true);
-    fetchUserApiKeys();
-  };
-
-  const secretsFetch = async (path: string, options: RequestInit = {}) => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-SquidCloud-Key': apiKey,
-      ...(options.headers as Record<string, string>),
-    };
-    return fetch(`${BASE_URL}${path}`, { ...options, headers });
+    setTokens([]);
+    setStats(null);
+    setMonitor(null);
   };
 
   const handleCreate = async () => {
     if (!createName.trim() || !createValue.trim()) return;
     setCreating(true);
     try {
-      const res = await secretsFetch('/secrets', {
+      const data = await squidveilFetch('/v1/secrets', {
         method: 'POST',
-        body: JSON.stringify({ name: createName.trim(), value: createValue.trim() }),
+        body: JSON.stringify({ name: createName.trim(), value: createValue.trim(), recovery_window_days: 7 }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create secret');
       setSecrets(prev => [data.secret, ...prev]);
       setCreateOpen(false);
       setCreateName('');
       setCreateValue('');
-      toast({ title: 'Secret created' });
+      toast({ title: 'Secret created', description: data.secret.name });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
@@ -164,244 +145,509 @@ const SquidVeilSecretsMobile = () => {
     }
   };
 
-  const handleRename = async () => {
-    if (!actionSecret || !renameName.trim()) return;
-    setRenaming(true);
+  const handleCreateToken = async () => {
+    if (!tokenName.trim()) return;
+    setCreatingToken(true);
     try {
-      const res = await secretsFetch(`/secrets/${actionSecret.id}/rename`, {
-        method: 'PATCH',
-        body: JSON.stringify({ name: renameName.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to rename secret');
-      setSecrets(prev => prev.map(s => s.id === actionSecret.id ? data.secret : s));
-      setActionOpen(false);
-      setActionSecret(null);
-      setRenameMode(false);
-      toast({ title: 'Secret renamed' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
-    } finally {
-      setRenaming(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!actionSecret) return;
-    setDeleting(true);
-    try {
-      const res = await secretsFetch(`/secrets/${actionSecret.id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete secret');
+      const body: Record<string, unknown> = { name: tokenName.trim(), policies: ['default'] };
+      if (tokenTtl.trim()) {
+        const ttl = Number(tokenTtl.trim());
+        if (Number.isFinite(ttl) && ttl > 0) body.expires_in_seconds = Math.floor(ttl * 86400);
       }
-      setSecrets(prev => prev.filter(s => s.id !== actionSecret.id));
-      setActionOpen(false);
-      setActionSecret(null);
-      setDeleteConfirm(false);
-      toast({ title: 'Secret deleted' });
+      const data = await squidveilFetch<{ token: SquidVeilToken; raw_token: string }>('/v1/tokens', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      setRawToken(data.raw_token);
+      setTokens(prev => [data.token, ...prev]);
+      setTokenName('');
+      setTokenTtl('');
+      setTokenCreateOpen(false);
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
-      setDeleting(false);
+      setCreatingToken(false);
     }
   };
 
-  const formatDate = (dateStr: string) => {
+  const openSecretActions = async (secret: SquidVeilSecret) => {
+    setActionSecret(secret);
+    setRevealedValue(null);
+    setSecretVersions([]);
+  };
+
+  const handleRead = async () => {
+    if (!actionSecret) return;
+    if (revealedValue) { setRevealedValue(null); return; }
+    setReading(true);
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric',
+      const data = await squidveilFetch<{ value: string }>(`/v1/secrets/${encodeURIComponent(actionSecret.name)}`);
+      setRevealedValue(data.value);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const handleRotate = async (secret: SquidVeilSecret) => {
+    try {
+      await squidveilFetch(`/v1/secrets/${encodeURIComponent(secret.name)}/rotate`, { method: 'POST', body: JSON.stringify({}) });
+      setActionSecret(null);
+      toast({ title: 'Secret rotated', description: `${secret.name} — new value generated` });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const loadVersions = async (secret: SquidVeilSecret) => {
+    try {
+      const data = await squidveilFetch<{ versions: any[] }>(`/v1/secrets/${encodeURIComponent(secret.name)}/versions`);
+      setSecretVersions(data.versions || []);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteSecret = async (secret: SquidVeilSecret) => {
+    try {
+      await squidveilFetch(`/v1/secrets/${encodeURIComponent(secret.name)}`, { method: 'DELETE' });
+      setActionSecret(null);
+      fetchSecrets();
+      toast({ title: 'Secret deleted', description: 'Restorable within the recovery window' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleUndelete = async (name: string) => {
+    try {
+      await squidveilFetch(`/v1/secrets/${encodeURIComponent(name)}/undelete`, { method: 'POST', body: JSON.stringify({}) });
+      fetchSecrets();
+      toast({ title: 'Secret restored', description: name });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleRotateToken = async (token: SquidVeilToken) => {
+    setRotatingToken(token.id);
+    try {
+      const data = await squidveilFetch<{ token: SquidVeilToken; raw_token: string }>(`/v1/tokens/${token.id}/rotate`, {
+        method: 'POST',
+        body: JSON.stringify({}),
       });
+      setRotatedRaw(data.raw_token);
+      setTokens(prev => prev.map(t => t.id === token.id ? { ...t, token_prefix: data.token.token_prefix } : t));
+      toast({ title: 'Token rotated', description: 'Previous value invalidated' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setRotatingToken(null);
+    }
+  };
+
+  const handleRevokeToken = async (token: SquidVeilToken) => {
+    try {
+      await squidveilFetch(`/v1/tokens/${token.id}/revoke`, { method: 'POST', body: JSON.stringify({}) });
+      setTokens(prev => prev.map(t => t.id === token.id ? { ...t, revoked_at: new Date().toISOString() } : t));
+      toast({ title: 'Token revoked', description: token.name });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteToken = async () => {
+    if (!deleteTokenId) return;
+    setDeletingToken(true);
+    try {
+      await squidveilFetch(`/v1/tokens/${deleteTokenId}`, { method: 'DELETE' });
+      setTokens(prev => prev.filter(t => t.id !== deleteTokenId));
+      setDeleteTokenId(null);
+      toast({ title: 'Token deleted permanently' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setDeletingToken(false);
+    }
+  };
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied to clipboard' });
+    } catch {
+      toast({ title: 'Copy failed', variant: 'destructive' });
+    }
+  };
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '—';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     } catch { return dateStr; }
   };
 
-  const openActions = (secret: Secret) => {
-    setActionSecret(secret);
-    setRenameMode(false);
-    setDeleteConfirm(false);
-    setRenameName(secret.name);
-    setActionOpen(true);
-  };
+  const activeSecrets = secrets.filter(s => !s.deleted_at);
+  const deletedSecrets = secrets.filter(s => s.deleted_at);
 
-  if (showApiKeyInput) {
+  if (!connected) {
     return (
-      <div className="px-3 pt-4">
-        <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-5 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-400">
-              <Key className="h-7 w-7" />
+      <div className="p-4 space-y-4">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-transparent border border-violet-500/20 p-4">
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
+              <Lock className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white">SquidVeil Secrets</h1>
+              <p className="text-xs text-white/50">Encrypted secrets, tokens & monitoring</p>
             </div>
           </div>
-          <h2 className="text-base font-semibold text-white mb-1">Select API Key</h2>
-          <p className="text-xs text-white/50 mb-5">
-            Choose an API key to encrypt secrets.
-          </p>
+        </div>
 
-          {loadingKeys ? (
-            <Loader2 className="h-5 w-5 animate-spin text-violet-400 mx-auto" />
-          ) : userApiKeys.length === 0 ? (
-            <div className="text-center">
-              <p className="text-sm text-white/40 mb-3">No API keys found.</p>
-              <a
-                href="/developer-api"
-                className="inline-flex items-center justify-center gap-1.5 w-full h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 font-medium text-sm"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Create in Developer API
-              </a>
+        <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+          <div className="flex flex-col items-center text-center py-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-400 mb-3">
+              <KeyRound className="h-6 w-6" />
             </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="relative">
-                <select
-                  value={selectedKeyId}
-                  onChange={e => handleSelectKey(e.target.value)}
-                  className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white appearance-none outline-none focus:border-violet-500/50 transition-colors cursor-pointer"
-                >
-                  <option value="" disabled className="bg-[#0a0a0f]">Select an API key...</option>
-                  {userApiKeys.map(k => (
-                    <option key={k.id} value={k.id} className="bg-[#0a0a0f]">{k.name} ({k.key_prefix}...)</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
-              </div>
-
-              {selectedKeyId && !localStorage.getItem('squidveil_api_key_' + selectedKeyId) && (
-                <div className="space-y-2">
-                  <p className="text-xs text-white/40 text-left">
-                    Paste the raw key (<span className="text-violet-400">shown once on creation</span>):
-                  </p>
-                  <input
-                    type="password"
-                    value={keyPasteValue}
-                    onChange={e => setKeyPasteValue(e.target.value)}
-                    placeholder="Paste raw API key..."
-                    className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
-                    onKeyDown={e => e.key === 'Enter' && handleSaveApiKey(keyPasteValue)}
-                  />
-                  <button
-                    onClick={() => handleSaveApiKey(keyPasteValue)}
-                    disabled={!keyPasteValue.trim()}
-                    className="w-full h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-40"
-                  >
-                    <Key className="w-4 h-4" />
-                    Connect
-                  </button>
-                </div>
-              )}
-
-              {selectedKeyId && localStorage.getItem('squidveil_api_key_' + selectedKeyId) && (
-                <p className="text-xs text-emerald-400/80">Key already connected — unlocking secrets...</p>
-              )}
-            </div>
-          )}
+            <h2 className="text-base font-semibold text-white">Connect your token</h2>
+            <p className="text-xs text-white/50 mt-1 mb-4">Paste an <span className="text-violet-400">sv_</span> access token to unlock SquidVeil.</p>
+            <input
+              type="password"
+              value={pasteValue}
+              onChange={e => setPasteValue(e.target.value)}
+              placeholder="Paste sv_ access token..."
+              className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+              onKeyDown={e => e.key === 'Enter' && handleConnect()}
+            />
+            <button
+              onClick={handleConnect}
+              disabled={!pasteValue.trim()}
+              className="mt-3 w-full h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 disabled:opacity-40 flex items-center justify-center gap-1.5 text-sm font-medium transition-all"
+            >
+              <KeyRound className="w-4 h-4" />
+              Connect
+            </button>
+            <a
+              href="/help/squidveil"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60 mt-3"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Token docs
+            </a>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="px-3 pt-4 pb-4">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Secrets</h2>
-          <p className="text-xs text-white/40">
-            {loading ? 'Loading...' : `${secrets.length} ${secrets.length === 1 ? 'secret' : 'secrets'} stored`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleClearApiKey}
-            className="h-8 px-3 rounded-xl bg-white/5 text-white/40 border border-white/10 text-xs hover:bg-white/10"
-          >
-            <X className="w-3 h-3" />
-          </button>
-          <a
-            href="/help/squidveil"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-8 px-3 rounded-xl bg-white/5 text-white/40 border border-white/10 text-xs flex items-center gap-1 hover:bg-white/10"
-          >
-            <ExternalLink className="w-3 h-3" />
-            Docs
-          </a>
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="h-9 px-4 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 text-sm font-medium flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New
-          </button>
+    <div className="p-4 space-y-4">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-transparent border border-violet-500/20 p-4">
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
+              <Lock className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white">SquidVeil Secrets</h1>
+              <p className="text-xs text-white/50">{activeSecrets.length} active secrets</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <a
+              href="/help/squidveil"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/40"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <button
+              onClick={handleDisconnect}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/40"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
-        </div>
-      ) : error ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center">
-          <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-3" />
-          <p className="text-sm text-red-400 font-medium">{error}</p>
-          <button onClick={fetchSecrets} className="mt-3 text-xs text-violet-400 underline underline-offset-2">
-            Try again
+      <div className="flex items-center gap-1 rounded-xl bg-white/[0.03] border border-white/10 p-1">
+        {([
+          { id: 'secrets', label: 'Secrets', icon: Lock },
+          { id: 'tokens', label: 'Tokens', icon: KeyRound },
+          { id: 'monitor', label: 'Monitor', icon: Activity },
+        ] as { id: Tab; label: string; icon: any }[]).map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all',
+              tab === t.id
+                ? 'bg-violet-500/20 text-violet-200 border border-violet-500/30'
+                : 'text-white/40',
+            )}
+          >
+            <t.icon className="w-3.5 h-3.5" />
+            {t.label}
           </button>
-        </div>
-      ) : secrets.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center">
-          <div className="flex justify-center mb-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-white/20">
-              <Lock className="h-6 w-6" />
+        ))}
+      </div>
+
+      {tab === 'secrets' && (
+        <div className="rounded-2xl bg-white/[0.04] border border-white/10 overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center py-14">
+              <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
             </div>
-          </div>
-          <p className="text-sm text-white/40 font-medium">No secrets yet</p>
-          <p className="text-xs text-white/30 mt-1">Create your first encrypted secret.</p>
+          ) : error ? (
+            <div className="flex flex-col items-center py-10 text-center px-6">
+              <AlertTriangle className="h-6 w-6 text-red-400 mb-2" />
+              <p className="text-xs text-red-400">{error}</p>
+              <button onClick={fetchSecrets} className="mt-2 text-xs text-violet-400 underline underline-offset-2">Retry</button>
+            </div>
+          ) : activeSecrets.length === 0 && deletedSecrets.length === 0 ? (
+            <div className="flex flex-col items-center py-12 text-center">
+              <Lock className="h-6 w-6 text-white/20 mb-2" />
+              <p className="text-sm text-white/40">No secrets yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {activeSecrets.map(secret => (
+                <button
+                  key={secret.id}
+                  onClick={() => openSecretActions(secret)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400 flex-shrink-0">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white/90 truncate">{secret.name}</p>
+                    <p className="text-xs text-white/40 mt-0.5">Created {formatDate(secret.created_at)}</p>
+                  </div>
+                  <MoreVertical className="w-4 h-4 text-white/20" />
+                </button>
+              ))}
+              {deletedSecrets.map(secret => (
+                <div key={secret.id} className="flex items-center gap-3 px-4 py-3 bg-amber-500/[0.03]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 flex-shrink-0">
+                    <Ban className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white/60 truncate">{secret.name}</p>
+                    <p className="text-xs text-amber-300/50">Pending purge · {formatDate(secret.delete_after)}</p>
+                  </div>
+                  <button
+                    onClick={() => handleUndelete(secret.name)}
+                    className="flex h-7 px-2.5 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs"
+                  >
+                    Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <button
             onClick={() => setCreateOpen(true)}
-            className="mt-4 h-9 px-4 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 text-sm font-medium inline-flex items-center gap-1.5"
+            className="w-full flex items-center justify-center gap-2 h-11 border-t border-white/5 text-violet-300 hover:bg-violet-500/5 text-sm font-medium transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             New Secret
           </button>
         </div>
-      ) : (
-        <div className="space-y-2">
-          {secrets.map(secret => (
-            <button
-              key={secret.id}
-              onClick={() => openActions(secret)}
-              className="w-full flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3.5 text-left active:scale-[0.99] transition-all duration-150"
-            >
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400 flex-shrink-0">
-                <Lock className="w-4 h-4" />
+      )}
+
+      {tab === 'tokens' && (
+        <div className="rounded-2xl bg-white/[0.04] border border-white/10 overflow-hidden">
+          {loadingTokens ? (
+            <div className="flex items-center justify-center py-14">
+              <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
+            </div>
+          ) : tokens.length === 0 ? (
+            <div className="flex flex-col items-center py-12 text-center">
+              <KeyRound className="h-6 w-6 text-white/20 mb-2" />
+              <p className="text-sm text-white/40">No tokens yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {tokens.map(token => {
+                const expired = !token.revoked_at && token.expires_at && new Date(token.expires_at) <= new Date();
+                return (
+                  <div key={token.id} className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        'flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0',
+                        token.revoked_at ? 'bg-red-500/10 text-red-400' : expired ? 'bg-amber-500/10 text-amber-400' : 'bg-violet-500/10 text-violet-400',
+                      )}>
+                        <KeyRound className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-white/90 truncate">{token.name}</p>
+                          {token.revoked_at && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase text-red-300/80 bg-red-500/10">Revoked</span>}
+                          {expired && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase text-amber-300/80 bg-amber-500/10">Expired</span>}
+                        </div>
+                        <p className="text-xs text-white/40 mt-0.5">
+                          <code className="text-violet-300/80">{token.token_prefix}...</code>
+                          {' · '}{formatDate(token.created_at)}
+                        </p>
+                        {rotatedRaw && rotatingToken === null && (
+                          <code className="block mt-2 text-[10px] text-emerald-300/90 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-2.5 py-1.5 break-all">
+                            {rotatedRaw}
+                          </code>
+                        )}
+                      </div>
+                      {!token.revoked_at && !expired && (
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => handleRotateToken(token)}
+                            disabled={rotatingToken === token.id}
+                            className="flex items-center gap-1 h-7 px-2.5 rounded-lg bg-violet-500/10 text-violet-300 border border-violet-500/20 text-xs disabled:opacity-40"
+                          >
+                            {rotatingToken === token.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                            Rotate
+                          </button>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleRevokeToken(token)}
+                              className="flex h-7 px-2 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs"
+                            >
+                              <Ban className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTokenId(token.id)}
+                              className="flex h-7 px-2 rounded-lg bg-red-500/10 text-red-300 border border-red-500/20 text-xs"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {rotatedRaw && rotatingToken === null && (
+                      <div className="flex items-center gap-2 mt-1 ml-11">
+                        <button
+                          onClick={() => handleCopy(rotatedRaw)}
+                          className="flex items-center gap-1 h-7 px-2.5 rounded-lg bg-white/5 text-white/50 border border-white/10 text-xs"
+                        >
+                          <Copy className="w-3 h-3" />
+                          Copy
+                        </button>
+                        <button onClick={() => setRotatedRaw(null)} className="flex h-7 px-2.5 rounded-lg bg-white/5 text-white/40 border border-white/10 text-xs">
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <button
+            onClick={() => setTokenCreateOpen(true)}
+            className="w-full flex items-center justify-center gap-2 h-11 border-t border-white/5 text-violet-300 hover:bg-violet-500/5 text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Token
+          </button>
+        </div>
+      )}
+
+      {tab === 'monitor' && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            {([
+              { label: 'Reads 24h', value: monitor?.activity_24h.reads ?? 0, icon: Eye },
+              { label: 'Failed auth 24h', value: monitor?.activity_24h.failed_auth ?? 0, icon: ShieldAlert },
+              { label: 'Active tokens', value: monitor?.tokens.active ?? 0, icon: KeyRound },
+              { label: 'Secrets', value: monitor?.secrets.total ?? 0, icon: Lock },
+            ] as { label: string; value: number; icon: any }[]).map(card => (
+              <div key={card.label} className="rounded-2xl bg-white/[0.04] border border-white/10 p-3.5">
+                <card.icon className={cn('w-4 h-4 mb-2', card.label.includes('Failed') && card.value > 0 ? 'text-red-400' : 'text-violet-400')} />
+                <p className="text-xl font-bold text-white">{card.value}</p>
+                <p className="text-[10px] uppercase tracking-wide text-white/30">{card.label}</p>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/90 truncate">{secret.name}</p>
-                <p className="text-xs text-white/40 mt-0.5">{formatDate(secret.created_at)}</p>
+            ))}
+          </div>
+
+          {stats && stats.activity.length > 0 && (
+            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-4 h-4 text-violet-400" />
+                <h3 className="text-sm font-semibold text-white">Activity — 30 days</h3>
               </div>
-              <ChevronRight className="w-4 h-4 text-white/20 flex-shrink-0" />
-            </button>
-          ))}
+              <div className="flex items-end gap-0.5 h-20">
+                {stats.activity.map((day, i) => {
+                  const total = Math.max(day.reads, day.writes, day.veilrefs, day.rotations);
+                  const maxTotal = Math.max(1, ...stats.activity.map(a => Math.max(a.reads, a.writes, a.veilrefs, a.rotations)));
+                  const isToday = i === stats.activity.length - 1;
+                  return (
+                    <div
+                      key={day.day}
+                      className={cn('flex-1 rounded-t', isToday ? 'bg-violet-400' : 'bg-violet-500/30')}
+                      style={{ height: `${(total / maxTotal) * 100}%`, minHeight: total > 0 ? '2px' : '1px' }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {monitor?.audit && (
+            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 flex items-center gap-3">
+              {monitor.audit.valid ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              )}
+              <div>
+                <p className={cn('text-sm font-medium', monitor.audit.valid ? 'text-emerald-300' : 'text-red-300')}>
+                  {monitor.audit.valid ? 'Audit chain intact' : 'Audit chain broken'}
+                </p>
+                <p className="text-xs text-white/30">{monitor.audit.checked} entries verified</p>
+              </div>
+            </div>
+          )}
+
+          {monitor && monitor.recent_failed_auth.length > 0 && (
+            <div className="rounded-2xl bg-red-500/[0.04] border border-red-500/15 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldAlert className="w-4 h-4 text-red-400" />
+                <h3 className="text-sm font-semibold text-white">Failed attempts</h3>
+              </div>
+              {monitor.recent_failed_auth.slice(0, 4).map(f => (
+                <div key={f.seq} className="flex items-center gap-2 py-1 text-xs">
+                  <span className="text-red-300/80 font-medium w-20 flex-shrink-0">{f.detail}</span>
+                  <span className="text-white/30 truncate flex-1">{f.ip || '—'}</span>
+                  <span className="text-white/30">{formatDate(f.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl border-t border-white/10 bg-[#0a0a0f] px-5 pt-5 pb-8">
-          <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-white/20" />
-          <h3 className="text-base font-semibold text-white mb-5">New Secret</h3>
-          <div className="space-y-4">
+        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
+          <div className="p-4 space-y-4">
+            <h2 className="text-lg font-semibold text-white">New Secret</h2>
             <div>
-              <label className="block text-xs font-medium text-white/50 mb-1.5">Name</label>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">Secret Name</label>
               <input
                 type="text"
                 value={createName}
                 onChange={e => setCreateName(e.target.value)}
                 placeholder="e.g. STRIPE_API_KEY"
-                className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50"
+                className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-white/50 mb-1.5">Value</label>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">Secret Value</label>
               <textarea
                 value={createValue}
                 onChange={e => setCreateValue(e.target.value)}
@@ -410,16 +656,10 @@ const SquidVeilSecretsMobile = () => {
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 resize-none"
               />
             </div>
-            <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3.5 py-2.5">
-              <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-300/80">
-                Encrypted with your API key. Value cannot be viewed after creation.
-              </p>
-            </div>
             <button
               onClick={handleCreate}
               disabled={creating || !createName.trim() || !createValue.trim()}
-              className="w-full h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 disabled:opacity-40 flex items-center justify-center gap-2 text-sm font-medium"
             >
               {creating && <Loader2 className="w-4 h-4 animate-spin" />}
               Create Secret
@@ -428,98 +668,186 @@ const SquidVeilSecretsMobile = () => {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={actionOpen} onOpenChange={v => { setActionOpen(v); if (!v) { setActionSecret(null); setRenameMode(false); setDeleteConfirm(false); }}}>
-        <SheetContent side="bottom" className="rounded-t-3xl border-t border-white/10 bg-[#0a0a0f] px-5 pt-5 pb-8">
-          <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-white/20" />
-
-          {deleteConfirm ? (
-            <>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-red-400 flex-shrink-0">
-                  <Trash2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-white">Delete Secret</h3>
-                  <p className="text-xs text-white/50">This cannot be undone.</p>
-                </div>
-              </div>
-              <p className="text-sm text-white/70 mb-6">
-                Delete <span className="font-medium text-white">{actionSecret?.name}</span>?
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setDeleteConfirm(false)}
-                  className="flex-1 h-11 rounded-xl border border-white/10 text-white/50 text-sm font-medium hover:text-white/70"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="flex-1 h-11 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 font-medium text-sm disabled:opacity-40 flex items-center justify-center gap-2"
-                >
-                  {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Delete
-                </button>
-              </div>
-            </>
-          ) : renameMode ? (
-            <>
-              <h3 className="text-base font-semibold text-white mb-5">Rename Secret</h3>
+      <Sheet open={tokenCreateOpen} onOpenChange={setTokenCreateOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
+          <div className="p-4 space-y-4">
+            <h2 className="text-lg font-semibold text-white">New Access Token</h2>
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">Token Name</label>
               <input
                 type="text"
-                value={renameName}
-                onChange={e => setRenameName(e.target.value)}
-                className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none focus:border-violet-500/50 mb-5"
-                autoFocus
-                onKeyDown={e => e.key === 'Enter' && handleRename()}
+                value={tokenName}
+                onChange={e => setTokenName(e.target.value)}
+                placeholder="e.g. production-ci"
+                className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50"
               />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setRenameMode(false)}
-                  className="flex-1 h-11 rounded-xl border border-white/10 text-white/50 text-sm font-medium hover:text-white/70"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRename}
-                  disabled={renaming || !renameName.trim()}
-                  className="flex-1 h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 font-medium text-sm disabled:opacity-40 flex items-center justify-center gap-2"
-                >
-                  {renaming && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Save
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-3 mb-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400 flex-shrink-0">
-                  <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">Expiry (days, optional)</label>
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={tokenTtl}
+                onChange={e => setTokenTtl(e.target.value)}
+                placeholder="Never expires"
+                className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50"
+              />
+            </div>
+            <button
+              onClick={handleCreateToken}
+              disabled={creatingToken || !tokenName.trim()}
+              className="w-full h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 disabled:opacity-40 flex items-center justify-center gap-2 text-sm font-medium"
+            >
+              {creatingToken && <Loader2 className="w-4 h-4 animate-spin" />}
+              Create Token
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!rawToken} onOpenChange={o => !o && setRawToken(null)}>
+        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-violet-500/20">
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-lg font-semibold text-white">Token created</h2>
+            </div>
+            <p className="text-xs text-white/50">Shown once — copy it now.</p>
+            {rawToken && (
+              <code className="block w-full text-xs text-emerald-300/90 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-3 py-2.5 break-all">
+                {rawToken}
+              </code>
+            )}
+            <button
+              onClick={() => rawToken && handleCopy(rawToken)}
+              className="w-full h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 flex items-center justify-center gap-1.5 text-sm font-medium"
+            >
+              <Copy className="w-4 h-4" />
+              Copy token
+            </button>
+            <button
+              onClick={() => setRawToken(null)}
+              className="w-full h-9 rounded-xl text-white/50 text-sm"
+            >
+              Done
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!actionSecret} onOpenChange={o => !o && setActionSecret(null)}>
+        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
+          <div className="p-4 space-y-4">
+            {actionSecret && (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-semibold text-white truncate">{actionSecret.name}</h2>
+                    <p className="text-xs text-white/40">Created {formatDate(actionSecret.created_at)}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h3 className="text-base font-semibold text-white truncate">{actionSecret?.name}</h3>
-                  <p className="text-xs text-white/50">Created {actionSecret && formatDate(actionSecret.created_at)}</p>
+
+                {revealedValue ? (
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 min-w-0 text-xs text-emerald-300/90 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-3 py-2.5 break-all max-h-24 overflow-y-auto">
+                      {revealedValue}
+                    </code>
+                    <button
+                      onClick={() => handleCopy(revealedValue)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/40 flex-shrink-0"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleRead}
+                    disabled={reading}
+                    className="w-full h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-40"
+                  >
+                    {reading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                    {reading ? 'Reading...' : 'Read value'}
+                  </button>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleRotate(actionSecret)}
+                    className="h-10 rounded-xl bg-white/5 border border-white/10 text-white/60 flex items-center justify-center gap-1.5 text-xs font-medium"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Rotate
+                  </button>
+                  <button
+                    onClick={() => loadVersions(actionSecret)}
+                    className="h-10 rounded-xl bg-white/5 border border-white/10 text-white/60 flex items-center justify-center gap-1.5 text-xs font-medium"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    Versions
+                  </button>
                 </div>
-              </div>
-              <div className="space-y-2">
+
+                {secretVersions.length > 0 && (
+                  <div className="rounded-xl bg-white/[0.02] border border-white/5 p-3 space-y-1.5">
+                    {secretVersions.map(v => (
+                      <div key={v.version_number} className="flex items-center gap-2 text-xs">
+                        <span className="text-white/60 font-medium w-6">v{v.version_number}</span>
+                        <span className={cn(
+                          'px-1.5 py-0.5 rounded text-[9px] uppercase',
+                          v.state === 'ENABLED' && 'text-emerald-300/80 bg-emerald-500/10',
+                          v.state === 'DISABLED' && 'text-amber-300/80 bg-amber-500/10',
+                          v.state === 'DESTROYED' && 'text-red-300/80 bg-red-500/10',
+                        )}>
+                          {v.state}
+                        </span>
+                        <span className="text-white/30 truncate flex-1">by {v.created_by || 'system'} · {formatDate(v.created_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <button
-                  onClick={() => setRenameMode(true)}
-                  className="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3.5 text-sm font-medium text-white/80 active:scale-[0.99] transition-all"
-                >
-                  <Pencil className="w-4 h-4 text-violet-400" />
-                  Rename
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(true)}
-                  className="w-full flex items-center gap-3 rounded-xl border border-red-500/15 bg-red-500/[0.04] px-4 py-3.5 text-sm font-medium text-red-400 active:scale-[0.99] transition-all"
+                  onClick={() => handleDeleteSecret(actionSecret)}
+                  className="w-full h-10 rounded-xl bg-red-500/10 text-red-300 border border-red-500/20 flex items-center justify-center gap-1.5 text-sm font-medium"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete
+                  Delete secret
                 </button>
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!deleteTokenId} onOpenChange={o => !o && setDeleteTokenId(null)}>
+        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
+          <div className="p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-400" />
+              <h2 className="text-lg font-semibold text-white">Delete Token</h2>
+            </div>
+            <p className="text-xs text-white/50">Permanent — the token can never be used again.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteTokenId(null)}
+                className="flex-1 h-10 rounded-xl bg-white/5 border border-white/10 text-white/50 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteToken}
+                disabled={deletingToken}
+                className="flex-1 h-10 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-40"
+              >
+                {deletingToken && <Loader2 className="w-4 h-4 animate-spin" />}
+                Delete
+              </button>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
     </div>

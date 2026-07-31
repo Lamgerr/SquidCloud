@@ -1,198 +1,166 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
-  Lock, Plus, Pencil, Trash2, Key, Upload,
-  MoreVertical, X, Loader2, AlertCircle, ChevronDown, ExternalLink, FileText,
+  Lock, Plus, Trash2, KeyRound, RefreshCw, Shield, ShieldCheck,
+  Activity, BarChart3, Fingerprint, Copy, Eye, EyeOff, History,
+  Settings2, CheckCircle2, AlertTriangle, ShieldAlert, Gauge,
+  Database, Bell, Search, Info, X, Loader2, ExternalLink, ChevronDown,
+  Ban, Clock, Redo, MoreVertical, Pencil,
 } from '@/lib/icon-map';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SUPABASE_URL } from '@/lib/supabaseEnv';
+import {
+  squidveilFetch, getSquidVeilToken, setSquidVeilToken, clearSquidVeilToken,
+  type SquidVeilSecret, type SquidVeilToken, type StatsResponse, type MonitorResponse,
+} from '@/lib/squidveilClient';
 
-interface Secret {
-  id: string;
-  name: string;
-  scope: any;
-  created_at: string;
-  updated_at: string;
-}
-
-const BASE_URL = `${SUPABASE_URL}/functions/v1/cloudbliss-api`;
-
-async function secretsFetch(path: string, options: RequestInit & { apiKey?: string }) {
-  const { apiKey, ...fetchOpts } = options;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(fetchOpts.headers as Record<string, string>),
-  };
-  if (apiKey) headers['X-SquidCloud-Key'] = apiKey;
-  return fetch(`${BASE_URL}${path}`, { ...fetchOpts, headers });
-}
+type Tab = 'secrets' | 'tokens' | 'monitor';
 
 const SquidVeilSecrets = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const [secrets, setSecrets] = useState<Secret[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(() => !!getSquidVeilToken());
+  const [pasteValue, setPasteValue] = useState('');
+  const [tab, setTab] = useState<Tab>('secrets');
+
+  const [secrets, setSecrets] = useState<SquidVeilSecret[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('squidveil_api_key') || '');
-  const [selectedKeyId, setSelectedKeyId] = useState(() => localStorage.getItem('squidveil_api_key_id') || '');
-  const [showApiKeyInput, setShowApiKeyInput] = useState(!apiKey);
+  const [tokens, setTokens] = useState<SquidVeilToken[]>([]);
+  const [loadingTokens, setLoadingTokens] = useState(false);
 
-  const [userApiKeys, setUserApiKeys] = useState<any[]>([]);
-  const [loadingKeys, setLoadingKeys] = useState(false);
-  const [keyPasteValue, setKeyPasteValue] = useState('');
-  const [showConfigImport, setShowConfigImport] = useState(false);
-  const [configImportResult, setConfigImportResult] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [monitor, setMonitor] = useState<MonitorResponse | null>(null);
+  const [loadingMonitor, setLoadingMonitor] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createValue, setCreateValue] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [createType, setCreateType] = useState('opaque');
 
-  const [renameId, setRenameId] = useState<string | null>(null);
-  const [renameName, setRenameName] = useState('');
-  const [renaming, setRenaming] = useState(false);
+  const [showTokenCreate, setShowTokenCreate] = useState(false);
+  const [creatingToken, setCreatingToken] = useState(false);
+  const [tokenName, setTokenName] = useState('');
+  const [tokenTtl, setTokenTtl] = useState('');
+  const [rawToken, setRawToken] = useState<string | null>(null);
+
+  const [rotatingToken, setRotatingToken] = useState<string | null>(null);
+  const [rotatedRaw, setRotatedRaw] = useState<{ id: string; name: string; raw: string } | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
+  const [reading, setReading] = useState<string | null>(null);
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [versions, setVersions] = useState<Record<string, any[]>>({});
+  const [loadingVersions, setLoadingVersions] = useState<string | null>(null);
+
+  const [showTokenDelete, setShowTokenDelete] = useState<string | null>(null);
+  const [deletingToken, setDeletingToken] = useState(false);
+
   const fetchSecrets = useCallback(async () => {
-    if (!apiKey) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await secretsFetch('/secrets', { apiKey });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch secrets');
+      const data = await squidveilFetch<{ secrets: SquidVeilSecret[] }>('/v1/secrets');
       setSecrets(data.secrets || []);
     } catch (e: any) {
-      setError(e.message);
+      if (e.code === 'INVALID_TOKEN' || e.code === 'REVOKED' || e.status === 401) {
+        setConnected(false);
+        clearSquidVeilToken();
+      } else {
+        setError(e.message);
+      }
     } finally {
       setLoading(false);
     }
-  }, [apiKey]);
+  }, []);
 
   useEffect(() => {
-    if (apiKey) fetchSecrets();
-  }, [apiKey, fetchSecrets]);
+    if (connected) {
+      fetchSecrets();
+      fetchTokens();
+    }
+  }, [connected, fetchSecrets, fetchTokens]);
 
-  const fetchUserApiKeys = useCallback(async () => {
-    if (!user) return;
-    setLoadingKeys(true);
+  const fetchTokens = useCallback(async () => {
+    setLoadingTokens(true);
     try {
-      const { data, error } = await supabase
-        .from('api_keys')
-        .select('id, name, key_prefix, created_at')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setUserApiKeys(data || []);
+      const data = await squidveilFetch<{ tokens: SquidVeilToken[] }>('/v1/tokens');
+      setTokens(data.tokens || []);
     } catch (e: any) {
-      console.error('Failed to fetch API keys:', e);
+      // token list requires token_admin — ignore for read-only tokens
+      if (e.status !== 403) toast({ title: 'Failed to load tokens', description: e.message, variant: 'destructive' });
     } finally {
-      setLoadingKeys(false);
+      setLoadingTokens(false);
     }
-  }, [user]);
+  }, [toast]);
+
+  const fetchMonitor = useCallback(async () => {
+    setLoadingMonitor(true);
+    try {
+      const [statsData, monitorData] = await Promise.all([
+        squidveilFetch<StatsResponse>('/v1/stats?days=30&top=6'),
+        squidveilFetch<MonitorResponse>('/v1/monitor'),
+      ]);
+      setStats(statsData);
+      setMonitor(monitorData);
+    } catch (e: any) {
+      if (e.status !== 403) toast({ title: 'Failed to load monitor', description: e.message, variant: 'destructive' });
+    } finally {
+      setLoadingMonitor(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    if (showApiKeyInput && user) fetchUserApiKeys();
-  }, [showApiKeyInput, user, fetchUserApiKeys]);
+    if (connected && tab === 'monitor') fetchMonitor();
+  }, [connected, tab, fetchMonitor]);
 
-  const handleSaveApiKey = (rawKey: string) => {
-    const trimmed = rawKey.trim();
-    if (!trimmed) { toast({ title: 'API key required', variant: 'destructive' }); return; }
-    localStorage.setItem('squidveil_api_key', trimmed);
-    if (selectedKeyId) {
-      localStorage.setItem('squidveil_api_key_id', selectedKeyId);
-      localStorage.setItem('squidveil_api_key_' + selectedKeyId, trimmed);
-    }
-    setApiKey(trimmed);
-    setKeyPasteValue('');
-    setShowApiKeyInput(false);
+  const handleConnect = () => {
+    const trimmed = pasteValue.trim();
+    if (!trimmed) return;
+    setSquidVeilToken(trimmed);
+    setConnected(true);
+    setPasteValue('');
     fetchSecrets();
   };
 
-  const handleSelectKey = (keyId: string) => {
-    setSelectedKeyId(keyId);
-    const storedRaw = localStorage.getItem('squidveil_api_key_' + keyId);
-    if (storedRaw) {
-      localStorage.setItem('squidveil_api_key', storedRaw);
-      localStorage.setItem('squidveil_api_key_id', keyId);
-      setApiKey(storedRaw);
-      setShowApiKeyInput(false);
-      fetchSecrets();
-    } else {
-      setKeyPasteValue('');
-    }
-  };
-
-  const handleImportConfig = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      if (file.name === '.squidveil' || file.name.endsWith('.squidveil')) {
-        const nameMatch = text.match(/name\s*=\s*"([^"]+)"/);
-        const envMatch = text.match(/environment\s*=\s*"([^"]+)"/);
-        setConfigImportResult(
-          `Config loaded: ${nameMatch?.[1] || 'unknown'} (${envMatch?.[1] || 'production'})`
-        );
-      } else if (file.name === '.squidproxy' || file.name.endsWith('.squidproxy')) {
-        const secretNames: string[] = [];
-        const regex = /name\s*=\s*"([^"]+)"/g;
-        let m;
-        while ((m = regex.exec(text)) !== null) secretNames.push(m[1]);
-        setConfigImportResult(
-          `.squidproxy loaded: ${secretNames.length} secret(s) configured`
-        );
-      } else {
-        setConfigImportResult('Unrecognized config file. Expected .squidveil or .squidproxy');
-      }
-      setTimeout(() => setConfigImportResult(null), 4000);
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
-  const handleClearApiKey = () => {
-    setApiKey('');
-    setSelectedKeyId('');
-    localStorage.removeItem('squidveil_api_key');
-    localStorage.removeItem('squidveil_api_key_id');
+  const handleDisconnect = () => {
+    clearSquidVeilToken();
+    setConnected(false);
     setSecrets([]);
-    setShowApiKeyInput(true);
-    fetchUserApiKeys();
+    setTokens([]);
+    setStats(null);
+    setMonitor(null);
+    setRawToken(null);
+    setRotatedRaw(null);
   };
 
   const handleCreate = async () => {
     if (!createName.trim() || !createValue.trim()) return;
     setCreating(true);
     try {
-      const res = await secretsFetch('/secrets', {
+      const data = await squidveilFetch('/v1/secrets', {
         method: 'POST',
-        apiKey,
-        body: JSON.stringify({ name: createName.trim(), value: createValue.trim() }),
+        body: JSON.stringify({
+          name: createName.trim(),
+          value: createValue.trim(),
+          secret_type: createType,
+          recovery_window_days: 7,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create secret');
       setSecrets(prev => [data.secret, ...prev]);
       setShowCreate(false);
       setCreateName('');
       setCreateValue('');
+      setCreateType('opaque');
       toast({ title: 'Secret created', description: data.secret.name });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
@@ -201,25 +169,37 @@ const SquidVeilSecrets = () => {
     }
   };
 
-  const handleRename = async () => {
-    if (!renameId || !renameName.trim()) return;
-    setRenaming(true);
+  const handleRead = async (secret: SquidVeilSecret) => {
+    if (revealed[secret.name]) {
+      setRevealed(prev => { const next = { ...prev }; delete next[secret.name]; return next; });
+      return;
+    }
+    setReading(secret.name);
     try {
-      const res = await secretsFetch(`/secrets/${renameId}/rename`, {
-        method: 'PATCH',
-        apiKey,
-        body: JSON.stringify({ name: renameName.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to rename secret');
-      setSecrets(prev => prev.map(s => s.id === renameId ? data.secret : s));
-      setRenameId(null);
-      setRenameName('');
-      toast({ title: 'Secret renamed' });
+      const data = await squidveilFetch<{ value: string; version: number }>(`/v1/secrets/${encodeURIComponent(secret.name)}`);
+      setRevealed(prev => ({ ...prev, [secret.name]: data.value }));
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
-      setRenaming(false);
+      setReading(null);
+    }
+  };
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied to clipboard' });
+    } catch {
+      toast({ title: 'Copy failed', variant: 'destructive' });
+    }
+  };
+
+  const handleRotate = async (secret: SquidVeilSecret) => {
+    try {
+      await squidveilFetch(`/v1/secrets/${encodeURIComponent(secret.name)}/rotate`, { method: 'POST', body: JSON.stringify({}) });
+      toast({ title: 'Secret rotated', description: `${secret.name} — new value generated` });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
   };
 
@@ -227,17 +207,10 @@ const SquidVeilSecrets = () => {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      const res = await secretsFetch(`/secrets/${deleteId}`, {
-        method: 'DELETE',
-        apiKey,
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete secret');
-      }
-      setSecrets(prev => prev.filter(s => s.id !== deleteId));
+      await squidveilFetch(`/v1/secrets/${encodeURIComponent(deleteId)}`, { method: 'DELETE' });
+      setSecrets(prev => prev.filter(s => s.name !== deleteId));
       setDeleteId(null);
-      toast({ title: 'Secret deleted' });
+      toast({ title: 'Secret deleted', description: 'Soft delete — restore within the recovery window' });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
@@ -245,15 +218,126 @@ const SquidVeilSecrets = () => {
     }
   };
 
-  const formatDate = (dateStr: string) => {
+  const handleUndelete = async (name: string) => {
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric',
+      await squidveilFetch(`/v1/secrets/${encodeURIComponent(name)}/undelete`, { method: 'POST', body: JSON.stringify({}) });
+      fetchSecrets();
+      toast({ title: 'Secret restored', description: name });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDestroy = async (name: string) => {
+    try {
+      await squidveilFetch(`/v1/secrets/${encodeURIComponent(name)}/destroy`, { method: 'POST', body: JSON.stringify({}) });
+      fetchSecrets();
+      toast({ title: 'Secret destroyed permanently', description: name });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const toggleVersions = async (secret: SquidVeilSecret) => {
+    const name = secret.name;
+    if (expanded[name]) {
+      setExpanded(prev => { const next = { ...prev }; delete next[name]; return next; });
+      return;
+    }
+    setLoadingVersions(name);
+    try {
+      const data = await squidveilFetch<{ versions: any[] }>(`/v1/secrets/${encodeURIComponent(name)}/versions`);
+      setVersions(prev => ({ ...prev, [name]: data.versions || [] }));
+      setExpanded(prev => ({ ...prev, [name]: true }));
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setLoadingVersions(null);
+    }
+  };
+
+  const handleCreateToken = async () => {
+    if (!tokenName.trim()) return;
+    setCreatingToken(true);
+    try {
+      const body: Record<string, unknown> = { name: tokenName.trim(), policies: ['default'] };
+      if (tokenTtl.trim()) {
+        const ttl = Number(tokenTtl.trim());
+        if (Number.isFinite(ttl) && ttl > 0) body.expires_in_seconds = Math.floor(ttl * 86400);
+      }
+      const data = await squidveilFetch<{ token: SquidVeilToken; raw_token: string }>('/v1/tokens', {
+        method: 'POST',
+        body: JSON.stringify(body),
       });
+      setRawToken(data.raw_token);
+      setTokens(prev => [data.token, ...prev]);
+      setTokenName('');
+      setTokenTtl('');
+      setShowTokenCreate(false);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setCreatingToken(false);
+    }
+  };
+
+  const handleRotateToken = async (token: SquidVeilToken) => {
+    setRotatingToken(token.id);
+    try {
+      const data = await squidveilFetch<{ token: SquidVeilToken; raw_token: string }>(`/v1/tokens/${token.id}/rotate`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      setRotatedRaw({ id: token.id, name: token.name, raw: data.raw_token });
+      setTokens(prev => prev.map(t => t.id === token.id ? { ...t, token_prefix: data.token.token_prefix } : t));
+      toast({ title: 'Token rotated', description: `${token.name} — previous value invalidated` });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setRotatingToken(null);
+    }
+  };
+
+  const handleRevokeToken = async (token: SquidVeilToken) => {
+    try {
+      await squidveilFetch(`/v1/tokens/${token.id}/revoke`, { method: 'POST', body: JSON.stringify({}) });
+      setTokens(prev => prev.map(t => t.id === token.id ? { ...t, revoked_at: new Date().toISOString() } : t));
+      toast({ title: 'Token revoked', description: token.name });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteToken = async () => {
+    if (!showTokenDelete) return;
+    setDeletingToken(true);
+    try {
+      await squidveilFetch(`/v1/tokens/${showTokenDelete}`, { method: 'DELETE' });
+      setTokens(prev => prev.filter(t => t.id !== showTokenDelete));
+      setShowTokenDelete(null);
+      toast({ title: 'Token deleted permanently' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setDeletingToken(false);
+    }
+  };
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '—';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     } catch { return dateStr; }
   };
 
-  if (showApiKeyInput) {
+  const maxActivity = stats?.activity.length
+    ? Math.max(1, ...stats.activity.map(a => Math.max(a.reads, a.writes, a.veilrefs, a.rotations)))
+    : 1;
+
+  const activeSecrets = secrets.filter(s => !s.deleted_at);
+  const deletedSecrets = secrets.filter(s => s.deleted_at);
+
+  if (!connected) {
     return (
       <div className="space-y-5">
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-transparent border border-violet-500/20 p-5">
@@ -264,7 +348,7 @@ const SquidVeilSecrets = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white">SquidVeil Secrets</h1>
-              <p className="mt-0.5 text-sm text-white/50">Manage encrypted secrets for your pipelines.</p>
+              <p className="mt-0.5 text-sm text-white/50">Manage encrypted secrets, tokens, and usage monitoring.</p>
             </div>
           </div>
         </div>
@@ -272,73 +356,42 @@ const SquidVeilSecrets = () => {
         <div className="rounded-2xl bg-white/[0.04] border border-white/10 overflow-hidden backdrop-blur-sm p-6">
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-400 mb-4">
-              <Key className="h-7 w-7" />
+              <KeyRound className="h-7 w-7" />
             </div>
-            <h2 className="text-lg font-semibold text-white mb-1">Select API Key</h2>
+            <h2 className="text-lg font-semibold text-white mb-1">Connect your SquidVeil token</h2>
             <p className="text-sm text-white/50 mb-6 max-w-md">
-              Choose a SquidCloud API key to encrypt and access secrets.
+              Paste an <span className="text-violet-400">sv_</span> access token to unlock secrets, token management, and monitoring.
             </p>
-
-            {loadingKeys ? (
-              <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
-            ) : userApiKeys.length === 0 ? (
-              <div className="text-center">
-                <p className="text-sm text-white/40 mb-3">No API keys found.</p>
-                <a
-                  href="/developer-api"
-                  className="inline-flex items-center gap-1.5 h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 px-4 text-sm font-medium transition-all"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Create one in Developer API
-                </a>
+            <div className="w-full max-w-sm space-y-3">
+              <div className="relative">
+                <input
+                  type="password"
+                  value={pasteValue}
+                  onChange={e => setPasteValue(e.target.value)}
+                  placeholder="Paste sv_ access token..."
+                  className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 pr-10 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+                  onKeyDown={e => e.key === 'Enter' && handleConnect()}
+                />
+                <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
               </div>
-            ) : (
-              <div className="w-full max-w-sm space-y-3">
-                <div className="relative">
-                  <select
-                    value={selectedKeyId}
-                    onChange={e => handleSelectKey(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white appearance-none outline-none focus:border-violet-500/50 transition-colors cursor-pointer"
-                  >
-                    <option value="" disabled className="bg-[#0a0a0f]">Select an API key...</option>
-                    {userApiKeys.map(k => (
-                      <option key={k.id} value={k.id} className="bg-[#0a0a0f]">{k.name} ({k.key_prefix}...)</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
-                </div>
-
-                {selectedKeyId && !localStorage.getItem('squidveil_api_key_' + selectedKeyId) && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-white/40 text-left">
-                      Paste the raw key (<span className="text-violet-400">shown once on creation</span>):
-                    </p>
-                    <div className="flex gap-2">
-                      <input
-                        type="password"
-                        value={keyPasteValue}
-                        onChange={e => setKeyPasteValue(e.target.value)}
-                        placeholder="Paste raw API key..."
-                        className="flex-1 h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
-                        onKeyDown={e => e.key === 'Enter' && handleSaveApiKey(keyPasteValue)}
-                      />
-                      <Button
-                        onClick={() => handleSaveApiKey(keyPasteValue)}
-                        disabled={!keyPasteValue.trim()}
-                        className="h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 px-4 gap-1.5 disabled:opacity-40"
-                      >
-                        <Key className="w-3.5 h-3.5" />
-                        Connect
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {selectedKeyId && localStorage.getItem('squidveil_api_key_' + selectedKeyId) && (
-                  <p className="text-xs text-emerald-400/80">Key already connected — unlocking secrets...</p>
-                )}
-              </div>
-            )}
+              <Button
+                onClick={handleConnect}
+                disabled={!pasteValue.trim()}
+                className="w-full h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 gap-1.5 disabled:opacity-40"
+              >
+                <KeyRound className="w-4 h-4" />
+                Connect
+              </Button>
+              <a
+                href="/help/squidveil"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60 transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Create or rotate a token in the docs
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -349,7 +402,7 @@ const SquidVeilSecrets = () => {
     <div className="space-y-5">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-transparent border border-violet-500/20 p-5">
         <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
-        <div className="relative z-10 flex items-center justify-between">
+        <div className="relative z-10 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 shadow-sm">
               <Lock className="h-6 w-6" />
@@ -357,18 +410,38 @@ const SquidVeilSecrets = () => {
             <div>
               <h1 className="text-xl font-bold text-white">SquidVeil Secrets</h1>
               <p className="mt-0.5 text-sm text-white/50">
-                {secrets.length} {secrets.length === 1 ? 'secret' : 'secrets'} stored
+                {activeSecrets.length} active · {tokens.filter(t => !t.revoked_at).length} tokens
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 h-9 px-4 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 transition-all text-sm font-medium"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              New Secret
-            </button>
+            {tab === 'secrets' && (
+              <button
+                onClick={() => setShowCreate(true)}
+                className="flex items-center gap-2 h-9 px-4 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 transition-all text-sm font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New Secret
+              </button>
+            )}
+            {tab === 'tokens' && (
+              <button
+                onClick={() => setShowTokenCreate(true)}
+                className="flex items-center gap-2 h-9 px-4 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 transition-all text-sm font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New Token
+              </button>
+            )}
+            {tab === 'monitor' && (
+              <button
+                onClick={fetchMonitor}
+                className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white/60 transition-all text-xs"
+              >
+                <RefreshCw className={cn('w-3 h-3', loadingMonitor && 'animate-spin')} />
+                Refresh
+              </button>
+            )}
             <a
               href="/help/squidveil"
               target="_blank"
@@ -380,140 +453,487 @@ const SquidVeilSecrets = () => {
               Docs
             </a>
             <button
-              onClick={handleImportConfig}
-              className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white/60 transition-all text-xs"
-              title="Import .squidveil or .squidproxy config"
-            >
-              <Upload className="w-3 h-3" />
-              Config
-            </button>
-            <button
-              onClick={handleClearApiKey}
+              onClick={handleDisconnect}
               className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white/60 transition-all text-xs"
-              title="Disconnect API key"
+              title="Disconnect token"
             >
               <X className="w-3 h-3" />
             </button>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".squidveil,.squidproxy"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          {configImportResult && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5">
-              <FileText className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <p className="text-xs text-emerald-300/80">{configImportResult}</p>
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white/[0.04] border border-white/10 overflow-hidden backdrop-blur-sm">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <AlertCircle className="h-8 w-8 text-red-400 mb-3" />
-            <p className="text-sm text-red-400 font-medium">{error}</p>
-            <button onClick={fetchSecrets} className="mt-3 text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2">
-              Try again
-            </button>
-          </div>
-        ) : secrets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/20 mb-4">
-              <Lock className="h-7 w-7" />
+      <div className="flex items-center gap-1 rounded-xl bg-white/[0.03] border border-white/10 p-1 w-fit">
+        {([
+          { id: 'secrets', label: 'Secrets', icon: Lock },
+          { id: 'tokens', label: 'Tokens', icon: KeyRound },
+          { id: 'monitor', label: 'Monitor', icon: Activity },
+        ] as { id: Tab; label: string; icon: any }[]).map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              'flex items-center gap-2 h-9 px-4 rounded-lg text-sm font-medium transition-all',
+              tab === t.id
+                ? 'bg-violet-500/20 text-violet-200 border border-violet-500/30'
+                : 'text-white/40 hover:text-white/70',
+            )}
+          >
+            <t.icon className="w-4 h-4" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'secrets' && (
+        <div className="rounded-2xl bg-white/[0.04] border border-white/10 overflow-hidden backdrop-blur-sm">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
             </div>
-            <p className="text-sm text-white/40 font-medium">No secrets yet</p>
-            <p className="text-xs text-white/30 mt-1">Create your first secret to get started.</p>
-            <Button
-              onClick={() => setShowCreate(true)}
-              className="mt-4 h-9 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 px-4 gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              New Secret
-            </Button>
-          </div>
-        ) : (
-          <div className="divide-y divide-white/5">
-            {secrets.map(secret => {
-              const isRenaming = renameId === secret.id;
-              return (
-                <div key={secret.id} className="group flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.02] transition-colors">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400 flex-shrink-0">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  {isRenaming ? (
-                    <div className="flex-1 flex items-center gap-2 min-w-0">
-                      <input
-                        type="text"
-                        value={renameName}
-                        onChange={e => setRenameName(e.target.value)}
-                        className="flex-1 h-8 rounded-lg border border-violet-500/30 bg-white/5 px-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50"
-                        placeholder="New name"
-                        autoFocus
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleRename();
-                          if (e.key === 'Escape') { setRenameId(null); setRenameName(''); }
-                        }}
-                      />
-                      <button
-                        onClick={handleRename}
-                        disabled={renaming || !renameName.trim()}
-                        className="h-7 px-3 rounded-lg bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                      >
-                        {renaming ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => { setRenameId(null); setRenameName(''); }}
-                        className="h-7 px-2 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-all"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertTriangle className="h-8 w-8 text-red-400 mb-3" />
+              <p className="text-sm text-red-400 font-medium">{error}</p>
+              <button onClick={fetchSecrets} className="mt-3 text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2">
+                Try again
+              </button>
+            </div>
+          ) : activeSecrets.length === 0 && deletedSecrets.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/20 mb-4">
+                <Lock className="h-7 w-7" />
+              </div>
+              <p className="text-sm text-white/40 font-medium">No secrets yet</p>
+              <p className="text-xs text-white/30 mt-1">Create your first secret to get started.</p>
+              <Button
+                onClick={() => setShowCreate(true)}
+                className="mt-4 h-9 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 px-4 gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New Secret
+              </Button>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {activeSecrets.map(secret => (
+                <div key={secret.id} className="px-5 py-3.5 hover:bg-white/[0.02] transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400 flex-shrink-0">
+                      <Lock className="w-4 h-4" />
                     </div>
-                  ) : (
-                    <>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white/90 truncate">{secret.name}</p>
-                        <p className="text-xs text-white/40 mt-0.5">Created {formatDate(secret.created_at)}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white/90 truncate">
+                        {secret.name}
+                        <span className="ml-2 text-[10px] uppercase tracking-wider text-white/30">{secret.secret_type}</span>
+                      </p>
+                      <p className="text-xs text-white/40 mt-0.5">
+                        Created {formatDate(secret.created_at)}
+                        {secret.description ? ` · ${secret.description}` : ''}
+                      </p>
+                      {revealed[secret.name] && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <code className="flex-1 min-w-0 text-xs text-emerald-300/90 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-2 break-all max-h-20 overflow-y-auto">
+                            {revealed[secret.name]}
+                          </code>
+                          <button
+                            onClick={() => handleCopy(revealed[secret.name])}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex-shrink-0"
+                            title="Copy value"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                      {expanded[secret.name] && (
+                        <div className="mt-2 rounded-xl bg-white/[0.02] border border-white/5 p-3 space-y-1.5">
+                          {loadingVersions === secret.name ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-violet-400" />
+                          ) : (versions[secret.name] || []).length === 0 ? (
+                            <p className="text-xs text-white/30">No versions</p>
+                          ) : (
+                            (versions[secret.name] || []).map((v: any) => (
+                              <div key={v.version_number} className="flex items-center gap-2 text-xs">
+                                <span className="text-white/60 font-medium w-6">v{v.version_number}</span>
+                                <span className={cn(
+                                  'px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide',
+                                  v.state === 'ENABLED' && 'text-emerald-300/80 bg-emerald-500/10',
+                                  v.state === 'DISABLED' && 'text-amber-300/80 bg-amber-500/10',
+                                  v.state === 'DESTROYED' && 'text-red-300/80 bg-red-500/10',
+                                )}>
+                                  {v.state}
+                                </span>
+                                <span className="text-white/30">by {v.created_by || 'system'} · {formatDate(v.created_at)}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all">
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem className="gap-2.5 text-sm cursor-pointer" onClick={() => handleRead(secret)}>
+                          {reading === secret.name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : revealed[secret.name] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {revealed[secret.name] ? 'Hide value' : 'Read value'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2.5 text-sm cursor-pointer" onClick={() => handleRotate(secret)}>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Rotate value
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2.5 text-sm cursor-pointer" onClick={() => toggleVersions(secret)}>
+                          <History className="w-3.5 h-3.5" />
+                          Versions
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="gap-2.5 text-sm text-red-400 cursor-pointer"
+                          onClick={() => setDeleteId(secret.name)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+
+              {deletedSecrets.length > 0 && (
+                <>
+                  <div className="px-5 py-2.5 bg-amber-500/[0.04]">
+                    <p className="text-[10px] uppercase tracking-wider text-amber-300/60 font-medium">Pending deletion</p>
+                  </div>
+                  {deletedSecrets.map(secret => (
+                    <div key={secret.id} className="flex items-center gap-3 px-5 py-3.5 bg-amber-500/[0.02]">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 flex-shrink-0">
+                        <Ban className="w-4 h-4" />
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white/60 truncate">{secret.name}</p>
+                        <p className="text-xs text-amber-300/50 mt-0.5">
+                          {secret.delete_after
+                            ? `Purges ${formatDate(secret.delete_after)}`
+                            : 'Purges immediately'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleUndelete(secret.name)}
+                          className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-medium transition-all"
+                        >
+                          <Redo className="w-3 h-3" />
+                          Restore
+                        </button>
+                        <button
+                          onClick={() => handleDestroy(secret.name)}
+                          className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-red-500/10 text-red-300 border border-red-500/20 hover:bg-red-500/20 text-xs font-medium transition-all"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Destroy
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'tokens' && (
+        <div className="rounded-2xl bg-white/[0.04] border border-white/10 overflow-hidden backdrop-blur-sm">
+          {loadingTokens ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
+            </div>
+          ) : tokens.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/20 mb-4">
+                <KeyRound className="h-7 w-7" />
+              </div>
+              <p className="text-sm text-white/40 font-medium">No tokens yet</p>
+              <Button
+                onClick={() => setShowTokenCreate(true)}
+                className="mt-4 h-9 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 px-4 gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New Token
+              </Button>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {tokens.map(token => {
+                const expired = !token.revoked_at && token.expires_at && new Date(token.expires_at) <= new Date();
+                return (
+                  <div key={token.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.02] transition-colors">
+                    <div className={cn(
+                      'flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0',
+                      token.revoked_at ? 'bg-red-500/10 text-red-400' : expired ? 'bg-amber-500/10 text-amber-400' : 'bg-violet-500/10 text-violet-400',
+                    )}>
+                      <KeyRound className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-white/90 truncate">{token.name}</p>
+                        {token.revoked_at ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide text-red-300/80 bg-red-500/10">Revoked</span>
+                        ) : expired ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide text-amber-300/80 bg-amber-500/10">Expired</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide text-emerald-300/80 bg-emerald-500/10">Active</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/40 mt-0.5">
+                        <code className="text-violet-300/80">{token.token_prefix}...</code>
+                        {' · '}Created {formatDate(token.created_at)}
+                        {token.expires_at && ` · Expires ${formatDate(token.expires_at)}`}
+                        {token.last_used_at && ` · Last used ${formatDate(token.last_used_at)}`}
+                        {' · '}{token.policies.join(', ')}
+                      </p>
+                      {rotatedRaw?.id === token.id && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <code className="flex-1 min-w-0 text-xs text-emerald-300/90 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-2 break-all">
+                            {rotatedRaw.raw}
+                          </code>
+                          <button
+                            onClick={() => handleCopy(rotatedRaw.raw)}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex-shrink-0"
+                            title="Copy new token"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {!token.revoked_at && !expired && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 opacity-0 group-hover:opacity-100 transition-all">
+                          <button className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all">
                             <MoreVertical className="w-3.5 h-3.5" />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
+                        <DropdownMenuContent align="end" className="w-40">
                           <DropdownMenuItem
                             className="gap-2.5 text-sm cursor-pointer"
-                            onClick={() => { setRenameId(secret.id); setRenameName(secret.name); }}
+                            disabled={rotatingToken === token.id}
+                            onClick={() => handleRotateToken(token)}
                           >
-                            <Pencil className="w-3.5 h-3.5" />
-                            Rename
+                            {rotatingToken === token.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            Rotate token
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="gap-2.5 text-sm text-amber-300 cursor-pointer"
+                            onClick={() => handleRevokeToken(token)}
+                          >
+                            <Ban className="w-3.5 h-3.5" />
+                            Revoke
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="gap-2.5 text-sm text-red-400 cursor-pointer"
-                            onClick={() => setDeleteId(secret.id)}
+                            onClick={() => setShowTokenDelete(token.id)}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'monitor' && (
+        <div className="space-y-5">
+          {loadingMonitor && !monitor ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
+            </div>
+          ) : !monitor ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl bg-white/[0.04] border border-white/10">
+              <Activity className="h-8 w-8 text-white/20 mb-3" />
+              <p className="text-sm text-white/40">Monitor requires the <code className="text-violet-300/80">audit</code> capability.</p>
+              <button onClick={fetchMonitor} className="mt-3 text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2">
+                Try again
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {([
+                  { label: 'Reads (24h)', value: monitor.activity_24h.reads, icon: Eye, color: 'violet' },
+                  { label: 'Writes (24h)', value: monitor.activity_24h.writes, icon: Pencil, color: 'emerald' },
+                  { label: 'VeilRefs (24h)', value: monitor.activity_24h.veilrefs, icon: Fingerprint, color: 'sky' },
+                  { label: 'Failed auth (24h)', value: monitor.activity_24h.failed_auth, icon: ShieldAlert, color: monitor.activity_24h.failed_auth > 0 ? 'red' : 'white' },
+                ] as { label: string; value: number; icon: any; color: string }[]).map(card => (
+                  <div key={card.label} className="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
+                    <div className={cn(
+                      'flex h-8 w-8 items-center justify-center rounded-lg mb-3',
+                      card.color === 'red' ? 'bg-red-500/10 text-red-400' : card.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' : card.color === 'sky' ? 'bg-sky-500/10 text-sky-400' : 'bg-violet-500/10 text-violet-400',
+                    )}>
+                      <card.icon className="w-4 h-4" />
+                    </div>
+                    <p className="text-2xl font-bold text-white">{card.value}</p>
+                    <p className="text-xs text-white/40 mt-0.5">{card.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <div className="lg:col-span-2 rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <BarChart3 className="w-4 h-4 text-violet-400" />
+                    <h3 className="text-sm font-semibold text-white">Activity — last 30 days</h3>
+                  </div>
+                  {stats && stats.activity.length > 0 ? (
+                    <div className="flex items-end gap-1 h-32">
+                      {stats.activity.map((day, i) => {
+                        const total = Math.max(day.reads, day.writes, day.veilrefs, day.rotations);
+                        const isToday = i === stats.activity.length - 1;
+                        return (
+                          <div
+                            key={day.day}
+                            className={cn('flex-1 rounded-t transition-all', isToday ? 'bg-violet-400' : 'bg-violet-500/30 hover:bg-violet-500/50')}
+                            style={{ height: `${(total / maxActivity) * 100}%`, minHeight: total > 0 ? '3px' : '1px' }}
+                            title={`${day.day}: ${day.reads} reads, ${day.writes} writes, ${day.veilrefs} veilrefs, ${day.rotations} rotations`}
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-white/30">No activity recorded yet.</p>
+                  )}
+                  {stats && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+                      {([
+                        { label: 'Total reads', value: stats.totals.reads, icon: Eye },
+                        { label: 'Total writes', value: stats.totals.writes, icon: Pencil },
+                        { label: 'Rotations', value: stats.totals.rotations, icon: RefreshCw },
+                        { label: 'VeilRefs issued', value: stats.totals.veilrefs_issued, icon: Fingerprint },
+                      ] as { label: string; value: number; icon: any }[]).map(s => (
+                        <div key={s.label} className="rounded-xl bg-white/[0.02] border border-white/5 p-3">
+                          <s.icon className="w-3.5 h-3.5 text-white/30 mb-1.5" />
+                          <p className="text-lg font-semibold text-white">{s.value}</p>
+                          <p className="text-[10px] uppercase tracking-wide text-white/30">{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <h3 className="text-sm font-semibold text-white">Audit chain</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {monitor.audit.valid ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                      )}
+                      <p className={cn('text-sm font-medium', monitor.audit.valid ? 'text-emerald-300' : 'text-red-300')}>
+                        {monitor.audit.valid ? 'Tamper-evident chain intact' : 'Chain broken!'}
+                      </p>
+                    </div>
+                    <p className="text-xs text-white/30 mt-1">
+                      {monitor.audit.checked} entries verified · last seq {monitor.audit.last_seq}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Gauge className="w-4 h-4 text-violet-400" />
+                      <h3 className="text-sm font-semibold text-white">Posture</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
+                        <p className="text-lg font-semibold text-emerald-300">{monitor.tokens.active}</p>
+                        <p className="text-white/30">Active tokens</p>
+                      </div>
+                      <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
+                        <p className="text-lg font-semibold text-red-300">{monitor.tokens.revoked + monitor.tokens.expired}</p>
+                        <p className="text-white/30">Revoked / expired</p>
+                      </div>
+                      <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
+                        <p className="text-lg font-semibold text-white">{monitor.secrets.total}</p>
+                        <p className="text-white/30">Secrets</p>
+                      </div>
+                      <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
+                        <p className="text-lg font-semibold text-amber-300">{monitor.secrets.rotation_due.length}</p>
+                        <p className="text-white/30">Rotation due</p>
+                      </div>
+                    </div>
+                    {monitor.secrets.pending_purge.length > 0 && (
+                      <div className="mt-3 rounded-xl bg-amber-500/10 border border-amber-500/20 p-2.5">
+                        <p className="text-[10px] uppercase tracking-wide text-amber-300/70 font-medium mb-1">Pending purge</p>
+                        {monitor.secrets.pending_purge.map(p => (
+                          <p key={p.name} className="text-xs text-amber-200/70">
+                            {p.name} — {formatDate(p.purge_at)}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {monitor.recent_failed_auth.length > 0 && (
+                <div className="rounded-2xl bg-red-500/[0.04] border border-red-500/15 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldAlert className="w-4 h-4 text-red-400" />
+                    <h3 className="text-sm font-semibold text-white">Failed authentication attempts</h3>
+                  </div>
+                  <div className="space-y-1.5">
+                    {monitor.recent_failed_auth.map(f => (
+                      <div key={f.seq} className="flex items-center gap-2 text-xs">
+                        <span className="text-red-300/80 font-medium w-24 flex-shrink-0">{f.detail}</span>
+                        <span className="text-white/30 truncate flex-1">{f.ip || '—'}</span>
+                        <span className="text-white/30 flex-shrink-0">{formatDate(f.created_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {monitor.recent_events.length > 0 && (
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <History className="w-4 h-4 text-violet-400" />
+                    <h3 className="text-sm font-semibold text-white">Recent events</h3>
+                  </div>
+                  <div className="space-y-1.5">
+                    {monitor.recent_events.map(e => (
+                      <div key={e.seq} className="flex items-center gap-2 text-xs">
+                        <span className={cn('flex-shrink-0 w-2 h-2 rounded-full', e.success ? 'bg-emerald-400/70' : 'bg-red-400/70')} />
+                        <code className="text-violet-300/70 w-40 flex-shrink-0 truncate">{e.action}</code>
+                        <span className="text-white/40 truncate flex-1">{e.path}</span>
+                        <span className="text-white/30 flex-shrink-0">{formatDate(e.created_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 text-xs text-white/30 px-1">
+                <Info className="w-3.5 h-3.5" />
+                Generated {formatDate(monitor.generated_at)} · stats window 30d
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowCreate(false)}>
@@ -531,7 +951,7 @@ const SquidVeilSecrets = () => {
                   type="text"
                   value={createName}
                   onChange={e => setCreateName(e.target.value)}
-                  placeholder="e.g. STRIPE_API_KEY"
+                  placeholder="e.g. STRIPE_API_KEY or db/prod/creds"
                   className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
                 />
               </div>
@@ -545,10 +965,29 @@ const SquidVeilSecrets = () => {
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors resize-none"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Type</label>
+                <div className="flex gap-2">
+                  {['opaque', 'connection_string', 'hmac_sign'].map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setCreateType(t)}
+                      className={cn(
+                        'flex-1 h-9 rounded-xl border text-xs font-medium transition-all',
+                        createType === t
+                          ? 'border-violet-500/40 bg-violet-500/10 text-violet-200'
+                          : 'border-white/10 bg-white/5 text-white/40 hover:text-white/60',
+                      )}
+                    >
+                      {t.replace('_', ' ')}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3">
-                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
                 <p className="text-xs text-amber-300/80">
-                  Secret values are encrypted with your API key and cannot be viewed after creation.
+                  Encrypted at rest with per-secret keys. Values are versioned and can be rotated anytime.
                 </p>
               </div>
             </div>
@@ -573,6 +1012,101 @@ const SquidVeilSecrets = () => {
         </div>
       )}
 
+      {showTokenCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowTokenCreate(false)}>
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-white">New Access Token</h2>
+              <button onClick={() => setShowTokenCreate(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-all">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Token Name</label>
+                <input
+                  type="text"
+                  value={tokenName}
+                  onChange={e => setTokenName(e.target.value)}
+                  placeholder="e.g. production-ci"
+                  className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Expiry (days, optional)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={tokenTtl}
+                  onChange={e => setTokenTtl(e.target.value)}
+                  placeholder="Never expires"
+                  className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+                />
+              </div>
+              <div className="flex items-center gap-2 rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-3">
+                <Info className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                <p className="text-xs text-violet-300/80">
+                  Tokens use the <code>default</code> policy (full access). Store the raw token securely — it is shown only once.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mt-6">
+              <Button
+                onClick={() => setShowTokenCreate(false)}
+                variant="ghost"
+                className="flex-1 h-10 rounded-xl text-white/50 hover:text-white/70"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateToken}
+                disabled={creatingToken || !tokenName.trim()}
+                className="flex-1 h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 disabled:opacity-40 disabled:cursor-not-allowed gap-1.5"
+              >
+                {creatingToken && <Loader2 className="w-4 h-4 animate-spin" />}
+                Create Token
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {rawToken && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setRawToken(null)}>
+          <div className="w-full max-w-md rounded-2xl border border-violet-500/20 bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Token created</h2>
+                <p className="text-sm text-white/50">Shown once — copy it now.</p>
+              </div>
+            </div>
+            <code className="block w-full text-xs text-emerald-300/90 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-3 break-all mb-2">
+              {rawToken}
+            </code>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => handleCopy(rawToken)}
+                className="flex-1 h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 gap-1.5"
+              >
+                <Copy className="w-4 h-4" />
+                Copy token
+              </Button>
+              <Button
+                onClick={() => setRawToken(null)}
+                variant="ghost"
+                className="h-10 rounded-xl text-white/50 hover:text-white/70"
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setDeleteId(null)}>
           <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -582,11 +1116,11 @@ const SquidVeilSecrets = () => {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-white">Delete Secret</h2>
-                <p className="text-sm text-white/50">This action cannot be undone.</p>
+                <p className="text-sm text-white/50">Soft delete — restorable within the recovery window.</p>
               </div>
             </div>
             <p className="text-sm text-white/70 mb-6">
-              Are you sure you want to delete <span className="font-medium text-white">{secrets.find(s => s.id === deleteId)?.name}</span>?
+              Are you sure you want to delete <span className="font-medium text-white">{deleteId}</span>?
             </p>
             <div className="flex items-center gap-3">
               <Button
@@ -602,6 +1136,39 @@ const SquidVeilSecrets = () => {
                 className="flex-1 h-10 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 hover:text-red-200 disabled:opacity-40 disabled:cursor-not-allowed gap-1.5"
               >
                 {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTokenDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowTokenDelete(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-red-400">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Delete Token</h2>
+                <p className="text-sm text-white/50">Permanent — the token can never be used again.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setShowTokenDelete(null)}
+                variant="ghost"
+                className="flex-1 h-10 rounded-xl text-white/50 hover:text-white/70"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteToken}
+                disabled={deletingToken}
+                className="flex-1 h-10 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 hover:text-red-200 disabled:opacity-40 disabled:cursor-not-allowed gap-1.5"
+              >
+                {deletingToken && <Loader2 className="w-4 h-4 animate-spin" />}
                 Delete
               </Button>
             </div>

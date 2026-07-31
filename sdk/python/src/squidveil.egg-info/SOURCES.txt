@@ -1,0 +1,15 @@
+LICENSE
+README.md
+pyproject.toml
+src/squidveil/__init__.py
+src/squidveil/_http.py
+src/squidveil/client.py
+src/squidveil/errors.py
+src/squidveil/models.py
+src/squidveil/py.typed
+src/squidveil.egg-info/PKG-INFO
+src/squidveil.egg-info/SOURCES.txt
+src/squidveil.egg-info/dependency_links.txt
+src/squidveil.egg-info/top_level.txt
+tests/test_client.py
+tests/test_live.py

@@ -30,8 +30,8 @@ const CATEGORIES = [
   { id: 'overview', title: 'Overview', icon: Book },
   { id: 'getting-started', title: 'Getting Started', icon: Terminal },
   { id: 'architecture', title: 'Architecture', icon: Shield },
-  { id: 'configuration', title: 'Configuration Files', icon: FileText },
-  { id: 'cli-reference', title: 'CLI Reference', icon: Terminal },
+  { id: 'configuration', title: 'Configuration', icon: FileText },
+  { id: 'tokens-policies', title: 'Tokens & Policies', icon: Terminal },
   { id: 'api-reference', title: 'API Reference', icon: Code },
   { id: 'language-support', title: 'Language Support', icon: Code },
   { id: 'security', title: 'Security', icon: Shield },
@@ -116,101 +116,85 @@ const sections: Section[] = [
         <div>
           <h2 className="text-xl font-bold text-white mb-4">What is SquidVeil?</h2>
           <p className="text-white/70 leading-relaxed">
-            SquidVeil is a zero-exposure secret management system that fundamentally rethinks how secrets are stored,
-            accessed, and verified in modern cloud infrastructure. Unlike traditional vault solutions that act as
-            centralized honey pots, SquidVeil distributes encrypted secret fragments across GitHub repositories,
-            exposes them only through ephemeral opaque references (VeilRefs), and enforces device-bound session
-            policies — all while leaving zero trace in dashboards or logs.
+            SquidVeil is a standalone secrets manager deployed as a Supabase Edge Function (
+            <InlineCode>squidveil-api</InlineCode>) with its own dedicated database schema (<InlineCode>squidveil</InlineCode>).
+            It is fully decoupled from any other product API: authentication uses its own access tokens
+            (<InlineCode>sv_&hellip;</InlineCode>), and every secret is encrypted at rest with AES-256-GCM using
+            envelope encryption.
           </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Zero-Exposure Architecture</h3>
-          <p className="text-white/70 leading-relaxed mb-4">
-            The core philosophy of SquidVeil is that secrets should never be exposed — not to the operator, not to
-            the CI/CD pipeline runner, and certainly not to logs or error messages. Every interaction with a secret
-            is mediated through a chain of cryptographic guarantees:
+          <p className="text-white/70 leading-relaxed mt-3">
+            Secrets are versioned (each version immutable), individually recoverable through a configurable
+            recovery window, rotatable manually or on a schedule, and deliverable to consumers via signed,
+            single-use, TTL-bounded references called VeilRefs. Every operation is written to an HMAC-chained,
+            tamper-evident audit log that can be verified end-to-end.
           </p>
-          <ul className="space-y-2 text-white/70 text-sm">
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">No direct access</strong> — Secrets are never returned in API responses. The closest you get is a VeilRef, which is a time-bound, device-scoped token.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Invisible storage</strong> — Encrypted chunks are pushed to random GitHub repos via RES54. No SquidCloud dashboard shows them.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Verify, don't reveal</strong> — The <InlineCode>/verify</InlineCode> endpoint lets you check a candidate value against the stored secret without ever transmitting the real value.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Ephemeral sessions</strong> — Every SquidShake session expires in 1 hour by default, and every VeilRef is single-use by default.</span>
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">How it Differs from Traditional Secret Management</h3>
-          <div className="overflow-x-auto rounded-lg border border-white/10">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-white/5 border-b border-white/10">
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Feature</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">HashiCorp Vault</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">AWS Secrets Manager</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">SquidVeil</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                <tr><td className="px-4 py-2.5 text-white/70">Storage</td><td className="px-4 py-2.5 text-white/50">Encrypted backend</td><td className="px-4 py-2.5 text-white/50">AWS KMS-backed</td><td className="px-4 py-2.5 text-[#4FC3F7]">GitHub RES54 (distributed)</td></tr>
-                <tr><td className="px-4 py-2.5 text-white/70">Secret exposure</td><td className="px-4 py-2.5 text-white/50">Returns value on read</td><td className="px-4 py-2.5 text-white/50">Returns value on read</td><td className="px-4 py-2.5 text-[#4FC3F7]">Never returned (VeilRef only)</td></tr>
-                <tr><td className="px-4 py-2.5 text-white/70">Auth model</td><td className="px-4 py-2.5 text-white/50">Token / LDAP / OIDC</td><td className="px-4 py-2.5 text-white/50">IAM roles</td><td className="px-4 py-2.5 text-[#4FC3F7]">SquidShake handshake + device binding</td></tr>
-                <tr><td className="px-4 py-2.5 text-white/70">TTL model</td><td className="px-4 py-2.5 text-white/50">Lease-based</td><td className="px-4 py-2.5 text-white/50">Rotation-based</td><td className="px-4 py-2.5 text-[#4FC3F7]">Per-ref TTL + max uses</td></tr>
-                <tr><td className="px-4 py-2.5 text-white/70">Audit visibility</td><td className="px-4 py-2.5 text-white/50">Audit device logs</td><td className="px-4 py-2.5 text-white/50">CloudTrail</td><td className="px-4 py-2.5 text-[#4FC3F7]">Immutable <InlineCode>squidveil_audit_log</InlineCode></td></tr>
-                <tr><td className="px-4 py-2.5 text-white/70">Value verification</td><td className="px-4 py-2.5 text-white/50">N/A</td><td className="px-4 py-2.5 text-white/50">N/A</td><td className="px-4 py-2.5 text-[#4FC3F7]">Yes (ciphertext compare)</td></tr>
-              </tbody>
-            </table>
-          </div>
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">Core Concepts</h3>
-          <div className="grid gap-4">
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h4 className="text-white font-semibold mb-1">VeilRef</h4>
-              <p className="text-sm text-white/60 leading-relaxed">
-                An opaque, cryptographically-signed reference token that grants temporary, device-bound access to a
-                secret. VeilRefs have a configurable TTL (default 60s), max use count (default 1), and an HMAC
-                signature computed from the API key. They cannot be replayed from a different device or after expiry.
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <h4 className="text-white font-semibold text-sm mb-1.5">Access Tokens</h4>
+              <p className="text-white/60 text-sm leading-relaxed">
+                <InlineCode>sv_&hellip;</InlineCode> credentials issued per owner. Stored only as a peppered
+                SHA-256 hash; the raw value is shown exactly once at creation and after rotation. Tokens can
+                expire, be revoked, rotated, or permanently deleted, and inherit capabilities through policies.
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h4 className="text-white font-semibold mb-1">SquidShake</h4>
-              <p className="text-sm text-white/60 leading-relaxed">
-                The authentication handshake protocol that establishes a session between a client and the SquidVeil
-                backend. The handshake exchanges nonces, generates an ephemeral session key, and binds the session
-                to a device fingerprint. All subsequent VeilRef issuances require a valid SquidShake session.
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <h4 className="text-white font-semibold text-sm mb-1.5">Policies &amp; Capabilities</h4>
+              <p className="text-white/60 text-sm leading-relaxed">
+                Vault-style rules of the form <InlineCode>{'{'} path, capabilities[], effect {'}'}</InlineCode>.
+                Paths are glob-matched against secret names; deny rules always win. Capabilities cover
+                read, write, delete, list, verify, rotate, versions, destroy, token_admin, policy_admin, audit.
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h4 className="text-white font-semibold mb-1">.squidveil</h4>
-              <p className="text-sm text-white/60 leading-relaxed">
-                The project-level configuration file in TOML format. It defines the project identity, daemon behavior
-                (auto-start, auto-inject), security policy (fail-closed, audit, ref TTL), and glob-based secret
-                allow/deny filters. This file should be committed to your repository.
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <h4 className="text-white font-semibold text-sm mb-1.5">Secrets &amp; Versions</h4>
+              <p className="text-white/60 text-sm leading-relaxed">
+                A secret is a named entry (path-like names supported) holding an ordered set of immutable
+                versions. Versions are <InlineCode>ENABLED</InlineCode>, <InlineCode>DISABLED</InlineCode>, or{' '}
+                <InlineCode>DESTROYED</InlineCode>; reads resolve the latest enabled version unless a specific
+                version is requested.
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h4 className="text-white font-semibold mb-1">.squidproxy</h4>
-              <p className="text-sm text-white/60 leading-relaxed">
-                The proxy interceptor configuration in TOML format. It defines which secrets should be injected into
-                HTTP requests (headers, HMAC signatures, connection strings, AES-GCM encryption keys) and what
-                hosts/paths/methods they apply to. The SquidVeil daemon uses this file when running in auto-inject mode.
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <h4 className="text-white font-semibold text-sm mb-1.5">Recovery &amp; Destruction</h4>
+              <p className="text-white/60 text-sm leading-relaxed">
+                Deleting a secret is a soft delete with a recovery window (<InlineCode>recovery_window_days</InlineCode>,
+                default 7). Within the window it can be restored; after the window it is purged by the scheduler.
+                <InlineCode>destroy</InlineCode> removes a secret permanently and immediately.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <h4 className="text-white font-semibold text-sm mb-1.5">VeilRefs</h4>
+              <p className="text-white/60 text-sm leading-relaxed">
+                Signed, single-use references to a specific version of a secret. Configurable TTL (5&ndash;86400s),
+                use limits (1&ndash;1000), optional device binding, and restricted operations (resolve and/or
+                verify). Consumed atomically server-side; the secret value is only ever returned through
+                <InlineCode>resolve</InlineCode>.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <h4 className="text-white font-semibold text-sm mb-1.5">Audit Log</h4>
+              <p className="text-white/60 text-sm leading-relaxed">
+                Every action is appended to an append-only log where each entry is HMAC-SHA256 chained to the
+                previous entry (<InlineCode>prev_hash</InlineCode> / <InlineCode>entry_hash</InlineCode>).
+                <InlineCode>/v1/audit/verify</InlineCode> replays the whole chain and reports tampering.
+                Failed authentication attempts record source IP and user agent.
               </p>
             </div>
           </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">What SquidVeil is Not</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            There is no local CLI, no daemon, no sidecar proxy, and no configuration-file workflow. SquidVeil is
+            a REST API plus three official SDKs (TypeScript, Python, Go). All interaction happens over HTTPS with
+            an <InlineCode>sv_</InlineCode> token or a VeilRef. This page documents the real, deployed system
+            <InlineCode>squidveil-api</InlineCode>.
+          </p>
         </div>
       </div>
     ),
@@ -222,91 +206,128 @@ const sections: Section[] = [
     content: (
       <div className="space-y-8">
         <div>
-          <h2 className="text-xl font-bold text-white mb-4">Getting Started with SquidVeil</h2>
+          <h2 className="text-xl font-bold text-white mb-4">Getting Started</h2>
           <p className="text-white/70 leading-relaxed mb-6">
-            This guide walks you through setting up SquidVeil on your local machine, creating your first secret,
-            and verifying it — all within minutes.
+            This walkthrough assumes the <InlineCode>squidveil-api</InlineCode> function and the{' '}
+            <InlineCode>squidveil</InlineCode> schema have been deployed to your Supabase project, and that
+            <InlineCode>SQUIDVEIL_MASTER_KEY</InlineCode> (or a service-role-derived fallback) is configured.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Prerequisites</h3>
-          <ul className="space-y-2 text-white/70 text-sm">
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>A SquidCloud account (free at <a href="https://squidcloud.inflate.live" className="text-[#4FC3F7] hover:underline" target="_blank" rel="noopener">squidcloud.inflate.live</a>)</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>A SquidCloud API key with <InlineCode>secrets</InlineCode> scope (<Link to="/developer-api" className="text-[#4FC3F7] hover:underline">generate one</Link>)</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>Node.js 18+ (for the CLI)</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>A GitHub account with a few repositories (for RES54 storage)</span>
-            </li>
+          <h3 className="text-lg font-semibold text-white mb-3">0. Prerequisites</h3>
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li>A Supabase project with the Edge Function <InlineCode>squidveil-api</InlineCode> deployed.</li>
+            <li>The <InlineCode>20260801_squidveil_schema.sql</InlineCode> migration applied (creates the
+            <InlineCode>squidveil</InlineCode> schema, RLS, indexes, and the <InlineCode>purge_expired()</InlineCode> helper).</li>
+            <li>Optional but recommended: set <InlineCode>SQUIDVEIL_MASTER_KEY</InlineCode> to a 64-character hex
+            string (32 random bytes). If unset, the key is derived from the service role key.</li>
+            <li>A Supabase user session JWT, used exactly once for bootstrap.</li>
           </ul>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">1. Install the CLI</h3>
-          <p className="text-white/70 text-sm mb-3">
-            SquidVeil ships as part of the <InlineCode>squidcloudctl</InlineCode> npm package. Install it globally:
+          <h3 className="text-lg font-semibold text-white mb-3">1. Bootstrap the First Admin Token</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Every owner starts with zero tokens. The first token is issued by <InlineCode>POST /v1/bootstrap</InlineCode>
+            using a valid Supabase session JWT in the Authorization header. This creates a{' '}
+            <InlineCode>default</InlineCode> policy (full access) and a <InlineCode>default-admin</InlineCode> token.
+            Calling it again returns <InlineCode>409 ALREADY_BOOTSTRAPPED</InlineCode>.
           </p>
-          <CodeBlock code="npm install -g squidcloudctl" lang="bash" />
-          <p className="text-white/60 text-sm mt-2">
-            Verify the installation: <InlineCode>squidcloud --version</InlineCode> should return a version number.
-          </p>
-        </div>
+          <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/bootstrap \\
+  -H "Authorization: Bearer <SUPABASE_SESSION_JWT>"
 
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">2. Initialize a Project</h3>
-          <p className="text-white/70 text-sm mb-3">
-            Navigate to your project directory and run the init command:
-          </p>
-          <CodeBlock code="squidcloud secrets init" lang="bash" />
-          <p className="text-white/70 text-sm mt-3">
-            This creates a <InlineCode>.squidveil</InlineCode> file in your project root. You'll be prompted for:
-          </p>
-          <ul className="space-y-1.5 text-white/60 text-sm mt-2 ml-4">
-            <li>&#8212; Project ID (auto-generated slug)</li>
-            <li>&#8212; Project name</li>
-            <li>&#8212; Environment (production, staging, or development)</li>
-            <li>&#8212; Daemon mode preferences</li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">3. Create Your First Secret</h3>
-          <p className="text-white/70 text-sm mb-3">
-            Create a secret using the CLI. You will be prompted for the name and value:
-          </p>
-          <CodeBlock code="squidcloud secrets create" lang="bash" />
-          <p className="text-white/70 text-sm mt-3">
-            Or pass inline (less secure — use only in CI with masked input):
-          </p>
-          <CodeBlock code="squidcloud secrets create --name STRIPE_API_KEY --value sk_live_xxx" lang="bash" />
-          <InfoBox variant="info">
-            Secret values are encrypted immediately with an AES-256-GCM key derived from your API key. The raw value
-            is never stored or logged.
+→ 201
+{
+  "success": true,
+  "token": { "name": "default-admin", "policies": ["default"], "token_prefix": "sv_AbCd12" },
+  "raw_token": "sv_AbCd12...",
+  "note": "raw_token is shown once"
+}`} lang="bash" />
+          <InfoBox variant="warning">
+            The raw token is returned only once, at bootstrap. It is never stored in plaintext — only a peppered
+            hash. Save it immediately (e.g. in your password manager or a CI secret).
           </InfoBox>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">4. Verify a Secret</h3>
-          <p className="text-white/70 text-sm mb-3">
-            The verify command checks a candidate value against the stored secret without exposing it:
+          <h3 className="text-lg font-semibold text-white mb-3">2. Create Your First Secret</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Authenticate every request with the <InlineCode>X-SquidVeil-Token</InlineCode> header (or{' '}
+            <InlineCode>Authorization: Bearer &hellip;</InlineCode>). The value is encrypted with AES-256-GCM
+            before it is written.
           </p>
-          <CodeBlock code="squidcloud secrets verify STRIPE_API_KEY" lang="bash" />
-          <p className="text-white/70 text-sm mt-3">
-            You will be prompted to enter the value to check. The CLI sends the candidate to <InlineCode>POST /secrets/:name/verify</InlineCode>,
-            which decrypts the stored value server-side and compares it to the candidate. The response is a boolean —
-            the actual secret is never transmitted over the wire.
+          <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/secrets \\
+  -H "X-SquidVeil-Token: sv_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "prod/db-password", "value": "correct horse battery staple", "description": "main DB"}'
+
+→ 201
+{
+  "success": true,
+  "secret": {
+    "id": "uuid",
+    "name": "prod/db-password",
+    "description": "main DB",
+    "labels": {},
+    "secret_type": "opaque",
+    "recovery_window_days": 7,
+    "created_at": "2026-08-01T12:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  }
+}`} lang="bash" />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">3. Read the Secret</h3>
+          <CodeBlock code={`curl https://<project>.supabase.co/functions/v1/squidveil-api/v1/secrets/prod/db-password \\
+  -H "X-SquidVeil-Token: sv_..."
+
+→ 200
+{
+  "success": true,
+  "name": "prod/db-password",
+  "value": "correct horse battery staple",
+  "version": 1,
+  "created_at": "2026-08-01T12:00:00Z",
+  "secret_type": "opaque"
+}`} lang="bash" />
+          <InfoBox variant="warning">
+            <InlineCode>GET /v1/secrets/:name</InlineCode> is the only way to obtain a plaintext value alongside
+            <InlineCode>POST /v1/veilref/resolve</InlineCode>. Every read is audited. Fetch values at the moment
+            of use; never persist them.
+          </InfoBox>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">4. Create a Scoped Token</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Create additional tokens with limited TTL and scoped policies so applications run with least privilege.
           </p>
-          <CodeBlock code={`$ squidcloud secrets verify STRIPE_API_KEY\nEnter value to verify: ********\n✓ Match: true`} lang="bash" />
+          <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/tokens \\
+  -H "X-SquidVeil-Token: sv_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "ci-prod", "policies": ["default"], "expires_in_seconds": 86400}'
+
+→ 201
+{
+  "success": true,
+  "token": { "id": "uuid", "name": "ci-prod", "token_prefix": "sv_XYzw89", "policies": ["default"], "created_at": "...", "expires_at": "..." },
+  "raw_token": "sv_XYzw89...",
+  "note": "raw_token is shown once"
+}`} lang="bash" />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">5. Use the Built-in Dashboard</h3>
+          <p className="text-white/70 text-sm leading-relaxed">
+            The SquidCloud dashboard ships with a SquidVeil management UI covering the same surface as the API:
+            a Secrets tab (create, read, rotate, versions, soft-delete/restore/destroy), a Tokens tab
+            (create, rotate, revoke, delete — raw values shown once), and a Monitor tab (usage stats,
+            30-day activity chart, audit-chain verification, failed authentication attempts, and token/secret
+            posture). Connect by pasting any <InlineCode>sv_</InlineCode> token; the token is stored locally in
+            the browser and never sent anywhere except the API.
+          </p>
         </div>
       </div>
     ),
@@ -318,208 +339,136 @@ const sections: Section[] = [
     content: (
       <div className="space-y-8">
         <div>
-          <h2 className="text-xl font-bold text-white mb-4">SquidVeil Architecture</h2>
-          <p className="text-white/70 leading-relaxed mb-6">
-            SquidVeil's architecture is designed around four principles: zero exposure, distributed storage, ephemeral
-            access, and cryptographic audit. Every component enforces these guarantees at different layers.
+          <h2 className="text-xl font-bold text-white mb-4">Architecture</h2>
+          <p className="text-white/70 leading-relaxed mb-4">
+            SquidVeil is a single Deno Edge Function backed by a dedicated Postgres schema. There is no separate
+            server: the function performs authentication, policy evaluation, encryption, and audit chaining, and
+            talks to Postgres with the service role through the <InlineCode>squidveil</InlineCode> schema.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">The VeilRef System</h3>
-          <p className="text-white/70 text-sm leading-relaxed mb-4">
-            VeilRef is the core access token that the SquidVeil system uses to grant ephemeral, device-bound access
-            to a secret. It is a JSON object with the following structure:
+          <h3 className="text-lg font-semibold text-white mb-3">Data Model</h3>
+          <PropTable
+            columns={['Table', 'Purpose']}
+            rows={[
+              ['secrets', 'Secret metadata: owner, name, description, labels, secret_type, recovery_window_days, deleted_at/delete_after'],
+              ['secret_versions', 'Immutable versions: encrypted_value, iv, key_id, state (ENABLED/DISABLED/DESTROYED), created_by'],
+              ['secret_keys', 'Per-secret data encryption keys (DEKs), wrapped by the master key (envelope encryption)'],
+              ['rotation_config', 'Per-secret rotation policy: enabled, interval_days, last/next_rotation_at, source'],
+              ['access_tokens', 'sv_ tokens: peppered token_hash, token_prefix, name, policies, expires_at, revoked_at, last_used_at'],
+              ['policies', 'Named rule sets: {path, capabilities[], effect} — Vault-style, deny wins'],
+              ['veilrefs', 'Issued references: ref_id, version pin, device_bound, expires_at, use counters, ops_allowed, hmac'],
+              ['audit_log', 'HMAC-chained audit: seq, prev_hash, entry_hash, action, actor, path, ip, user_agent, success'],
+            ]}
+          />
+          <p className="text-white/60 text-sm mt-2">
+            Row-level security is enabled on every table with owner-scoped policies; the Edge Function accesses
+            them with the service role.
           </p>
-          <CodeBlock code={`{
-  "ref_id": "a1b2c3d4",
-  "secret_name": "STRIPE_API_KEY",
-  "session_id": "550e8400-e29b-41d4-a716-446655440000",
-  "device_bound": "sha256$...device_fingerprint...",
-  "issued_at": "2026-06-29T12:00:00Z",
-  "expires_at": "2026-06-29T12:01:00Z",
-  "use_count_max": 1,
-  "use_count_used": 0,
-  "ops_allowed": ["proxy_request"],
-  "hmac": "ed25519$..."
-}`} lang="json" />
-          <div className="space-y-3 mt-4">
-            <h4 className="text-white font-semibold text-sm">Key properties of VeilRef:</h4>
-            <ul className="space-y-2 text-white/70 text-sm">
-              <li className="flex items-start gap-3">
-                <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-                <span><strong className="text-white/90">Opaque References:</strong> A VeilRef contains the secret name and session metadata, but never the actual secret value. To resolve a VeilRef to its value, you must call <InlineCode>POST /veilref/resolve</InlineCode> with the complete JSON — and the ref must be valid and unexpired.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-                <span><strong className="text-white/90">TTL Enforcement (60s default):</strong> Each VeilRef expires after <InlineCode>ref_ttl</InlineCode> seconds. The server validates <InlineCode>expires_at</InlineCode> on every verify/resolve call. Expired refs return 401.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-                <span><strong className="text-white/90">Device Binding:</strong> During SquidShake handshake, the client provides a <InlineCode>device_fingerprint</InlineCode>. Every VeilRef issued during that session is cryptographically bound to that fingerprint via SHA-256. Resolving from a different device fails.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-                <span><strong className="text-white/90">HMAC Integrity:</strong> The canonical fields of each VeilRef are HMAC-SHA256-signed using a key derived from the API key. Any tampering invalidates the signature, and the server rejects forged refs.</span>
-              </li>
-            </ul>
-          </div>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">SquidShake Protocol</h3>
-          <p className="text-white/70 text-sm leading-relaxed mb-4">
-            SquidShake is a three-step handshake protocol that establishes a session and issues VeilRefs:
+          <h3 className="text-lg font-semibold text-white mb-3">Envelope Encryption</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Values are encrypted twice over:
           </p>
-          <div className="space-y-4">
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white font-semibold text-sm mb-2">Step 1: Handshake</h4>
-              <p className="text-white/60 text-sm leading-relaxed">
-                The client sends <InlineCode>POST /squidshake/handshake</InlineCode> with a <InlineCode>device_fingerprint</InlineCode>
-                and <InlineCode>session_nonce</InlineCode>. The server generates a session ID, server nonce, an ephemeral
-                Ed25519 key pair, and an encrypted session key. It stores the session in <InlineCode>squidveil_sessions</InlineCode>
-                with a 1-hour TTL.
-              </p>
-              <CodeBlock code={`POST /squidshake/handshake
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm mb-3">
+            <li>
+              <strong>Master key</strong> (<InlineCode>SQUIDVEIL_MASTER_KEY</InlineCode>, 32 bytes hex) never
+              leaves the function runtime. If unset, it is derived via SHA-256 of{' '}
+              <InlineCode>squidveil-master-v1:&lt;service-role-key&gt;</InlineCode>.
+            </li>
+            <li>
+              <strong>Per-secret DEK</strong>: a random 32-byte data encryption key stored in{' '}
+              <InlineCode>secret_keys</InlineCode> wrapped by the master key (AES-256-GCM). Each rotation
+              generates a fresh DEK (<InlineCode>dek-&lt;secretId&gt;-v&lt;ts&gt;</InlineCode>), so a rotated
+              version is encrypted with a key that never protected older versions.
+            </li>
+            <li>
+              <strong>Per-version ciphertext</strong>: AES-256-GCM with a random 12-byte IV, encrypted with the
+              secret&rsquo;s current DEK.
+            </li>
+          </ul>
+          <p className="text-white/60 text-sm leading-relaxed">
+            The <InlineCode>aes_gcm</InlineCode> secret type supports client-side encryption (BYOK): the client
+            supplies the ciphertext and IV, and only an empty placeholder key row is stored.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Access Token Lifecycle</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Tokens are <InlineCode>sv_</InlineCode> + 32 random bytes base64url. Only{' '}
+            <InlineCode>SHA-256(masterKey : token)</InlineCode> is stored, so a database leak does not reveal
+            usable credentials. The 8-character prefix exists purely for display. On every request the function
+            checks revocation and expiry, updates <InlineCode>last_used_at</InlineCode>, and enforces an
+            in-memory rate limit of 300 requests per minute per token hash (per edge instance). Rotating a token
+            replaces the hash in place: the old value is immediately invalid, the identity (name, policies,
+            expiry) is preserved.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Policy Evaluation</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            A token carries a list of policy names; the union of their rules is evaluated for each request.
+            Rules are <InlineCode>{'{'} path, capabilities[], effect {'}'}</InlineCode> where path supports
+            glob matching: <InlineCode>*</InlineCode> matches everything, <InlineCode>prod/*</InlineCode> is a
+            prefix match, <InlineCode>*/db-*</InlineCode> contains-matching, and an exact name matches itself.
+          </p>
+          <CodeBlock code={`// Least-privilege policy for a read-only app token
 {
-  "device_fingerprint": "mac:aa:bb:cc:dd:ee:ff|host:my-machine",
-  "session_nonce": "abc123...",
-  "project_id": "my-project"
-}
-
-→ 200
-{
-  "session_id": "550e8400-...",
-  "server_nonce": "def456...",
-  "server_public_key": "squidshake_ed25519_...",
-  "encrypted_session_key": "hex..."
+  "name": "app-readonly",
+  "rules": [
+    { "path": "prod/*", "capabilities": ["read", "list"], "effect": "allow" },
+    { "path": "prod/highly-sensitive", "capabilities": ["read"], "effect": "deny" }
+  ]
 }`} lang="json" />
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white font-semibold text-sm mb-2">Step 2: Issue VeilRef</h4>
-              <p className="text-white/60 text-sm leading-relaxed">
-                With a valid session, the client requests a VeilRef for a specific secret. The server validates the
-                session, looks up the secret, and returns a signed VeilRef JSON blob. The secret value is NOT included.
-              </p>
-              <CodeBlock code={`POST /squidshake/ref
-{
-  "session_id": "550e8400-...",
-  "secret_name": "STRIPE_API_KEY",
-  "device_fingerprint": "mac:aa:bb:cc:dd:ee:ff|host:my-machine",
-  "ref_ttl": 60,
-  "max_uses": 1,
-  "ops_allowed": ["proxy_request"]
-}
-
-→ 200
-{
-  "session_id": "550e8400-...",
-  "veil_ref_json": "{...serialized VeilRef object...}",
-  "hmac": "ed25519$..."
-}`} lang="json" />
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white font-semibold text-sm mb-2">Step 3: Verify or Resolve</h4>
-              <p className="text-white/60 text-sm leading-relaxed">
-                Downstream services use <InlineCode>POST /veilref/verify</InlineCode> to check the ref's integrity and
-                expiry without exposing the secret, or <InlineCode>POST /veilref/resolve</InlineCode> to get the actual
-                decrypted value (when ready to use it).
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Encryption Model</h3>
-          <p className="text-white/70 text-sm leading-relaxed mb-4">
-            SquidVeil uses a two-tier encryption model to protect secrets at rest:
-          </p>
-          <div className="overflow-x-auto rounded-lg border border-white/10 mb-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-white/5 border-b border-white/10">
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Step</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Operation</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Algorithm</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">1</td>
-                  <td className="px-4 py-2.5 text-white/70">Key derivation from API key</td>
-                  <td className="px-4 py-2.5 font-mono text-[13px] text-white/80">SHA-256(apiKey) → 256-bit key</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">2</td>
-                  <td className="px-4 py-2.5 text-white/70">Encrypt secret value</td>
-                  <td className="px-4 py-2.5 font-mono text-[13px] text-white/80">AES-256-GCM (random IV)</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">3</td>
-                  <td className="px-4 py-2.5 text-white/70">Store encrypted payload</td>
-                  <td className="px-4 py-2.5 font-mono text-[13px] text-white/80">RES54 GitHub storage</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">4</td>
-                  <td className="px-4 py-2.5 text-white/70">VeilRef signing</td>
-                  <td className="px-4 py-2.5 font-mono text-[13px] text-white/80">HMAC-SHA-256 (derived key)</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="text-white/70 text-sm leading-relaxed">
-            The derived AES key is never stored or transmitted. It is recomputed from the API key on every request,
-            ensuring that a leaked database does not expose secrets.
+          <p className="text-white/60 text-sm leading-relaxed">
+            Listing is itself path-scoped: <InlineCode>GET /v1/secrets</InlineCode> only returns secrets the
+            token may list or read.
           </p>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">RES54 Storage</h3>
-          <p className="text-white/70 text-sm leading-relaxed mb-4">
-            RES54 (Redundant Storage 54) is SquidVeil's proprietary distributed storage layer. When a secret is created,
-            its encrypted payload is pushed as a JSON file to a randomly selected GitHub repository authorized by the
-            user. The file is stored in a path like <InlineCode>{'{userId}'}/secrets/{'{chunkId}'}.json</InlineCode>.
+          <h3 className="text-lg font-semibold text-white mb-3">Audit Chain</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Each entry stores <InlineCode>prev_hash</InlineCode> (the previous entry&rsquo;s{' '}
+            <InlineCode>entry_hash</InlineCode>) and its own <InlineCode>entry_hash</InlineCode> ={' '}
+            <InlineCode>HMAC-SHA256(auditKey, prev_hash + canonical)</InlineCode>, where the audit key is derived
+            from the master key and <InlineCode>canonical</InlineCode> is a deterministic serialization of the
+            entry. A failure result is returned to the client; the chain itself is written in the background so
+            auditing never breaks the primary operation. Failed authentication (<InlineCode>auth.failed</InlineCode>)
+            captures <InlineCode>x-forwarded-for</InlineCode> and <InlineCode>user-agent</InlineCode> — these
+            entries are global (not owner-scoped) so brute-force attempts can be seen in the monitor.
           </p>
-          <div className="space-y-2 text-white/70 text-sm">
-            <p><strong className="text-white/90">Key characteristics:</strong></p>
-            <ul className="space-y-1.5 ml-4">
-              <li>&#8212; Each secret chunk is stored in a different repo (random selection)</li>
-              <li>&#8212; Files are invisible to the SquidCloud dashboard — no secret management UI</li>
-              <li>&#8212; Chunks are JSON with versioning, type markers, and timestamps</li>
-              <li>&#8212; The database stores only the storage path and repo reference</li>
-              <li>&#8212; Fallback to direct database storage if GitHub integration is unavailable</li>
-            </ul>
-          </div>
-          <CodeBlock code={`{
-  "version": "3.0",
-  "type": "squidveil_secret",
-  "name": "STRIPE_API_KEY",
-  "encrypted_value": "base64...",
-  "iv": "hex...",
-  "created_at": "2026-06-29T12:00:00Z"
-}`} lang="json" />
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Proxy Interceptor</h3>
-          <p className="text-white/70 text-sm leading-relaxed mb-4">
-            The SquidVeil daemon can operate in proxy interception mode, using <InlineCode>LD_PRELOAD</InlineCode>
-            (on Linux) to hook socket-level <InlineCode>connect()</InlineCode>, <InlineCode>send()</InlineCode>, and
-            <InlineCode>recv()</InlineCode> calls. This allows transparent injection of secrets into HTTP requests
-            without modifying application code.
+          <h3 className="text-lg font-semibold text-white mb-3">Rotation</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Three rotation paths:
           </p>
-          <div className="space-y-2 text-white/70 text-sm">
-            <p><strong className="text-white/90">Available injection modes:</strong></p>
-            <ul className="space-y-1.5 ml-4">
-              <li>&#8212; <InlineCode>http_auth</InlineCode> — Injects <InlineCode>Authorization: Bearer &lt;secret&gt;</InlineCode> header</li>
-              <li>&#8212; <InlineCode>hmac_sign</InlineCode> — Signs request body with HMAC using the secret as key</li>
-              <li>&#8212; <InlineCode>connection_string</InlineCode> — Replaces connection string placeholders in URLs</li>
-              <li>&#8212; <InlineCode>aes_gcm</InlineCode> — Encrypts request body with AES-256-GCM using the secret</li>
-            </ul>
-          </div>
-          <p className="text-white/60 text-sm mt-3">
-            The proxy is configured via <InlineCode>.squidproxy</InlineCode> and respects allow/deny host and path
-            rules. It runs as a user-space daemon and does not require root.
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li><strong>Manual</strong> — <InlineCode>POST /v1/secrets/:name/rotate</InlineCode>; value auto-generated
+            (32 random bytes base64url) unless provided.</li>
+            <li><strong>Scheduled</strong> — <InlineCode>POST /rotate/due</InlineCode> (authenticated with the
+            internal cron token) rotates every enabled config whose <InlineCode>next_rotation_at</InlineCode> has
+            passed, then runs <InlineCode>purge_expired()</InlineCode> to drop secrets past their recovery window
+            and expired VeilRefs. Wire it to a scheduler such as Supabase pg_cron.</li>
+            <li><strong>Lazy</strong> — a read of a secret whose scheduled rotation is due rotates it first, so
+            consumers can never observe a stale value.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">VeilRef Flow</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Issuing a VeilRef returns a self-contained JSON blob signed with the master key and a server-side
+            row with use counters. Verification/resolution re-derives the HMAC, checks expiry, use limits,
+            allowed operations, and optional device binding, then consumes a use with a conditional update
+            (optimistic concurrency), so concurrent consumption cannot double-spend a single-use ref.
           </p>
         </div>
       </div>
@@ -527,361 +476,185 @@ const sections: Section[] = [
   },
   {
     id: 'configuration',
-    title: 'Configuration Files',
+    title: 'Configuration',
     icon: FileText,
     content: (
       <div className="space-y-8">
         <div>
-          <h2 className="text-xl font-bold text-white mb-4">Configuration Files</h2>
+          <h2 className="text-xl font-bold text-white mb-4">Server Configuration</h2>
           <p className="text-white/70 leading-relaxed mb-6">
-            SquidVeil uses three configuration files: <InlineCode>.squidveil</InlineCode> (project config),
-            <InlineCode>.squidproxy</InlineCode> (proxy injection rules), and <InlineCode>.squidveil.lock</InlineCode>
-            (auto-generated lockfile). All use TOML syntax.
-          </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">.squidveil — Project Configuration</h3>
-          <p className="text-white/70 text-sm mb-4">
-            The <InlineCode>.squidveil</InlineCode> file defines your project's SquidVeil integration. It is typically
-            created by <InlineCode>squidcloud secrets init</InlineCode> and should be committed to your repo.
-          </p>
-
-          <div className="border border-white/10 rounded-lg bg-white/[0.02] p-5 mb-4">
-            <h4 className="text-white font-semibold text-sm mb-3">Schema (Zod)</h4>
-            <CodeBlock code={`const ProjectConfigSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  environment: z.enum(['production','staging','development']).default('production'),
-});
-
-const DaemonConfigSchema = z.object({
-  auto_start: z.boolean().default(true),
-  auto_inject: z.boolean().default(true),
-  kernel_mode: z.enum(['auto','fuse','xpc','binder','winpipe']).default('auto'),
-});
-
-const PolicyConfigSchema = z.object({
-  fail_closed: z.boolean().default(true),
-  audit: z.boolean().default(true),
-  allow_print: z.boolean().default(false),
-  ref_ttl: z.number().int().positive().default(60),
-  ref_max_uses: z.number().int().positive().default(1),
-});
-
-const SecretsFilterSchema = z.object({
-  allow: z.array(z.string()).default([]),
-  deny: z.array(z.string()).default([]),
-});
-
-const ProxyConfigSchema = z.object({
-  enabled: z.boolean().default(true),
-  intercept_http: z.boolean().default(true),
-});`} lang="typescript" />
-          </div>
-
-          <PropTable
-            columns={['Field', 'Type', 'Default', 'Description']}
-            rows={[
-              ['project.id', 'string', '—', 'Unique project identifier'],
-              ['project.name', 'string', '—', 'Human-readable project name'],
-              ['project.environment', '"production" | "staging" | "development"', '"production"', 'Deployment environment'],
-              ['daemon.auto_start', 'boolean', 'true', 'Auto-start SquidVeil daemon on boot'],
-              ['daemon.auto_inject', 'boolean', 'true', 'Auto-inject secrets via proxy'],
-              ['daemon.kernel_mode', '"auto" | "fuse" | "xpc" | "binder" | "winpipe"', '"auto"', 'Kernel interception backend'],
-              ['policy.fail_closed', 'boolean', 'true', 'Reject all requests if daemon is down'],
-              ['policy.audit', 'boolean', 'true', 'Log all secret access to audit trail'],
-              ['policy.allow_print', 'boolean', 'false', 'Allow printing secrets to stdout'],
-              ['policy.ref_ttl', 'number (seconds)', '60', 'Default VeilRef TTL'],
-              ['policy.ref_max_uses', 'number', '1', 'Default max uses per VeilRef'],
-              ['secrets.allow', 'string[]', '[]', 'Glob patterns for allowed secrets'],
-              ['secrets.deny', 'string[]', '[]', 'Glob patterns for denied secrets'],
-              ['proxy.enabled', 'boolean', 'true', 'Enable proxy interceptor'],
-              ['proxy.intercept_http', 'boolean', 'true', 'Intercept HTTP traffic'],
-            ]}
-          />
-
-          <div className="mt-4">
-            <h4 className="text-white font-semibold text-sm mb-2">Example .squidveil</h4>
-            <CodeBlock code={`[project]
-id = "my-app-42"
-name = "My Application"
-environment = "production"
-
-[daemon]
-auto_start = true
-auto_inject = true
-kernel_mode = "auto"
-
-[policy]
-fail_closed = true
-audit = true
-allow_print = false
-ref_ttl = 60
-ref_max_uses = 1
-
-[secrets]
-allow = ["*_API_KEY", "*_SECRET", "DB_*"]
-deny = ["TEST_*", "LOCAL_*"]
-
-[proxy]
-enabled = true
-intercept_http = true`} lang="toml" />
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">.squidproxy — Proxy Interceptor Configuration</h3>
-          <p className="text-white/70 text-sm mb-4">
-            The <InlineCode>.squidproxy</InlineCode> file defines which secrets to inject into outgoing HTTP requests,
-            how to inject them, and which hosts/paths/methods to target. Each entry is a <InlineCode>[[secret]]</InlineCode>
-            array element in TOML.
-          </p>
-
-          <PropTable
-            columns={['Field', 'Type', 'Description']}
-            rows={[
-              ['name', 'string', 'Name of the secret to inject'],
-              ['type', '"http_auth" | "hmac_sign" | "connection_string" | "aes_gcm"', 'Injection mode'],
-              ['inject_header', 'string?', 'Header name for http_auth (e.g. "X-API-Key")'],
-              ['inject_format', 'string?', 'Format string for the injected value (e.g. "Bearer {secret}")'],
-              ['allowed_hosts', 'string[]', 'Host glob patterns to apply this rule to'],
-              ['allowed_paths', 'string[]', 'Path glob patterns to apply this rule to'],
-              ['methods', 'string[]', 'HTTP methods to intercept'],
-              ['rate_limit', 'number?', 'Max requests per second for this rule'],
-              ['ref_ttl', 'number?', 'Override VeilRef TTL for this rule'],
-              ['algorithm', 'string?', 'HMAC algorithm (e.g. "sha256")'],
-              ['output_header', 'string?', 'Header to inject HMAC into'],
-              ['key_size', 'number?', 'AES key size in bits'],
-              ['signing_algo', 'string?', 'Signing algorithm for hmac_sign'],
-            ]}
-          />
-
-          <div className="mt-4">
-            <h4 className="text-white font-semibold text-sm mb-2">Example .squidproxy</h4>
-            <CodeBlock code={`[[secret]]
-name = "STRIPE_API_KEY"
-type = "http_auth"
-inject_header = "Authorization"
-inject_format = "Bearer {secret}"
-allowed_hosts = ["api.stripe.com", "*.stripe.com"]
-allowed_paths = ["/v1/*", "/v2/*"]
-methods = ["GET", "POST", "PUT", "DELETE"]
-rate_limit = 100
-ref_ttl = 120
-
-[[secret]]
-name = "GITHUB_WEBHOOK_SECRET"
-type = "hmac_sign"
-algorithm = "sha256"
-output_header = "X-Hub-Signature-256"
-inject_format = "sha256={secret}"
-allowed_hosts = ["api.github.com"]
-allowed_paths = ["/repos/*/hooks/*"]
-methods = ["POST"]
-ref_ttl = 30
-
-[[secret]]
-name = "DATABASE_URL"
-type = "connection_string"
-allowed_hosts = ["*.supabase.co", "*.rds.amazonaws.com"]
-allowed_paths = ["/*"]
-methods = ["*"]
-
-[[secret]]
-name = "ENCRYPTION_KEY"
-type = "aes_gcm"
-key_size = 256
-allowed_hosts = ["api.encryption-service.com"]
-allowed_paths = ["/encrypt/*"]
-methods = ["POST"]`} lang="toml" />
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">.squidveil.lock — Auto-Generated Lockfile</h3>
-          <p className="text-white/70 text-sm leading-relaxed">
-            When the SquidVeil daemon starts, it generates a <InlineCode>.squidveil.lock</InlineCode> file in the
-            project root. This file contains the current session ID, daemon PID, and a timestamp. It is used to
-            coordinate multiple daemon instances and should never be committed to version control.
-          </p>
-          <CodeBlock code={`session_id = "550e8400-e29b-41d4-a716-446655440000"
-daemon_pid = 12345
-started_at = "2026-06-29T12:00:00Z"
-version = "3.0"`} lang="toml" />
-          <p className="text-white/60 text-xs mt-2">
-            Add <InlineCode>.squidveil.lock</InlineCode> to your <InlineCode>.gitignore</InlineCode>.
-          </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Glob Patterns for Allow/Deny</h3>
-          <p className="text-white/70 text-sm leading-relaxed mb-3">
-            The <InlineCode>secrets.allow</InlineCode> and <InlineCode>secrets.deny</InlineCode> fields support glob
-            matching. The logic is: if <InlineCode>allow</InlineCode> is non-empty, a secret must match at least one
-            allow pattern; if <InlineCode>deny</InlineCode> has a match, the secret is rejected regardless.
+            All server configuration is environment-based. There are no config files.
           </p>
           <PropTable
-            columns={['Pattern', 'Matches', 'Does Not Match']}
+            columns={['Variable', 'Required', 'Description']}
             rows={[
-              ['*', 'Anything', '—'],
-              ['STRIPE_*', 'STRIPE_API_KEY, STRIPE_SECRET', 'STRIPE'],
-              ['*_KEY', 'API_KEY, SECRET_KEY', 'KEYCHAIN'],
-              ['DB_*', 'DB_URL, DB_PASSWORD', 'DATABASE_URL'],
-              ['TEST_*', 'TEST_API_KEY', 'STRIPE_API_KEY'],
+              ['SQUIDVEIL_SUPABASE_URL', 'No', 'PostgREST URL; falls back to SUPABASE_URL'],
+              ['SQUIDVEIL_SERVICE_ROLE_KEY', 'No', 'Service role key; falls back to SUPABASE_SERVICE_ROLE_KEY'],
+              ['SQUIDVEIL_MASTER_KEY', 'No', '64 hex chars (32 bytes) master key. Derived from the service role key if absent'],
             ]}
           />
+          <h3 className="text-lg font-semibold text-white mb-3 mt-6">Internal Cron Token</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            The scheduled-rotation endpoint <InlineCode>POST /rotate/due</InlineCode> does not accept an{' '}
+            <InlineCode>sv_</InlineCode> token. It is authenticated by comparing the{' '}
+            <InlineCode>x-squidveil-cron-token</InlineCode> header against <InlineCode>system_config</InlineCode>
+            (key <InlineCode>internal_cron_token</InlineCode>). Example pg_cron schedule:
+          </p>
+          <CodeBlock code={`select cron.schedule(
+  'squidveil-rotate-due',
+  '0 * * * *',
+  $sql$
+  select net.http_post(
+    url := 'https://<project>.supabase.co/functions/v1/squidveil-api/rotate/due',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-squidveil-cron-token', '<internal_cron_token>'
+    )
+  )
+  $sql$
+);`} lang="sql" />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Client Configuration</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            The official SDKs read two environment variables:
+          </p>
+          <PropTable
+            columns={['Variable', 'Description']}
+            rows={[
+              ['SQUIDVEIL_URL', 'Base URL of the function, e.g. https://<project>.supabase.co/functions/v1/squidveil-api'],
+              ['SQUIDVEIL_TOKEN', 'An sv_ access token'],
+            ]}
+          />
+          <CodeBlock code={`export SQUIDVEIL_URL="https://<project>.supabase.co/functions/v1/squidveil-api"
+export SQUIDVEIL_TOKEN="sv_..."`} lang="bash" />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Secret Types</h3>
+          <PropTable
+            columns={['secret_type', 'Meaning']}
+            rows={[
+              ['opaque', 'Default. Arbitrary string, server-side encrypted'],
+              ['connection_string', 'A connection string (semantic tag; same encryption as opaque)'],
+              ['hmac_sign', 'An HMAC signing key (semantic tag)'],
+              ['http_auth', 'An HTTP basic auth credential (semantic tag)'],
+              ['aes_gcm', 'Client-side encrypted (BYOK): value is pre-encrypted ciphertext, iv required. Server stores it as-is'],
+            ]}
+          />
+          <h3 className="text-lg font-semibold text-white mb-3 mt-6">Per-Secret Settings</h3>
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li><InlineCode>recovery_window_days</InlineCode> (0&ndash;365, default 7): how long a soft-deleted
+            secret stays restorable before purge.</li>
+            <li><InlineCode>labels</InlineCode>: free-form JSON object of string values for metadata.</li>
+            <li><InlineCode>description</InlineCode>: up to 2000 characters.</li>
+            <li>Rotation config: <InlineCode>enabled</InlineCode> + <InlineCode>interval_days</InlineCode>
+            (1&ndash;3650, default 30).</li>
+          </ul>
         </div>
       </div>
     ),
   },
   {
-    id: 'cli-reference',
-    title: 'CLI Reference',
+    id: 'tokens-policies',
+    title: 'Tokens & Policies',
     icon: Terminal,
     content: (
       <div className="space-y-8">
         <div>
-          <h2 className="text-xl font-bold text-white mb-4">CLI Reference</h2>
-          <p className="text-white/70 leading-relaxed mb-6">
-            The SquidVeil CLI is available via the <InlineCode>squidcloudctl</InlineCode> npm package.
-            All commands are under the <InlineCode>squidcloud secrets</InlineCode> namespace.
+          <h2 className="text-xl font-bold text-white mb-4">Access Tokens</h2>
+          <p className="text-white/70 leading-relaxed mb-4">
+            Token management requires the <InlineCode>token_admin</InlineCode> capability. All token operations
+            are owner-scoped.
           </p>
         </div>
 
+        <div className="space-y-6">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <h3 className="text-white font-semibold mb-2">Create a Token</h3>
+            <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/tokens \\
+  -H "X-SquidVeil-Token: sv_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "app-server",
+    "policies": ["app-readonly"],
+    "expires_in_seconds": 2592000
+  }'
+
+→ 201 { "success": true, "token": { ... }, "raw_token": "sv_...", "note": "raw_token is shown once" }`} lang="bash" />
+            <PropTable
+              columns={['Parameter', 'Type', 'Required', 'Description']}
+              rows={[
+                ['name', 'string', 'Yes', 'Max 100 chars'],
+                ['policies', 'string[]', 'No', 'Defaults to ["default"]'],
+                ['expires_in_seconds', 'int', 'No', '1..31536000 (up to 1 year); omitted = never expires'],
+              ]}
+            />
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <h3 className="text-white font-semibold mb-2">Rotate / Revoke / Delete</h3>
+            <CodeBlock code={`# Rotate: same identity, new raw token. Old value is permanently invalid.
+curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/tokens/<id>/rotate \\
+  -H "X-SquidVeil-Token: sv_..."
+
+→ 200 { "success": true, "token": { "id": "...", "name": "...", "token_prefix": "sv_New8p" }, "raw_token": "sv_..." }
+
+# Revoke: marks revoked_at; cannot be rotated afterwards (409 REVOKED)
+curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/tokens/<id>/revoke \\
+  -H "X-SquidVeil-Token: sv_..."
+
+# Delete: permanent removal
+curl -X DELETE https://<project>.supabase.co/functions/v1/squidveil-api/v1/tokens/<id> \\
+  -H "X-SquidVeil-Token: sv_..."`} lang="bash" />
+            <InfoBox variant="warning">
+              Rotating or deleting a token is final for that credential value. Audits record{' '}
+              <InlineCode>token.rotated</InlineCode>, <InlineCode>token.revoked</InlineCode>, and{' '}
+              <InlineCode>token.deleted</InlineCode>.
+            </InfoBox>
+          </div>
+        </div>
+
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">squidcloud secrets list</h3>
-          <p className="text-white/70 text-sm mb-2">
-            List all secrets for the authenticated project. Displays name, ID, creation date, and storage type.
+          <h2 className="text-xl font-bold text-white mb-4 mt-8">Policies</h2>
+          <p className="text-white/70 leading-relaxed mb-4">
+            Policy management requires the <InlineCode>policy_admin</InlineCode> capability. A policy is a named
+            array of rules. Rules are evaluated as a union across all policies attached to the token; deny wins.
           </p>
-          <CodeBlock code={`squidcloud secrets list
-squidcloud secrets list --output json
-squidcloud secrets list --env staging`} lang="bash" />
           <PropTable
-            columns={['Flag', 'Type', 'Description']}
+            columns={['Capability', 'Grants']}
             rows={[
-              ['--output', 'string', 'Output format: "table" (default) or "json"'],
-              ['--env', 'string', 'Filter by environment (production, staging, development)'],
+              ['read', 'Read secret values (GET /v1/secrets/:name)'],
+              ['write', 'Create and update secrets (POST /v1/secrets, POST /v1/secrets/:name, undelete)'],
+              ['delete', 'Soft-delete secrets (DELETE /v1/secrets/:name)'],
+              ['list', 'See secrets in listings'],
+              ['verify', 'Verify candidate values without exposing them'],
+              ['rotate', 'Rotate secrets and configure rotation schedules'],
+              ['versions', 'List, restore, disable, enable versions'],
+              ['destroy', 'Permanently destroy secrets and versions'],
+              ['token_admin', 'Manage access tokens'],
+              ['policy_admin', 'Manage policies'],
+              ['audit', 'Read audit log, stats, and monitor'],
             ]}
           />
-        </div>
+          <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/policies \\
+  -H "X-SquidVeil-Token: sv_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "app-readonly",
+    "rules": [
+      { "path": "prod/*", "capabilities": ["read", "list"], "effect": "allow" }
+    ]
+  }'
 
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">squidcloud secrets create</h3>
-          <p className="text-white/70 text-sm mb-2">
-            Create a new secret. Prompts for name and value interactively, or accepts inline flags.
-          </p>
-          <CodeBlock code={`squidcloud secrets create
-squidcloud secrets create --name DB_PASSWORD --value p@ssw0rd
-squidcloud secrets create --name API_KEY --value "sk_xxx" --env staging`} lang="bash" />
-          <PropTable
-            columns={['Flag', 'Type', 'Description']}
-            rows={[
-              ['--name', 'string', 'Secret name (uppercase snake_case recommended)'],
-              ['--value', 'string', 'Secret value (omit for interactive prompt)'],
-              ['--env', 'string', 'Environment scope'],
-            ]}
-          />
-          <InfoBox variant="warning">
-            Passing <InlineCode>--value</InlineCode> inline may leak the secret into shell history. Prefer interactive
-            mode or use <InlineCode>$SQUIDVEIL_SECRET_VALUE</InlineCode> environment variable.
-          </InfoBox>
-        </div>
+curl -X PUT https://<project>.supabase.co/functions/v1/squidveil-api/v1/policies/<id> \\
+  -H "X-SquidVeil-Token: sv_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{ "rules": [ ... ] }'
 
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">squidcloud secrets rename</h3>
-          <p className="text-white/70 text-sm mb-2">
-            Rename an existing secret. The secret value is preserved.
-          </p>
-          <CodeBlock code={`squidcloud secrets rename STRIPE_API_KEY STRIPE_LIVE_KEY
-squidcloud secrets rename <current-name> <new-name>`} lang="bash" />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">squidcloud secrets delete</h3>
-          <p className="text-white/70 text-sm mb-2">
-            Permanently delete a secret. Requires confirmation.
-          </p>
-          <CodeBlock code={`squidcloud secrets delete STRIPE_API_KEY
-squidcloud secrets delete STRIPE_API_KEY --force`} lang="bash" />
-          <PropTable
-            columns={['Flag', 'Type', 'Description']}
-            rows={[
-              ['--force', 'boolean', 'Skip confirmation prompt'],
-            ]}
-          />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">squidcloud secrets verify</h3>
-          <p className="text-white/70 text-sm mb-2">
-            Verify a candidate value against a stored secret without exposing the stored value. Prompts for the
-            value to check, or accepts inline.
-          </p>
-          <CodeBlock code={`squidcloud secrets verify STRIPE_API_KEY
-squidcloud secrets verify STRIPE_API_KEY --value "sk_test_xxx"
-squidcloud secrets verify STRIPE_API_KEY --output json`} lang="bash" />
-          <p className="text-white/60 text-sm mt-2">
-            Output: <InlineCode>true</InlineCode> (match) or <InlineCode>false</InlineCode> (no match).
-          </p>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">squidcloud secrets export</h3>
-          <p className="text-white/70 text-sm mb-2">
-            Export all secret names and metadata (not values) as JSON for use in CI/CD pipelines.
-          </p>
-          <CodeBlock code={`squidcloud secrets export
-squidcloud secrets export --format json
-squidcloud secrets export --format dotenv`} lang="bash" />
-          <PropTable
-            columns={['Flag', 'Type', 'Description']}
-            rows={[
-              ['--format', 'string', 'Export format: "json" or "dotenv"'],
-              ['--output', 'string', 'Output file path (defaults to stdout)'],
-            ]}
-          />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">squidcloud secrets audit</h3>
-          <p className="text-white/70 text-sm mb-2">
-            View the immutable audit log for all secret operations: creates, reads (via VeilRef), renames, deletes,
-            and verify attempts.
-          </p>
-          <CodeBlock code={`squidcloud secrets audit
-squidcloud secrets audit --since 2026-06-01
-squidcloud secrets audit --secret STRIPE_API_KEY
-squidcloud secrets audit --limit 50`} lang="bash" />
-          <PropTable
-            columns={['Flag', 'Type', 'Description']}
-            rows={[
-              ['--since', 'string', 'Show entries after this date (ISO 8601)'],
-              ['--until', 'string', 'Show entries before this date'],
-              ['--secret', 'string', 'Filter by secret name'],
-              ['--action', 'string', 'Filter by action type (create, read, rename, delete, verify)'],
-              ['--limit', 'number', 'Max entries to return (default 20)'],
-            ]}
-          />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">squidcloud secrets init</h3>
-          <p className="text-white/70 text-sm mb-2">
-            Initialize SquidVeil in the current directory. Creates a <InlineCode>.squidveil</InlineCode> file with
-            prompted values.
-          </p>
-          <CodeBlock code={`squidcloud secrets init
-squidcloud secrets init --project-id my-app --name "My App" --env production`} lang="bash" />
-          <PropTable
-            columns={['Flag', 'Type', 'Description']}
-            rows={[
-              ['--project-id', 'string', 'Project identifier (auto-generated if omitted)'],
-              ['--name', 'string', 'Human-readable project name'],
-              ['--env', 'string', 'Environment (production, staging, development)'],
-              ['--daemon', 'boolean', 'Enable daemon mode (default true)'],
-            ]}
-          />
+curl -X DELETE https://<project>.supabase.co/functions/v1/squidveil-api/v1/policies/<id> \\
+  -H "X-SquidVeil-Token: sv_..."`} lang="bash" />
         </div>
       </div>
     ),
@@ -895,11 +668,14 @@ squidcloud secrets init --project-id my-app --name "My App" --env production`} l
         <div>
           <h2 className="text-xl font-bold text-white mb-4">API Reference</h2>
           <p className="text-white/70 leading-relaxed mb-2">
-            All SquidVeil API endpoints are exposed through the SquidCloud API gateway. The base URL is:
+            Base URL:
           </p>
-          <CodeBlock code="https://<project>.supabase.co/functions/v1/cloudbliss-api" lang="bash" />
-          <p className="text-white/70 text-sm mb-6">
-            All requests require the <InlineCode>X-SquidCloud-Key</InlineCode> header with a valid API key.
+          <CodeBlock code="https://<project>.supabase.co/functions/v1/squidveil-api" lang="bash" />
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Authenticate with the <InlineCode>X-SquidVeil-Token: sv_&hellip;</InlineCode> header or{' '}
+            <InlineCode>Authorization: Bearer sv_&hellip;</InlineCode>. Errors return a JSON body of the form{' '}
+            <InlineCode>{'{'} "error": "...", "code": "INVALID_TOKEN", "success": false {'}'}</InlineCode>.
+            Request bodies are limited to 256 KB. The in-memory rate limit is 300 requests/minute per token.
           </p>
         </div>
 
@@ -907,193 +683,520 @@ squidcloud secrets init --project-id my-app --name "My App" --env production`} l
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
             <div className="flex items-center gap-3 mb-3">
               <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
-              <code className="text-white font-mono text-sm">/secrets</code>
+              <code className="text-white font-mono text-sm">/health</code>
             </div>
-            <p className="text-white/60 text-sm mb-3">List all secrets (names and metadata only — no values).</p>
-            <CodeBlock code={`curl -X GET https://<project>.supabase.co/functions/v1/cloudbliss-api/secrets \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY"
+            <p className="text-white/60 text-sm mb-3">Unauthenticated liveness probe.</p>
+            <CodeBlock code={`curl https://<project>.supabase.co/functions/v1/squidveil-api/health
 
-→ 200
-{
-  "secrets": [
-    {
-      "id": "uuid",
-      "name": "STRIPE_API_KEY",
-      "scope": null,
-      "storage_type": "res54",
-      "created_at": "2026-06-29T12:00:00Z",
-      "updated_at": "2026-06-29T12:00:00Z"
-    }
-  ],
-  "success": true
-}`} lang="bash" />
+→ 200 { "ok": true, "service": "squidveil-api", "version": 10 }`} lang="bash" />
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
             <div className="flex items-center gap-3 mb-3">
               <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
-              <code className="text-white font-mono text-sm">/secrets</code>
+              <code className="text-white font-mono text-sm">/v1/bootstrap</code>
             </div>
-            <p className="text-white/60 text-sm mb-3">Create a new secret. The value is encrypted with AES-256-GCM before storage.</p>
-            <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/cloudbliss-api/secrets \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+            <p className="text-white/60 text-sm mb-3">
+              Issue the first admin token for an owner with zero tokens. Requires a Supabase session JWT in the
+              Authorization header. Creates the <InlineCode>default</InlineCode> policy and a{' '}
+              <InlineCode>default-admin</InlineCode> token. Returns <InlineCode>409 ALREADY_BOOTSTRAPPED</InlineCode>{' '}
+              for owners who already have a token.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+              <code className="text-white font-mono text-sm">/rotate/due</code>
+            </div>
+            <p className="text-white/60 text-sm mb-3">
+              Internal scheduler endpoint. Authenticated via the <InlineCode>x-squidveil-cron-token</InlineCode>{' '}
+              header (compared against <InlineCode>system_config.internal_cron_token</InlineCode>). Rotates all
+              due scheduled rotations (auto-generated values) and purges expired secrets and VeilRefs.
+            </p>
+            <CodeBlock code={`→ 200 { "success": true, "rotated": 2, "purged": 5 }`} lang="bash" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Tokens (requires token_admin)</h3>
+          <div className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/tokens</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">List tokens (id, name, token_prefix, policies, created_at, expires_at, revoked_at, last_used_at). Raw values are never returned.</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/tokens</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">Create a token. Returns <InlineCode>raw_token</InlineCode> once.</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/tokens/:id/rotate</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">Invalidate the current value; issue a new raw token with the same identity. <InlineCode>409 REVOKED</InlineCode> for revoked tokens.</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/tokens/:id/revoke</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">Mark the token revoked. Revoked tokens are rejected with <InlineCode>401 REVOKED</InlineCode>.</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500/20 text-red-400">DELETE</span>
+                <code className="text-white font-mono text-sm">/v1/tokens/:id</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">Permanently delete a token.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Policies (requires policy_admin)</h3>
+          <div className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/policies</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">List policies.</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/policies</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Create a policy. <InlineCode>409 DUPLICATE</InlineCode> if the name exists. Rules must be a
+                non-empty array of <InlineCode>{'{'} path, capabilities[], effect {'}'}</InlineCode> with valid
+                capabilities.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-400">PUT</span>
+                <code className="text-white font-mono text-sm">/v1/policies/:id</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">Replace a policy&rsquo;s rules. Applies immediately to every token referencing it.</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500/20 text-red-400">DELETE</span>
+                <code className="text-white font-mono text-sm">/v1/policies/:id</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">Delete a policy.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Secrets</h3>
+          <div className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/secrets</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                List secrets (metadata only — never values), filtered by the token&rsquo;s policies (list or read
+                capability for active secrets; delete or list for deleted ones).
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Create a secret. Requires <InlineCode>write</InlineCode> on the name path. Name: 1&ndash;255
+                chars, letters/digits/underscore/dot/slash/hyphen, no leading or trailing slash, no double slash.
+              </p>
+              <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/secrets \\
+  -H "X-SquidVeil-Token: sv_..." \\
   -H "Content-Type: application/json" \\
-  -d '{"name": "STRIPE_API_KEY", "value": "sk_live_xxx"}'
+  -d '{
+    "name": "prod/api-key",
+    "value": "sk_live_xxx",
+    "secret_type": "opaque",
+    "description": "Production API key",
+    "labels": { "env": "prod", "team": "payments" },
+    "recovery_window_days": 7
+  }'`} lang="bash" />
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name?version=N</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Read a value. Returns the latest enabled version by default, or a specific version. Requires{' '}
+                <InlineCode>read</InlineCode>. Triggers lazy scheduled rotation if due. A version that is not
+                enabled returns <InlineCode>404 VERSION_UNAVAILABLE</InlineCode>.
+              </p>
+              <CodeBlock code={`→ 200
+{
+  "success": true,
+  "name": "prod/api-key",
+  "value": "sk_live_xxx",
+  "version": 3,
+  "created_at": "2026-08-01T12:00:00Z",
+  "secret_type": "opaque"
+}`} lang="bash" />
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Update a secret: pass <InlineCode>value</InlineCode> to create a new version,{' '}
+                <InlineCode>description</InlineCode> and/or <InlineCode>labels</InlineCode> to patch metadata, or
+                both. Requires <InlineCode>write</InlineCode>.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-500/20 text-red-400">DELETE</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Soft delete. Sets <InlineCode>deleted_at</InlineCode> and <InlineCode>delete_after</InlineCode>{' '}
+                (now + recovery window; immediately if the window is 0). Restorable via undelete until purged.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/rotate</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Create a new version with a fresh DEK. Value auto-generated unless provided. Updates the rotation
+                schedule&rsquo;s last/next timestamps. Requires <InlineCode>rotate</InlineCode>.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/rotation</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Read or configure the rotation schedule. GET returns enabled, interval_days, last_rotated_at,
+                next_rotation_at, source. POST accepts <InlineCode>enabled</InlineCode> and{' '}
+                <InlineCode>interval_days</InlineCode> (1&ndash;3650). Requires <InlineCode>rotate</InlineCode>.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/undelete</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">Restore a soft-deleted secret. Requires <InlineCode>write</InlineCode>.</p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/destroy</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Permanently delete a secret and all its versions. Requires <InlineCode>destroy</InlineCode>.
+                Irreversible.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/versions</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                List versions (newest first): version_number, state, created_by, created_at, destroyed_at, key_id.
+                Requires <InlineCode>versions</InlineCode> or <InlineCode>read</InlineCode>.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Versions (requires versions, or destroy)</h3>
+          <div className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/versions/:n/restore</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Re-encrypt the value of version <InlineCode>n</InlineCode> into a new version at the head.
+                Returns <InlineCode>{'{'} restored: true, from_version: n {'}'}</InlineCode>. Cannot restore a
+                DESTROYED version.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/versions/:n/disable</code>
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/versions/:n/enable</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Flip a version between ENABLED and DISABLED. DESTROYED versions cannot be changed.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/secrets/:name/versions/:n/destroy</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Permanently wipe a version: ciphertext and IV are zeroed, state becomes DESTROYED. Requires{' '}
+                <InlineCode>destroy</InlineCode>. Irreversible.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">VeilRefs (requires read on the secret)</h3>
+          <div className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/veilref</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">Issue a VeilRef for a specific version of a secret.</p>
+              <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/squidveil-api/v1/veilref \\
+  -H "X-SquidVeil-Token: sv_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "secret_name": "prod/api-key",
+    "ops_allowed": ["resolve"],
+    "ref_ttl": 300,
+    "max_uses": 1,
+    "version": 3,
+    "device_fingerprint": "node-7f93ab"
+  }'
 
 → 201
 {
-  "secret": {
-    "id": "uuid",
-    "name": "STRIPE_API_KEY",
-    "storage_type": "res54",
-    "created_at": "2026-06-29T12:00:00Z"
-  },
-  "success": true
+  "success": true,
+  "veil_ref_json": "{ \\"ref_id\\": \\"...\\", \\"secret_name\\": \\"prod/api-key\\", ... }",
+  "ref_id": "..."
 }`} lang="bash" />
-            <PropTable
-              columns={['Parameter', 'Type', 'Required', 'Description']}
-              rows={[
-                ['name', 'string', 'Yes', 'Secret name (must be unique per user)'],
-                ['value', 'string', 'Yes', 'Secret value (encrypted at rest)'],
-              ]}
-            />
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
-              <code className="text-white font-mono text-sm">/secrets/:name/verify</code>
+              <PropTable
+                columns={['Parameter', 'Type', 'Default', 'Description']}
+                rows={[
+                  ['secret_name', 'string', '—', 'Target secret'],
+                  ['ops_allowed', 'string[]', '["resolve"]', 'resolve and/or verify'],
+                  ['ref_ttl', 'int', '60', 'Seconds before expiry (5..86400)'],
+                  ['max_uses', 'int', '1', 'Total permitted uses (1..1000)'],
+                  ['version', 'int', 'latest', 'Pin to a specific enabled version'],
+                  ['device_fingerprint', 'string', '—', 'Binds the ref to a device (also accepted via X-SquidVeil-Device header)'],
+                ]}
+              />
             </div>
-            <p className="text-white/60 text-sm mb-3">
-              Verify a candidate value against the stored secret without exposing the real value. The server decrypts
-              the stored value and compares it to the candidate.
-            </p>
-            <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/cloudbliss-api/secrets/STRIPE_API_KEY/verify \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"value": "sk_live_xxx"}'
 
-→ 200
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/veilref/verify</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Verify a VeilRef&rsquo;s signature, expiry, and availability without revealing the value. Consumes
+                one use. Body: <InlineCode>{'{'} veil_ref_json: "..." {'}'}</InlineCode>.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+                <code className="text-white font-mono text-sm">/v1/veilref/resolve</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Resolve a VeilRef to the plaintext value. Consumes one use atomically; concurrent double-spend
+                attempts fail with <InlineCode>409 CONCURRENT_CONSUME</InlineCode>. For device-bound refs, send
+                the <InlineCode>X-SquidVeil-Device</InlineCode> header.
+              </p>
+              <CodeBlock code={`→ 200
 {
-  "matched": true,
-  "success": true
-}`} lang="bash" />
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
-              <code className="text-white font-mono text-sm">/squidshake/handshake</code>
-            </div>
-            <p className="text-white/60 text-sm mb-3">
-              Initiate a SquidShake session. Returns a session ID, server nonce, public key, and encrypted session key.
-              Required before issuing VeilRefs.
-            </p>
-            <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/cloudbliss-api/squidshake/handshake \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"device_fingerprint": "mac:aa:bb:cc:dd:ee:ff|host:my-machine", "session_nonce": "abc123", "project_id": "my-project"}'
-
-→ 200
-{
-  "version": "1.0",
-  "session_id": "uuid",
-  "server_nonce": "uuid",
-  "server_public_key": "squidshake_ed25519_...",
-  "encrypted_session_key": "hex...",
-  "success": true
-}`} lang="bash" />
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
-              <code className="text-white font-mono text-sm">/squidshake/ref</code>
-            </div>
-            <p className="text-white/60 text-sm mb-3">
-              Issue a VeilRef for a specific secret. Requires a valid session ID. Returns a signed VeilRef JSON blob.
-            </p>
-            <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/cloudbliss-api/squidshake/ref \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "session_id": "550e8400-...",
-    "secret_name": "STRIPE_API_KEY",
-    "device_fingerprint": "mac:aa:bb:cc:dd:ee:ff",
-    "ref_ttl": 60,
-    "max_uses": 1
-  }'
-
-→ 200
-{
-  "session_id": "550e8400-...",
-  "veil_ref_json": "{...serialized VeilRef...}",
-  "hmac": "ed25519$...",
-  "success": true
-}`} lang="bash" />
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
-              <code className="text-white font-mono text-sm">/squidshake/audit</code>
-            </div>
-            <p className="text-white/60 text-sm mb-3">Log an audit event for custom tracking.</p>
-            <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/cloudbliss-api/squidshake/audit \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"action": "custom_event", "project_id": "my-project", "secret_name": "STRIPE_API_KEY", "success": true}'
-
-→ 200 { "success": true }`} lang="bash" />
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
-              <code className="text-white font-mono text-sm">/veilref/verify</code>
-            </div>
-            <p className="text-white/60 text-sm mb-3">
-              Verify a VeilRef's integrity, expiry, and HMAC signature without resolving the secret value.
-            </p>
-            <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/cloudbliss-api/veilref/verify \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"veil_ref_json": "{...serialized VeilRef..."}'
-
-→ 200
-{
-  "verified": true,
-  "secret_name": "STRIPE_API_KEY",
-  "success": true
-}`} lang="bash" />
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
-              <code className="text-white font-mono text-sm">/veilref/resolve</code>
-            </div>
-            <p className="text-white/60 text-sm mb-3">
-              Resolve a valid, unexpired VeilRef to its actual secret value. This is the only endpoint that returns
-              the plaintext secret.
-            </p>
-            <CodeBlock code={`curl -X POST https://<project>.supabase.co/functions/v1/cloudbliss-api/veilref/resolve \\
-  -H "X-SquidCloud-Key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"veil_ref_json": "{...serialized VeilRef..."}'
-
-→ 200
-{
+  "success": true,
   "value": "sk_live_xxx",
-  "secret_name": "STRIPE_API_KEY",
-  "success": true
+  "secret_name": "prod/api-key",
+  "version_number": 3
 }`} lang="bash" />
-            <InfoBox variant="warning">
-              Only use <InlineCode>/veilref/resolve</InlineCode> at the exact moment you need the value. Do not store
-              the resolved value. The endpoint respects TTL and device binding — a ref resolved from a different device
-              or after expiry returns an error.
-            </InfoBox>
+              <InfoBox variant="warning">
+                VeilRef failures return: <InlineCode>NOT_FOUND</InlineCode>, <InlineCode>EXPIRED</InlineCode>,{' '}
+                <InlineCode>CONSUMED</InlineCode>, <InlineCode>BAD_SIGNATURE</InlineCode>,{' '}
+                <InlineCode>OP_NOT_ALLOWED</InlineCode>, <InlineCode>DEVICE_MISMATCH</InlineCode>,{' '}
+                <InlineCode>SECRET_GONE</InlineCode>, <InlineCode>VERSION_UNAVAILABLE</InlineCode>,{' '}
+                <InlineCode>CONCURRENT_CONSUME</InlineCode>.
+              </InfoBox>
+            </div>
           </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Audit (requires audit)</h3>
+          <div className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/audit?action=&amp;path=&amp;actor=&amp;from=&amp;to=&amp;limit=&amp;offset=</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Query the owner&rsquo;s audit entries, newest first. <InlineCode>path</InlineCode> is a
+                case-insensitive substring filter; <InlineCode>limit</InlineCode> defaults to 50 (max 200);{' '}
+                <InlineCode>from</InlineCode>/<InlineCode>to</InlineCode> are ISO timestamps.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/audit/verify</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Replay the entire HMAC chain and report integrity:
+              </p>
+              <CodeBlock code={`→ 200 { "success": true, "valid": true, "checked": 58, "last_seq": 69 }`} lang="bash" />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Stats &amp; Monitor (requires audit)</h3>
+          <div className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/stats?days=30&amp;top=10</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                Usage analytics derived from the audit log. <InlineCode>days</InlineCode> 1&ndash;365 (default
+                30); <InlineCode>top</InlineCode> 1&ndash;50 (default 10). The activity array is zero-filled so
+                charts are continuous.
+              </p>
+              <CodeBlock code={`→ 200
+{
+  "success": true,
+  "days": 30,
+  "totals": {
+    "reads": 42, "writes": 7,
+    "veilrefs_issued": 3, "veilrefs_resolved": 3, "veilrefs_verified": 0,
+    "rotations": 2, "failed_auth": 5
+  },
+  "top_secrets": [ { "name": "prod/api-key", "count": 30 } ],
+  "top_writes": [ { "name": "prod/api-key", "count": 4 } ],
+  "reads_by_token": [ { "token_id": "uuid", "token_name": "app-server", "count": 30 } ],
+  "activity": [
+    { "day": "2026-07-02", "reads": 0, "writes": 0, "veilrefs": 0, "rotations": 0 },
+    { "day": "2026-07-03", "reads": 4, "writes": 1, "veilrefs": 0, "rotations": 0 }
+  ]
+}`} lang="bash" />
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400">GET</span>
+                <code className="text-white font-mono text-sm">/v1/monitor</code>
+              </div>
+              <p className="text-white/60 text-sm mb-3">
+                One-shot health and security posture: audit chain verification, token/secret counts, rotation
+                posture, 24h activity, the 10 most recent failed authentication attempts (global, with IP and
+                user agent), and the 25 most recent owner events.
+              </p>
+              <CodeBlock code={`→ 200
+{
+  "success": true,
+  "generated_at": "2026-08-01T12:00:00Z",
+  "audit": { "valid": true, "checked": 58, "last_seq": 69 },
+  "tokens": { "total": 2, "active": 1, "revoked": 1, "expired": 0 },
+  "secrets": {
+    "total": 4,
+    "pending_purge": [ { "name": "old/thing", "purge_at": "..." } ],
+    "rotation_enabled": 1,
+    "rotation_due": []
+  },
+  "activity_24h": { "reads": 3, "writes": 1, "veilrefs": 0, "rotations": 0, "failed_auth": 2 },
+  "recent_failed_auth": [ { "seq": 71, "action": "auth.failed", "detail": "INVALID_TOKEN", "path": "auth", "ip": "203.0.113.7", "user_agent": "curl/8.0", "created_at": "..." } ],
+  "recent_events": [ { "seq": 70, "action": "secret.read", "path": "prod/api-key", "success": true, "ip": null, "created_at": "..." } ]
+}`} lang="bash" />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Keys</h3>
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400">POST</span>
+              <code className="text-white font-mono text-sm">/v1/keys/rotate</code>
+            </div>
+            <p className="text-white/60 text-sm mb-3">
+              Re-encrypt (re-wrap) every active DEK with the current master key. Use after changing{' '}
+              <InlineCode>SQUIDVEIL_MASTER_KEY</InlineCode>. Requires <InlineCode>write</InlineCode> on{' '}
+              <InlineCode>*</InlineCode>. Client-encrypted (BYOK) rows are skipped.
+            </p>
+            <CodeBlock code={`→ 200 { "success": true, "rewrapped": 6 }`} lang="bash" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Error Codes</h3>
+          <PropTable
+            columns={['Code', 'HTTP', 'Meaning']}
+            rows={[
+              ['UNAUTHORIZED', '401', 'Missing token or Supabase JWT'],
+              ['INVALID_TOKEN', '401', 'Token hash not found'],
+              ['REVOKED', '401 / 409', 'Token revoked (auth reject / rotate attempt)'],
+              ['EXPIRED', '401', 'Token or VeilRef expired'],
+              ['RATE_LIMITED', '429', 'Over 300 requests/min per token'],
+              ['FORBIDDEN', '403', 'Missing capability for this path'],
+              ['NOT_FOUND', '404', 'Resource not found'],
+              ['DUPLICATE', '409', 'Secret or policy name already exists'],
+              ['ALREADY_BOOTSTRAPPED', '409', 'Owner already has a token'],
+              ['ALREADY_DELETED', '409', 'Secret is already soft-deleted'],
+              ['DESTROYED', '409', 'Version is destroyed and immutable'],
+              ['CONSUMED', '401', 'VeilRef use limit reached'],
+              ['BAD_SIGNATURE', '401', 'VeilRef HMAC invalid (tampered)'],
+              ['OP_NOT_ALLOWED', '401', 'Operation not in ops_allowed'],
+              ['DEVICE_MISMATCH', '401', 'Device binding mismatch'],
+              ['CONCURRENT_CONSUME', '409', 'VeilRef raced another consumer'],
+              ['VERSION_UNAVAILABLE', '404 / 409', 'Requested version not enabled'],
+              ['NO_VERSION', '404', 'Secret has no enabled versions'],
+              ['SECRET_GONE', '404', 'Secret deleted since issuance'],
+              ['INVALID_NAME', '400', 'Invalid secret/policy/token name'],
+              ['INVALID_VALUE', '400', 'Missing secret value'],
+              ['INVALID_TYPE', '400', 'Unknown secret_type'],
+              ['INVALID_TTL', '400', 'expires_in_seconds / ref_ttl out of range'],
+              ['INVALID_USES', '400', 'max_uses out of range'],
+              ['INVALID_OPS', '400', 'ops_allowed empty'],
+              ['INVALID_VERSION', '400', 'Version parameter not a positive integer'],
+              ['INVALID_WINDOW', '400', 'recovery_window_days out of range'],
+              ['INVALID_INTERVAL', '400', 'interval_days out of range'],
+              ['INVALID_LABELS', '400', 'labels must be an object of strings'],
+              ['INVALID_RULES', '400', 'Policy rules malformed'],
+              ['INVALID_BODY', '400', 'Body has neither value nor metadata'],
+              ['INVALID_JSON', '400', 'Malformed JSON body or VeilRef'],
+              ['BODY_TOO_LARGE', '413', 'Body exceeds 256 KB'],
+              ['DECRYPT_FAILED', '500', 'Value could not be decrypted'],
+              ['DB_ERROR', '500', 'Database failure'],
+              ['INTERNAL', '500', 'Unhandled error'],
+            ]}
+          />
         </div>
       </div>
     ),
@@ -1107,176 +1210,122 @@ squidcloud secrets init --project-id my-app --name "My App" --env production`} l
         <div>
           <h2 className="text-xl font-bold text-white mb-4">Language Support</h2>
           <p className="text-white/70 leading-relaxed mb-6">
-            SquidVeil provides native SDKs for all major programming languages. Each SDK handles SquidShake handshake,
-            VeilRef management, and secret resolution automatically.
+            Official SDKs wrap the REST API with retries (jittered backoff on 429/5xx), optional TTL caching,
+            typed errors with stable codes, and device-fingerprint support for VeilRefs. All SDKs read{' '}
+            <InlineCode>SQUIDVEIL_URL</InlineCode> and <InlineCode>SQUIDVEIL_TOKEN</InlineCode>.
           </p>
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">Python</h3>
           <p className="text-white/70 text-sm mb-2">
-            Install via pip and import <InlineCode>squidveil</InlineCode>. The SDK auto-detects <InlineCode>.squidveil</InlineCode>
-            in the project root and reads the API key from <InlineCode>SQUIDCLOUD_API_KEY</InlineCode> environment variable.
+            Zero runtime dependencies. Install from PyPI (<InlineCode>squidveil</InlineCode> 0.1.0).
           </p>
           <CodeBlock code={`pip install squidveil`} lang="bash" />
-          <CodeBlock code={`import squidveil
+          <CodeBlock code={`from squidveil import SquidVeilClient
 
-# Get a secret value (handles handshake + ref issuance + resolve)
-api_key = squidveil.get("STRIPE_API_KEY")
-print(f"Connected to Stripe: {len(api_key) > 0}")
+client = SquidVeilClient.from_env()  # SQUIDVEIL_URL + SQUIDVEIL_TOKEN
 
-# Verify without exposing
-is_match = squidveil.verify("STRIPE_API_KEY", "sk_test_xxx")
-print(f"Key matches: {is_match}")
+secret = client.get_secret("prod/db-password", cache_ttl=60)
+print(secret.value)                   # in memory only, never logged
 
-# List all secrets
-secrets = squidveil.list()
-for s in secrets:
-    print(f"  {s['name']} (created: {s['created_at']})")
+# VeilRef handoff: consumer gets the JSON, resolves it once
+ref = client.issue_veilref("prod/db-password", max_uses=1, ref_ttl=300)
+resolved = client.resolve_veilref(ref.json)
+print(resolved.value)
 
-# Audit log
-audit = squidveil.audit(secret="STRIPE_API_KEY")
-for entry in audit:
-    print(f"  [{entry['action']}] {entry['timestamp']}")`} lang="python" />
+# Admin surface
+client.create_secret("prod/api-key", "sk_live_xxx", description="API key")
+client.rotate_secret("prod/api-key")          # auto-generated value
+client.configure_rotation("prod/api-key", enabled=True, interval_days=30)
+status = client.audit_verify()
+print("audit chain valid:", status.valid)`} lang="python" />
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">JavaScript / TypeScript</h3>
           <p className="text-white/70 text-sm mb-2">
-            The Node.js SDK supports both CommonJS and ESM. It uses the same API key discovery mechanism and
-            automatically manages SquidShake sessions.
+            Package <InlineCode>@squidcloud-kodai/squidveil-js</InlineCode> (0.1.1), Node and browser compatible.
           </p>
-          <CodeBlock code={`npm install squidveil-wasm`} lang="bash" />
-          <CodeBlock code={`const squidveil = require('squidveil');
+          <CodeBlock code={`npm install @squidcloud-kodai/squidveil-js`} lang="bash" />
+          <CodeBlock code={`import { SquidVeilClient } from '@squidcloud-kodai/squidveil-js';
 
-// Get a secret
-const apiKey = await squidveil.get('STRIPE_API_KEY');
-console.log('Resolved secret:', apiKey.substring(0, 4) + '...');
-
-// Verify a candidate
-const match = await squidveil.verify('STRIPE_API_KEY', 'sk_test_xxx');
-console.log('Match:', match);
-
-// List all secrets
-const secrets = await squidveil.list();
-console.log(\`\${secrets.length} secrets found\`);
-
-// Export as dotenv
-const env = await squidveil.export({ format: 'dotenv' });
-console.log(env);`} lang="javascript" />
-          <CodeBlock code={`import { SquidVeil } from 'squidveil';
-
-const sv = new SquidVeil({
-  apiKey: process.env.SQUIDCLOUD_API_KEY,
-  configPath: './.squidveil',
+const client = new SquidVeilClient({
+  url: process.env.SQUIDVEIL_URL,
+  token: process.env.SQUIDVEIL_TOKEN,
+  cacheTtlMs: 60_000,
 });
 
-const dbUrl = await sv.get('DATABASE_URL');
-console.log('DB URL:', dbUrl);`} lang="typescript" />
+const secret = await client.getSecret('prod/db-password');
+console.log('resolved version', secret.version);
+
+const ref = await client.issueVeilRef('prod/db-password', {
+  maxUses: 1,
+  refTtl: 300,
+  opsAllowed: ['resolve'],
+});
+const resolved = await client.resolveVeilRef(ref.json);
+
+await client.createSecret('prod/api-key', 'sk_live_xxx', { secretType: 'opaque', description: 'API key' });
+await client.rotateSecret('prod/api-key');
+await client.configureRotation('prod/api-key', true, 30);
+await client.softDelete('old/thing');
+const audit = await client.auditVerify();
+console.log('audit chain valid:', audit.valid);`} lang="typescript" />
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">Go</h3>
           <p className="text-white/70 text-sm mb-2">
-            The Go SDK provides a simple <InlineCode>squidveil.Get()</InlineCode> function that handles the full
-            lifecycle. Session state is managed internally.
+            Standard library only. Module path <InlineCode>squidveil.vercel.app/squidveil-go</InlineCode>,
+            served from the SquidVeil Go module proxy.
           </p>
-          <CodeBlock code={`go get github.com/squidcloud/squidveil-go`} lang="bash" />
+          <CodeBlock code={`export GOPROXY=https://squidveil.vercel.app,https://proxy.golang.org,direct
+export GONOSUMDB=squidveil.vercel.app
+go get squidveil.vercel.app/squidveil-go`} lang="bash" />
           <CodeBlock code={`package main
 
 import (
+    "context"
     "fmt"
-    "log"
-    squidveil "github.com/squidcloud/squidveil-go"
+    "time"
+    squidveil "squidveil.vercel.app/squidveil-go"
 )
 
 func main() {
-    client := squidveil.NewClient(squidveil.ClientConfig{
-        APIKey: os.Getenv("SQUIDCLOUD_API_KEY"),
+    ctx := context.Background()
+    client, err := squidveil.NewFromEnv(squidveil.WithCacheTTL(60 * time.Second))
+    if err != nil {
+        panic(err)
+    }
+
+    secret, err := client.GetSecret(ctx, "prod/db-password")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("resolved version", secret.Version)
+
+    ref, err := client.IssueVeilRef(ctx, "prod/db-password", squidveil.VeilRefIssueOptions{
+        MaxUses: 1, RefTTL: 300, OpsAllowed: []string{"resolve"},
     })
-
-    // Get a secret
-    value, err := client.Get("STRIPE_API_KEY")
     if err != nil {
-        log.Fatal(err)
+        panic(err)
     }
-    fmt.Printf("Secret resolved: %s\\n", value[:4]+"...")
-
-    // Verify without exposing
-    match, err := client.Verify("STRIPE_API_KEY", "sk_test_xxx")
+    resolved, err := client.ResolveVeilRef(ctx, ref.JSON)
     if err != nil {
-        log.Fatal(err)
+        panic(err)
     }
-    fmt.Printf("Match: %v\\n", match)
+    fmt.Println(resolved.Value)
 }`} lang="go" />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">PHP</h3>
-          <p className="text-white/70 text-sm mb-2">
-            The PHP SDK provides a class-based interface with magic property access for convenience.
-          </p>
-          <CodeBlock code={`composer require squidcloud/squidveil-php`} lang="bash" />
-          <CodeBlock code={`<?php
-require_once 'vendor/autoload.php';
-
-use SquidCloud\\SquidVeil\\Client;
-
-$squidveil = new Client([
-    'api_key' => getenv('SQUIDCLOUD_API_KEY'),
-    'config' => '.squidveil',
-]);
-
-// Magic property access
-$apiKey = $squidveil->STRIPE_API_KEY;
-echo "Key: " . substr($apiKey, 0, 4) . "...\\n";
-
-// Verify
-$match = $squidveil->verify('STRIPE_API_KEY', 'sk_test_xxx');
-echo $match ? "Match!\\n" : "No match\\n";
-
-// List
-$secrets = $squidveil->list();
-foreach ($secrets as $s) {
-    echo "{$s['name']} ({$s['created_at']})\\n";
-}`} lang="php" />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">C</h3>
-          <p className="text-white/70 text-sm mb-2">
-            The C SDK is a lightweight library suitable for embedded systems and performance-critical applications.
-            It uses synchronous I/O and static allocation.
-          </p>
-          <CodeBlock code={`#include <squidveil.h>
-#include <stdio.h>
-
-int main() {
-    squidveil_client_t *client = squidveil_init(
-        getenv("SQUIDCLOUD_API_KEY"),
-        ".squidveil"
-    );
-    if (!client) {
-        fprintf(stderr, "Failed to initialize SquidVeil\\n");
-        return 1;
+          <p className="text-white/70 text-sm mt-2 mb-1">Typed errors with stable codes:</p>
+          <CodeBlock code={`if err != nil {
+    switch {
+    case squidveil.IsVeilRefConsumed(err): // CONSUMED
+    case squidveil.IsNotFound(err):        // NOT_FOUND
+    case squidveil.IsPermission(err):      // FORBIDDEN
+    case squidveil.IsRateLimited(err):     // RATE_LIMITED
     }
-
-    // Get a secret
-    char *value = NULL;
-    int ret = squidveil_get(client, "STRIPE_API_KEY", &value);
-    if (ret == 0 && value) {
-        printf("Key: %.4s...\\n", value);
-        free(value);
-    }
-
-    // Verify
-    bool match = false;
-    squidveil_verify(client, "STRIPE_API_KEY", "sk_test_xxx", &match);
-    printf("Match: %s\\n", match ? "true" : "false");
-
-    squidveil_destroy(client);
-    return 0;
-}`} lang="c" />
+}`} lang="go" />
         </div>
       </div>
     ),
@@ -1289,153 +1338,86 @@ int main() {
       <div className="space-y-8">
         <div>
           <h2 className="text-xl font-bold text-white mb-4">Security Model</h2>
-          <p className="text-white/70 leading-relaxed mb-6">
-            SquidVeil is built with a defense-in-depth approach. Every layer of the system is designed to minimize
-            the blast radius of a compromise, make exfiltration detectable, and ensure that no single breach exposes
-            secrets.
+          <p className="text-white/70 leading-relaxed mb-4">
+            SquidVeil&rsquo;s guarantees rest on defense in depth: the master key never leaves the function
+            runtime, plaintext secrets are only ever produced in response to authorized reads, the audit log
+            cannot be rewritten unnoticed, and access tokens are not usable even if the database is dumped.
           </p>
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">Threat Model</h3>
-          <div className="overflow-x-auto rounded-lg border border-white/10 mb-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-white/5 border-b border-white/10">
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Threat</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Impact</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Mitigation</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">Database compromise</td>
-                  <td className="px-4 py-2.5 text-white/50">Attacker gains access to <InlineCode>squid_vault_secrets</InlineCode></td>
-                  <td className="px-4 py-2.5 text-white/80">Values are AES-256-GCM encrypted; key is derived from API key, not stored</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">API key leak</td>
-                  <td className="px-4 py-2.5 text-white/50">Attacker can decrypt secrets</td>
-                  <td className="px-4 py-2.5 text-white/80">Short-lived sessions, device binding, VeilRef TTL limits blast radius</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">GitHub repo compromise</td>
-                  <td className="px-4 py-2.5 text-white/50">RES54 chunks exposed</td>
-                  <td className="px-4 py-2.5 text-white/80">Chunks are encrypted; no key material on GitHub; chunks are versioned JSON without secrets</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">Insider threat</td>
-                  <td className="px-4 py-2.5 text-white/50">Operator views secrets</td>
-                  <td className="px-4 py-2.5 text-white/80">Zero-exposure architecture: dashboard never shows values; every access is audited</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">Replay attack</td>
-                  <td className="px-4 py-2.5 text-white/50">Captured VeilRef reused</td>
-                  <td className="px-4 py-2.5 text-white/80">Device binding, single-use default, HMAC integrity check, TTL enforcement</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-white/70">Log leakage</td>
-                  <td className="px-4 py-2.5 text-white/50">Secret appears in logs</td>
-                  <td className="px-4 py-2.5 text-white/80">Secrets never appear in API responses; <InlineCode>allow_print</InlineCode> is false by default</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <PropTable
+            columns={['Threat', 'Mitigation']}
+            rows={[
+              ['Database dump / leaked backups', 'Values are AES-256-GCM ciphertext under wrapped DEKs; tokens are peppered hashes only'],
+              ['Stolen sv_ token', 'Policies bound capabilities to paths; expiry and revocation; rotate at any time'],
+              ['Compromised edge-function instance', 'Master key stays in function env; keys/rotate rewraps DEKs after rotation'],
+              ['Insider rewriting audit rows', 'HMAC chain: any insertion/deletion/reordering breaks entry_hash linkage'],
+              ['VeilRef replay / theft', 'Single-use atomic consumption, TTL, optional device binding, HMAC signature'],
+              ['Token brute force', 'SHA-256 peppered hashes, 300 req/min rate limit, failed attempts recorded with IP/UA'],
+              ['Direct PostgREST access', 'RLS enabled on every table, owner-scoped policies'],
+            ]}
+          />
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Attack Surface Analysis</h3>
-          <div className="grid gap-4">
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white text-sm font-semibold mb-2">API Gateway</h4>
-              <p className="text-white/60 text-sm leading-relaxed">
-                All endpoints require a valid API key in the <InlineCode>X-SquidCloud-Key</InlineCode> header.
-                The key is verified against the <InlineCode>api_keys</InlineCode> table with active status checks.
-                Rate limiting is enforced at the gateway level (10,000 req/hour standard tier).
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white text-sm font-semibold mb-2">SquidShake Sessions</h4>
-              <p className="text-white/60 text-sm leading-relaxed">
-                Sessions expire after 1 hour. Each session is bound to a device fingerprint computed via SHA-256.
-                The session key is randomly generated and stored only in the <InlineCode>squidveil_sessions</InlineCode>
-                table. Expired sessions are automatically pruned.
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white text-sm font-semibold mb-2">VeilRef Management</h4>
-              <p className="text-white/60 text-sm leading-relaxed">
-                VeilRefs are stored in <InlineCode>squidveil_refs</InlineCode> with the full JSON blob and expiry.
-                The HMAC signature prevents forgery. The resolve endpoint increments a use counter; exhausted refs
-                are rejected.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Memory Protection</h3>
-          <p className="text-white/70 text-sm leading-relaxed mb-4">
-            The SquidVeil daemon implements several memory protection mechanisms to prevent secret leakage:
-          </p>
-          <ul className="space-y-2 text-white/70 text-sm">
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">mlock() / VirtualLock:</strong> Pages containing secret data are locked into RAM to prevent swapping to disk.</span>
+          <h3 className="text-lg font-semibold text-white mb-3">Key Management</h3>
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li>
+              <InlineCode>SQUIDVEIL_MASTER_KEY</InlineCode> should be a 64-hex-character random value set as a
+              function secret. Never put it in client code.
             </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Core dump exclusion:</strong> The daemon sets <InlineCode>PR_SET_DUMPABLE=0</InlineCode> (Linux) and registers <InlineCode>MADV_DONTDUMP</InlineCode> on secret memory regions.</span>
+            <li>
+              Rotating the master key requires two steps: update the environment, then call{' '}
+              <InlineCode>POST /v1/keys/rotate</InlineCode> to re-wrap all DEKs. Until then, old DEKs stay
+              wrapped with the old key.
             </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Immediate zeroization:</strong> After a secret is used, the buffer is overwritten with zeros before <InlineCode>free()</InlineCode>.</span>
+            <li>
+              Each secret rotation also rolls its DEK (<InlineCode>dek-&lt;secretId&gt;-v&lt;ts&gt;</InlineCode>),
+              so old versions are not readable with the new key.
             </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Compiler hardening:</strong> Binaries are compiled with <InlineCode>-fstack-protector-strong</InlineCode>, <InlineCode>-D_FORTIFY_SOURCE=2</InlineCode>, and PIE.</span>
+            <li>
+              Versions migrated from the legacy CloudBliss vault were keyed with the retired API key and are
+              marked <InlineCode>DESTROYED</InlineCode>; they are unrecoverable and must be rotated to create a
+              new value.
             </li>
           </ul>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Supply Chain Security</h3>
-          <p className="text-white/70 text-sm leading-relaxed mb-4">
-            All SquidVeil SDK packages are:
+          <h3 className="text-lg font-semibold text-white mb-3">Audit Integrity</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            Entries are chained by construction: <InlineCode>entry_hash = HMAC(auditKey, prev_hash +
+            canonical)</InlineCode>, with <InlineCode>seq</InlineCode> from a Postgres sequence. Verifying the
+            chain replays every entry and recomputes each hash; any modification, deletion, or reordering fails
+            verification with the offending <InlineCode>seq</InlineCode>. The audit key is derived from the
+            master key, so it rotates with it. Failed logins are logged globally (actor
+            <InlineCode>unknown</InlineCode> for unknown tokens) with IP and user agent so brute-force campaigns
+            are visible in the monitor.
           </p>
-          <ul className="space-y-2 text-white/70 text-sm">
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>Signed with Sigstore (cosign) for npm/PyPI/Go packages</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>Built with reproducible builds (SLSA Level 3 target)</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>Published with locked dependency trees (<InlineCode>npm shrinkwrap</InlineCode>, <InlineCode>go.sum</InlineCode>)</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>Scanned for CVEs on every release via Snyk and Dependabot</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span>Audited by a third-party security firm annually</span>
-            </li>
-          </ul>
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white mb-3">Insider Threat Mitigation</h3>
-          <p className="text-white/70 text-sm leading-relaxed">
-            SquidVeil's zero-exposure architecture inherently protects against insider threats. Since secrets are
-            never returned in API responses, even a SquidCloud administrator with database access cannot see the
-            plaintext values — they only see AES-256-GCM ciphertext. The VeilRef system ensures that even with a
-            valid API key, secret access is scoped to specific devices, time windows, and operations. Every access
-            attempt (successful or failed) is logged to the immutable <InlineCode>squidveil_audit_log</InlineCode> table.
+          <h3 className="text-lg font-semibold text-white mb-3">VeilRef Security</h3>
+          <p className="text-white/70 text-sm leading-relaxed mb-2">
+            A VeilRef is a signed capability token: the HMAC is recomputed server-side from stored fields, and
+            the canonical serialization is pinned to <InlineCode>ref_id</InlineCode>, secret, version, expiry,
+            use limits, and device binding. Consumption is a conditional UPDATE on{' '}
+            <InlineCode>use_count_used</InlineCode>, so two racing consumers cannot both spend the last use.
+            <InlineCode>ops_allowed</InlineCode> restricts whether a ref can even read the value — a
+            verify-only ref never touches plaintext.
           </p>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Operational Notes</h3>
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li>Rate limiting is per edge instance (in-memory), not a global counter.</li>
+            <li>Audit writes are best-effort: a failure never breaks the primary operation.</li>
+            <li>Raw tokens are returned once and never logged; SDKs redact tokens in string representations.</li>
+            <li>Body size is capped at 256 KB and JSON is strictly parsed.</li>
+          </ul>
         </div>
       </div>
     ),
@@ -1448,167 +1430,81 @@ int main() {
       <div className="space-y-8">
         <div>
           <h2 className="text-xl font-bold text-white mb-4">Best Practices</h2>
-          <p className="text-white/70 leading-relaxed mb-6">
-            Follow these guidelines to get the most out of SquidVeil while maintaining a strong security posture.
-          </p>
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">Naming Conventions</h3>
-          <p className="text-white/70 text-sm mb-4">
-            Consistent naming makes secrets easier to manage and audit:
-          </p>
-          <ul className="space-y-2 text-white/70 text-sm">
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Uppercase snake_case:</strong> <InlineCode>STRIPE_API_KEY</InlineCode>, <InlineCode>DATABASE_URL</InlineCode>, <InlineCode>GITHUB_TOKEN</InlineCode></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Prefix with service:</strong> <InlineCode>STRIPE_*</InlineCode>, <InlineCode>AWS_*</InlineCode>, <InlineCode>DB_*</InlineCode></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Suffix with type:</strong> <InlineCode>*_KEY</InlineCode>, <InlineCode>*_URL</InlineCode>, <InlineCode>*_TOKEN</InlineCode>, <InlineCode>*_SECRET</InlineCode></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Avoid abbreviations:</strong> Use <InlineCode>DATABASE_URL</InlineCode> instead of <InlineCode>DB_URL</InlineCode></span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Use environment suffix:</strong> <InlineCode>STRIPE_API_KEY_PROD</InlineCode>, <InlineCode>STRIPE_API_KEY_STAGING</InlineCode></span>
-            </li>
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li>Use path-like names for environments and domains: <InlineCode>prod/db-password</InlineCode>,{' '}
+            <InlineCode>staging/api-key</InlineCode>.</li>
+            <li>Names may only contain letters, digits, <InlineCode>_ . / -</InlineCode>, and must not start or
+            end with <InlineCode>/</InlineCode>.</li>
+            <li>Add <InlineCode>labels</InlineCode> (env, team, rotation-owner) and a description for
+            discoverability.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-3">Least Privilege</h3>
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li>One token per workload, named after the workload, with policies scoped to the paths it touches.</li>
+            <li>Deny first: block <InlineCode>prod/*</InlineCode> secrets from staging tokens with an explicit
+            deny rule, then allow specific paths.</li>
+            <li>Give <InlineCode>token_admin</InlineCode>, <InlineCode>policy_admin</InlineCode>,{' '}
+            <InlineCode>destroy</InlineCode>, and <InlineCode>audit</InlineCode> only to administrative tokens.</li>
+            <li>Prefer short-lived tokens (<InlineCode>expires_in_seconds</InlineCode>) in CI/CD; rotate on every
+            pipeline run.</li>
           </ul>
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">Rotation Strategy</h3>
-          <p className="text-white/70 text-sm mb-4">
-            Regular secret rotation limits the window of exposure if a secret is compromised:
-          </p>
-          <div className="overflow-x-auto rounded-lg border border-white/10 mb-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-white/5 border-b border-white/10">
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Secret Type</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Recommended Rotation</th>
-                  <th className="text-left px-4 py-2.5 text-white/60 text-xs uppercase tracking-wider">Method</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                <tr><td className="px-4 py-2.5 text-white/70">API keys</td><td className="px-4 py-2.5 text-white/50">90 days</td><td className="px-4 py-2.5 text-white/80">Create new, update clients, delete old</td></tr>
-                <tr><td className="px-4 py-2.5 text-white/70">Database credentials</td><td className="px-4 py-2.5 text-white/50">180 days</td><td className="px-4 py-2.5 text-white/80">Rotation via CI/CD pipeline</td></tr>
-                <tr><td className="px-4 py-2.5 text-white/70">OAuth tokens</td><td className="px-4 py-2.5 text-white/50">At provider's expiry</td><td className="px-4 py-2.5 text-white/80">Refresh token flow</td></tr>
-                <tr><td className="px-4 py-2.5 text-white/70">Encryption keys</td><td className="px-4 py-2.5 text-white/50">1 year</td><td className="px-4 py-2.5 text-white/80">Re-encrypt data with new key</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <InfoBox variant="tip">
-            Use <InlineCode>squidcloud secrets verify</InlineCode> in your CI/CD pipeline to check that secrets haven't
-            been rotated by another team member before deploying.
-          </InfoBox>
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li>Enable scheduled rotation (<InlineCode>POST /v1/secrets/:name/rotation</InlineCode>) for high-risk
+            credentials; set <InlineCode>interval_days</InlineCode> by sensitivity (e.g. 7 for API keys, 90 for
+            certs).</li>
+            <li>Wire <InlineCode>POST /rotate/due</InlineCode> to pg_cron with the internal cron token; it also
+            purges expired secrets and VeilRefs.</li>
+            <li>Consumers must re-resolve after rotation — versions are immutable, so old values keep working
+            only while their versions exist. Rotating a token invalidates the old value immediately.</li>
+          </ul>
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">Audit Monitoring</h3>
-          <p className="text-white/70 text-sm leading-relaxed">
-            Regularly review the audit log for anomalous patterns:
-          </p>
-          <ul className="space-y-2 text-white/70 text-sm mt-3">
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Unexpected verify failures:</strong> Multiple failed verifications from the same device may indicate a brute-force attempt.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Off-hours access:</strong> Secret resolves outside business hours from unfamiliar IP ranges.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">High-frequency resolves:</strong> A single secret being resolved dozens of times per minute may indicate a compromised client.</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-[#4FC3F7] mt-1.5">&#9679;</span>
-              <span><strong className="text-white/90">Deleted secrets:</strong> Unexpected deletions should trigger an incident response.</span>
-            </li>
+          <ul className="list-disc pl-5 space-y-1.5 text-white/70 text-sm">
+            <li>Alert on <InlineCode>monitor.recent_failed_auth</InlineCode> entries and spikes in{' '}
+            <InlineCode>totals.failed_auth</InlineCode>.</li>
+            <li>Run <InlineCode>GET /v1/audit/verify</InlineCode> on a schedule (e.g. daily) and alert when{' '}
+            <InlineCode>valid</InlineCode> is false.</li>
+            <li>Review <InlineCode>GET /v1/stats?days=90&amp;top=20</InlineCode> for unexpected read patterns.</li>
+            <li>Watch <InlineCode>monitor.secrets.rotation_due</InlineCode> if the scheduler is down.</li>
           </ul>
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">CI/CD Integration</h3>
-          <p className="text-white/70 text-sm mb-4">
-            Integrate SquidVeil into your CI/CD pipeline using the following pattern:
-          </p>
-          <CodeBlock code={`# .github/workflows/deploy.yml
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install SquidVeil
-        run: npm install -g squidcloudctl
-
-      - name: Verify secrets exist
-        run: |
-          squidcloud secrets list \\
-            --output json \\
-            --env production
-
-      - name: Verify specific secret
-        env:
-          SQUIDCLOUD_API_KEY: \${{ secrets.SQUIDCLOUD_API_KEY }}
-        run: |
-          squidcloud secrets verify DATABASE_URL \\
-            --value "\${{ secrets.EXPECTED_DB_URL }}"
-
-      - name: Export secrets for deployment
-        env:
-          SQUIDCLOUD_API_KEY: \${{ secrets.SQUIDCLOUD_API_KEY }}
-        run: |
-          squidcloud secrets export \\
-            --format dotenv \\
-            --output .env.production
-
-      - name: Deploy
-        run: |
-          source .env.production
-          ./deploy.sh`} lang="yaml" />
+          <CodeBlock code={`# One-shot CI job: fetch at the moment of use, never persist
+export SQUIDVEIL_URL="https://<project>.supabase.co/functions/v1/squidveil-api"
+export SQUIDVEIL_TOKEN="\${SQUIDVEIL_CI_TOKEN}"
+pip install squidveil
+python -c "from squidveil import SquidVeilClient; print(SquidVeilClient.from_env().get_secret('prod/api-key').value)" > .key.tmp
+deploy_using "$(cat .key.tmp)"
+rm -f .key.tmp`} lang="bash" />
         </div>
 
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">Emergency Procedures</h3>
-          <div className="space-y-4">
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white text-sm font-semibold mb-2">Secret Compromise</h4>
-              <ol className="space-y-1.5 text-white/60 text-sm ml-4 list-decimal">
-                <li>Immediately delete the compromised secret: <InlineCode>squidcloud secrets delete SECRET_NAME --force</InlineCode></li>
-                <li>Rotate the credential at the provider (e.g., regenerate Stripe key, rotate DB password)</li>
-                <li>Create a new secret with the updated credential</li>
-                <li>Audit the <InlineCode>squidveil_audit_log</InlineCode> to determine if the secret was accessed</li>
-                <li>Rotate the API key used to access SquidVeil</li>
-              </ol>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white text-sm font-semibold mb-2">API Key Compromise</h4>
-              <ol className="space-y-1.5 text-white/60 text-sm ml-4 list-decimal">
-                <li>Revoke the compromised API key in SquidCloud Developer API settings</li>
-                <li>Generate a new API key</li>
-                <li>Update all clients with the new key</li>
-                <li>Since secrets are encrypted with a key derived from the API key, the old key cannot decrypt them</li>
-              </ol>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <h4 className="text-white text-sm font-semibold mb-2">Daemon Failure</h4>
-              <ol className="space-y-1.5 text-white/60 text-sm ml-4 list-decimal">
-                <li>Check daemon status: <InlineCode>squidcloud doctor</InlineCode></li>
-                <li>If <InlineCode>fail_closed</InlineCode> is true, applications will reject requests — restart the daemon</li>
-                <li>Temporarily set <InlineCode>fail_closed = false</InlineCode> in <InlineCode>.squidveil</InlineCode> for emergency access</li>
-                <li>Investigate daemon logs in <InlineCode>~/.squidveil/daemon.log</InlineCode></li>
-              </ol>
-            </div>
-          </div>
+          <ol className="list-decimal pl-5 space-y-1.5 text-white/70 text-sm">
+            <li><strong>Suspected token leak</strong> — <InlineCode>POST /v1/tokens/:id/revoke</InlineCode> (or
+            delete), then create a replacement and rotate dependent secrets.</li>
+            <li><strong>Suspected secret leak</strong> — <InlineCode>POST /v1/secrets/:name/rotate</InlineCode>{' '}
+            immediately; review <InlineCode>GET /v1/audit?path=&lt;name&gt;</InlineCode> for who read it.</li>
+            <li><strong>Master key compromise</strong> — rotate <InlineCode>SQUIDVEIL_MASTER_KEY</InlineCode>,
+            then <InlineCode>POST /v1/keys/rotate</InlineCode> to re-wrap every DEK, then rotate all secrets.</li>
+            <li><strong>Audit chain invalid</strong> — treat as a security incident; snapshot the DB, review
+            entries around the failing <InlineCode>seq</InlineCode>.</li>
+          </ol>
         </div>
       </div>
     ),
@@ -1620,152 +1516,103 @@ jobs:
     content: (
       <div className="space-y-8">
         <div>
-          <h2 className="text-xl font-bold text-white mb-4">FAQ & Troubleshooting</h2>
-          <p className="text-white/70 leading-relaxed mb-6">
-            Common issues, their causes, and solutions.
-          </p>
+          <h2 className="text-xl font-bold text-white mb-4">FAQ &amp; Troubleshooting</h2>
         </div>
 
         <div className="space-y-4">
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">"API key not found" or "Invalid API key"</h3>
-            <div className="space-y-2 text-white/60 text-sm">
-              <p><strong className="text-white/80">Cause:</strong> The <InlineCode>X-SquidCloud-Key</InlineCode> header is missing, incorrect, or the key has been revoked.</p>
-              <p><strong className="text-white/80">Solution:</strong></p>
-              <ol className="ml-4 space-y-1 list-decimal">
-                <li>Verify the key is set: <InlineCode>echo $SQUIDCLOUD_API_KEY</InlineCode></li>
-                <li>Check that the key has <InlineCode>secrets</InlineCode> scope in Developer API settings</li>
-                <li>Ensure the key is active (not revoked)</li>
-                <li>Re-generate the key if necessary</li>
-              </ol>
-              <CodeBlock code={`# Verify API key works
-curl -X GET https://<project>.supabase.co/functions/v1/cloudbliss-api/user \\
-  -H "X-SquidCloud-Key: $SQUIDCLOUD_API_KEY"`} lang="bash" />
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">"A secret named X already exists"</h3>
+            <h3 className="text-white font-semibold mb-2">"Invalid access token" (INVALID_TOKEN)</h3>
             <p className="text-white/60 text-sm leading-relaxed">
-              Secret names must be unique per user. If you see this error, either rename the existing secret or
-              choose a different name. Use <InlineCode>squidcloud secrets list</InlineCode> to check existing names.
+              The token was never issued, was rotated, or was deleted. Rotating a token invalidates the previous
+              value permanently. Check the token prefix against your list (<InlineCode>GET /v1/tokens</InlineCode>).
             </p>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">Secret verification fails (returns false)</h3>
-            <div className="space-y-2 text-white/60 text-sm">
-              <p><strong className="text-white/80">Cause:</strong> The candidate value does not match the stored secret, or the secret was rotated.</p>
-              <p><strong className="text-white/80">Solution:</strong></p>
-              <ol className="ml-4 space-y-1 list-decimal">
-                <li>Double-check the candidate value for leading/trailing whitespace</li>
-                <li>Confirm the correct secret name (verification is case-sensitive)</li>
-                <li>Check the audit log to see when the secret was last modified</li>
-                <li>If the secret was recently rotated, update your verification value</li>
-              </ol>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">Session expired</h3>
+            <h3 className="text-white font-semibold mb-2">"Access token revoked" (REVOKED)</h3>
             <p className="text-white/60 text-sm leading-relaxed">
-              SquidShake sessions expire after 1 hour by default. If you receive a session-related error, initiate
-              a new handshake via <InlineCode>POST /squidshake/handshake</InlineCode>. All SDKs handle this
-              automatically — only custom integrations need to manage session refresh manually.
+              The token was revoked via <InlineCode>POST /v1/tokens/:id/revoke</InlineCode>. It cannot be rotated;
+              create a new token with the same policies.
             </p>
-            <CodeBlock code={`// Manual session refresh if using raw API:
-const handshake = await fetch('/squidshake/handshake', {
-  method: 'POST',
-  headers: { 'X-SquidCloud-Key': apiKey },
-  body: JSON.stringify({ device_fingerprint }),
-});
-const { session_id } = await handshake.json();
-// Use session_id for subsequent VeilRef requests`} lang="javascript" />
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">Rate limiting (429 Too Many Requests)</h3>
+            <h3 className="text-white font-semibold mb-2">"Already bootstrapped" (ALREADY_BOOTSTRAPPED)</h3>
             <p className="text-white/60 text-sm leading-relaxed">
-              The standard rate limit is 10,000 requests per hour per API key. If you hit the limit:
+              <InlineCode>POST /v1/bootstrap</InlineCode> only issues the first token for an owner. Create
+              additional tokens with <InlineCode>POST /v1/tokens</InlineCode> (requires{' '}
+              <InlineCode>token_admin</InlineCode>).
             </p>
-            <ol className="ml-4 space-y-1 text-white/60 text-sm list-decimal mt-2">
-              <li>Reduce polling frequency — cache VeilRefs and reuse until expiry</li>
-              <li>Batch operations where possible</li>
-              <li>Upgrade to a higher tier for increased limits</li>
-              <li>Check <InlineCode>X-RateLimit-Remaining</InlineCode> headers in responses</li>
-            </ol>
-            <CodeBlock code={`X-RateLimit-Limit: 10000
-X-RateLimit-Remaining: 9500
-X-RateLimit-Reset: 1735689600`} lang="text" />
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">Debug Mode</h3>
+            <h3 className="text-white font-semibold mb-2">"Requested version is not enabled" (VERSION_UNAVAILABLE)</h3>
             <p className="text-white/60 text-sm leading-relaxed">
-              Enable debug logging to troubleshoot issues:
-            </p>
-            <CodeBlock code={`# Enable debug mode
-export SQUIDVEIL_DEBUG=true
-
-# Run with verbose logging
-squidcloud secrets list --verbose
-
-# View daemon logs
-tail -f ~/.squidveil/daemon.log
-
-# Check daemon health
-squidcloud doctor
-
-# Test connectivity
-curl -v https://<project>.supabase.co/functions/v1/cloudbliss-api \\
-  -H "X-SquidCloud-Key: $SQUIDCLOUD_API_KEY"`} lang="bash" />
-            <p className="text-white/60 text-sm mt-2">
-              Debug logs are written to <InlineCode>~/.squidveil/debug.log</InlineCode>. NEVER share debug logs
-              publicly — they may contain sensitive metadata.
+              Reading a specific <InlineCode>?version=N</InlineCode> only works for versions in the{' '}
+              <InlineCode>ENABLED</InlineCode> state. Disabled or destroyed versions are never returned.
             </p>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">Common Error Codes</h3>
-            <PropTable
-              columns={['HTTP Status', 'Error', 'Description']}
-              rows={[
-                ['400', 'Invalid JSON body', 'Request body is malformed or missing required fields'],
-                ['401', 'Invalid session', 'SquidShake session ID is invalid or expired'],
-                ['404', 'Secret not found', 'The specified secret name does not exist'],
-                ['404', 'VeilRef not found', 'The VeilRef has expired or was never issued'],
-                ['409', 'Already exists', 'A secret with this name already exists'],
-                ['422', 'Invalid HMAC', 'VeilRef signature verification failed (tampered ref)'],
-                ['429', 'Rate limit exceeded', 'Too many requests; wait and retry'],
-                ['500', 'Internal server error', 'Server-side failure; check service status'],
-              ]}
-            />
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">Can I store secrets in my .env file?</h3>
+            <h3 className="text-white font-semibold mb-2">"Legacy value was keyed by the retired CloudBliss API key..."</h3>
             <p className="text-white/60 text-sm leading-relaxed">
-              No. The whole point of SquidVeil is to eliminate long-lived secret storage in files. Use
-              <InlineCode>squidcloud secrets export --format dotenv</InlineCode> in CI/CD to generate ephemeral
-              <InlineCode>.env</InlineCode> files that are used once and discarded. In development, use the
-              SquidVeil daemon in auto-inject mode to inject secrets into your local environment.
+              Values migrated from the old CloudBliss vault are unrecoverable by design. Rotate the secret
+              (<InlineCode>POST /v1/secrets/:name/rotate</InlineCode>) to create a new encrypted value.
             </p>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-white font-semibold mb-2">How do I migrate from HashiCorp Vault / AWS Secrets Manager?</h3>
+            <h3 className="text-white font-semibold mb-2">"VeilRef expired" / "consumed" / "device mismatch"</h3>
             <p className="text-white/60 text-sm leading-relaxed">
-              Use the export feature of your current provider to get a JSON dump of secrets, then iterate through
-              them with <InlineCode>squidcloud secrets create</InlineCode>. See
-              <InlineCode>squidcloud secrets export</InlineCode> for the output format. Note that SquidVeil does
-              not support bulk import directly — we recommend writing a short migration script.
+              Issue refs with the TTL and use limit you actually need (<InlineCode>ref_ttl</InlineCode> up to
+              86400s, <InlineCode>max_uses</InlineCode> up to 1000). Device-bound refs require the same{' '}
+              <InlineCode>X-SquidVeil-Device</InlineCode> header on resolve that was used at issuance.
             </p>
-            <CodeBlock code={`# Example migration script
-cat vault-export.json | jq -c '.[]' | while read secret; do
-  name=$(echo $secret | jq -r '.name')
-  value=$(echo $secret | jq -r '.value')
-  squidcloud secrets create --name "$name" --value "$value"
-done`} lang="bash" />
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <h3 className="text-white font-semibold mb-2">Rate limiting (429 RATE_LIMITED)</h3>
+            <p className="text-white/60 text-sm leading-relaxed">
+              The limit is 300 requests/minute per token per edge instance. Enable SDK caching
+              (<InlineCode>cacheTtlMs</InlineCode> / <InlineCode>cache_ttl</InlineCode> /{' '}
+              <InlineCode>WithCacheTTL</InlineCode>) and retry with backoff (SDKs do this automatically).
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <h3 className="text-white font-semibold mb-2">"Secret X already exists" (DUPLICATE)</h3>
+            <p className="text-white/60 text-sm leading-relaxed">
+              Names are unique per owner. Update the existing secret with <InlineCode>POST /v1/secrets/:name</InlineCode>,
+              or undelete it first if it was soft-deleted.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <h3 className="text-white font-semibold mb-2">"Token cannot write this secret path" (FORBIDDEN)</h3>
+            <p className="text-white/60 text-sm leading-relaxed">
+              Your token&rsquo;s policies do not grant the capability on that path. Review the token&rsquo;s
+              policy rules (<InlineCode>GET /v1/policies</InlineCode>) and either adjust the policy or use an
+              admin token.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <h3 className="text-white font-semibold mb-2">Can I store secrets in a .env file?</h3>
+            <p className="text-white/60 text-sm leading-relaxed">
+              Only as an ephemeral step in CI/CD: resolve values at the moment of use (SDK or{' '}
+              <InlineCode>curl</InlineCode>), write to a temp file with restrictive permissions, use it, and
+              delete it. Never commit secret values to repositories.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <h3 className="text-white font-semibold mb-2">How do I migrate from Vault / AWS Secrets Manager?</h3>
+            <p className="text-white/60 text-sm leading-relaxed">
+              Dump your secrets to JSON, then create each one with{' '}
+              <InlineCode>POST /v1/secrets</InlineCode> (SDK <InlineCode>createSecret</InlineCode>{' '}
+              / <InlineCode>create_secret</InlineCode> / <InlineCode>CreateSecret</InlineCode>). Consider rotating
+              them immediately after import so old material is not carried over.
+            </p>
           </div>
         </div>
 
@@ -1968,7 +1815,7 @@ export default function SquidVeilDocs() {
                 <Search className="h-10 w-10 text-white/20 mb-4" />
                 <p className="text-white/50 font-medium">No results found</p>
                 <p className="text-sm text-white/30 mt-1">
-                  Try a different search term, like <button onClick={() => setSearchQuery('secret')} className="text-violet-400 hover:underline">"secret"</button> or <button onClick={() => setSearchQuery('cli')} className="text-violet-400 hover:underline">"cli"</button>
+                  Try a different search term, like <button onClick={() => setSearchQuery('secret')} className="text-violet-400 hover:underline">"secret"</button> or <button onClick={() => setSearchQuery('token')} className="text-violet-400 hover:underline">"token"</button>
                 </p>
               </div>
             ) : (
@@ -2000,7 +1847,7 @@ export default function SquidVeilDocs() {
 
             <div className="mt-16 pt-8 border-t border-white/10 text-center">
               <p className="text-xs text-white/30">
-                SquidVeil v3.0 — Part of the{' '}
+                SquidVeil v2 — Standalone Secrets Manager. Part of the{' '}
                 <Link to="/" className="text-violet-400 hover:underline">SquidCloud</Link> platform.
                 Published under MIT License.
               </p>

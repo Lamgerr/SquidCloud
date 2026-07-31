@@ -1,0 +1,41 @@
+{
+  "name": "@squidcloud-kodai/squidveil-js",
+  "version": "0.1.1",
+  "description": "Official JavaScript/TypeScript SDK for SquidVeil — the standalone secrets manager. Server client with retries, caching, and typed errors; browser build exposes verify-only VeilRef checks (never secret values).",
+  "license": "Apache-2.0",
+  "keywords": ["secrets", "vault", "security", "veilref", "squidveil", "sdk"],
+  "homepage": "https://squidcloud.vercel.app",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./browser": {
+      "types": "./dist/types/browser.d.ts",
+      "import": "./dist/esm/browser.js",
+      "require": "./dist/cjs/browser.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "npm run build:esm && npm run build:cjs && npm run build:types",
+    "build:esm": "node node_modules/typescript/bin/tsc -p tsconfig.esm.json",
+    "build:cjs": "node node_modules/typescript/bin/tsc -p tsconfig.cjs.json && node -e \"require('fs').writeFileSync('dist/cjs/package.json', JSON.stringify({type:'commonjs'}))\"",
+    "build:types": "node node_modules/typescript/bin/tsc -p tsconfig.types.json",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}
