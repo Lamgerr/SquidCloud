@@ -31,6 +31,7 @@ const SquidVeilSecrets = () => {
 
   const [bootstrapping, setBootstrapping] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [bootstrapName, setBootstrapName] = useState('');
 
   const [secrets, setSecrets] = useState<SquidVeilSecret[]>([]);
   const [loading, setLoading] = useState(false);
@@ -141,16 +142,18 @@ const SquidVeilSecrets = () => {
         setBootstrapError('Sign in to your account first, then try again.');
         return;
       }
-      const data = await squidveilBootstrap(session.access_token);
+      const data = await squidveilBootstrap(session.access_token, bootstrapName);
       setSquidVeilToken(data.raw_token);
       setActiveTokenPrefix(data.token.token_prefix);
       setActivePrefixState(data.token.token_prefix);
       setConnected(true);
+      setRawToken(data.raw_token);
+      setBootstrapName('');
       toast({ title: 'Token created', description: `${data.token.name} — saved and ready to use` });
     } catch (e: any) {
       if (e.code === 'ALREADY_BOOTSTRAPPED') {
         setBootstrapError(
-          'Your account already has tokens. Tokens are shown only once at creation, so a token created on another device cannot be recovered here. Delete a token from the device where it was created, or contact support.',
+          'Your account already has a token. Tokens are shown only once at creation, so a value created on another device cannot be recovered here. Rotate a token from the Tokens tab to get a fresh value (shown once), or revoke one to reclaim a slot.',
         );
       } else {
         setBootstrapError(e.message || 'Failed to create token. Please try again.');
@@ -432,9 +435,21 @@ const SquidVeilSecrets = () => {
               dashboard. You can hold up to 3 tokens.
             </p>
             <div className="w-full max-w-sm space-y-3">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={bootstrapName}
+                  onChange={e => setBootstrapName(e.target.value)}
+                  placeholder="Token name (e.g. dashboard-admin)"
+                  maxLength={100}
+                  className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 pr-10 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+                  onKeyDown={e => e.key === 'Enter' && !bootstrapping && handleBootstrap()}
+                />
+                <Fingerprint className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
+              </div>
               <Button
                 onClick={handleBootstrap}
-                disabled={bootstrapping}
+                disabled={bootstrapping || !bootstrapName.trim()}
                 className="w-full h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 gap-1.5 disabled:opacity-40"
               >
                 {bootstrapping ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}

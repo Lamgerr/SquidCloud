@@ -26,6 +26,7 @@ const SquidVeilSecretsMobile = () => {
 
   const [bootstrapping, setBootstrapping] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [bootstrapName, setBootstrapName] = useState('');
 
   const [secrets, setSecrets] = useState<SquidVeilSecret[]>([]);
   const [loading, setLoading] = useState(false);
@@ -123,7 +124,7 @@ const SquidVeilSecretsMobile = () => {
       const { data: sessionData } = await supabase.auth.getSession();
       const sessionJwt = sessionData?.session?.access_token;
       if (!sessionJwt) throw new Error('You must be signed in to create a token');
-      const result = await squidveilBootstrap(sessionJwt);
+      const result = await squidveilBootstrap(sessionJwt, bootstrapName);
       if (!result.success || !result.raw_token) {
         throw new Error('Token was created but the raw value was not returned');
       }
@@ -131,6 +132,8 @@ const SquidVeilSecretsMobile = () => {
       setActiveTokenPrefix(result.token.token_prefix);
       setActivePrefixState(result.token.token_prefix);
       setConnected(true);
+      setRawToken(result.raw_token);
+      setBootstrapName('');
       toast({ title: 'Token created', description: 'You can now manage secrets from this dashboard.' });
       fetchSecrets();
       fetchTokens();
@@ -379,10 +382,19 @@ const SquidVeilSecretsMobile = () => {
               It is shown only once — store it somewhere safe. The token is then used automatically by this
               dashboard. You can hold up to 3 tokens.
             </p>
+            <input
+              type="text"
+              value={bootstrapName}
+              onChange={e => setBootstrapName(e.target.value)}
+              placeholder="Token name (e.g. dashboard-admin)"
+              maxLength={100}
+              className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+              onKeyDown={e => e.key === 'Enter' && !bootstrapping && handleBootstrap()}
+            />
             <button
               onClick={handleBootstrap}
-              disabled={bootstrapping}
-              className="mt-1 w-full h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 disabled:opacity-40 flex items-center justify-center gap-1.5 text-sm font-medium transition-all"
+              disabled={bootstrapping || !bootstrapName.trim()}
+              className="mt-3 w-full h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 disabled:opacity-40 flex items-center justify-center gap-1.5 text-sm font-medium transition-all"
             >
               {bootstrapping ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
               {bootstrapping ? 'Creating token...' : 'Create my first token'}

@@ -34,13 +34,14 @@ export interface BootstrapResult {
   raw_token: string;
 }
 
-export async function squidveilBootstrap(sessionJwt: string): Promise<BootstrapResult> {
+export async function squidveilBootstrap(sessionJwt: string, name?: string): Promise<BootstrapResult> {
   const res = await fetch(`${BASE_URL}/v1/bootstrap`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${sessionJwt}`,
     },
+    body: name && name.trim() ? JSON.stringify({ name: name.trim() }) : undefined,
   });
   let data: any = null;
   try {

@@ -147,6 +147,7 @@ Deno.serve(async (req: Request) => {
   if (path === '/v1/bootstrap' && method === 'POST') {
     const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
     if (!jwt) return errorResponse('Provide a Supabase session JWT in the Authorization header', 401, 'UNAUTHORIZED')
+    const body = await req.json().catch(() => ({}))
     const { data: userData, error: userErr } = await supabase.auth.getUser(jwt)
     if (userErr || !userData?.user) return errorResponse('Invalid Supabase session', 401, 'UNAUTHORIZED')
     const ownerId = userData.user.id
@@ -157,23 +158,33 @@ Deno.serve(async (req: Request) => {
     }
 
     const masterKey = await getMasterKey()
-    const { data: defaultPolicy, error: polErr } = await supabase
+    const tokenName = typeof body?.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 100) : 'default-admin'
+
+    const { data: existingPolicy } = await supabase
       .from('policies')
-      .insert({
-        owner_id: ownerId,
-        name: 'default',
-        rules: [{
-          path: '*',
-          capabilities: [
-            'read', 'write', 'delete', 'list', 'verify', 'rotate', 'versions', 'destroy',
-            'token_admin', 'policy_admin', 'audit',
-          ],
-          effect: 'allow',
-        }],
-      })
       .select('id')
-      .single()
-    if (polErr) return errorResponse('Failed to create default policy', 500, 'DB_ERROR')
+      .eq('owner_id', ownerId)
+      .eq('name', 'default')
+      .maybeSingle()
+    if (!existingPolicy) {
+      const { error: polErr } = await supabase
+        .from('policies')
+        .insert({
+          owner_id: ownerId,
+          name: 'default',
+          rules: [{
+            path: '*',
+            capabilities: [
+              'read', 'write', 'delete', 'list', 'verify', 'rotate', 'versions', 'destroy',
+              'token_admin', 'policy_admin', 'audit',
+            ],
+            effect: 'allow',
+          }],
+        })
+        .select('id')
+        .single()
+      if (polErr) return errorResponse('Failed to create default policy', 500, 'DB_ERROR')
+    }
 
     const rawToken = generateAccessToken()
     const tokenHash = await hashAccessToken(masterKey, rawToken)
@@ -181,7 +192,7 @@ Deno.serve(async (req: Request) => {
       owner_id: ownerId,
       token_hash: tokenHash,
       token_prefix: rawToken.slice(0, 8),
-      name: 'default-admin',
+      name: tokenName,
       policies: ['default'],
     })
     if (tokErr) return errorResponse('Failed to create bootstrap token', 500, 'DB_ERROR')
@@ -193,7 +204,7 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse({
       success: true,
-      token: { name: 'default-admin', policies: ['default'], token_prefix: rawToken.slice(0, 8) },
+      token: { name: tokenName, policies: ['default'], token_prefix: rawToken.slice(0, 8) },
       raw_token: rawToken,
       note: 'raw_token is shown once',
     }, 201)
