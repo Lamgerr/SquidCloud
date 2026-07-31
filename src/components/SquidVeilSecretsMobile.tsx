@@ -5,21 +5,27 @@ import {
   Lock, Plus, Trash2, KeyRound, RefreshCw, Activity, BarChart3,
   Fingerprint, Copy, Eye, EyeOff, History, CheckCircle2, AlertTriangle,
   ShieldAlert, Info, X, Loader2, ExternalLink, Ban, MoreVertical, Pencil,
-  ChevronDown,
+  ChevronDown, AlertCircle,
 } from '@/lib/icon-map';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
-  squidveilFetch, getSquidVeilToken, setSquidVeilToken, clearSquidVeilToken,
+  squidveilFetch, squidveilBootstrap, getSquidVeilToken, setSquidVeilToken, clearSquidVeilToken,
+  getActiveTokenPrefix, setActiveTokenPrefix, clearActiveTokenPrefix,
   type SquidVeilSecret, type SquidVeilToken, type StatsResponse, type MonitorResponse,
 } from '@/lib/squidveilClient';
+import { supabase } from '@/integrations/supabase/client';
 
 type Tab = 'secrets' | 'tokens' | 'monitor';
+
+const MAX_TOKENS = 3;
 
 const SquidVeilSecretsMobile = () => {
   const { toast } = useToast();
   const [connected, setConnected] = useState(() => !!getSquidVeilToken());
-  const [pasteValue, setPasteValue] = useState('');
   const [tab, setTab] = useState<Tab>('secrets');
+
+  const [bootstrapping, setBootstrapping] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
 
   const [secrets, setSecrets] = useState<SquidVeilSecret[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,6 +33,7 @@ const SquidVeilSecretsMobile = () => {
 
   const [tokens, setTokens] = useState<SquidVeilToken[]>([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
+  const [activePrefix, setActivePrefixState] = useState(() => getActiveTokenPrefix());
 
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [monitor, setMonitor] = useState<MonitorResponse | null>(null);
@@ -50,7 +57,8 @@ const SquidVeilSecretsMobile = () => {
   const [rotatingToken, setRotatingToken] = useState<string | null>(null);
   const [rotatedRaw, setRotatedRaw] = useState<string | null>(null);
 
-  const [deleteTokenId, setDeleteTokenId] = useState<string | null>(null);
+  const [deleteTokenId, setDeleteTokenId] = useState<{ id: string; name: string } | null>(null);
+  const [deleteTokenConfirmName, setDeleteTokenConfirmName] = useState('');
   const [deletingToken, setDeletingToken] = useState(false);
 
   const fetchSecrets = useCallback(async () => {
@@ -63,6 +71,7 @@ const SquidVeilSecretsMobile = () => {
       if (e.code === 'INVALID_TOKEN' || e.code === 'REVOKED' || e.status === 401) {
         setConnected(false);
         clearSquidVeilToken();
+        clearActiveTokenPrefix();
       } else {
         setError(e.message);
       }
@@ -107,17 +116,41 @@ const SquidVeilSecretsMobile = () => {
     if (connected && tab === 'monitor') fetchMonitor();
   }, [connected, tab, fetchMonitor]);
 
-  const handleConnect = () => {
-    const trimmed = pasteValue.trim();
-    if (!trimmed) return;
-    setSquidVeilToken(trimmed);
-    setConnected(true);
-    setPasteValue('');
-    fetchSecrets();
+  const handleBootstrap = async () => {
+    setBootstrapping(true);
+    setBootstrapError(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const sessionJwt = sessionData?.session?.access_token;
+      if (!sessionJwt) throw new Error('You must be signed in to create a token');
+      const result = await squidveilBootstrap(sessionJwt);
+      if (!result.success || !result.raw_token) {
+        throw new Error('Token was created but the raw value was not returned');
+      }
+      setSquidVeilToken(result.raw_token);
+      setActiveTokenPrefix(result.token.token_prefix);
+      setActivePrefixState(result.token.token_prefix);
+      setConnected(true);
+      toast({ title: 'Token created', description: 'You can now manage secrets from this dashboard.' });
+      fetchSecrets();
+      fetchTokens();
+    } catch (e: any) {
+      if (e.code === 'ALREADY_BOOTSTRAPPED') {
+        setBootstrapError('A token already exists for this account. It can only be created once — if you lost its value, you can rotate or revoke tokens from the Developer API page, then reconnect here.');
+      } else if (e.message && e.message.toLowerCase().includes('unauthenticated')) {
+        setBootstrapError('Your session has expired. Sign out and back in, then try again.');
+      } else {
+        setBootstrapError(e.message || 'Could not create the token. Please try again.');
+      }
+    } finally {
+      setBootstrapping(false);
+    }
   };
 
   const handleDisconnect = () => {
     clearSquidVeilToken();
+    clearActiveTokenPrefix();
+    setActivePrefixState(null);
     setConnected(false);
     setSecrets([]);
     setTokens([]);
@@ -147,6 +180,10 @@ const SquidVeilSecretsMobile = () => {
 
   const handleCreateToken = async () => {
     if (!tokenName.trim()) return;
+    if (tokens.length >= MAX_TOKENS) {
+      toast({ title: 'Token limit reached', description: `You can have up to ${MAX_TOKENS} tokens. Revoke or delete one to create another.`, variant: 'destructive' });
+      return;
+    }
     setCreatingToken(true);
     try {
       const body: Record<string, unknown> = { name: tokenName.trim(), policies: ['default'] };
@@ -159,10 +196,14 @@ const SquidVeilSecretsMobile = () => {
         body: JSON.stringify(body),
       });
       setRawToken(data.raw_token);
+      setSquidVeilToken(data.raw_token);
+      setActiveTokenPrefix(data.token.token_prefix);
+      setActivePrefixState(data.token.token_prefix);
       setTokens(prev => [data.token, ...prev]);
       setTokenName('');
       setTokenTtl('');
       setTokenCreateOpen(false);
+      toast({ title: 'Token created', description: 'The new token is now the active token for this dashboard.' });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
@@ -238,8 +279,14 @@ const SquidVeilSecretsMobile = () => {
         body: JSON.stringify({}),
       });
       setRotatedRaw(data.raw_token);
+      const wasActive = token.token_prefix === getActiveTokenPrefix();
+      if (wasActive) {
+        setSquidVeilToken(data.raw_token);
+        setActiveTokenPrefix(data.token.token_prefix);
+        setActivePrefixState(data.token.token_prefix);
+      }
       setTokens(prev => prev.map(t => t.id === token.id ? { ...t, token_prefix: data.token.token_prefix } : t));
-      toast({ title: 'Token rotated', description: 'Previous value invalidated' });
+      toast({ title: 'Token rotated', description: wasActive ? 'Active token updated with the new value' : 'Previous value invalidated' });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
@@ -250,20 +297,35 @@ const SquidVeilSecretsMobile = () => {
   const handleRevokeToken = async (token: SquidVeilToken) => {
     try {
       await squidveilFetch(`/v1/tokens/${token.id}/revoke`, { method: 'POST', body: JSON.stringify({}) });
+      const wasActive = token.token_prefix === getActiveTokenPrefix();
+      if (wasActive) {
+        clearSquidVeilToken();
+        clearActiveTokenPrefix();
+        setActivePrefixState(null);
+        setConnected(false);
+      }
       setTokens(prev => prev.map(t => t.id === token.id ? { ...t, revoked_at: new Date().toISOString() } : t));
-      toast({ title: 'Token revoked', description: token.name });
+      toast({ title: 'Token revoked', description: wasActive ? 'The active token was revoked — dashboard disconnected' : token.name });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
   };
 
   const handleDeleteToken = async () => {
-    if (!deleteTokenId) return;
+    if (!deleteTokenId || deleteTokenConfirmName !== deleteTokenId.name) return;
     setDeletingToken(true);
     try {
-      await squidveilFetch(`/v1/tokens/${deleteTokenId}`, { method: 'DELETE' });
-      setTokens(prev => prev.filter(t => t.id !== deleteTokenId));
+      await squidveilFetch(`/v1/tokens/${deleteTokenId.id}`, { method: 'DELETE' });
+      const wasActive = deleteTokenId.name === getActiveTokenPrefix();
+      if (wasActive) {
+        clearSquidVeilToken();
+        clearActiveTokenPrefix();
+        setActivePrefixState(null);
+        setConnected(false);
+      }
+      setTokens(prev => prev.filter(t => t.id !== deleteTokenId.id));
       setDeleteTokenId(null);
+      setDeleteTokenConfirmName('');
       toast({ title: 'Token deleted permanently' });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
@@ -311,24 +373,26 @@ const SquidVeilSecretsMobile = () => {
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-400 mb-3">
               <KeyRound className="h-6 w-6" />
             </div>
-            <h2 className="text-base font-semibold text-white">Connect your token</h2>
-            <p className="text-xs text-white/50 mt-1 mb-4">Paste an <span className="text-violet-400">sv_</span> access token to unlock SquidVeil.</p>
-            <input
-              type="password"
-              value={pasteValue}
-              onChange={e => setPasteValue(e.target.value)}
-              placeholder="Paste sv_ access token..."
-              className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
-              onKeyDown={e => e.key === 'Enter' && handleConnect()}
-            />
+            <h2 className="text-base font-semibold text-white">Create your first token</h2>
+            <p className="text-xs text-white/50 mt-1 mb-4 max-w-xs">
+              SquidVeil issues an <span className="text-violet-400">sv_</span> access token for your account.
+              It is shown only once — store it somewhere safe. The token is then used automatically by this
+              dashboard. You can hold up to 3 tokens.
+            </p>
             <button
-              onClick={handleConnect}
-              disabled={!pasteValue.trim()}
-              className="mt-3 w-full h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 disabled:opacity-40 flex items-center justify-center gap-1.5 text-sm font-medium transition-all"
+              onClick={handleBootstrap}
+              disabled={bootstrapping}
+              className="mt-1 w-full h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 disabled:opacity-40 flex items-center justify-center gap-1.5 text-sm font-medium transition-all"
             >
-              <KeyRound className="w-4 h-4" />
-              Connect
+              {bootstrapping ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+              {bootstrapping ? 'Creating token...' : 'Create my first token'}
             </button>
+            {bootstrapError && (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 mt-3 text-left w-full">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-300/80 leading-relaxed">{bootstrapError}</p>
+              </div>
+            )}
             <a
               href="/help/squidveil"
               target="_blank"
@@ -336,7 +400,7 @@ const SquidVeilSecretsMobile = () => {
               className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60 mt-3"
             >
               <ExternalLink className="w-3 h-3" />
-              Token docs
+              Read the SquidVeil documentation
             </a>
           </div>
         </div>
@@ -489,6 +553,9 @@ const SquidVeilSecretsMobile = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium text-white/90 truncate">{token.name}</p>
+                          {token.token_prefix === activePrefix && !token.revoked_at && !expired && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide text-violet-200/90 bg-violet-500/15 border border-violet-500/25">Active</span>
+                          )}
                           {token.revoked_at && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase text-red-300/80 bg-red-500/10">Revoked</span>}
                           {expired && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase text-amber-300/80 bg-amber-500/10">Expired</span>}
                         </div>
@@ -520,7 +587,7 @@ const SquidVeilSecretsMobile = () => {
                               <Ban className="w-3 h-3" />
                             </button>
                             <button
-                              onClick={() => setDeleteTokenId(token.id)}
+                              onClick={() => setDeleteTokenId({ id: token.id, name: token.name })}
                               className="flex h-7 px-2 rounded-lg bg-red-500/10 text-red-300 border border-red-500/20 text-xs"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -550,10 +617,12 @@ const SquidVeilSecretsMobile = () => {
           )}
           <button
             onClick={() => setTokenCreateOpen(true)}
-            className="w-full flex items-center justify-center gap-2 h-11 border-t border-white/5 text-violet-300 hover:bg-violet-500/5 text-sm font-medium transition-colors"
+            disabled={tokens.length >= MAX_TOKENS}
+            className="w-full flex items-center justify-center gap-2 h-11 border-t border-white/5 text-violet-300 hover:bg-violet-500/5 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4" />
             New Token
+            {tokens.length > 0 && <span className="text-[10px] text-white/30">({tokens.length} / {MAX_TOKENS})</span>}
           </button>
         </div>
       )}
@@ -668,10 +737,24 @@ const SquidVeilSecretsMobile = () => {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={tokenCreateOpen} onOpenChange={setTokenCreateOpen}>
+      <Sheet open={tokenCreateOpen} onOpenChange={o => { if (!o) setRawToken(null); setTokenCreateOpen(o); }}>
         <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
           <div className="p-4 space-y-4">
             <h2 className="text-lg font-semibold text-white">New Access Token</h2>
+            {tokens.length >= MAX_TOKENS && (
+              <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <p className="text-xs text-amber-300/80">
+                  Limit reached ({MAX_TOKENS} tokens). Revoke or delete one to create another.
+                </p>
+              </div>
+            )}
+            <div className="flex items-center gap-2 rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-3">
+              <Info className="w-4 h-4 text-violet-400 flex-shrink-0" />
+              <p className="text-xs text-violet-300/80">
+                The new token becomes the active token for this dashboard. Store the raw token securely — it is shown only once.
+              </p>
+            </div>
             <div>
               <label className="block text-xs font-medium text-white/50 mb-1.5">Token Name</label>
               <input
@@ -823,7 +906,7 @@ const SquidVeilSecretsMobile = () => {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={!!deleteTokenId} onOpenChange={o => !o && setDeleteTokenId(null)}>
+      <Sheet open={!!deleteTokenId} onOpenChange={o => { if (!o) { setDeleteTokenId(null); setDeleteTokenConfirmName(''); } }}>
         <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
           <div className="p-4 space-y-4">
             <div className="flex items-center gap-2">
@@ -831,20 +914,44 @@ const SquidVeilSecretsMobile = () => {
               <h2 className="text-lg font-semibold text-white">Delete Token</h2>
             </div>
             <p className="text-xs text-white/50">Permanent — the token can never be used again.</p>
+            {deleteTokenId && (
+              <div className="flex items-start gap-2.5 p-3 rounded-xl border border-red-500/20 bg-red-500/5">
+                <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                <p className="text-xs text-red-300/80 leading-relaxed">
+                  {deleteTokenId.name === activePrefix
+                    ? 'This is the token the dashboard is using. Deleting it will disconnect SquidVeil from this dashboard.'
+                    : 'All applications using this token will lose access immediately.'}
+                </p>
+              </div>
+            )}
+            {deleteTokenId && (
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">
+                  Type <span className="font-mono text-white font-semibold">{deleteTokenId.name}</span> to confirm
+                </label>
+                <input
+                  type="text"
+                  value={deleteTokenConfirmName}
+                  onChange={e => setDeleteTokenConfirmName(e.target.value)}
+                  placeholder={deleteTokenId.name}
+                  className="w-full h-10 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-white/25 outline-none focus:border-red-500/40 font-mono"
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               <button
-                onClick={() => setDeleteTokenId(null)}
+                onClick={() => { setDeleteTokenId(null); setDeleteTokenConfirmName(''); }}
                 className="flex-1 h-10 rounded-xl bg-white/5 border border-white/10 text-white/50 text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteToken}
-                disabled={deletingToken}
+                disabled={deletingToken || !deleteTokenId || deleteTokenConfirmName !== deleteTokenId.name}
                 className="flex-1 h-10 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-40"
               >
                 {deletingToken && <Loader2 className="w-4 h-4 animate-spin" />}
-                Delete
+                Delete Token
               </button>
             </div>
           </div>

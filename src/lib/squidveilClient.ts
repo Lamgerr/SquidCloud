@@ -2,6 +2,7 @@ import { SUPABASE_URL } from '@/lib/supabaseEnv';
 
 const BASE_URL = `${SUPABASE_URL}/functions/v1/squidveil-api`;
 const TOKEN_KEY = 'squidveil_token';
+const ACTIVE_PREFIX_KEY = 'squidveil_active_prefix';
 
 export function getSquidVeilToken(): string {
   return localStorage.getItem(TOKEN_KEY) || '';
@@ -13,6 +14,47 @@ export function setSquidVeilToken(token: string) {
 
 export function clearSquidVeilToken() {
   localStorage.removeItem(TOKEN_KEY);
+}
+
+export function getActiveTokenPrefix(): string {
+  return localStorage.getItem(ACTIVE_PREFIX_KEY) || '';
+}
+
+export function setActiveTokenPrefix(prefix: string) {
+  localStorage.setItem(ACTIVE_PREFIX_KEY, prefix);
+}
+
+export function clearActiveTokenPrefix() {
+  localStorage.removeItem(ACTIVE_PREFIX_KEY);
+}
+
+export interface BootstrapResult {
+  success: boolean;
+  token: { name: string; policies: string[]; token_prefix: string };
+  raw_token: string;
+}
+
+export async function squidveilBootstrap(sessionJwt: string): Promise<BootstrapResult> {
+  const res = await fetch(`${BASE_URL}/v1/bootstrap`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${sessionJwt}`,
+    },
+  });
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  if (!res.ok) {
+    const err = new Error(data?.error || `Request failed (${res.status})`) as Error & { code?: string; status?: number };
+    err.code = data?.code;
+    err.status = res.status;
+    throw err;
+  }
+  return data as BootstrapResult;
 }
 
 export async function squidveilFetch<T = any>(
