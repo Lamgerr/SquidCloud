@@ -55,6 +55,7 @@ import StorageTab from '@/components/StorageTab';
 import Scripts from '@/pages/Scripts';
 import MobileBottomNavbar from '@/components/MobileBottomNavbar';
 import MobileNavHeader from '@/components/MobileNavHeader';
+import { SignalsBell } from '@/components/SignalsBell';
 import CreateUploadSegmented from '@/components/CreateUploadSegmented';
 import { CommandPalette } from '@/components/CommandPalette';
 import { backgroundUploadService } from '@/services/backgroundUpload';
@@ -1894,6 +1895,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   </DropdownMenu>
                 </div>
                 <div className="flex items-center gap-2">
+                  <SignalsBell className="h-8 w-8 rounded-xl" />
                   <button
                     onClick={() => setIsSpotlightOpen(true)}
                     className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 lg-press-subtle transition-all"

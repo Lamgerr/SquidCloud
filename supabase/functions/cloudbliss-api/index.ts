@@ -2,6 +2,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { sendSignal } from '../_shared/signals.ts'
 
 import {
   CORS_HEADERS, jsonResponse, errorResponse, apiError, verifyRequestSignature,
@@ -108,6 +109,22 @@ serve(async (req) => {
       const reason = deductResult?.reason || 'Credit check failed'
       const code = deductResult?.code || 'CREDIT_ERROR'
       return apiError(reason, code, 402, null)
+    }
+
+    // Notify the owner once per day when credits drop to 20% of the daily limit.
+    const remaining = Number(deductResult?.credits_remaining)
+    const dailyLimit = Number(deductResult?.daily_limit)
+    if (Number.isFinite(remaining) && remaining >= 0 && Number.isFinite(dailyLimit) && dailyLimit > 0 && remaining <= dailyLimit * 0.2) {
+      void sendSignal({
+        service_id: 'cloudbliss',
+        user_id: userId,
+        type: 'credits_low',
+        severity: 'warning',
+        title: 'API credits running low',
+        body: `${remaining} credits remaining (${dailyLimit} daily limit). Top up or your API calls will start failing.`,
+        link: '/developer-api',
+        idempotency_key: `credits_low:${userId}:${new Date().toISOString().slice(0, 10)}`,
+      })
     }
 
     // ===== ROUTING LAYER =====

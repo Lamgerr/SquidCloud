@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { SignalsBell } from '@/components/SignalsBell';
 import SwitchAccountSheet from '@/components/SwitchAccountSheet';
 
 interface MobileNavHeaderProps {
@@ -55,6 +56,8 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          <SignalsBell className="rounded-xl" />
+
           <Button
             onClick={onSearchClick}
             variant="ghost"

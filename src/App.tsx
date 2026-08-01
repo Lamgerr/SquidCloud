@@ -18,6 +18,7 @@ import MobileDownloadNotification from "@/components/MobileDownloadNotification"
 import MaintenanceBanner from "@/components/MaintenanceBanner";
 import AdminDevPanel from "@/components/AdminDevPanel";
 import ServiceWorkerManager from "@/utils/serviceWorkerManager";
+import { SignalsBridge } from "@/components/SignalsBridge";
 import { useEffect, lazy, Suspense, type ReactNode } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { initMobileApp, isNativePlatform } from "@/utils/mobile";
@@ -56,6 +57,7 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const AnalyticsDashboard = lazy(() => import("./components/AnalyticsDashboard"));
 const SecurityCenter = lazy(() => import("./components/SecurityCenter"));
+const SignalsPage = lazy(() => import("./pages/SignalsPage"));
 const StoragePage = lazy(() => import("./pages/StoragePage"));
 const ExtensionLab = lazy(() => import("./pages/ExtensionLab"));
 const Documentation = lazy(() => import("./pages/Documentation"));
@@ -209,6 +211,7 @@ const AppContent = () => {
             {showMaintenanceBanner && <MaintenanceBanner />}
             {showHeader && <MainHeader />}
             <Toaster />
+            <SignalsBridge />
             <NativeMobileBridge />
             <AnimatePresence mode="wait" initial={false}>
           <Routes location={location} key={location.pathname}>
@@ -290,6 +293,15 @@ const AppContent = () => {
             <RouteSuspense>
               <ProtectedRoute>
                 <SecurityCenter />
+              </ProtectedRoute>
+            </RouteSuspense>
+            </AnimatedRoute>
+          } />
+          <Route path="/signals" element={
+            <AnimatedRoute>
+            <RouteSuspense>
+              <ProtectedRoute>
+                <SignalsPage />
               </ProtectedRoute>
             </RouteSuspense>
             </AnimatedRoute>

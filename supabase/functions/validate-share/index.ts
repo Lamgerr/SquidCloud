@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
+import { sendSignal } from '../_shared/signals.ts';
 
 serve(async (req) => {
   return withPrelGateway(req, { functionId: 'validate-share', operation: 'default' }, async (ctx: PrelContext) => {
@@ -40,6 +41,20 @@ serve(async (req) => {
             requiresPassword: true 
           }, 401);
         }
+      }
+
+      // Notify the share owner once per share per day.
+      if (shareInfo.owner_id) {
+        void sendSignal({
+          service_id: 'cloudbliss',
+          user_id: shareInfo.owner_id,
+          type: 'share_viewed',
+          severity: 'info',
+          title: `Your file '${shareInfo.file_name}' was viewed`,
+          body: 'Someone opened your shared link.',
+          link: '/dashboard',
+          idempotency_key: `share_viewed:${shareId}:${new Date().toISOString().slice(0, 10)}`,
+        });
       }
 
       return jsonResponse({ 

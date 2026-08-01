@@ -11,12 +11,12 @@ import {
   Settings, 
   LogOut, 
   Sparkles,
-  Bell,
   Menu,
   X
 } from '@/lib/icon-map';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SquidLogo from '@/components/ui/SquidLogo';
+import { SignalsBell } from '@/components/SignalsBell';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -228,9 +228,9 @@ const MainHeader: React.FC = () => {
 
                   <div className="w-px h-5 bg-border/50 mx-1.5" aria-hidden="true" />
 
-                  {/* Notifications + Avatar */}
+                  {/* Signals + Avatar */}
                   <div className="flex items-center gap-0.5 pl-1">
-                    <NavIconButton onClick={() => {}} icon={<Bell />} label="Notifications" />
+                    <SignalsBell />
                     
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

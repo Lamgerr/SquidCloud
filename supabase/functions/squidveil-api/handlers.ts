@@ -14,6 +14,7 @@ import {
   base64UrlEncode, randomBytes, constantTimeEqual, toHex,
   type PolicyRule,
 } from './lib.ts'
+import { sendSignal } from '../_shared/signals.ts'
 
 export interface AuthContext {
   tokenId: string
@@ -193,6 +194,17 @@ export async function handleTokensAPI(supabase: any, ctx: AuthContext, method: s
       success: true,
     })
 
+    void sendSignal({
+      service_id: 'squidveil',
+      user_id: ctx.ownerId,
+      type: 'token_created',
+      severity: 'info',
+      title: `Token '${name}' created`,
+      body: 'A new API token was created for your account.',
+      link: '/dashboard',
+      idempotency_key: `token_created:${token.id}`,
+    })
+
     return jsonResponse({ success: true, token: token, raw_token: rawToken, note: 'raw_token is shown once' }, 201)
   }
 
@@ -232,6 +244,17 @@ export async function handleTokensAPI(supabase: any, ctx: AuthContext, method: s
     await appendAudit(supabase, masterKey, {
       action: 'token.rotated', actor_type: 'token', actor_id: ctx.tokenId,
       path: existing.name, success: true,
+    })
+
+    void sendSignal({
+      service_id: 'squidveil',
+      user_id: ctx.ownerId,
+      type: 'token_rotated',
+      severity: 'warning',
+      title: `Token '${existing.name}' rotated`,
+      body: 'The previous token value is permanently invalid.',
+      link: '/dashboard',
+      idempotency_key: `token_rotated:${existing.id}`,
     })
 
     return jsonResponse({
@@ -284,6 +307,16 @@ export async function handleTokensAPI(supabase: any, ctx: AuthContext, method: s
       actor_id: ctx.tokenId,
       path: data.name,
       success: true,
+    })
+    void sendSignal({
+      service_id: 'squidveil',
+      user_id: ctx.ownerId,
+      type: 'token_revoked',
+      severity: 'urgent',
+      title: `Token '${data.name}' revoked`,
+      body: 'A token on your account was revoked. If this was not you, audit your tokens immediately.',
+      link: '/dashboard',
+      idempotency_key: `token_revoked:${data.id}`,
     })
     return jsonResponse({ success: true, token: data })
   }
@@ -1394,7 +1427,19 @@ export async function handleRotateDue(supabase: any, req: Request): Promise<Resp
     const newValue = base64UrlEncode(randomBytes(32))
     const keyId = await ensureDek(supabase, masterKey, secret.owner_id, secret.id, freshKeyId)
     const dek = await getSecretDek(supabase, masterKey, secret.owner_id, keyId)
-    if (!dek) continue
+    if (!dek) {
+      void sendSignal({
+        service_id: 'squidveil',
+        user_id: secret.owner_id,
+        type: 'rotation_failed',
+        severity: 'urgent',
+        title: `Rotation failed for '${secret.name}'`,
+        body: 'Scheduled auto-rotation could not complete. Investigate before the secret expires.',
+        link: '/dashboard',
+        idempotency_key: `rotation_failed:${secret.id}:${now.toISOString().slice(0, 10)}`,
+      })
+      continue
+    }
     const { ciphertext, iv } = await aes256GcmEncrypt(new TextEncoder().encode(newValue), dek)
 
     const { data: nRow } = await supabase

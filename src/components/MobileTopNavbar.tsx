@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, RotateCcw, Upload, ArrowLeft, Home, Crown, Sparkles } from '@/lib/icon-map';
+import { Plus, RotateCcw, Upload, ArrowLeft, Home, Crown, Sparkles, Bell } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSignals } from '@/hooks/useSignals';
 
 interface MobileTopNavbarProps {
   onFilesClick: () => void;
@@ -28,6 +29,7 @@ const MobileTopNavbar: React.FC<MobileTopNavbarProps> = ({
   const [activeTab, setActiveTab] = useState<'add' | 'upload'>('add');
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const { unreadCount } = useSignals(user?.id);
   const isFree = user && !profile?.is_premium;
 
   const handleTabClick = (tab: 'files' | 'add' | 'upload' | 'reload', onClick: () => void) => {
@@ -116,6 +118,30 @@ const MobileTopNavbar: React.FC<MobileTopNavbarProps> = ({
               Plan
             </button>
           )}
+          {/* Signals button */}
+          <button
+            onClick={() => handleTabClick('files', () => navigate('/signals'))}
+            className={cn(
+              "relative flex items-center justify-center",
+              "h-9 w-9 rounded-xl",
+              "bg-muted/40",
+              "text-muted-foreground hover:text-foreground",
+              "transition-all duration-150 active:scale-95"
+            )}
+            aria-label="Signals"
+          >
+            <Bell className="h-4 w-4" strokeWidth={1.75} />
+            {unreadCount > 0 && (
+              <span className={cn(
+                "absolute -top-1 -right-1",
+                "min-w-[16px] h-[16px] px-1 rounded-full",
+                "flex items-center justify-center",
+                "bg-red-500 text-white text-[9px] font-bold leading-none"
+              )}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
           {/* Home button */}
           <button
             onClick={() => handleTabClick('files', onFilesClick)}
