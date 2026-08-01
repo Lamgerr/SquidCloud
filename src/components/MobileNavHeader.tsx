@@ -56,7 +56,7 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
-          <SignalsBell className="rounded-xl" />
+          <SignalsBell className="rounded-xl" iconClassName="h-[18px] w-[18px]" />
 
           <Button
             onClick={onSearchClick}

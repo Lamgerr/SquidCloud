@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
+import { sendSignal } from '../_shared/signals.ts';
 
 interface TrashRequest {
   action: 'cleanup' | 'restore' | 'permanent_delete';
@@ -48,6 +49,17 @@ serve(async (req) => {
             .eq('user_id', ctx.userId);
 
           if (deleteError) throw deleteError;
+
+          void sendSignal({
+            service_id: 'cloudbliss',
+            user_id: ctx.userId,
+            type: 'trash_purge',
+            severity: 'info',
+            title: 'File permanently deleted',
+            body: 'A file was permanently removed from your trash. This cannot be undone.',
+            link: '/dashboard',
+            idempotency_key: `trash_purge:${ctx.userId}:${fileId}`,
+          });
 
           return jsonResponse({ message: 'File permanently deleted' });
 

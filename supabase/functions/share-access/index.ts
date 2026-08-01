@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendSignal } from "../_shared/signals.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -12,6 +13,58 @@ const CORS = {
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+async function getShareOwner(
+  supabase: ReturnType<typeof createClient>,
+  shareId: string,
+): Promise<{ user_id: string; file_name: string | null } | null> {
+  const { data: share } = await supabase
+    .from('shares')
+    .select('user_id, file_id, folder_id')
+    .eq('share_id', shareId)
+    .maybeSingle();
+  if (!share?.user_id) return null;
+
+  let file_name: string | null = null;
+  if (share.file_id) {
+    const { data: file } = await supabase.from('files').select('name').eq('id', share.file_id).maybeSingle();
+    file_name = file?.name ?? null;
+  } else if (share.folder_id) {
+    const { data: folder } = await supabase.from('folders').select('name').eq('id', share.folder_id).maybeSingle();
+    file_name = folder?.name ?? null;
+  }
+  return { user_id: share.user_id, file_name };
+}
+
+async function notifyShareOwner(
+  supabase: ReturnType<typeof createClient>,
+  shareId: string,
+  event: 'viewed' | 'downloaded',
+) {
+  try {
+    const owner = await getShareOwner(supabase, shareId);
+    if (!owner) return;
+
+    const label = owner.file_name ? `'${owner.file_name}'` : 'your file';
+    const type = event === 'viewed' ? 'share_viewed' : 'share_downloaded';
+    const severity = event === 'viewed' ? 'info' : 'info';
+
+    await sendSignal({
+      service_id: 'cloudbliss',
+      user_id: owner.user_id,
+      type,
+      severity,
+      title: event === 'viewed' ? `Shared file viewed: ${label}` : `Shared file downloaded: ${label}`,
+      body: event === 'viewed'
+        ? 'Someone opened your shared link.'
+        : 'Someone downloaded your shared file.',
+      link: '/dashboard',
+      idempotency_key: `${type}:${shareId}:${new Date().toISOString().slice(0, 10)}`,
+    });
+  } catch (err) {
+    console.error(`[share-access] notify owner ${event} failed`, String(err));
+  }
 }
 
 serve(async (req) => {
@@ -41,6 +94,7 @@ serve(async (req) => {
         p_user_agent: req.headers.get('user-agent') || '',
         p_geo_country: country || null,
       });
+      void notifyShareOwner(supabase, shareId, 'viewed');
       return json({ ok: true });
     }
 
@@ -61,6 +115,8 @@ serve(async (req) => {
       if (check.burn_after_reading) {
         await supabase.rpc('execute_burn_after_reading', { p_share_id: shareId });
       }
+
+      void notifyShareOwner(supabase, shareId, 'downloaded');
 
       return json({
         ok: true, burn_after_reading: check.burn_after_reading,

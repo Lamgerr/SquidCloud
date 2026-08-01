@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendSignal } from "../_shared/signals.ts";
 import {
   sendEmail,
   buildReceiptEmailHtml,
@@ -211,6 +212,17 @@ serve(async (req) => {
       }).maybeSingle();
 
       await sendPaymentEmails(supabase, userId, planType, billingPeriod, now, expiryDate, amount || 0, txHash || '');
+
+      void sendSignal({
+        service_id: 'cloudbliss',
+        user_id: userId,
+        type: 'payment_success',
+        severity: 'info',
+        title: 'Payment successful',
+        body: `Your ${planType} ${billingPeriod} plan is now active.`,
+        link: '/dashboard',
+        idempotency_key: `payment_success:${sessionId}`,
+      });
     }
 
     if (event === 'payment.failed') {
@@ -236,6 +248,17 @@ serve(async (req) => {
           session_id: sessionId,
         },
       }).maybeSingle();
+
+      void sendSignal({
+        service_id: 'cloudbliss',
+        user_id: userId,
+        type: 'subscription_payment_failed',
+        severity: 'urgent',
+        title: 'Payment failed',
+        body: `Your ${planType} ${billingPeriod} payment could not be processed. Check your payment details and try again.`,
+        link: '/checkout',
+        idempotency_key: `payment_failed:${sessionId}`,
+      });
     }
 
     if (event === 'payment.expired') {

@@ -12,13 +12,17 @@ const ALLOWED_SERVICES = new Set(['cloudbliss', 'squidveil', 'signals']);
 const SERVICE_TYPE_ALLOWLIST: Record<string, string[]> = {
   cloudbliss: [
     'share_viewed',
+    'share_downloaded',
+    'file_shared',
     'file_request_filled',
     'credits_low',
     'subscription_expiring',
     'subscription_payment_failed',
+    'payment_success',
     'trash_purge',
     'workspace_invite',
     'upload_failed',
+    'password_changed',
   ],
   squidveil: [
     'token_created',

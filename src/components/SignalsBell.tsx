@@ -16,7 +16,7 @@ const SEVERITY_DOT: Record<string, string> = {
   urgent: 'bg-red-500',
 };
 
-export function SignalsBell({ className }: { className?: string }) {
+export function SignalsBell({ className, iconClassName }: { className?: string; iconClassName?: string }) {
   const { user } = useAuth();
   const { signals, unreadCount, timeAgo, markRead, markAllRead, clear } = useSignals(user?.id);
   const navigate = useNavigate();
@@ -49,13 +49,13 @@ export function SignalsBell({ className }: { className?: string }) {
           )}
           aria-label="Signals"
         >
-          <Bell className="w-[18px] h-[18px]" />
+          <Bell className={cn('w-[18px] h-[18px]', iconClassName)} />
           {unreadCount > 0 && (
             <span className={cn(
-              'absolute -top-0.5 -right-0.5',
-              'min-w-[17px] h-[17px] px-1 rounded-full',
+              'absolute -top-1 -right-1',
+              'min-w-[15px] h-[15px] px-0.5 rounded-full',
               'flex items-center justify-center',
-              'bg-red-500 text-white text-[10px] font-bold leading-none',
+              'bg-red-500 text-white text-[9px] font-bold leading-none',
               unreadCount > 0 && 'animate-in zoom-in-95'
             )}>
               {unreadCount > 99 ? '99+' : unreadCount}

@@ -1895,7 +1895,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   </DropdownMenu>
                 </div>
                 <div className="flex items-center gap-2">
-                  <SignalsBell className="h-8 w-8 rounded-xl" />
+                  <SignalsBell className="h-8 w-8 rounded-xl" iconClassName="h-4 w-4" />
                   <button
                     onClick={() => setIsSpotlightOpen(true)}
                     className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 lg-press-subtle transition-all"

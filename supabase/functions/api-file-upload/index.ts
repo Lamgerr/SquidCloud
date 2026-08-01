@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts'
+import { sendSignal } from '../_shared/signals.ts'
 
 const validateEncryptionKeyFormat = (key: string): boolean => {
   return key.length >= 8 && key.length <= 512
@@ -16,6 +17,7 @@ serve(async (req) => {
     let fileName = null
     let fileSize = null
     let errorMessage = null
+    let keyUserId: string | null = null
 
     try {
       const supabase = createClient(
@@ -48,6 +50,8 @@ serve(async (req) => {
         statusCode = 401
         throw new Error('Invalid or inactive API key')
       }
+
+      keyUserId = keyData.user_id
 
       if (!keyData.scopes.includes('write')) {
         statusCode = 403
@@ -131,6 +135,19 @@ serve(async (req) => {
     } catch (error: unknown) {
       console.error('API upload error:', error)
       errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+      if (keyUserId && statusCode >= 400) {
+        void sendSignal({
+          service_id: 'cloudbliss',
+          user_id: keyUserId,
+          type: 'upload_failed',
+          severity: 'warning',
+          title: fileName ? `Upload failed: ${fileName}` : 'Upload failed',
+          body: errorMessage.slice(0, 500),
+          link: '/dashboard',
+          idempotency_key: `upload_failed:${keyUserId}:${fileName ?? 'file'}:${new Date().toISOString().slice(0, 10)}`,
+        });
+      }
 
       return jsonResponse({
         error: error instanceof Error ? error.message : 'Unknown error',

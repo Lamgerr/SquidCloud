@@ -33,6 +33,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import MigrationWizard from '@/components/MigrationWizard';
 import CancelSubscriptionFlow from '@/components/CancelSubscriptionFlow';
 import { cn } from '@/lib/utils';
+import { emitSignal } from '@/lib/api';
 import { mfaService, MfaFactor } from '@/services/mfa-service';
 
 const ACCOUNT_PREFS_STORAGE_KEY = 'squid_account_settings_v3';
@@ -490,6 +491,13 @@ const AccountSettings = () => {
       if (signInError) throw new Error('Current password is incorrect');
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
+      void emitSignal({
+        type: 'password_changed',
+        severity: 'warning',
+        title: 'Password changed',
+        body: 'Your account password was changed. If this wasn\'t you, contact support immediately.',
+        link: '/settings/account',
+      });
       toast({ title: "Password updated", description: "Your password has been changed." });
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       setChangingPassword(false);

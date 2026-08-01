@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendSignal } from "../_shared/signals.ts";
 import {
   sendEmail,
   buildReceiptEmailHtml,
@@ -358,6 +359,24 @@ async function handleCron(supabase: ReturnType<typeof createClient>, dryRun = fa
         });
 
         if (!triggered) continue; // Already triggered
+
+        if (type === 'banner' || type === 'popup') {
+          const days = days_remaining ?? 0;
+          void sendSignal({
+            service_id: 'cloudbliss',
+            user_id,
+            type: 'subscription_expiring',
+            severity: isPostExpiry ? 'urgent' : 'warning',
+            title: isPostExpiry ? 'Subscription expired' : 'Subscription expiring soon',
+            body: isPostExpiry
+              ? 'Your premium plan has ended. Renew to keep your features active.'
+              : days > 0
+              ? `Your ${plan_type} plan expires in ${days} day${days === 1 ? '' : 's'}.`
+              : `Your ${plan_type} plan is about to expire.`,
+            link: '/checkout',
+            idempotency_key: `subscription_expiring:${user_id}:${stage}`,
+          });
+        }
 
         if (type === 'email') {
           results.emails_triggered++;

@@ -15,6 +15,7 @@ import { INKModal } from '@/components/INKModal';
 import { useINK } from '@/hooks/useINK';
 import { isPasskeyAvailable, authenticateWithPasskey } from '@/lib/webauthn';
 import { getOAuthRedirectUrl, getPasswordRecoveryRedirectUrl } from '@/lib/appLinks';
+import { emitSignal } from '@/lib/api';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -109,6 +110,13 @@ const Auth = () => {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+      void emitSignal({
+        type: 'password_changed',
+        severity: 'warning',
+        title: 'Password changed',
+        body: 'Your account password was changed. If this wasn\'t you, contact support immediately.',
+        link: '/settings/account',
+      });
       toast({ title: "Password updated", description: "Your password has been successfully updated." });
       navigate('/auth', { replace: true });
       setIsPasswordReset(false);

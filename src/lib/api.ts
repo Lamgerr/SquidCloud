@@ -976,9 +976,34 @@ export async function shareFile(id: string, shared: boolean = true): Promise<str
   }
 }
 
+// Emit a signal for the signed-in user (client-safe types only: password_changed, file_shared)
+export async function emitSignal(payload: {
+  type: 'password_changed' | 'file_shared';
+  severity?: 'info' | 'warning' | 'urgent';
+  title: string;
+  body?: string;
+  link?: string;
+  idempotency_key?: string;
+}): Promise<void> {
+  try {
+    await supabase.functions.invoke('emit-signal', {
+      body: {
+        type: payload.type,
+        severity: payload.severity ?? 'info',
+        title: payload.title,
+        body: payload.body,
+        link: payload.link,
+        idempotency_key: payload.idempotency_key,
+      },
+    });
+  } catch (error) {
+    console.error('emitSignal failed:', error);
+  }
+}
+
 // Create a secure share for a file with advanced options
 export async function createFileShare(
-  fileId: string, 
+  fileId: string,
   options?: ShareOptions & {
     sharedEncryptionKey?: string; shareSecretHash?: string;
     maxViews?: number; maxDownloads?: number;
@@ -1037,6 +1062,15 @@ export async function createFileShare(
     }
 
     await supabase.from('files').update({ shared: true }).eq('id', fileId);
+
+    void emitSignal({
+      type: 'file_shared',
+      severity: 'info',
+      title: 'Share link created',
+      body: 'Your file share link is ready to send.',
+      link: '/dashboard',
+      idempotency_key: `file_shared:${shareId}`,
+    });
 
     const shareUrl = buildPublicUrl(`/s/${shareId}`);
     return { shareId, shareUrl };
@@ -1104,6 +1138,14 @@ export async function createFolderShare(
     }
 
     const shareUrl = buildPublicUrl(`/s/${shareId}`);
+    void emitSignal({
+      type: 'file_shared',
+      severity: 'info',
+      title: 'Folder share link created',
+      body: fileCount > 0 ? `Your folder share is ready — ${fileCount} file${fileCount === 1 ? '' : 's'} included.` : 'Your folder share link is ready to send.',
+      link: '/dashboard',
+      idempotency_key: `file_shared:${shareId}`,
+    });
     return { shareId, shareUrl, fileCount };
   } catch (error: any) {
     console.error("Error creating folder share:", error);
