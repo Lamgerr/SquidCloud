@@ -357,6 +357,17 @@ serve(async (req) => {
 
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? '';
   const isServiceRole = bearerToken === serviceRoleKey;
+  const internalKeyHeader = req.headers.get('X-Internal-Key') ?? '';
+
+  let isInternal = false;
+  if (internalKeyHeader) {
+    const { data: config } = await supabase
+      .from('system_config')
+      .select('value')
+      .eq('key', 'INTERNAL_WEBHOOK_KEY')
+      .single();
+    if (config?.value === internalKeyHeader) isInternal = true;
+  }
 
   try {
     // ---- GET /status ----
@@ -523,13 +534,13 @@ serve(async (req) => {
 
     // ---- POST /cron ----
     if (req.method === 'POST' && (path === 'cron' || path === 'check-expiry')) {
-      if (!isServiceRole) return json({ error: 'Unauthorized: service role required' }, 401);
+      if (!isServiceRole && !isInternal) return json({ error: 'Unauthorized: service role or internal key required' }, 401);
       return await handleCron(supabase, false);
     }
 
     // ---- POST /cron-dry-run ----
     if (req.method === 'POST' && path === 'cron-dry-run') {
-      if (!isServiceRole) return json({ error: 'Unauthorized: service role required' }, 401);
+      if (!isServiceRole && !isInternal) return json({ error: 'Unauthorized: service role or internal key required' }, 401);
       return await handleCron(supabase, true);
     }
 
