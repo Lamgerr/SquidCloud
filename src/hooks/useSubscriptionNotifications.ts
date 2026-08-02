@@ -22,7 +22,7 @@ export function useSubscriptionNotifications() {
     if (!user) { setPending([]); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('subscription-manager/pending-notifications');
+      const { data, error } = await supabase.functions.invoke('subscription-manager/pending-notifications', { method: 'GET' });
       if (error) throw error;
       setPending(data || []);
     } catch (e) {
