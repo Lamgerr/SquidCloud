@@ -6,6 +6,14 @@ import {
   buildReceiptEmailHtml,
   buildWelcomeEmailHtml,
   getDisplayName,
+  emailShell,
+  BG,
+  BORDER,
+  TEXT,
+  TEXT_2,
+  MUTED,
+  MONO_STACK,
+  APP_URL,
   type ReceiptParams,
 } from "../_shared/gmail-email.ts";
 
@@ -49,6 +57,30 @@ function getPlanName(planType: string): string {
 // EMAIL TEMPLATES — Subscription Expiry & Win-back
 // ═══════════════════════════════════════════════════════════════════
 
+function cardDivider(): string {
+  return `<tr><td style="padding:24px 40px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="height:1px;background-color:${BORDER};font-size:1px;line-height:1px;">&nbsp;</td></tr></table></td></tr>`;
+}
+
+function ctaButton(href: string, text: string): string {
+  return `<tr><td style="padding:0 40px 8px 40px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="${TEXT}" style="border-radius:999px;"><a href="${href}" target="_blank" style="display:inline-block;padding:13px 32px;font-size:16px;font-weight:600;letter-spacing:0.01em;color:${BG};text-decoration:none;border-radius:999px;">${escapeHtml(text)}</a></td></tr></table></td></tr>`;
+}
+
+function secondaryLink(href: string, text: string): string {
+  return `<tr><td align="center" style="padding:12px 40px 32px 40px;"><a href="${href}" target="_blank" style="font-size:14px;color:${MUTED};text-decoration:none;">${escapeHtml(text)}</a></td></tr>`;
+}
+
+function changeList(items: string[]): string {
+  const rows = items
+    .map(
+      (i) => `<tr>
+        <td width="24" style="padding:6px 0;"><span style="font-family:${MONO_STACK};font-size:14px;color:${MUTED};">−</span></td>
+        <td style="padding:6px 0;"><span style="font-size:16px;color:${TEXT_2};">${escapeHtml(i)}</span></td>
+      </tr>`,
+    )
+    .join("");
+  return `<tr><td style="padding:0 40px 20px 40px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table></td></tr>`;
+}
+
 function buildStageEmailHtml(
   planType: string,
   username: string,
@@ -59,227 +91,60 @@ function buildStageEmailHtml(
   upsellData?: { targetPlan?: string; targetBilling?: string; savings?: string; bonusDays?: number }
 ): string {
   const planName = getPlanName(planType);
-  const expiryDate = formatDateTime(expiresAt);
   const expiryDateOnly = formatDate(expiresAt);
+  const label = billingPeriod.charAt(0).toUpperCase() + billingPeriod.slice(1);
 
-  const contentBlocks: string[] = [];
+  const title =
+    stage >= 4
+      ? "Your plan has ended"
+      : daysRemaining > 0
+        ? `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`
+        : "Plan ended";
 
-  // --- WEEKLY STAGE 2: Upsell offer ---
-  if (billingPeriod === 'weekly' && stage === 2) {
-    contentBlocks.push(`
-      <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6">
-        Your <strong>${escapeHtml(planName)}</strong> plan expires tomorrow at ${expiryDate.split(', ').slice(1).join(', ')}.
-      </p>
-      <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:12px;padding:20px;margin:0 0 20px;border:1px solid #f59e0b">
-        <h2 style="margin:0 0 8px;color:#92400e;font-size:18px">Switch to monthly today — get 10 extra days free</h2>
-        <p style="margin:0 0 12px;color:#78350f;font-size:14px">You have 1 day left on your weekly plan ($0.75 value). Switch to monthly now for $4.00. We'll add your remaining day PLUS 10 bonus days on top of your full month — giving you 41 days total for $4.</p>
-        <table style="width:100%;border-collapse:collapse;margin:12px 0">
-          <tr>
-            <td style="width:50%;padding:10px;background:#fff8e7;border-radius:8px 0 0 8px;text-align:center;border:1px solid #fbbf24">
-              <p style="margin:0;font-size:11px;color:#92400e;font-weight:600">STAY WEEKLY</p>
-              <p style="margin:4px 0;font-size:16px;color:#78350f;font-weight:700">$0.75/week</p>
-              <p style="margin:0;font-size:11px;color:#92400e">~$3.26/mo equivalent</p>
-              <p style="margin:0;font-size:11px;color:#92400e">No bonus days</p>
-            </td>
-            <td style="width:50%;padding:10px;background:#fefce8;border-radius:0 8px 8px 0;text-align:center;border:2px solid #6366f1;position:relative">
-              <span style="position:absolute;top:-8px;right:8px;background:#6366f1;color:#fff;font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">RECOMMENDED</span>
-              <p style="margin:0;font-size:11px;color:#4f46e5;font-weight:600">SWITCH MONTHLY</p>
-              <p style="margin:4px 0;font-size:16px;color:#4338ca;font-weight:700">$4.00/month</p>
-              <p style="margin:0;font-size:11px;color:#4f46e5">~$0.92/week equivalent</p>
-              <p style="margin:0;font-size:11px;color:#7c3aed;font-weight:600">+ 10 BONUS DAYS</p>
-              <p style="margin:0;font-size:11px;color:#4f46e5">41 days total</p>
-              <p style="margin:0;font-size:11px;color:#4f46e5">Save $3.50 vs weekly</p>
-            </td>
-          </tr>
-        </table>
-      </div>
-      <table cellpadding="0" cellspacing="0" style="margin:0 auto 12px">
-        <tr>
-          <td><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=monthly&upsell=weekly_bonus" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Switch to Monthly — Get 10 Bonus Days</a></td>
-        </tr>
-      </table>
-      <p style="margin:0 0 20px;text-align:center">
-        <a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=weekly" style="color:#6b7280;font-size:13px">Just renew weekly for $0.75</a>
-      </p>
-    `);
-  }
+  const rows: string[] = [
+    `<tr><td style="padding:34px 40px 0 40px;"><span style="font-size:26px;font-weight:600;letter-spacing:-0.02em;color:${TEXT};">${escapeHtml(title)}</span></td></tr>`,
+    `<tr><td style="padding:10px 40px 0 40px;"><span style="font-size:16px;color:${TEXT_2};">${escapeHtml(planName)} · ${label} plan</span></td></tr>`,
+    cardDivider(),
+    `<tr><td style="padding:0 40px 8px 40px;"><span style="font-size:17px;color:${TEXT_2};line-height:1.8;">Hi ${escapeHtml(username)},</span></td></tr>`,
+  ];
 
-  // --- WEEKLY STAGE 3: Final day ---
-  if (billingPeriod === 'weekly' && stage === 3) {
-    contentBlocks.push(`
-      <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6">
-        Your <strong>${escapeHtml(planName)}</strong> plan expires <strong>today</strong> at ${expiryDate.split(', ').slice(1).join(', ')}.
-      </p>
-      <div style="background:#fef3c7;border-radius:8px;padding:14px;margin:0 0 16px;border-left:4px solid #f59e0b">
-        <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5">
-          <strong>When it expires:</strong><br>
-          • Sites may enter the 50-day archive countdown<br>
-          • Priority queue access ends<br>
-          • File size limit drops to 1GB<br>
-          • API tokens drop to 1,000/day
-        </p>
-      </div>
-    `);
-    if (upsellData?.bonusDays) {
-      contentBlocks.push(`
-        <p style="margin:0 0 16px;color:#374151;font-size:14px">Special offer still available — switch to monthly and get ${upsellData.bonusDays} bonus days.</p>
-      `);
+  const isLastDay = (billingPeriod === 'weekly' && stage === 3) ||
+                    (billingPeriod === 'monthly' && stage === 4) ||
+                    (billingPeriod === 'annual' && stage === 5);
+
+  if (daysRemaining > 0) {
+    rows.push(
+      `<tr><td style="padding:0 40px 24px 40px;"><span style="font-size:17px;color:${TEXT_2};line-height:1.8;">Your <strong style="color:${TEXT};">${escapeHtml(planName)}</strong> subscription ${isLastDay ? "expires today" : `expires on <strong style="color:${TEXT};">${escapeHtml(expiryDateOnly)}</strong>`}. Your benefits continue until then.</span></td></tr>`,
+    );
+    if (isLastDay) {
+      rows.push(changeList([
+        "Sites may enter the 50-day archive countdown",
+        "Priority queue access ends",
+        "Max upload file size drops to 1 GB",
+        "API tokens drop to 1,000 per day",
+      ]));
     }
-    contentBlocks.push(`
-      <table cellpadding="0" cellspacing="0" style="margin:0 auto">
-        <tr>
-          <td><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=${billingPeriod}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Keep my Supporter benefits</a></td>
-        </tr>
-      </table>
-    `);
+    rows.push(ctaButton(`${APP_URL}/checkout?plan=${planType}&billing=${billingPeriod}`, isLastDay ? "Renew my subscription" : "Manage subscription"));
+    rows.push(secondaryLink(`${APP_URL}/settings/account?tab=preferences`, "Update notification preferences"));
+  } else {
+    rows.push(
+      `<tr><td style="padding:0 40px 24px 40px;"><span style="font-size:17px;color:${TEXT_2};line-height:1.8;">Your <strong style="color:${TEXT};">${escapeHtml(planName)}</strong> subscription ended on <strong style="color:${TEXT};">${escapeHtml(expiryDateOnly)}</strong>. Your account is now on the Free plan.</span></td></tr>`,
+    );
+    rows.push(changeList([
+      "Sites may enter the 50-day archive countdown",
+      "Priority queue access ends",
+      "Max upload file size drops to 1 GB",
+      "API tokens drop to 1,000 per day",
+      "Supporter badge removed from profile",
+    ]));
+    rows.push(ctaButton(`${APP_URL}/checkout?plan=${planType}&billing=${billingPeriod === 'annual' ? 'annual' : 'monthly'}`, `Reactivate ${escapeHtml(planName)}`));
+    rows.push(secondaryLink(`${APP_URL}/settings/account?tab=preferences`, "Update notification preferences"));
   }
 
-  // --- MONTHLY STAGE 3: Annual upsell ---
-  if (billingPeriod === 'monthly' && stage === 3) {
-    contentBlocks.push(`
-      <p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6">
-        Your <strong>${escapeHtml(planName)}</strong> plan renews in <strong>${daysRemaining} days</strong>.
-      </p>
-      <div style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe);border-radius:12px;padding:20px;margin:12px 0 20px;border:1px solid #818cf8">
-        <h2 style="margin:0 0 8px;color:#3730a3;font-size:18px">Lock in 4 months free by switching to annual</h2>
-        <p style="margin:0 0 8px;color:#4338ca;font-size:14px">
-          You're currently paying $4/month = $48/year.<br>
-          Switch to annual today and pay just $32/year.<br>
-          You save <strong>$16 every year</strong> — that's <strong>4 months completely free</strong>.
-        </p>
-        <p style="margin:0;color:#4338ca;font-size:13px">Your current billing period's remaining days carry over.</p>
-      </div>
-      <table cellpadding="0" cellspacing="0" style="margin:0 auto 10px">
-        <tr>
-          <td><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=annual&upsell=monthly_to_annual" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Switch to Annual — Save $16/yr</a></td>
-        </tr>
-      </table>
-      <p style="margin:0;text-align:center"><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=monthly" style="color:#6b7280;font-size:13px">Keep my monthly plan</a></p>
-    `);
-  }
+  const footerExtra =
+    `<a href="${APP_URL}/settings/account?tab=preferences" style="color:${MUTED};text-decoration:underline;">Manage notification preferences</a>`;
 
-  // --- ANNUAL STAGE 3: Supporter+ upsell ---
-  if (billingPeriod === 'annual' && stage === 3 && planType !== 'supporter-plus') {
-    contentBlocks.push(`
-      <p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6">
-        Your <strong>${escapeHtml(planName)}</strong> plan renews in <strong>${daysRemaining} days</strong>.
-      </p>
-      <div style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);border-radius:12px;padding:20px;margin:12px 0 20px;border:1px solid #a855f7">
-        <h2 style="margin:0 0 8px;color:#6b21a8;font-size:18px">Upgrade to Supporter+ at renewal — unlimited everything</h2>
-        <table style="width:100%;border-collapse:collapse;margin:12px 0">
-          <tr>
-            <th style="text-align:left;padding:6px 8px;font-size:12px;color:#6b21a8;border-bottom:1px solid #d8b4fe">Feature</th>
-            <th style="text-align:center;padding:6px 8px;font-size:11px;color:#6b21a8;border-bottom:1px solid #d8b4fe">Supporter</th>
-            <th style="text-align:center;padding:6px 8px;font-size:11px;color:#7c3aed;border-bottom:1px solid #d8b4fe;font-weight:700">Supporter+</th>
-          </tr>
-          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">Concurrent uploads</td><td style="text-align:center;font-size:12px;color:#6b7280">10</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Unlimited</td></tr>
-          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">Concurrent downloads</td><td style="text-align:center;font-size:12px;color:#6b7280">10</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Unlimited</td></tr>
-          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">File size limit</td><td style="text-align:center;font-size:12px;color:#6b7280">12GB</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Unlimited</td></tr>
-          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">API tokens/day</td><td style="text-align:center;font-size:12px;color:#6b7280">10,000</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Unlimited</td></tr>
-          <tr><td style="padding:5px 8px;font-size:12px;color:#374151">Queue priority</td><td style="text-align:center;font-size:12px;color:#6b7280">Priority</td><td style="text-align:center;font-size:12px;color:#7c3aed;font-weight:600">Top Priority</td></tr>
-        </table>
-        <p style="margin:8px 0 0;color:#4338ca;font-size:13px">
-          <strong>Price difference: $48/year = $4/month extra</strong><br>
-          For truly unlimited everything.
-        </p>
-      </div>
-      <table cellpadding="0" cellspacing="0" style="margin:0 auto 10px">
-        <tr>
-          <td><a href="https://squidcloud.vercel.app/checkout?plan=supporter-plus&billing=annual&upsell=supporter_to_plus" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#a855f7,#d946ef);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Upgrade to Supporter+ at renewal</a></td>
-        </tr>
-      </table>
-      <p style="margin:0;text-align:center"><a href="https://squidcloud.vercel.app/checkout?plan=supporter&billing=annual" style="color:#6b7280;font-size:13px">Keep my current Supporter plan</a></p>
-    `);
-  }
-
-  // --- MONTHLY STAGE 6 / WEEKLY STAGE 5 / ANNUAL STAGE 7: Post-expiry win-back ---
-  if ((billingPeriod === 'weekly' && stage === 5) || (billingPeriod === 'monthly' && stage === 6) || (billingPeriod === 'annual' && stage === 7)) {
-    contentBlocks.push(`
-      <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6">
-        Your <strong>${escapeHtml(planName)}</strong> plan has ended. You're now on the free plan.
-      </p>
-      <div style="background:#fef3c7;border-radius:8px;padding:14px;margin:0 0 16px;border-left:4px solid #f59e0b">
-        <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5">
-          <strong>What changed:</strong><br>
-          • Priority queue — now standard queue<br>
-          • Always-active sites — 50-day archive timer started<br>
-          • File size limit dropped to 1GB<br>
-          • API tokens reduced to 1,000/day<br>
-          • Supporter badge removed from profile
-        </p>
-      </div>
-    `);
-    if (billingPeriod === 'annual') {
-      contentBlocks.push(`
-        <p style="margin:0 0 16px;color:#374151;font-size:14px;font-style:italic">
-          You've been a supporter for a full year — thank you. We'd love to have you back.
-        </p>
-      `);
-    }
-    contentBlocks.push(`
-      <table cellpadding="0" cellspacing="0" style="margin:0 auto">
-        <tr>
-          <td><a href="https://squidcloud.vercel.app/checkout?plan=${planType}&billing=${billingPeriod === 'annual' ? 'annual' : 'monthly'}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600">Reactivate ${escapeHtml(planName)} — from $${billingPeriod === 'annual' ? '32' : '4'}/mo</a></td>
-        </tr>
-      </table>
-    `);
-  }
-
-  // --- Generic stage content for simple warning emails ---
-  if (contentBlocks.length === 0) {
-    contentBlocks.push(`
-      <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6">
-        Your <strong>${escapeHtml(planName)}</strong> plan ${daysRemaining > 0 ? `expires in <strong>${daysRemaining} day${daysRemaining === 1 ? '' : 's'}</strong>` : 'has expired'}.
-      </p>
-      <p style="margin:0 0 20px;color:#6b7280;font-size:14px">
-        ${daysRemaining > 0 ? `Your current benefits continue until ${expiryDateOnly}.` : `Your account has been reverted to the Free plan.`}
-      </p>
-      <table cellpadding="0" cellspacing="0" style="margin:0 auto">
-        <tr>
-          <td><a href="https://squidcloud.vercel.app/pricing" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600">${daysRemaining > 0 ? 'Manage my subscription' : 'View Plans'}</a></td>
-        </tr>
-      </table>
-    `);
-  }
-
-  const headerBg = stage >= 4 ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)';
-  const headerTitle = stage >= 4 ? 'Your plan has ended' : `${daysRemaining > 0 ? `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left` : 'Plan ended'}`;
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-          <tr>
-            <td style="background:${headerBg};padding:28px 32px;text-align:center">
-              <h1 style="color:#ffffff;margin:0;font-size:20px">${escapeHtml(headerTitle)}</h1>
-              <p style="color:rgba(255,255,255,0.85);margin:4px 0 0;font-size:13px">${escapeHtml(planName)} — ${billingPeriod} plan</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 32px">
-              <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6">
-                Hey <strong>${escapeHtml(username)}</strong>,
-              </p>
-              ${contentBlocks.join('\n')}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center">
-              <p style="margin:0;color:#9ca3af;font-size:11px">
-                SquidCloud · <a href="https://squidcloud.vercel.app/settings/account?tab=preferences" style="color:#9ca3af;text-decoration:underline">Notification preferences</a> · <a href="{{unsubscribe_url}}" style="color:#9ca3af;text-decoration:underline">Unsubscribe</a>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  return emailShell(rows.join("\n"), "Subscription", undefined, footerExtra);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -430,46 +295,45 @@ async function handleCron(supabase: ReturnType<typeof createClient>, dryRun = fa
 
 function buildSubject(planType: string, billingPeriod: string, stage: number, username: string, daysRemaining: number): string {
   const planName = getPlanName(planType);
-  const name = username.split(' ')[0];
 
   const subjects: Record<string, Record<number, string>> = {
     weekly: {
-      1: `Your ${planName} week is almost up, ${name}`,
-      2: `1 day left — and here's a better deal, ${name}`,
-      3: `Last chance — your benefits expire today`,
-      5: `Your ${planName} benefits have ended, ${name}`,
-      6: `${name}, we miss you — come back to ${planName}`,
+      1: `Your ${planName} subscription renews in 7 days`,
+      2: `Your ${planName} subscription renews tomorrow`,
+      3: `Your ${planName} subscription expires today`,
+      5: `Your ${planName} subscription has ended`,
+      6: `Your ${planName} subscription has ended`,
     },
     monthly: {
-      1: `Your ${planName} plan renews in ${daysRemaining} days`,
-      2: `Your ${planName} plan renews soon`,
-      3: `${daysRemaining} days left on your ${planName} plan`,
-      4: `Your ${planName} plan expires tomorrow`,
-      6: `You're back on the free plan, ${name}`,
-      7: `${name}, your ${planName} benefits are waiting`,
-      8: `Final chance — reactivate your ${planName} plan`,
+      1: `Your ${planName} subscription renews in ${daysRemaining} days`,
+      2: `Your ${planName} subscription renews soon`,
+      3: `${daysRemaining} days remaining on your ${planName} subscription`,
+      4: `Your ${planName} subscription expires tomorrow`,
+      6: `Your ${planName} subscription has ended`,
+      7: `Your ${planName} subscription has ended`,
+      8: `Your ${planName} subscription has ended`,
     },
     annual: {
-      1: `Your ${planName} plan renews in 30 days, ${name}`,
-      2: `Your annual plan renews in 15 days`,
-      3: `1 week until your annual plan renews`,
-      4: `3 days left on your annual plan`,
-      5: `Your annual plan expires tomorrow`,
-      7: `Your annual plan has ended — here's what changed`,
-      8: `${name}, your annual benefits are waiting`,
-      9: `Last chance to reactivate your annual plan`,
+      1: `Your ${planName} subscription renews in 30 days`,
+      2: `Your ${planName} subscription renews in 15 days`,
+      3: `Your ${planName} subscription renews in 7 days`,
+      4: `3 days remaining on your ${planName} subscription`,
+      5: `Your ${planName} subscription expires tomorrow`,
+      7: `Your ${planName} subscription has ended`,
+      8: `Your ${planName} subscription has ended`,
+      9: `Your ${planName} subscription has ended`,
     },
   };
 
-  return subjects[billingPeriod]?.[stage] || `Your ${planName} plan needs attention, ${name}`;
+  return subjects[billingPeriod]?.[stage] || `Your ${planName} subscription status`;
 }
 
 function buildTextBody(planType: string, billingPeriod: string, stage: number, username: string, daysRemaining: number, daysSinceExpiry: number): string {
   const planName = getPlanName(planType);
   if (daysRemaining > 0) {
-    return `Hey ${username}, your ${planName} ${billingPeriod} plan has ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining. Manage your subscription at https://squidcloud.vercel.app/settings/account`;
+    return `Hi ${username}, your ${planName} subscription has ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining. Manage your subscription at https://squidcloud.vercel.app/checkout?plan=${planType}&billing=${billingPeriod}`;
   }
-  return `Hey ${username}, your ${planName} plan ended ${daysSinceExpiry} day${daysSinceExpiry === 1 ? '' : 's'} ago. Reactivate at https://squidcloud.vercel.app/pricing`;
+  return `Hi ${username}, your ${planName} subscription ended ${daysSinceExpiry} day${daysSinceExpiry === 1 ? '' : 's'} ago. Renew at https://squidcloud.vercel.app/checkout?plan=${planType}&billing=${billingPeriod === 'annual' ? 'annual' : 'monthly'}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════

@@ -72,17 +72,17 @@ async function sendEmails(
 
   // Welcome email
   try {
-    const welcomeSubject = `Welcome to ${planName}! Your subscription is active, ${username}`;
-    const welcomeText = `Hey ${username}, welcome to ${planName}! Your subscription is active until ${expiresAt}.`;
-    await sendEmail(recipientEmail, welcomeSubject, welcomeText, buildWelcomeEmailHtml(planType, username, expiresAt));
+    const welcomeSubject = `Your ${planName} subscription is now active`;
+    const welcomeText = `Hi ${username}, thank you for choosing SquidCloud. Your ${planName} subscription is active until ${expiresAt}.`;
+    await sendEmail(recipientEmail, welcomeSubject, welcomeText, buildWelcomeEmailHtml(planType, username, expiresAt, billingPeriod));
   } catch (e) {
     console.error('Failed to send welcome email:', e);
   }
 
   // Receipt email
   try {
-    const receiptSubject = `Payment Successful — ${planName} ${billingPeriod} Subscription`;
-    const receiptText = `Your ${planName} ${billingPeriod} subscription is active. Total: $${amount.toFixed(2)} USD.`;
+    const receiptSubject = `Receipt for your ${planName} subscription`;
+    const receiptText = `Your ${planName} ${billingPeriod} subscription is active. Total paid: $${amount.toFixed(2)} USD.`;
     const receiptParams: ReceiptParams = {
       username,
       userId,
