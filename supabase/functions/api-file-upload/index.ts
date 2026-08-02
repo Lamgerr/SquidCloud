@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts'
 import { sendSignal } from '../_shared/signals.ts'
+import { emitWebhookEvent } from '../_shared/webhook-emitter.ts'
 
 const validateEncryptionKeyFormat = (key: string): boolean => {
   return key.length >= 8 && key.length <= 512
@@ -122,6 +123,18 @@ serve(async (req) => {
       }
 
       statusCode = 201
+
+      void emitWebhookEvent({
+        userId: keyData.user_id,
+        event: 'file.uploaded',
+        data: {
+          file_id: fileRecord.id,
+          file_name: fileRecord.name,
+          file_size: fileRecord.size,
+          mime_type: fileRecord.type,
+          source: 'api',
+        },
+      })
 
       return jsonResponse({
         success: true,

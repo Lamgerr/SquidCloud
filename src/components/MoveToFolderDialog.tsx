@@ -7,6 +7,7 @@ import { Folder, ChevronRight, ArrowLeft, Home, Check } from '@/lib/icon-map';
 import { type FolderItem } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { emitWebhookEvent } from '@/lib/webhook-events';
 
 interface MoveToFolderDialogProps {
   open: boolean;
@@ -92,6 +93,14 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({
           .eq('id', fileId)
           .eq('user_id', user.id);
         if (error) throw error;
+      }
+      for (const fileId of fileIds) {
+        void emitWebhookEvent('file.moved', {
+          file_id: fileId,
+          old_folder_id: null,
+          new_folder_id: targetPath,
+          moved_by: user.id,
+        });
       }
       toast({
         title: 'Moved',

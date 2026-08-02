@@ -3,6 +3,7 @@ import { uploadFileWithRes54, downloadFileWithRes54 } from "./res54";
 import { decryptData, encryptData, generateEncryptionKey } from "./encryption";
 import { buildPublicUrl } from "@/lib/appLinks";
 import { createSecureFileRecord, fetchFileEncryptionKey } from "@/lib/secure-file-metadata";
+import { emitWebhookEvent } from "@/lib/webhook-events";
 
 const ACTIVE_WORKSPACE_STORAGE_KEY = 'squid_active_workspace_id';
 const ACTIVE_PROVIDER_TYPE_STORAGE_KEY = 'squid_active_provider_type';
@@ -734,6 +735,15 @@ export const uploadFile = async (
       (fileItem as any).processor = "res54";
     }
     
+    void emitWebhookEvent('file.uploaded', {
+      file_id: fileItem.id,
+      file_name: fileItem.name,
+      file_size: fileItem.size,
+      mime_type: fileItem.type,
+      folder_id: fileItem.parent_folder || null,
+      source: 'app',
+    });
+    
     return fileItem;
   } catch (error: any) {
     console.error("Error uploading file:", error);
@@ -920,11 +930,25 @@ export async function downloadFile(fileId: string, onProgress?: (progress: numbe
 
 export async function deleteFile(id: string): Promise<void> {
   try {
+    const { data: fileRecord } = await supabase
+      .from('files')
+      .select('name, size')
+      .eq('id', id)
+      .single();
+
     const { data, error } = await supabase.rpc('delete_file_secure', { file_uuid: id });
 
     if (error || !data) {
       console.error("Error deleting file:", error);
       throw new Error(error?.message || 'Failed to delete file');
+    }
+
+    void emitWebhookEvent('file.deleted', {
+      file_id: id,
+      file_name: fileRecord?.name || null,
+      file_size: fileRecord?.size || null,
+      deleted_at: new Date().toISOString(),
+    });
     }
   } catch (error) {
     console.error("Error deleting file:", error);
@@ -1072,6 +1096,13 @@ export async function createFileShare(
       idempotency_key: `file_shared:${shareId}`,
     });
 
+    void emitWebhookEvent('file.shared', {
+      file_id: fileId,
+      share_id: shareId,
+      expires_at: options?.expiresAt || null,
+      access_level: options?.viewOnly ? 'view' : 'download',
+    });
+
     const shareUrl = buildPublicUrl(`/s/${shareId}`);
     return { shareId, shareUrl };
   } catch (error: any) {
@@ -1146,6 +1177,14 @@ export async function createFolderShare(
       link: '/dashboard',
       idempotency_key: `file_shared:${shareId}`,
     });
+
+    void emitWebhookEvent('file.shared', {
+      folder_id: folderId,
+      share_id: shareId,
+      file_count: fileCount,
+      expires_at: options?.expiresAt || null,
+    });
+
     return { shareId, shareUrl, fileCount };
   } catch (error: any) {
     console.error("Error creating folder share:", error);
@@ -1169,6 +1208,11 @@ export async function revokeFileShare(fileId: string): Promise<boolean> {
     
     // Explicitly unset the 'shared' state on the actual file record
     await supabase.from('files').update({ shared: false }).eq('id', fileId);
+
+    void emitWebhookEvent('share_link.revoked', {
+      file_id: fileId,
+      revoked_at: new Date().toISOString(),
+    });
 
     return true;
   } catch (error) {

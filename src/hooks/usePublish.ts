@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { downloadFile } from '@/lib/api';
+import { emitWebhookEvent } from '@/lib/webhook-events';
 import {
   checkPublishStatus,
   createPublication,
@@ -278,6 +279,14 @@ export function usePublish() {
         totalSizeBytes: stats.totalBytes,
       });
 
+      void emitWebhookEvent('site.published', {
+        site_id: publication.id,
+        site_name: siteSlug,
+        url: siteUrl,
+        file_count: stats.fileCount,
+        published_at: new Date().toISOString(),
+      });
+
       setProgress(null);
       setLoading(false);
       return { publication, slug: siteSlug, url: siteUrl };
@@ -310,6 +319,13 @@ export function usePublish() {
       const publication = await updatePublication(slug, {
         fileCount: stats.fileCount,
         totalSizeBytes: stats.totalBytes,
+      });
+
+      void emitWebhookEvent('site.redeployed', {
+        site_id: publication.id,
+        site_name: slug,
+        file_count: stats.fileCount,
+        redeployed_at: new Date().toISOString(),
       });
 
       setProgress(null);

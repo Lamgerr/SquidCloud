@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { emitWebhookEvent } from "../_shared/webhook-emitter.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") as string;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
@@ -356,6 +357,20 @@ async function executePipeline(
     last_run_status: runStatus,
     total_runs: (script.total_runs || 0) + 1,
   }).eq('id', script.id);
+
+  // Emit pipeline webhook event
+  void emitWebhookEvent({
+    userId: script.user_id || user?.id,
+    event: runStatus === 'failed' ? 'pipeline.failed' : 'pipeline.completed',
+    data: {
+      pipeline_id: script.id,
+      pipeline_name: script.name,
+      run_id: runId,
+      status: runStatus,
+      trigger_type: triggerType,
+      completed_at: completedAt,
+    },
+  });
 }
 
 // ── Main Handler ─────────────────────────────────────────────────────────────

@@ -14,6 +14,8 @@ interface WebhookEvent {
   status: 'pending' | 'success' | 'failed';
   response_status: number | null;
   error_message: string | null;
+  attempt_count?: number;
+  duration_ms?: number | null;
   created_at: string;
 }
 
@@ -119,6 +121,12 @@ export function WebhookEventLogs() {
                   </Badge>
                   {log.response_status && (
                     <span className="text-[10px] text-white/30 font-mono">{log.response_status}</span>
+                  )}
+                  {log.attempt_count > 1 && (
+                    <span className="text-[10px] text-white/30 font-mono">attempt {log.attempt_count}</span>
+                  )}
+                  {typeof log.duration_ms === 'number' && (
+                    <span className="text-[10px] text-white/30 font-mono">{log.duration_ms}ms</span>
                   )}
                 </div>
                 {log.error_message && (

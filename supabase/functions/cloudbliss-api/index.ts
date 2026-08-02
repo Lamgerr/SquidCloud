@@ -3,6 +3,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { sendSignal } from '../_shared/signals.ts'
+import { emitWebhookEvent } from '../_shared/webhook-emitter.ts'
 
 import {
   CORS_HEADERS, jsonResponse, errorResponse, apiError, verifyRequestSignature,
@@ -124,6 +125,17 @@ serve(async (req) => {
         body: `${remaining} credits remaining (${dailyLimit} daily limit). Top up or your API calls will start failing.`,
         link: '/developer-api',
         idempotency_key: `credits_low:${userId}:${new Date().toISOString().slice(0, 10)}`,
+      })
+
+      void emitWebhookEvent({
+        userId,
+        event: 'api_tokens.quota_warning',
+        data: {
+          used: Math.max(0, dailyLimit - remaining),
+          limit: dailyLimit,
+          remaining,
+          reset_at: new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z').toISOString(),
+        },
       })
     }
 

@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { generateEncryptionKey, encryptData, decryptData } from '@/lib/encryption';
+import { emitWebhookEvent } from '@/lib/webhook-events';
 
 export interface FileOrganizationResult {
   foldersCreated: string[];
@@ -356,11 +357,26 @@ export class SquidAITools {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
+    const { data: fileRecord } = await supabase
+      .from('files')
+      .select('name')
+      .eq('id', fileId)
+      .eq('user_id', user.id)
+      .single();
+
     const { error } = await supabase
       .from('files')
       .update({ name: newName })
       .eq('id', fileId)
       .eq('user_id', user.id);
+
+    if (!error) {
+      void emitWebhookEvent('file.renamed', {
+        file_id: fileId,
+        old_name: fileRecord?.name || null,
+        new_name: newName,
+      });
+    }
 
     return !error;
   }

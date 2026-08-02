@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import {
   Plus, Trash2, RotateCcw, ExternalLink, Network,
   CheckCircle2, XCircle, Clock, Copy, Eye, EyeOff,
-  AlertCircle, Zap, Globe, MessageSquare, Share2,
+  AlertCircle, Zap, Globe, MessageSquare, Share2, Send,
 } from '@/lib/icon-map';
 import { MobileCreateWebhookSheet } from '@/components/MobileCreateWebhookSheet';
 import { Button } from '@/components/ui/button';
@@ -128,6 +128,32 @@ export function WebhookManager({ open, onClose, standalone = false }: WebhookMan
     toast({ title: 'Secret copied' });
   };
 
+  const handlePing = async (webhook: WebhookRecord) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('webhook-dispatch', {
+        body: { action: 'ping', webhookId: webhook.id },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast({
+          title: `Ping OK — ${data.statusCode} in ${data.durationMs}ms`,
+          description: data.response?.slice(0, 120) || 'Delivery successful',
+        });
+        setWebhooks(prev => prev.map(w =>
+          w.id === webhook.id ? { ...w, last_triggered_at: new Date().toISOString() } : w
+        ));
+      } else {
+        toast({
+          title: `Ping failed${data?.statusCode ? ` — ${data.statusCode}` : ''}`,
+          description: data?.error || data?.response?.slice(0, 120) || 'Delivery failed',
+          variant: 'destructive',
+        });
+      }
+    } catch (e: any) {
+      toast({ title: 'Ping error', description: e.message, variant: 'destructive' });
+    }
+  };
+
   const headerContent = (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2.5 min-w-0">
@@ -202,6 +228,13 @@ export function WebhookManager({ open, onClose, standalone = false }: WebhookMan
             title="Rotate secret"
           >
             <RotateCcw className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => handlePing(webhook)}
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/50 hover:text-emerald-400 hover:bg-emerald-400/10 transition-colors"
+            title="Send test ping"
+          >
+            <Send className="w-3 h-3" />
           </button>
           <button
             onClick={() => setDeleteTarget(webhook)}

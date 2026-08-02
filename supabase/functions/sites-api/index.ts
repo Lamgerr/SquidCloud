@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { emitWebhookEvent } from "../_shared/webhook-emitter.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") as string;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
@@ -88,6 +89,20 @@ serve(async (req) => {
       }).select().single();
 
       if (insertError) return json({ error: insertError.message }, 500);
+
+      void emitWebhookEvent({
+        userId: user.id,
+        event: 'site.published',
+        data: {
+          site_id: pub.id,
+          site_slug: pub.site_slug,
+          site_name: siteSlug,
+          url: siteUrl,
+          visibility: pub.visibility,
+          published_at: new Date().toISOString(),
+        },
+      });
+
       return json({ publication: pub, siteSlug, siteUrl });
     }
 
@@ -152,6 +167,18 @@ serve(async (req) => {
       }
 
       await supabase.from('site_publications').delete().eq('id', pub.id);
+
+      void emitWebhookEvent({
+        userId: user.id,
+        event: 'site.unpublished',
+        data: {
+          site_id: pub.id,
+          site_slug: pub.site_slug,
+          site_name: pub.site_slug,
+          unpublished_at: new Date().toISOString(),
+        },
+      });
+
       return json({ success: true, message: 'Site unpublished' });
     }
 

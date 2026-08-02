@@ -340,6 +340,81 @@ GRANT EXECUTE ON FUNCTION public.update_webhook TO authenticated;
 GRANT EXECUTE ON FUNCTION public.delete_webhook TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rotate_webhook_secret TO authenticated;
 
+-- Webhook Pipeline v2 — industry-standard delivery tracking
+ALTER TABLE public.webhook_events_log
+  ADD COLUMN IF NOT EXISTS delivery_id UUID,
+  ADD COLUMN IF NOT EXISTS attempt_count INT NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS duration_ms INT,
+  ADD COLUMN IF NOT EXISTS response_body TEXT,
+  ADD COLUMN IF NOT EXISTS event_payload JSONB;
+
+CREATE INDEX IF NOT EXISTS idx_webhook_events_log_pending
+  ON public.webhook_events_log(status, next_attempt_at)
+  WHERE status = 'pending';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_events_log_delivery
+  ON public.webhook_events_log(delivery_id)
+  WHERE delivery_id IS NOT NULL;
+
+ALTER TABLE public.webhooks
+  ADD COLUMN IF NOT EXISTS total_deliveries INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS failed_deliveries INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_status TEXT,
+  ADD COLUMN IF NOT EXISTS last_duration_ms INT;
+
+CREATE OR REPLACE FUNCTION public.ping_webhook(p_webhook_id UUID)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_webhook public.webhooks;
+  v_url TEXT;
+BEGIN
+  SELECT * INTO v_webhook FROM public.webhooks WHERE id = p_webhook_id AND user_id = auth.uid();
+  IF v_webhook.id IS NULL THEN
+    RAISE EXCEPTION 'Webhook not found or access denied';
+  END IF;
+
+  UPDATE public.webhooks
+  SET last_triggered_at = now(), last_status = 'ping',
+      updated_at = now()
+  WHERE id = v_webhook.id;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'webhook_id', v_webhook.id,
+    'url', v_webhook.url,
+    'events', v_webhook.events
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.ping_webhook(UUID) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_webhook_deliveries(
+  p_limit INT DEFAULT 50,
+  p_status TEXT DEFAULT NULL
+)
+RETURNS SETOF public.webhook_events_log
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT * FROM public.webhook_events_log
+  WHERE user_id = auth.uid()
+    AND (p_status IS NULL OR status = p_status)
+  ORDER BY created_at DESC
+  LIMIT LEAST(GREATEST(p_limit, 1), 200);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_webhook_deliveries(INT, TEXT) TO authenticated;
+
 -- ============================================================
 -- 4. SQUIDEMBED — Embed tokens
 -- ============================================================

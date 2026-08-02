@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendSignal } from "../_shared/signals.ts";
+import { emitWebhookEvent } from "../_shared/webhook-emitter.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -95,6 +96,16 @@ serve(async (req) => {
         p_geo_country: country || null,
       });
       void notifyShareOwner(supabase, shareId, 'viewed');
+      void emitWebhookEvent({
+        userId: (await getShareOwner(supabase, shareId))?.user_id || '',
+        event: 'share_link.accessed',
+        data: {
+          share_id: shareId,
+          accessed_at: new Date().toISOString(),
+          ip_address: req.headers.get('x-real-ip') || '',
+          user_agent: req.headers.get('user-agent') || '',
+        },
+      });
       return json({ ok: true });
     }
 
@@ -117,6 +128,17 @@ serve(async (req) => {
       }
 
       void notifyShareOwner(supabase, shareId, 'downloaded');
+      void emitWebhookEvent({
+        userId: (await getShareOwner(supabase, shareId))?.user_id || '',
+        event: 'share_link.accessed',
+        data: {
+          share_id: shareId,
+          accessed_at: new Date().toISOString(),
+          ip_address: req.headers.get('x-real-ip') || '',
+          user_agent: req.headers.get('user-agent') || '',
+          action: 'download',
+        },
+      });
 
       return json({
         ok: true, burn_after_reading: check.burn_after_reading,
