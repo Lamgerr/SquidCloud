@@ -949,7 +949,6 @@ export async function deleteFile(id: string): Promise<void> {
       file_size: fileRecord?.size || null,
       deleted_at: new Date().toISOString(),
     });
-    }
   } catch (error) {
     console.error("Error deleting file:", error);
     throw error;

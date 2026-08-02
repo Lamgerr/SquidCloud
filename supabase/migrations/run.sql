@@ -152,7 +152,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  deleted BOOLEAN;
+  deleted BIGINT;
 BEGIN
   DELETE FROM public.entity_notes
   WHERE id = p_note_id AND user_id = auth.uid();
@@ -310,7 +310,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE deleted BOOLEAN;
+DECLARE deleted BIGINT;
 BEGIN
   DELETE FROM public.webhooks WHERE id = p_webhook_id AND user_id = auth.uid();
   GET DIAGNOSTICS deleted = ROW_COUNT;
@@ -479,7 +479,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE updated BOOLEAN;
+DECLARE updated BIGINT;
 BEGIN
   UPDATE public.embed_tokens SET is_active = false, updated_at = now()
   WHERE id = p_token_id AND user_id = auth.uid();

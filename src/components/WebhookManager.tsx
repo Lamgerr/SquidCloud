@@ -92,7 +92,7 @@ export function WebhookManager({ open, onClose, standalone = false }: WebhookMan
     }
   }, []);
 
-  useEffect(() => { if (open) fetchWebhooks(); }, [open, fetchWebhooks]);
+  useEffect(() => { if (open || standalone) fetchWebhooks(); }, [open, standalone, fetchWebhooks]);
 
   const handleDelete = async (webhook: WebhookRecord) => {
     try {
