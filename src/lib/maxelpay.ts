@@ -1,13 +1,17 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabaseEnv';
+import { secureSupabase } from '@/lib/supabase-proxy';
 
 const MAXELPAY_API = 'https://api.maxelpay.com/api/v1';
 
 async function callProxy(endpoint: string, payload: any, testMode = false): Promise<any> {
+  const { data } = await secureSupabase.auth.getSession();
+  const token = data.session?.access_token ?? SUPABASE_ANON_KEY;
+
   const res = await fetch(`${SUPABASE_URL}/functions/v1/maxelpay-proxy`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({ endpoint, payload, mode: testMode ? 'test' : 'live' }),
   });

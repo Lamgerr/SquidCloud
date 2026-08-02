@@ -5,7 +5,7 @@ type SupabaseClient = ReturnType<typeof createClient>;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -19,6 +19,27 @@ serve(async (req) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const internalKey = req.headers.get("X-Internal-Key") || "";
+  const authHeader = req.headers.get("Authorization") || "";
+  const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+  if (internalKey) {
+    const { data: config } = await supabase
+      .from("system_config")
+      .select("value")
+      .eq("key", "INTERNAL_WEBHOOK_KEY")
+      .single();
+    if (config?.value !== internalKey) {
+      return new Response(JSON.stringify({ error: "Invalid internal key" }), {
+        status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
+      });
+    }
+  } else if (jwt !== SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
+    });
+  }
+
   let job: any = null;
 
   try {

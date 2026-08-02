@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "npm:aws4fetch";
+import { withPrelGateway } from "../_shared/kza-prel.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,7 @@ const createErrorResponse = (message: string, status = 500, details?: any) => {
 };
 
 serve(async (req) => {
+  return withPrelGateway(req, { functionId: 'github-storage', operation: 'default' }, async (ctx) => {
   // Handle CORS Preflight requests for the Edge Function
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -219,4 +221,5 @@ serve(async (req) => {
   } catch (error: any) {
     return createErrorResponse(`Internal server error: ${error.message}`);
   }
+  });
 });

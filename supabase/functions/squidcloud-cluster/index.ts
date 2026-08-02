@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "npm:aws4fetch";
+import { withPrelGateway } from "../_shared/kza-prel.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -73,6 +74,7 @@ async function loadB2Clusters(supabase: any): Promise<B2Cluster[]> {
 }
 
 serve(async (req) => {
+  return withPrelGateway(req, { functionId: 'squidcloud-cluster', operation: 'default' }, async (ctx) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -262,4 +264,5 @@ serve(async (req) => {
   } catch (error: any) {
     return createErrorResponse(`Internal server error: ${error.message}`);
   }
+  });
 });

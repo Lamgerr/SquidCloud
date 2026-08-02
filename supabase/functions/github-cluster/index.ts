@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { withPrelGateway } from "../_shared/kza-prel.ts";
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +24,7 @@ function generateSecureFolder(): string {
 }
 
 serve(async (req: Request) => {
+  return withPrelGateway(req, { functionId: 'github-cluster', operation: 'default' }, async () => {
   if (req.method === 'OPTIONS') return corsResponse();
 
   try {
@@ -81,4 +83,5 @@ serve(async (req: Request) => {
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
+  });
 });
