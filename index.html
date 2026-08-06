@@ -69,6 +69,49 @@
     <meta name="description" content="SquidCloud - Secure, Unlimited Cloud Storage for Your Digital Life with end-to-end encryption" />
     <meta name="keywords" content="cloud storage, secure storage, encrypted files, file sharing, unlimited storage" />
     <meta name="theme-color" content="#2563eb" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://squidcloud.vercel.app/" />
+    
+    <!-- Structured data for Google -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "SquidCloud",
+      "alternateName": "SquidCloud - Secure Cloud Storage",
+      "url": "https://squidcloud.vercel.app/",
+      "description": "Secure, unlimited cloud storage with end-to-end encryption, zero-knowledge architecture with RES54 end-to-end encryption and the KZA security layer, plus AI-powered organization.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "SquidCloud",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://squidcloud.vercel.app/logo-1024.png"
+        }
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://squidcloud.vercel.app/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "SquidCloud",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web, Android, iOS, Windows, macOS, Linux",
+      "url": "https://squidcloud.vercel.app/",
+      "description": "Secure, unlimited cloud storage with end-to-end encryption, secret management, REST APIs and SDKs, and zero-knowledge architecture.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
     
     <!-- PWA Support -->
     <link rel="manifest" href="/manifest.json" />
@@ -76,17 +119,17 @@
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://squidcloud.app/" />
+    <meta property="og:url" content="https://squidcloud.vercel.app/" />
     <meta property="og:title" content="SquidCloud - Secure, Unlimited Cloud Storage" />
     <meta property="og:description" content="Experience the future of secure storage with end-to-end encryption, unlimited space, and AI-powered organization." />
-    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="og:image" content="https://squidcloud.vercel.app/artwork.png" />
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://squidcloud.app/" />
+    <meta property="twitter:url" content="https://squidcloud.vercel.app/" />
     <meta property="twitter:title" content="SquidCloud - Secure, Unlimited Cloud Storage" />
     <meta property="twitter:description" content="Experience the future of secure storage with end-to-end encryption, unlimited space, and AI-powered organization." />
-    <meta property="twitter:image" content="/og-image.jpg" />
+    <meta property="twitter:image" content="https://squidcloud.vercel.app/artwork.png" />
     
     <!-- Fonts -->
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
@@ -95,7 +138,13 @@
     <title>SquidCloud - Secure, Unlimited Cloud Storage</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><h1>SquidCloud - Secure, Unlimited Cloud Storage</h1><p>SquidCloud is a secure cloud storage platform with end-to-end encryption, unlimited storage, zero-knowledge architecture with RES54 end-to-end encryption and the KZA security layer, plus AI-powered organization. Upload, share, and manage files with powerful features like secret management, REST APIs and SDKs, file requests, and lightning-fast download speeds.</p><p>Key features: Unlimited storage, zero-knowledge end-to-end encryption, file sharing with secure links, secret management, developer APIs, and full cross-platform support on web, Android, iOS, Windows, macOS, and Linux.</p><p><a href="/pricing">Pricing</a> | <a href="/cli">CLI &amp; Developer Docs</a> | <a href="/help/docs">Documentation</a> | <a href="/help/squidveil">SquidVeil Encryption</a></p></div>
+    <noscript>
+      <h1>SquidCloud - Secure, Unlimited Cloud Storage</h1>
+      <p>SquidCloud is a secure cloud storage platform with end-to-end encryption, unlimited storage, zero-knowledge architecture with RES54 end-to-end encryption and the KZA security layer, plus AI-powered organization. Upload, share, and manage files with powerful features like secret management, REST APIs and SDKs, file requests, and lightning-fast download speeds.</p>
+      <p>Key features: Unlimited storage, zero-knowledge end-to-end encryption, file sharing with secure links, secret management, developer APIs, and full cross-platform support on web, Android, iOS, Windows, macOS, and Linux.</p>
+      <p><a href="/pricing">Pricing</a> | <a href="/cli">CLI &amp; Developer Docs</a> | <a href="/help/docs">Documentation</a> | <a href="/help/squidveil">SquidVeil Encryption</a></p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

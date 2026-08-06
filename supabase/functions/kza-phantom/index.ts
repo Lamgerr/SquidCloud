@@ -2,6 +2,17 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts'
 
+const hmacHex = async (key: string, message: string): Promise<string> => {
+  const enc = new TextEncoder()
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw', enc.encode(key),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false, ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(message))
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 const ghostEndpoints = [
   '/admin-old',
   '/admin-backup',
@@ -101,11 +112,16 @@ serve(async (req) => {
   }
 
   const callSentinel = async (tier: 'RED' | 'BLACK', threatType: string, description: string) => {
+    const serviceKey = SUPABASE_SERVICE_ROLE_KEY
+    const internalSecret = Deno.env.get('KZA_INTERNAL_SECRET') ?? serviceKey
+    const ts = Date.now().toString()
+    const sig = await hmacHex(internalSecret, ts)
     return await fetch(`${SUPABASE_URL}/functions/v1/kza-sentinel`, {
       method: 'POST',
       headers: {
         Authorization: req.headers.get('Authorization') ?? '',
         'Content-Type': 'application/json',
+        'X-KZA-Internal': `${ts}:${sig}`,
         'X-KZA-Session': req.headers.get('X-KZA-Session') ?? '',
         'X-Forwarded-For': req.headers.get('X-Forwarded-For') ?? '',
         'User-Agent': req.headers.get('User-Agent') ?? '',
@@ -144,7 +160,7 @@ serve(async (req) => {
     return sentinelResponse
   }
 
-  const tokenHeader = authHeader || req.headers.get('x-api-key') || req.headers.get('apikey') || ''
+  const tokenHeader = req.headers.get('Authorization') || req.headers.get('x-api-key') || req.headers.get('apikey') || ''
   if (tokenHeader) {
     const { data: tokens } = await supabase
       .from('kza_phantom_assets')

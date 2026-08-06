@@ -17,4 +17,4 @@ Disallow: /dashboard
 Disallow: /.env
 Disallow: /.git
 
-Sitemap: https://SquidCloud.app/sitemap.xml
+Sitemap: https://squidcloud.vercel.app/sitemap.xml

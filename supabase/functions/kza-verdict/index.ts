@@ -103,7 +103,7 @@ serve(async (req) => {
     linked_accounts: linkedAccounts ?? [],
     network_intel: {
       ip: threatEvent.ip_address,
-      country: threatEvent.payload_snapshot?.country ?? 'UNKNOWN',
+      country: threatEvent.country ?? 'UNKNOWN',
       isp: null,
       is_vpn: false,
       is_tor: false,

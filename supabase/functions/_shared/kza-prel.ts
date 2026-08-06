@@ -179,6 +179,12 @@ export async function withPrelGateway(
     const jwtToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
 
     if (jwtToken) {
+      const serviceRole = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim()
+      if (serviceRole && jwtToken === serviceRole) {
+        // Internal function-to-function call: service-role bearer passes through
+        return handler(anonymousCtx(options.functionId, options.operation))
+      }
+
       const { data: { user }, error } = await supabase.auth.getUser(jwtToken)
 
       if (!error && user) {
@@ -285,6 +291,20 @@ export async function withPrelDirect(
     }
   }
 
+  // Binding: token is bound to the network fingerprint it was issued to.
+  // Service-role callers (function-to-function) are exempt.
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const serviceRole = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  const isInternal = serviceRole === (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '') && serviceRole !== ''
+  if (!isInternal && parsed.binding) {
+    const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const userAgent = req.headers.get('user-agent') ?? ''
+    const incomingBinding = await sha256(`${ipAddress}|${userAgent}`)
+    if (incomingBinding !== parsed.binding) {
+      return jsonResponse({ error: 'Token binding mismatch', code: 'KZA_PREL_BINDING' }, 403)
+    }
+  }
+
   const ctx: PrelContext = {
     userId: parsed.userId,
     sessionId: parsed.sessionId,
@@ -305,6 +325,7 @@ export async function withPrelDirect(
 
 interface PrelToken {
   version: number
+  kid: string
   userId: string
   sessionId: string
   functionId: string
@@ -317,8 +338,14 @@ interface PrelToken {
   f2faWindow: number
   isLongOp: boolean
   longOpExpiresAt: number | null
+  binding: string
 }
 
 export function getCorsHeaders(): Record<string, string> {
   return CORS_HEADERS
+}
+
+export async function sha256(input: string): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
 }

@@ -1,8 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, ListObjectsV2Command, DeleteObjectCommand, PutBucketCorsCommand } from "npm:@aws-sdk/client-s3";
-import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, ListObjectsV2Command, DeleteObjectCommand, PutBucketCorsCommand } from "https://esm.sh/@aws-sdk/client-s3";
+import { getSignedUrl } from "https://esm.sh/@aws-sdk/s3-request-presigner";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from './_shared/kza-prel.ts';
+import { getProviderCredentials } from './_shared/provider-vault.ts';
 
 function getEndpointForProvider(providerType: string, accountId?: string, customEndpoint?: string): string {
   if (customEndpoint) return customEndpoint;
@@ -98,18 +99,7 @@ serve(async (req) => {
         };
       } else {
         try {
-          const parsed = JSON.parse(providerRow.encrypted_credentials);
-          const { ciphertext, nonce } = parsed || {};
-          if (!ciphertext || !nonce) throw new Error("Invalid encrypted payload");
-
-          const { data: decrypted, error: decryptError } = await supabase.rpc("decrypt_keyring_secret", {
-            p_key_name: "storage_provider_credentials",
-            p_ciphertext: ciphertext,
-            p_nonce: nonce,
-          });
-
-          if (decryptError || !decrypted) throw new Error("Decrypt failed");
-          credentials = JSON.parse(decrypted as string);
+          credentials = await getProviderCredentials(supabase, supabaseServiceKey, providerRow);
         } catch {
           return jsonResponse({ success: false, error: "Provider credentials are invalid. Please reconfigure provider." }, 400);
         }

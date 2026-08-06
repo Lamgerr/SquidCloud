@@ -45,15 +45,24 @@ serve(async (req) => {
       return jsonResponse({ error: 'Missing threat context' }, 400)
     }
 
+    // Veil: hash the IP for privacy-preserving correlation
+    const { data: ipHash } = await supabase.rpc('kza_veil_ip_hash', { p_ip: ipAddress }).catch(() => ({ data: null }))
+
+    const decryptSnapshot = async (ct: string, nonce: string): Promise<Record<string, any> | null> => {
+      if (!ct || !nonce) return null
+      const { data } = await supabase.rpc('kza_veil_decrypt_snapshot', { p_ciphertext: ct, p_nonce: nonce }).catch(() => ({ data: null }))
+      return data ?? null
+    }
+
     const now = new Date()
     const since30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
     const since30Minutes = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
 
     const { data: recentEvents } = await supabase
       .from('kza_threat_events')
-      .select('id,user_id,ip_address,endpoint_hit,created_at,payload_snapshot,threat_type')
+      .select('id,user_id,ip_hash,ip_address,endpoint_hit,created_at,payload_snapshot,payload_snapshot_enc,payload_snapshot_nonce,threat_type')
       .gte('created_at', since30Days)
-      .or(`ip_address.eq.${ipAddress}`)
+      .or(ipHash ? `ip_hash.eq.${ipHash}` : `ip_address.eq.${ipAddress}`)
 
   const linkedUsers = new Set<string>()
   const linkDetails: { linked_user_id: string; reason: string; score: number }[] = []
@@ -61,11 +70,17 @@ serve(async (req) => {
     if (!event.user_id || event.user_id === userId) continue
     let score = 0
     const reasons: string[] = []
-    if (event.ip_address === ipAddress) {
+    if (event.ip_hash === ipHash) {
       score += 40
       reasons.push('IP_MATCH')
     }
-    const eventUa = event.payload_snapshot?.headers?.user_agent
+    let eventUa: string | null = null
+    if (event.payload_snapshot_enc) {
+      const snap = await decryptSnapshot(event.payload_snapshot_enc, event.payload_snapshot_nonce)
+      eventUa = snap?.headers?.user_agent ?? null
+    } else {
+      eventUa = event.payload_snapshot?.headers?.user_agent ?? null
+    }
     if (userAgent && eventUa && eventUa === userAgent) {
       score += 30
       reasons.push('UA_MATCH')
@@ -96,7 +111,7 @@ serve(async (req) => {
   if (threatType) {
     const { data: campaignEvents } = await supabase
       .from('kza_threat_events')
-      .select('user_id,ip_address')
+      .select('user_id,ip_hash')
       .eq('threat_type', threatType)
       .gte('created_at', since30Minutes)
 
@@ -104,7 +119,7 @@ serve(async (req) => {
     const campaignIps = new Set<string>()
     for (const event of campaignEvents ?? []) {
       if (event.user_id) campaignUsers.add(event.user_id)
-      if (event.ip_address) campaignIps.add(event.ip_address)
+      if (event.ip_hash) campaignIps.add(event.ip_hash)
     }
 
     if (campaignUsers.size + campaignIps.size >= 3) {
@@ -114,7 +129,7 @@ serve(async (req) => {
           threat_tier: 'RED',
           threat_type: 'COORDINATED_ATTACK',
           description: 'Coordinated attack detected across multiple accounts/IPs',
-          payload_snapshot: { threat_type: threatType, users: [...campaignUsers], ips: [...campaignIps] },
+          payload_snapshot: { threat_type: threatType },
           endpoint_hit: 'MULTIPLE',
           method: 'MULTIPLE',
         })
@@ -126,14 +141,14 @@ serve(async (req) => {
           threat_event_id: campaignThreat.id,
           incident_title: 'COORDINATED ATTACK DETECTED',
           threat_tier: 'RED',
-          attacker_profile: { accounts: [...campaignUsers], ips: [...campaignIps] },
+          attacker_profile: { accounts: [...campaignUsers], ip_hashes: [...campaignIps] },
           attack_timeline: [],
           what_was_targeted: 'Multiple endpoints',
           potential_harm: 'Coordinated campaign detected.',
           techniques_used: [threatType],
           actions_taken: ['ORACLE_ESCALATION'],
           linked_accounts: [...campaignUsers],
-          network_intel: { ips: [...campaignIps] },
+          network_intel: { ip_hashes: [...campaignIps] },
         })
 
         await fetch(`${SUPABASE_URL}/functions/v1/kza-verdict`, {
@@ -161,12 +176,12 @@ serve(async (req) => {
 
   if (threatTier === 'BLACK') {
     const techniques = (recentEvents ?? [])
-      .filter((event) => event.user_id === userId || event.ip_address === ipAddress)
+      .filter((event) => event.user_id === userId || event.ip_hash === ipHash)
       .map((event) => event.threat_type)
       .filter((value) => typeof value === 'string') as string[]
 
     const firstSeen = (recentEvents ?? [])
-      .filter((event) => event.user_id === userId || event.ip_address === ipAddress)
+      .filter((event) => event.user_id === userId || event.ip_hash === ipHash)
       .map((event) => new Date(event.created_at))
       .sort((a, b) => a.getTime() - b.getTime())[0]
 
@@ -180,7 +195,7 @@ serve(async (req) => {
       .update({
         attacker_profile: {
           accounts: [...linkedUsers, ...(userId ? [userId] : [])],
-          ips: [...new Set([ipAddress, ...(recentEvents ?? []).map((event) => event.ip_address).filter(Boolean)])],
+          ip_address: ipAddress,
           techniques_attempted: techniques,
           inferred_skill_level: inferSkillLevel(techniques),
           first_seen: firstSeen?.toISOString() ?? null,

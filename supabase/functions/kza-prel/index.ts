@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cip, x-f2fa, x-prel-token, x-prel-session, x-prel-op, x-prel-long-op, x-kza-session, x-forwarded-for',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cip, x-f2fa, x-prel-token, x-prel-session, x-prel-op, x-prel-long-op, x-kza-session, x-kza-geo, x-kza-sc-ts, x-kza-sc-sig, x-kza-sc-client, x-forwarded-for',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
@@ -24,6 +24,7 @@ interface PrelContext {
 
 interface PrelToken {
   version: number
+  kid: string
   userId: string
   sessionId: string
   functionId: string
@@ -36,6 +37,7 @@ interface PrelToken {
   f2faWindow: number
   isLongOp: boolean
   longOpExpiresAt: number | null
+  binding: string
 }
 
 serve(async (req) => {
@@ -66,6 +68,10 @@ serve(async (req) => {
         return await handleRefresh(req, supabase)
       case '/revoke':
         return await handleRevoke(req, supabase)
+      case '/veil/export':
+        return await handleVeilExport(req, supabase)
+      case '/veil/delete':
+        return await handleVeilDelete(req, supabase)
       default:
         return jsonResponse({ error: 'Unknown endpoint', code: 'KZA_PREL_UNKNOWN' }, 404)
     }
@@ -75,6 +81,8 @@ serve(async (req) => {
   }
 })
 
+// ========== GATEWAY ==========
+
 async function handleGateway(req: Request, supabase: any): Promise<Response> {
   const authHeader = req.headers.get('Authorization') ?? ''
   const cipHeader = req.headers.get('X-CIP') ?? ''
@@ -83,6 +91,7 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
   const longOpHeader = req.headers.get('X-PREL-Long-Op') === 'true'
   const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
   const userAgent = req.headers.get('user-agent') ?? ''
+  const geoHeader = req.headers.get('x-kza-geo') ?? ''
 
   const body = await req.json().catch(() => ({}))
   const requestFunctionId = typeof body.function_id === 'string' ? body.function_id : ''
@@ -92,7 +101,7 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
     return jsonResponse({ error: 'function_id required', code: 'KZA_PREL_MISSING_FN' }, 400)
   }
 
-  // Lookup function registry entry
+  // ========== OPERATION SCOPING ==========
   const { data: registry, error: regError } = await supabase
     .from('kza_prel_registry')
     .select('*')
@@ -106,26 +115,36 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
     }, 501)
   }
 
+  const allowedOps = registry.allowed_operations ?? []
+  if (allowedOps.length > 0 && !allowedOps.includes(requestOperation)) {
+    return jsonResponse({
+      error: `Operation '${requestOperation}' not allowed for ${requestFunctionId}`,
+      code: 'KZA_PREL_OPERATION_DENIED',
+    }, 403)
+  }
+
   if (registry.required_auth_level === 'none') {
     return issueToken(supabase, requestFunctionId, requestOperation, {
       userId: 'anonymous',
       sessionId: sessionHeader || crypto.randomUUID(),
       cipScore: null,
       f2faWindow: null,
+      geoScore: null,
       isLongOp: false,
       ttlSeconds: registry.ttl_seconds,
       longOpTtlSeconds: registry.long_op_ttl_seconds,
       chainDepth: 0,
       parentTokenHash: null,
+      binding: await computeBinding(ipAddress, userAgent),
     })
   }
 
   // ========== LAYER 1: IDENTITY ==========
   let userId: string | null = null
   let authMethod = ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
 
   if (registry.required_auth_level === 'jwt' || registry.required_auth_level === 'hmac_jwt' || registry.required_auth_level === 'any') {
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
     if (token) {
       const { data: { user }, error: authError } = await supabase.auth.getUser(token)
       if (!authError && user) {
@@ -136,7 +155,6 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
   }
 
   if (!userId && (registry.required_auth_level === 'api_key' || registry.required_auth_level === 'any')) {
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
     if (token && token.startsWith('cb_')) {
       const keyPrefix = token.substring(0, 11)
       const { data: candidates } = await supabase
@@ -167,11 +185,28 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
     }
   }
 
-  if (!userId && (registry.required_auth_level === 'hmac' || registry.required_auth_level === 'hmac_jwt')) {
-    const queryParams = urlSearchParamsFromReq(req)
-    if (queryParams?.get('signature')) {
-      userId = queryParams.get('userId') || null
-      authMethod = 'hmac'
+  // Real HMAC: verified server-side with the function's per-function key
+  if (!userId && (registry.required_auth_level === 'hmac' || registry.required_auth_level === 'hmac_gateway' || registry.required_auth_level === 'hmac_jwt')) {
+    if (registry.required_auth_level === 'hmac_gateway') {
+      const hmacUserId = await verifyHmacSignature(req, supabase, requestFunctionId)
+      if (hmacUserId) {
+        userId = hmacUserId
+        authMethod = 'hmac'
+      }
+    } else if (registry.required_auth_level === 'hmac') {
+      // Self-verified hmac: function performs its own signature check.
+      // Gateway issues a bound placeholder so userId can never be spoofed.
+      if (token) {
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+        if (!authError && user) {
+          userId = user.id
+          authMethod = 'jwt'
+        }
+      }
+      if (!userId) {
+        userId = 'hmac'
+        authMethod = 'hmac'
+      }
     }
   }
 
@@ -186,10 +221,11 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
     userId = 'anonymous'
   }
 
-  // Session binding
+  // Session binding (server-chosen when absent)
   const sessionId = sessionHeader || crypto.randomUUID()
+  const binding = await computeBinding(ipAddress, userAgent)
 
-  // ========== LAYER 1b: RATE LIMITING ==========
+  // ========== LAYER 1b: RATE LIMITING (user + IP) ==========
   if (registry.rate_limit_rps > 0 && userId !== 'anonymous') {
     const { data: rateResult } = await supabase.rpc('kza_check_rate_limit', {
       p_user_id: userId,
@@ -199,16 +235,8 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
     })
 
     if (rateResult && rateResult.allowed === false) {
-      await supabase.from('kza_threat_events').insert({
-        user_id: userId,
-        threat_tier: 'YELLOW',
-        threat_type: 'RATE_LIMIT',
-        description: `Rate limit exceeded for ${requestFunctionId}`,
-        endpoint_hit: req.url,
-        method: req.method,
-        ip_address: ipAddress,
-        rate_limit_exceeded: true,
-      })
+      await logThreat(supabase, userId, ipAddress, req, 'YELLOW', 'RATE_LIMIT',
+        `Rate limit exceeded for ${requestFunctionId}`, { rate_limit_exceeded: true })
       return jsonResponse({
         error: 'Rate limit exceeded',
         code: 'KZA_PREL_RATE_LIMIT',
@@ -217,69 +245,106 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
     }
   }
 
-  // ========== LAYER 1c: GEO-VELOCITY ==========
+  if (userId === 'anonymous' || authMethod === 'api_key' || authMethod === 'hmac') {
+    const ipHash = await veilIpHash(supabase, ipAddress)
+    if (ipHash) {
+      const { data: ipRate } = await supabase.rpc('kza_check_ip_rate_limit', {
+        p_ip_hash: ipHash,
+        p_function_id: requestFunctionId,
+        p_max_rps: registry.rate_limit_rps,
+        p_burst_size: registry.rate_limit_burst,
+      })
+      if (ipRate && ipRate.allowed === false) {
+        return jsonResponse({
+          error: 'Rate limit exceeded',
+          code: 'KZA_PREL_IP_RATE_LIMIT',
+          retry_after: ipRate.retry_after,
+        }, 429)
+      }
+    }
+  }
+
+  // ========== LAYER 1c: GEO-VELOCITY + GEO-FENCE ==========
   let geoScore: number | null = null
-  if (registry.geo_velocity_check && userId !== 'anonymous') {
-    const { data: geoResult } = await supabase.rpc('kza_check_geo_velocity', {
+  if ((registry.geo_velocity_check || registry.geo_fence_check) && userId !== 'anonymous') {
+    const [lat, lng, acc] = parseGeoHeader(geoHeader)
+
+    const geoResult = await supabase.rpc('kza_check_geo_velocity', {
       p_user_id: userId,
       p_ip_address: ipAddress,
-      p_latitude: null,
-      p_longitude: null,
+      p_latitude: lat,
+      p_longitude: lng,
       p_max_speed_kmh: registry.geo_max_speed_kmh,
-    })
+    }).then(r => r.data).catch(() => null)
 
     geoScore = geoResult?.score ?? 100
 
     if (geoResult?.alert === true) {
-      await supabase.from('kza_threat_events').insert({
-        user_id: userId,
-        threat_tier: 'ORANGE',
-        threat_type: 'IMPOSSIBLE_TRAVEL',
-        description: `Impossible travel detected for ${requestFunctionId}: ${JSON.stringify(geoResult)}`,
-        endpoint_hit: req.url,
-        method: req.method,
-        ip_address: ipAddress,
-        geo_score: geoScore,
-      })
+      await logThreat(supabase, userId, ipAddress, req, 'ORANGE', 'IMPOSSIBLE_TRAVEL',
+        `Impossible travel detected for ${requestFunctionId}: ${JSON.stringify(geoResult)}`,
+        { geo_score: geoScore })
       return jsonResponse({
         error: 'Suspicious activity detected',
         code: 'KZA_PREL_GEO_VELOCITY',
         geo_score: geoScore,
       }, 403)
     }
+
+    if (registry.geo_fence_check) {
+      const country = req.headers.get('cf-ipcountry') ?? req.headers.get('x-country') ?? 'UNKNOWN'
+      const fence = await supabase.rpc('kza_check_geo_fence', { p_country: country })
+        .then(r => r.data).catch(() => null)
+      if (fence && fence.allowed === false) {
+        await logThreat(supabase, userId, ipAddress, req, 'RED', 'GEO_FENCE',
+          `Geo-fence blocked ${country}: ${fence.reason ?? ''}`, { country })
+        return jsonResponse({
+          error: 'Access denied',
+          code: 'KZA_PREL_GEO_FENCE',
+        }, fence.shadow ? 404 : 403)
+      }
+    }
   }
 
-  // ========== LAYER 2: CIP ==========
+  // ========== LAYER 2: CIP (with proof-of-work) ==========
   let cipScore: number | null = null
-  if (registry.cip_required && cipHeader) {
-    cipScore = await verifyCIP(cipHeader, userId, sessionId, requestFunctionId, supabase)
+  if (registry.cip_required) {
+    if (!cipHeader) {
+      return jsonResponse({
+        error: 'Client integrity proof required',
+        code: 'KZA_PREL_CIP_MISSING',
+      }, 401)
+    }
+    cipScore = await verifyCIP(cipHeader, userId, sessionId, requestFunctionId, supabase, ipAddress, userAgent)
     if (cipScore === null || cipScore < 40) {
-      await supabase.from('kza_threat_events').insert({
-        user_id: userId,
-        threat_tier: 'RED',
-        threat_type: 'CIP_FAILURE',
-        description: `CIP check failed for ${requestFunctionId}`,
-        endpoint_hit: req.url,
-        method: req.method,
-        ip_address: ipAddress,
-        payload_snapshot: { cip_header: cipHeader },
-      })
+      if (cipScore === 1) {
+        // PoW required — hand out the challenge (stateless, windowed)
+        const challenge = await powChallenge(supabase, userId, requestFunctionId)
+        return jsonResponse({
+          error: 'Proof-of-work required',
+          code: 'KZA_PREL_CIP_POW',
+          challenge,
+          pow_bits: await powBits(supabase),
+        }, 401)
+      }
+      await logThreat(supabase, userId, ipAddress, req, 'RED', 'CIP_FAILURE',
+        `CIP check failed for ${requestFunctionId}`, { cip_header: cipHeader })
       return jsonResponse({
         error: 'Client integrity check failed',
         code: 'KZA_PREL_CIP_FAILED',
         score: cipScore,
       }, 403)
     }
-  } else if (registry.cip_required && !cipHeader) {
-    return jsonResponse({
-      error: 'Client integrity proof required',
-      code: 'KZA_PREL_CIP_MISSING',
-    }, 401)
   }
 
-  // ========== LAYER 3: F2FA ==========
+  // ========== LAYER 3: F2FA (server-issued seed only) ==========
   let f2faWindow: number | null = null
-  if (registry.f2fa_required && f2faHeader) {
+  if (registry.f2fa_required) {
+    if (!f2faHeader) {
+      return jsonResponse({
+        error: 'F2FA code required',
+        code: 'KZA_PREL_F2FA_MISSING',
+      }, 401)
+    }
     const f2faResult = await verifyF2FA(f2faHeader, userId, requestFunctionId, sessionId, supabase)
     if (!f2faResult.valid) {
       if (f2faResult.bruteForce) {
@@ -295,11 +360,6 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
       }, 403)
     }
     f2faWindow = f2faResult.window
-  } else if (registry.f2fa_required && !f2faHeader) {
-    return jsonResponse({
-      error: 'F2FA code required',
-      code: 'KZA_PREL_F2FA_MISSING',
-    }, 401)
   }
 
   // ========== ISSUE TOKEN ==========
@@ -314,19 +374,24 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
     longOpTtlSeconds: registry.long_op_ttl_seconds,
     chainDepth: 0,
     parentTokenHash: null,
+    binding,
   })
 }
+
+// ========== VALIDATE ==========
 
 async function handleValidate(req: Request, supabase: any): Promise<Response> {
   const prelToken = req.headers.get('X-PREL-Token') ?? ''
   const targetFunctionId = req.headers.get('X-PREL-Function') ?? ''
   const longOpHeader = req.headers.get('X-PREL-Long-Op') === 'true'
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const serviceRole = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  const isInternal = serviceRole === (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '') && serviceRole !== ''
 
   if (!prelToken) {
     return jsonResponse({ error: 'PREL token required', code: 'KZA_PREL_MISSING' }, 401)
   }
 
-  // Verify token HMAC
   const { data: payload, error: verifyError } = await supabase.rpc('kza_prel_verify_token', {
     p_token: prelToken,
     p_function_id: targetFunctionId || ''
@@ -343,7 +408,6 @@ async function handleValidate(req: Request, supabase: any): Promise<Response> {
     return jsonResponse({ error: 'Invalid token payload', code: 'KZA_PREL_INVALID_SIG' }, 403)
   }
 
-  // Check expiry
   const now = Date.now()
   const effectiveExpiry = token.isLongOp && token.longOpExpiresAt
     ? token.longOpExpiresAt
@@ -353,7 +417,17 @@ async function handleValidate(req: Request, supabase: any): Promise<Response> {
     return jsonResponse({ error: 'Token expired', code: 'KZA_PREL_EXPIRED' }, 401)
   }
 
-  // Check token not consumed
+  // Binding: token is bound to the network fingerprint it was issued to.
+  // Internal (service-role) chain calls are exempt.
+  if (!isInternal && token.binding) {
+    const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const userAgent = req.headers.get('user-agent') ?? ''
+    const incomingBinding = await computeBinding(ipAddress, userAgent)
+    if (incomingBinding !== token.binding) {
+      return jsonResponse({ error: 'Token binding mismatch', code: 'KZA_PREL_BINDING' }, 403)
+    }
+  }
+
   const { data: session } = await supabase
     .from('kza_prel_sessions')
     .select('consumed_at, chain_depth')
@@ -368,7 +442,6 @@ async function handleValidate(req: Request, supabase: any): Promise<Response> {
     return jsonResponse({ error: 'Token already consumed', code: 'KZA_PREL_CONSUMED' }, 409)
   }
 
-  // Lookup target function registry
   const { data: registry } = await supabase
     .from('kza_prel_registry')
     .select('*')
@@ -379,7 +452,6 @@ async function handleValidate(req: Request, supabase: any): Promise<Response> {
     return jsonResponse({ error: 'Target function not registered', code: 'KZA_PREL_UNREGISTERED' }, 501)
   }
 
-  // Check allowed_callers
   if (registry.allowed_callers?.length > 0) {
     if (!registry.allowed_callers.includes(token.functionId)) {
       return jsonResponse({
@@ -389,7 +461,6 @@ async function handleValidate(req: Request, supabase: any): Promise<Response> {
     }
   }
 
-  // Check chain depth
   const newDepth = (token.chainDepth || 0) + 1
   if (newDepth > registry.chain_depth_limit) {
     return jsonResponse({
@@ -398,13 +469,11 @@ async function handleValidate(req: Request, supabase: any): Promise<Response> {
     }, 403)
   }
 
-  // Mark current token as consumed
   await supabase
     .from('kza_prel_sessions')
     .update({ consumed_at: new Date().toISOString() })
     .eq('token_hash', await sha256(prelToken))
 
-  // Issue child token for target function
   return await issueToken(supabase, targetFunctionId, token.operation, {
     userId: token.userId,
     sessionId: token.sessionId,
@@ -415,15 +484,38 @@ async function handleValidate(req: Request, supabase: any): Promise<Response> {
     longOpTtlSeconds: registry.long_op_ttl_seconds,
     chainDepth: newDepth,
     parentTokenHash: await sha256(prelToken),
+    binding: token.binding,
   })
 }
 
+// ========== REFRESH (verified + capped) ==========
+
 async function handleRefresh(req: Request, supabase: any): Promise<Response> {
   const prelToken = req.headers.get('X-PREL-Token') ?? ''
-  const extendSeconds = parseInt(req.headers.get('X-PREL-Extend') ?? '300')
+  const extendSeconds = Math.min(parseInt(req.headers.get('X-PREL-Extend') ?? '300') || 300, 600)
 
   if (!prelToken) {
     return jsonResponse({ error: 'PREL token required', code: 'KZA_PREL_MISSING' }, 401)
+  }
+
+  // Signature must verify before any extension
+  const { data: payload } = await supabase.rpc('kza_prel_verify_token', {
+    p_token: prelToken,
+    p_function_id: ''
+  })
+  if (!payload) {
+    return jsonResponse({ error: 'Invalid token signature', code: 'KZA_PREL_INVALID_SIG' }, 403)
+  }
+
+  let token: PrelToken
+  try {
+    token = JSON.parse(payload)
+  } catch {
+    return jsonResponse({ error: 'Invalid token payload', code: 'KZA_PREL_INVALID_SIG' }, 403)
+  }
+
+  if (token.expiresAt < Date.now() && !(token.isLongOp && token.longOpExpiresAt > Date.now())) {
+    return jsonResponse({ error: 'Token expired', code: 'KZA_PREL_EXPIRED' }, 401)
   }
 
   const tokenHash = await sha256(prelToken)
@@ -457,13 +549,27 @@ async function handleRefresh(req: Request, supabase: any): Promise<Response> {
   })
 }
 
+// ========== REVOKE (owner or service role only) ==========
+
 async function handleRevoke(req: Request, supabase: any): Promise<Response> {
   const body = await req.json().catch(() => ({}))
   const userId = body.user_id ?? ''
   const sessionId = body.session_id ?? ''
+  const authHeader = req.headers.get('Authorization') ?? ''
 
   if (!userId) {
     return jsonResponse({ error: 'user_id required', code: 'KZA_PREL_MISSING' }, 400)
+  }
+
+  const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const isService = authHeader === `Bearer ${serviceRole}`
+
+  if (!isService) {
+    const jwtToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+    const { data: { user }, error } = await supabase.auth.getUser(jwtToken)
+    if (error || !user || user.id !== userId) {
+      return jsonResponse({ error: 'Not authorized to revoke this user', code: 'KZA_PREL_REVOKE_FORBIDDEN' }, 403)
+    }
   }
 
   const query = supabase.from('kza_prel_sessions').update({ consumed_at: new Date().toISOString() })
@@ -473,7 +579,6 @@ async function handleRevoke(req: Request, supabase: any): Promise<Response> {
   query.eq('user_id', userId)
   await query
 
-  // Also revoke F2FA seeds
   const f2faQuery = supabase.from('kza_prel_f2fa_seeds').update({ is_active: false })
   if (sessionId) {
     f2faQuery.eq('session_nonce', sessionId)
@@ -482,6 +587,36 @@ async function handleRevoke(req: Request, supabase: any): Promise<Response> {
   await f2faQuery
 
   return jsonResponse({ ok: true, revoked: true })
+}
+
+// ========== VEIL (user privacy endpoints) ==========
+
+async function handleVeilExport(req: Request, supabase: any): Promise<Response> {
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const jwtToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  const { data: { user }, error } = await supabase.auth.getUser(jwtToken)
+  if (error || !user) {
+    return jsonResponse({ error: 'Authentication required', code: 'KZA_PREL_MISSING' }, 401)
+  }
+  const { data, error: rpcError } = await supabase.rpc('kza_veil_export_profile', { p_user_id: user.id })
+  if (rpcError) {
+    return jsonResponse({ error: 'Export failed', code: 'KZA_PREL_INTERNAL' }, 500)
+  }
+  return jsonResponse({ ok: true, data })
+}
+
+async function handleVeilDelete(req: Request, supabase: any): Promise<Response> {
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const jwtToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  const { data: { user }, error } = await supabase.auth.getUser(jwtToken)
+  if (error || !user) {
+    return jsonResponse({ error: 'Authentication required', code: 'KZA_PREL_MISSING' }, 401)
+  }
+  const { data, error: rpcError } = await supabase.rpc('kza_veil_delete_profile', { p_user_id: user.id })
+  if (rpcError) {
+    return jsonResponse({ error: 'Delete failed', code: 'KZA_PREL_INTERNAL' }, 500)
+  }
+  return jsonResponse({ ok: true, deleted: true })
 }
 
 // ========== TOKEN ISSUANCE ==========
@@ -501,11 +636,13 @@ async function issueToken(
     longOpTtlSeconds: number
     chainDepth: number
     parentTokenHash: string | null
+    binding: string
   }
 ): Promise<Response> {
   const now = Date.now()
   const token: PrelToken = {
-    version: 1,
+    version: 2,
+    kid: 'kza_prel_hmac_v2',
     userId: opts.userId,
     sessionId: opts.sessionId,
     functionId,
@@ -518,11 +655,11 @@ async function issueToken(
     f2faWindow: opts.f2faWindow ?? 0,
     isLongOp: opts.isLongOp,
     longOpExpiresAt: opts.isLongOp ? now + opts.longOpTtlSeconds * 1000 : null,
+    binding: opts.binding,
   }
 
   const payload = JSON.stringify(token)
 
-  // Sign via pgsodium
   const { data: signedToken, error: signError } = await supabase.rpc('kza_prel_sign_token', {
     p_function_id: functionId,
     p_payload: payload,
@@ -535,10 +672,9 @@ async function issueToken(
 
   const tokenHash = await sha256(signedToken)
 
-  // Store session
   await supabase.from('kza_prel_sessions').insert({
     token_hash: tokenHash,
-    user_id: opts.userId === 'anonymous' ? null : opts.userId,
+    user_id: opts.userId === 'anonymous' || opts.userId === 'hmac' ? null : opts.userId,
     session_id: opts.sessionId,
     parent_token_hash: opts.parentTokenHash,
     function_id: functionId,
@@ -553,9 +689,9 @@ async function issueToken(
     long_op_expires_at: token.longOpExpiresAt
       ? new Date(token.longOpExpiresAt).toISOString()
       : null,
+    binding_hash: opts.binding || null,
   })
 
-  // Add geo_score to response context
   const responseContext: Record<string, unknown> = {
     user_id: opts.userId,
     session_id: opts.sessionId,
@@ -577,14 +713,60 @@ async function issueToken(
   })
 }
 
-// ========== CIP VERIFICATION ==========
+// ========== REAL HMAC (gateway-verified) ==========
+
+async function verifyHmacSignature(req: Request, supabase: any, functionId: string): Promise<string | null> {
+  const qp = new URL(req.url).searchParams
+  const sig = qp.get('gsig')
+  const ts = qp.get('gts')
+  const userId = qp.get('guser')
+  const path = qp.get('gpath')
+
+  if (!sig || !ts || !userId || !path) return null
+  if (Math.abs(Date.now() - Number(ts)) > 5 * 60 * 1000) return null
+
+  const { data: verified } = await supabase.rpc('kza_prel_hmac_verify', {
+    p_function_id: functionId,
+    p_ts: ts,
+    p_method: req.method,
+    p_path: path,
+    p_user_id: userId,
+    p_signature: sig,
+  })
+
+  return verified === true ? userId : null
+}
+
+// ========== CIP VERIFICATION (with proof-of-work) ==========
+
+async function powChallenge(supabase: any, userId: string, functionId: string): Promise<string> {
+  const secret = Deno.env.get('KZA_CIP_CHALLENGE_KEY') ?? ''
+  if (!secret) return ''
+  const window = Math.floor(Date.now() / (15 * 60 * 1000))
+  return sha256(`${secret}:${userId}:${functionId}:${window}`)
+}
+
+async function powBits(supabase: any): Promise<number> {
+  const { data } = await supabase.rpc('kza_validate_cip_version', { p_version: '1.0.0' }).catch(() => ({ data: null }))
+  return data?.pow_bits ?? 0
+}
+
+function powSolved(challenge: string, entropyHash: string, solution: string, bits: number): boolean {
+  if (!challenge || bits <= 0) return false
+  const target = Math.ceil(bits / 4)
+  if (!solution || solution.length === 0 || solution.length > 64) return false
+  // verify solution actually solves the hash prefix
+  return sha256(`${challenge}:${entropyHash}:${solution}`).then((h) => h.startsWith('0'.repeat(target)))
+}
 
 async function verifyCIP(
   cipHeader: string,
   userId: string,
   sessionId: string,
   functionId: string,
-  supabase: any
+  supabase: any,
+  ipAddress: string,
+  userAgent: string
 ): Promise<number | null> {
   try {
     const parts = cipHeader.split('.')
@@ -593,11 +775,10 @@ async function verifyCIP(
     const buildVersion = parts[0]
     const entropyHash = parts[1]
     const timingDelta = parseInt(parts[2])
+    const powSolution = parts[3] ?? ''
 
-    // Validate timing window (50-500ms for browser, rejects curl/scripts)
     if (timingDelta < 50 || timingDelta > 5000) return 0
 
-    // Verify CIP version from registry
     const { data: cipConfig } = await supabase.rpc('kza_validate_cip_version', {
       p_version: buildVersion,
     })
@@ -607,22 +788,28 @@ async function verifyCIP(
     const timingMinMs = cipConfig.timing_min_ms ?? 80
     const timingMaxMs = cipConfig.timing_max_ms ?? 500
     const entropyRequired = cipConfig.entropy_required ?? 64
+    const powRequired = Boolean(cipConfig.pow_required)
 
-    // Score based on entropy hash quality against current requirements
+    // Proof-of-work gate: challenge is windowed-HMAC(secret), verified server-side
+    if (powRequired) {
+      const challenge = await powChallenge(supabase, userId, functionId)
+      if (challenge && !(await powSolved(challenge, entropyHash, powSolution, cipConfig.pow_bits ?? 0))) {
+        return 1 // signal: PoW required
+      }
+    }
+
     const entropyScore = entropyHash.length >= entropyRequired ? 100
       : entropyHash.length >= 32 ? 60
       : 20
 
-    // Timing bonus against current config
     const timingScore = timingDelta >= timingMinMs && timingDelta <= timingMaxMs ? 100
       : timingDelta > 500 && timingDelta <= 2000 ? 60
       : 20
 
     const finalScore = Math.min(100, Math.round((entropyScore + timingScore) / 2))
 
-    // Log CIP usage for audit
     await supabase.from('kza_threat_events').insert({
-      user_id: userId,
+      user_id: userId === 'anonymous' || userId === 'hmac' ? null : userId,
       threat_tier: 'GREEN',
       threat_type: 'CIP_CHECK',
       description: `CIP v${buildVersion} score ${finalScore} for ${functionId}`,
@@ -637,7 +824,7 @@ async function verifyCIP(
   }
 }
 
-// ========== F2FA VERIFICATION ==========
+// ========== F2FA VERIFICATION (server seed only) ==========
 
 async function verifyF2FA(
   f2faCode: string,
@@ -647,7 +834,6 @@ async function verifyF2FA(
   supabase: any
 ): Promise<{ valid: boolean; window: number | null; bruteForce: boolean }> {
   try {
-    // Count recent failures
     const since = new Date(Date.now() - 5 * 60 * 1000).toISOString()
     const { count: failCount } = await supabase
       .from('kza_threat_events')
@@ -660,7 +846,6 @@ async function verifyF2FA(
       return { valid: false, window: null, bruteForce: true }
     }
 
-    // Get active seed for this user+function
     const { data: seed } = await supabase
       .from('kza_prel_f2fa_seeds')
       .select('seed_derived')
@@ -675,7 +860,6 @@ async function verifyF2FA(
       return { valid: false, window: null, bruteForce: false }
     }
 
-    // Check current and ±1 window
     const currentWindow = Math.floor(Date.now() / 30000)
     for (const offset of [0, -1, 1]) {
       const window = currentWindow + offset
@@ -685,7 +869,6 @@ async function verifyF2FA(
       }
     }
 
-    // Log failure
     await supabase.from('kza_threat_events').insert({
       user_id: userId,
       threat_tier: 'YELLOW',
@@ -717,7 +900,6 @@ async function computeF2FACode(seed: string, functionId: string, window: number)
   const hashBuffer = await crypto.subtle.digest('SHA-256', combined)
   const hashArray = new Uint8Array(hashBuffer)
 
-  // Proprietary reduction: XOR first 24 bytes into 8 bytes
   let code = 0
   for (let i = 0; i < 3; i++) {
     const block = new DataView(hashArray.slice(i * 8, i * 8 + 8).buffer)
@@ -757,6 +939,52 @@ async function banSession(supabase: any, userId: string, ipAddress: string, reas
 
 // ========== UTILITIES ==========
 
+async function computeBinding(ipAddress: string, userAgent: string): Promise<string> {
+  return sha256(`${ipAddress}|${userAgent}`)
+}
+
+async function veilIpHash(supabase: any, ipAddress: string): Promise<string | null> {
+  if (!ipAddress || ipAddress === 'unknown') return null
+  const { data } = await supabase.rpc('kza_veil_ip_hash', { p_ip: ipAddress }).catch(() => ({ data: null }))
+  return data ?? null
+}
+
+async function logThreat(
+  supabase: any,
+  userId: string,
+  ipAddress: string,
+  req: Request,
+  tier: string,
+  type: string,
+  description: string,
+  extra: Record<string, unknown> = {}
+) {
+  const ipHash = await veilIpHash(supabase, ipAddress)
+  await supabase.from('kza_threat_events').insert({
+    user_id: userId === 'anonymous' || userId === 'hmac' ? null : userId,
+    ip_hash: ipHash,
+    threat_tier: tier,
+    threat_type: type,
+    description,
+    endpoint_hit: req.url,
+    method: req.method,
+    ip_address: ipAddress,
+    payload_snapshot: extra,
+  }).catch(() => {})
+}
+
+function parseGeoHeader(value: string): [number | null, number | null, number | null] {
+  try {
+    const [lat, lng, acc] = value.split(',')
+    const latN = parseFloat(lat)
+    const lngN = parseFloat(lng)
+    if (isNaN(latN) || isNaN(lngN)) return [null, null, null]
+    return [latN, lngN, parseFloat(acc) || null]
+  } catch {
+    return [null, null, null]
+  }
+}
+
 function jsonResponse(payload: Record<string, unknown>, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -771,12 +999,4 @@ function jsonResponse(payload: Record<string, unknown>, status = 200, headers: R
 async function sha256(input: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-function urlSearchParamsFromReq(req: Request): URLSearchParams | null {
-  try {
-    return new URL(req.url).searchParams
-  } catch {
-    return null
-  }
 }

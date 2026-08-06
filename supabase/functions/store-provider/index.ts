@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
+import { wrapProviderCreds } from '../_shared/provider-vault.ts';
 
 type ProviderPayload = {
   providerType: string;
@@ -63,37 +64,14 @@ serve(async (req) => {
       bucketName: payload.bucketName,
     };
 
-    const { data: encryptedData, error: encryptError } = await supabase.rpc(
-      "encrypt_keyring_secret",
-      {
-        p_key_name: "storage_provider_credentials",
-        p_plaintext: JSON.stringify(credentials),
-      }
-    );
-
-    if (encryptError || !Array.isArray(encryptedData) || encryptedData.length === 0) {
-      return jsonResponse({ success: false, error: "Failed to encrypt credentials" }, 500);
-    }
-
-    const [encryptedEntry] = encryptedData;
-    if (!encryptedEntry?.ciphertext || !encryptedEntry?.nonce) {
-      return jsonResponse({ success: false, error: "Failed to encrypt credentials" }, 500);
-    }
-
-    const encryptedPayload = JSON.stringify({
-      ciphertext: encryptedEntry.ciphertext,
-      nonce: encryptedEntry.nonce,
-      version: 1,
-    });
-
-    // Insert new provider record (no longer unique constraint, each call = new bucket)
+    // Insert new provider record WITHOUT storing credentials (vault holds them)
     const { data, error } = await supabase
       .from("storage_providers")
       .insert({
         user_id: ctx.userId,
         provider_type: providerType,
         label: payload.label || `${providerType} - ${payload.bucketName}`,
-        encrypted_credentials: encryptedPayload,
+        encrypted_credentials: null,
         bucket_name: payload.bucketName,
         bucket_region: payload.bucketRegion || 'auto',
         bucket_endpoint: payload.bucketEndpoint || null,
@@ -107,6 +85,24 @@ serve(async (req) => {
 
     if (error) {
       return jsonResponse({ success: false, error: error.message }, 500);
+    }
+
+    // Wrap credentials into the server-side vault (never REST-visible).
+    const wrapped = await wrapProviderCreds(supabaseServiceKey, JSON.stringify(credentials));
+    const { error: vaultErr } = await supabase
+      .from("storage_provider_vault")
+      .insert({
+        provider_id: data.id,
+        user_id: ctx.userId,
+        wrapped_credentials: wrapped.wrapped,
+        iv: wrapped.iv,
+        key_version: 1,
+      });
+
+    if (vaultErr) {
+      // Roll back the provider row so we never orphan it without credentials.
+      await supabase.from("storage_providers").delete().eq("id", data.id);
+      return jsonResponse({ success: false, error: "Failed to store credentials securely" }, 500);
     }
 
     return jsonResponse({ success: true, provider: data });

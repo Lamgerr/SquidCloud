@@ -1,7 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { S3Client, HeadBucketCommand, ListObjectsV2Command } from "npm:@aws-sdk/client-s3";
+import { S3Client, HeadBucketCommand, ListObjectsV2Command } from "https://esm.sh/@aws-sdk/client-s3";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
+import { getProviderCredentials } from '../_shared/provider-vault.ts';
 
 function getEndpointForProvider(providerType: string, accountId?: string, customEndpoint?: string): string {
   if (customEndpoint) return customEndpoint;
@@ -45,18 +46,7 @@ serve(async (req) => {
         const results = [];
         for (const provider of providers) {
           try {
-            let credentials: any;
-            const parsed = JSON.parse(provider.encrypted_credentials);
-            const { ciphertext, nonce } = parsed || {};
-            if (!ciphertext || !nonce) continue;
-
-            const { data: decrypted } = await supabase.rpc("decrypt_keyring_secret", {
-              p_key_name: "storage_provider_credentials",
-              p_ciphertext: ciphertext,
-              p_nonce: nonce,
-            });
-            if (!decrypted) continue;
-            credentials = JSON.parse(decrypted as string);
+            const credentials = await getProviderCredentials(supabase, supabaseServiceKey, provider);
 
             const endpoint = provider.bucket_endpoint || getEndpointForProvider(
               provider.provider_type, credentials.accountId
@@ -163,7 +153,7 @@ serve(async (req) => {
         const results = [];
         for (const bucket of buckets) {
           try {
-            const { AwsClient } = await import("npm:aws4fetch");
+            const { AwsClient } = await import("https://esm.sh/aws4fetch");
             const client = new AwsClient({
               accessKeyId: bucket.access_key_id,
               secretAccessKey: bucket.secret_access_key,

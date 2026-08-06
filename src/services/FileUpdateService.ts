@@ -102,6 +102,28 @@ export class FileUpdateService {
       // Remove the temporary duplicate record created by the upload step.
       await supabase.from('files').delete().eq('id', uploadResult.id);
 
+      // The vault row for the temp record cascaded away with the delete; the
+      // existing file now points at chunks encrypted with the NEW key, so
+      // re-store that key in the vault for the existing file. (BYOK uploads
+      // keep their key client-derived and skip the vault.)
+      if (uploadResult.encryptionKey === 'managed_key' && uploadResult.metadata?.encryptionKey) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const { error: storeError } = await supabase.functions.invoke('store-file-key', {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+          body: { fileId, key: uploadResult.metadata.encryptionKey },
+        });
+        if (storeError) {
+          console.warn('FileUpdateService: store-file-key failed; falling back to legacy tags key for updated file', storeError);
+          const legacyTags = JSON.stringify({
+            ...uploadResult.metadata,
+            encryptionKey: uploadResult.metadata.encryptionKey,
+          });
+          await supabase.from('files').update({ tags: [legacyTags] }).eq('id', fileId);
+        } else {
+          console.log('FileUpdateService: Vault key re-stored for updated file');
+        }
+      }
+
       console.log('FileUpdateService: File updated successfully');
 
       return {

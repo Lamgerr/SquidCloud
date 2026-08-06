@@ -127,6 +127,12 @@ verify_jwt = false
 [functions.kza-verdict]
 verify_jwt = false
 
+[functions.kza-heartbeat]
+verify_jwt = false
+
+[functions.kza-admin]
+verify_jwt = false
+
 [functions.migration-oauth]
 verify_jwt = true
 

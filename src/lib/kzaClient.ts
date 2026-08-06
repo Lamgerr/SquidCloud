@@ -102,7 +102,12 @@ export async function kzaCheck(
     const data = await res.json()
     return { ok: true, blocked: false, score: data.score, tier: data.tier }
   } catch {
-    // Never let KZA failure block the user — fail open, log only
+    // Fail-open by default; VITE_KZA_FAIL_CLOSED=1 makes KZA a hard gate.
+    const failClosed = (import.meta.env.VITE_KZA_FAIL_CLOSED as string) === '1'
+    if (failClosed) {
+      console.error('[KZA] Sentinel unreachable — failing closed')
+      return { ok: false, blocked: true, code: 'KZA_UNAVAILABLE' }
+    }
     console.warn('[KZA] Sentinel unreachable — failing open')
     return { ok: true, blocked: false }
   }

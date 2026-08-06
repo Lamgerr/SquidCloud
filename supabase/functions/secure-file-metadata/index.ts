@@ -18,26 +18,52 @@ type SecureFilePayload = {
   encryptionKey?: string | null;
 };
 
-let cachedFileColumns: Set<string> | null = null;
-let fileColumnsChecked = false;
+const encoder = new TextEncoder();
 
-const getFileColumns = async (supabase: ReturnType<typeof createClient>) => {
-  if (fileColumnsChecked) return cachedFileColumns;
-  fileColumnsChecked = true;
-
-  const { data: columnsData, error } = await supabase
-    .from("information_schema.columns")
-    .select("column_name")
-    .eq("table_schema", "public")
-    .eq("table_name", "files");
-
-  if (error || !Array.isArray(columnsData)) {
-    return null;
+function fromHex(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
+  return out;
+}
 
-  cachedFileColumns = new Set(columnsData.map((col: any) => col.column_name));
-  return cachedFileColumns;
-};
+function base64Encode(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes));
+}
+
+function base64Decode(b64: string): Uint8Array {
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+async function sha256Hex(data: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hmacSha256Hex(key: Uint8Array, data: string): Promise<string> {
+  const keyObj = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', keyObj, encoder.encode(data));
+  return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function getMasterKey(serviceKey: string): Promise<Uint8Array> {
+  const env = Deno.env.get('SQUIDVEIL_MASTER_KEY');
+  if (env && /^[0-9a-f]{64}$/i.test(env)) return fromHex(env);
+  return fromHex(await sha256Hex(encoder.encode('squidveil-master-v1:' + serviceKey)));
+}
+
+async function getFileKeyKek(serviceKey: string): Promise<Uint8Array> {
+  const master = await getMasterKey(serviceKey);
+  return fromHex(await hmacSha256Hex(master, 'file-key-vault-v1'));
+}
+
+async function aes256GcmWrap(plaintext: string, key: Uint8Array): Promise<{ wrapped: string; iv: string }> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const keyObj = await crypto.subtle.importKey('raw', key, { name: 'AES-GCM' }, false, ['encrypt']);
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, keyObj, encoder.encode(plaintext));
+  return { wrapped: base64Encode(new Uint8Array(ct)), iv: base64Encode(iv) };
+}
 
 serve(async (req) => {
   return withPrelGateway(req, { functionId: 'secure-file-metadata', operation: 'default' }, async (ctx: PrelContext) => {
@@ -89,32 +115,16 @@ serve(async (req) => {
       }
     }
 
-    let encryptedKey: string | null = null;
-    let encryptedKeyNonce: string | null = null;
+    let wrappedVault: { wrapped_key: string; iv: string } | null = null;
 
-    if (payload.encryptionKey) {
-      const { data: encryptedData, error: encryptError } = await supabase.rpc(
-        "encrypt_keyring_secret",
-        {
-          p_key_name: "file_encryption_keys",
-          p_plaintext: payload.encryptionKey,
-        }
-      );
-
-      if (encryptError || !Array.isArray(encryptedData) || encryptedData.length === 0) {
-        return jsonResponse({ success: false, error: "Failed to encrypt file key" }, 500);
-      }
-
-      const [encryptedEntry] = encryptedData;
-      encryptedKey = encryptedEntry?.ciphertext ?? null;
-      encryptedKeyNonce = encryptedEntry?.nonce ?? null;
-      if (!encryptedKey || !encryptedKeyNonce) {
+    if (payload.encryptionKey && payload.encryptionKeyLabel === 'managed_key') {
+      try {
+        const kek = await getFileKeyKek(supabaseServiceKey);
+        wrappedVault = await aes256GcmWrap(payload.encryptionKey, kek);
+      } catch {
         return jsonResponse({ success: false, error: "Failed to encrypt file key" }, 500);
       }
     }
-
-    const columnSet = await getFileColumns(supabase);
-    const hasColumn = (columnName: string) => columnSet?.has(columnName) ?? false;
 
     const insertPayload: Record<string, unknown> = {
       name: payload.name,
@@ -128,26 +138,20 @@ serve(async (req) => {
       tags: payload.metadata ? [payload.metadata] : null,
     };
 
-    if (hasColumn("workspace_id")) {
+    if (payload.workspaceId !== undefined) {
       insertPayload.workspace_id = resolvedWorkspaceId;
     }
-    if (hasColumn("parent_folder")) {
-      insertPayload.parent_folder = payload.parentFolder ?? null;
+    if (payload.parentFolder) {
+      insertPayload.parent_folder = payload.parentFolder;
     }
-    if (hasColumn("storage_provider_id")) {
-      insertPayload.storage_provider_id = payload.storageProviderId ?? null;
+    if (payload.storageProviderId) {
+      insertPayload.storage_provider_id = payload.storageProviderId;
     }
-    if (hasColumn("external_object_key")) {
-      insertPayload.external_object_key = payload.externalObjectKey ?? null;
+    if (payload.externalObjectKey) {
+      insertPayload.external_object_key = payload.externalObjectKey;
     }
-    if (payload.processor && hasColumn("processor")) {
+    if (payload.processor) {
       insertPayload.processor = payload.processor;
-    }
-    if (encryptedKey && hasColumn("encrypted_key")) {
-      insertPayload.encrypted_key = encryptedKey;
-    }
-    if (encryptedKeyNonce && hasColumn("encrypted_key_nonce")) {
-      insertPayload.encrypted_key_nonce = encryptedKeyNonce;
     }
 
     const { data: fileData, error: insertError } = await supabase
@@ -158,6 +162,24 @@ serve(async (req) => {
 
     if (insertError || !fileData) {
       return jsonResponse({ success: false, error: insertError?.message || "Failed to save file" }, 500);
+    }
+
+    if (wrappedVault) {
+      const { error: vaultErr } = await supabase
+        .from("file_key_vault")
+        .upsert(
+          {
+            file_id: fileData.id,
+            user_id: userId,
+            wrapped_key: wrappedVault.wrapped_key,
+            iv: wrappedVault.iv,
+            key_version: 1,
+          },
+          { onConflict: "file_id" },
+        );
+      if (vaultErr) {
+        return jsonResponse({ success: false, error: "Failed to store file key" }, 500);
+      }
     }
 
     return jsonResponse({ success: true, file: fileData });

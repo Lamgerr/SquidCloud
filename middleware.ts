@@ -45,8 +45,10 @@ function isStaticAsset(pathname: string): boolean {
 }
 
 export const config = {
-  matcher: '/((?!api/|assets/|favicon\\.ico|version\\.json|service-worker\\.js).*)',
+  matcher: '/((?!api/|assets/|favicon\\.ico|version\\.json|service-worker\\.js|robots\\.txt|sitemap\\.xml|sitemap_index\\.xml).*)',
 };
+
+const CRAWLER_RE = /Googlebot|google-extended|bingbot|DuckDuckBot|YandexBot|Baiduspider|Slurp|facebookexternalhit|Twitterbot|LinkedInBot|Pinterest|AhrefsBot|SemrushBot|Moz|GPTBot|OAI-SearchBot|CCBot|Applebot|bytespider/i;
 
 export default async function middleware(request: Request): Promise<Response | undefined> {
   const url = new URL(request.url);
@@ -56,6 +58,11 @@ export default async function middleware(request: Request): Promise<Response | u
     if (isStaticAsset(pathname) || pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
       return undefined;
     }
+  }
+
+  const ua = request.headers.get('user-agent') || '';
+  if (CRAWLER_RE.test(ua)) {
+    return undefined;
   }
 
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()

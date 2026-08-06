@@ -78,6 +78,26 @@ export class KzaPrelClient {
       ? await this.getF2FA(functionId, sessionId)
       : undefined
 
+    const result = await this.callGateway(functionId, operation, sessionId, options, cip, f2fa)
+
+    // CIP proof-of-work: server issued a challenge — solve and retry once
+    if (result.code === 'KZA_PREL_CIP_POW' && options.useCIP && result.challenge) {
+      const powSolution = await this.solveCIPChallenge(result.challenge, cip!, result.pow_bits ?? 0)
+      const retried = await this.callGateway(functionId, operation, sessionId, options, `${cip}.${powSolution}`, f2fa)
+      return retried
+    }
+
+    return result
+  }
+
+  private async callGateway(
+    functionId: string,
+    operation: string,
+    sessionId: string,
+    options: { longOp?: boolean },
+    cip: string | undefined,
+    f2fa: string | undefined
+  ): Promise<PrelGatewayResult> {
     const { data: authData } = await this.supabase.auth.getSession()
     const authHeader = authData?.session?.access_token
       ? `Bearer ${authData.session.access_token}`
@@ -107,7 +127,7 @@ export class KzaPrelClient {
       return { ok: false, error: error.message, code: 'KZA_PREL_ERROR' }
     }
 
-    const result = data as PrelGatewayResult
+    const result = data as PrelGatewayResult & { challenge?: string; pow_bits?: number }
 
     if (result.ok && result.prel_token && result.context) {
       this.cacheSession({
@@ -298,33 +318,38 @@ export class KzaPrelClient {
   }
 
   async getF2FA(functionId: string, sessionId: string): Promise<string> {
-    try {
-      const { data: seedData, error: seedError } = await this.supabase.rpc(
-        'kza_prel_generate_f2fa_seed',
-        {
-          p_function_id: functionId,
-          p_session_nonce: sessionId,
-        }
-      )
-
-      if (seedError || !seedData) {
-        return await this.computeFallbackF2FA(functionId, sessionId)
-      }
-
-      const seed = String(seedData)
-      const currentWindow = Math.floor(Date.now() / 30000)
-      return await this.computeF2FACode(seed, functionId, currentWindow)
-    } catch {
-      return await this.computeFallbackF2FA(functionId, sessionId)
-    }
-  }
-
-  private async computeFallbackF2FA(functionId: string, sessionId: string): Promise<string> {
     const { data: { user } } = await this.supabase.auth.getUser()
-    const userId = user?.id || 'anonymous'
-    const seed = await this.sha256(userId + functionId + sessionId)
+
+    const { data: seedData, error: seedError } = await this.supabase.rpc(
+      'kza_prel_generate_f2fa_seed',
+      {
+        p_user_id: user?.id,
+        p_function_id: functionId,
+        p_session_nonce: sessionId,
+      }
+    )
+
+    if (seedError || !seedData) {
+      throw new Error(`KZA_F2FA_SEED_UNAVAILABLE: ${seedError?.message ?? 'no seed'}`)
+    }
+
+    const seed = String(seedData)
     const currentWindow = Math.floor(Date.now() / 30000)
     return await this.computeF2FACode(seed, functionId, currentWindow)
+  }
+
+  async solveCIPChallenge(challenge: string, cip: string, powBits: number): Promise<string> {
+    const [, hash] = cip.split('.')
+    const target = Math.ceil(powBits / 4)
+    if (!target) return ''
+    for (let nonce = 0; nonce < 2_000_000; nonce++) {
+      const candidate = `${challenge}:${hash}:${nonce}`
+      const digest = await this.sha256(candidate)
+      if (digest.startsWith('0'.repeat(target))) {
+        return String(nonce)
+      }
+    }
+    return ''
   }
 
   private async computeF2FACode(seed: string, functionId: string, window: number): Promise<string> {

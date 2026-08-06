@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidcloud-v12.0.26-streamer';
+const CACHE_NAME = 'squidcloud-v12.0.18-1785820878533'; // Dynamic cache name
 
 self.addEventListener('install', () => self.skipWaiting());
 

@@ -6,6 +6,7 @@ import { base64ToArrayBuffer } from '@/services/byok-encryption';
 import { requestEphemeralBYOKKey, requestKeySelection, requestMandatoryBYOKSetup, type BYOKPromptReason } from '@/services/ephemeral-byok-prompt';
 import { deriveFileKey, deriveChunkKey, generatePerFileKey, encryptChunkV3, decryptChunkV3 } from '@/lib/encryption-v3';
 import type { FileKeyMaterial } from '@/lib/encryption-v3';
+import { fetchFileEncryptionKey } from '@/lib/secure-file-metadata';
 import { SUPABASE_URL } from '@/lib/supabaseEnv';
 
 const isProductionBuild = import.meta.env.PROD;
@@ -702,7 +703,9 @@ export const uploadFileWithRes54 = async (
   
   progressCallback?.(90, 'finalizing');
   
-  const dbEncryptionKey = byokPolicy.enabled ? 'sha256:byok_encrypted' : metadata.encryptionKey;
+  const isVaultManagedUpload = !byokPolicy.enabled;
+  const rawUploadKey = isVaultManagedUpload ? metadata.encryptionKey : null;
+  const dbEncryptionKey = byokPolicy.enabled ? 'sha256:byok_encrypted' : 'managed_key';
   const metadataString = JSON.stringify({
     ...metadata,
     encryptionKey: dbEncryptionKey,
@@ -744,6 +747,27 @@ export const uploadFileWithRes54 = async (
     let { data: rpcData, error: rpcError } = await supabase.rpc('create_file_record', rpcArgs as any);
     if (rpcError || !rpcData) throw new Error("Failed to create file record");
     createdFile = rpcData as any;
+  }
+
+  if (rawUploadKey && createdFile?.id) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error: storeError } = await supabase.functions.invoke('store-file-key', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+        body: { fileId: createdFile.id, key: rawUploadKey },
+      });
+      if (storeError) throw storeError;
+    } catch (storeFail) {
+      console.warn('[res54] store-file-key failed; falling back to legacy tags key', createdFile.id, storeFail);
+      const legacyMetadata = JSON.stringify({
+        ...metadata,
+        encryptionKey: rawUploadKey,
+        chunks: metadata.chunks.map(chunk => ({ ...chunk, repo: chunk.repo, path: chunk.path }))
+      });
+      await supabase.from('files')
+        .update({ tags: [legacyMetadata], encryption_key: rawUploadKey })
+        .eq('id', createdFile.id);
+    }
   }
   
   progressCallback?.(100, 'complete');
@@ -976,7 +1000,14 @@ export const downloadFileWithRes54 = async (
       }
     };
 
-    const defaultKey = options.decryptionKey || metadata.encryptionKey;
+    let defaultKey = options.decryptionKey || metadata.encryptionKey;
+    if (defaultKey === 'managed_key' && !options.decryptionKey) {
+      try {
+        defaultKey = await fetchFileEncryptionKey(fileId);
+      } catch (keyError) {
+        console.warn('[res54] managed key fetch failed', keyError);
+      }
+    }
     const isExplicitBYOK = defaultKey === 'sha256:byok_encrypted' || defaultKey === 'byok_encrypted' || defaultKey === 'byok_protected' || !defaultKey;
     let decryptedChunks: ArrayBuffer[] | null = null;
 
@@ -1087,14 +1118,31 @@ export const downloadFilePreview = async (fileId: string, maxChunks: number = 3,
 
   if (!metadata.encryptionKey) throw new Error('No encryption key available for preview');
 
+  let previewKey = metadata.encryptionKey;
+  if (previewKey === 'managed_key') {
+    try {
+      previewKey = await fetchFileEncryptionKey(fileId);
+    } catch (keyError) {
+      console.warn('[res54] preview managed key fetch failed', keyError);
+    }
+  }
+
   const decrypted: ArrayBuffer[] = [];
-  for (const chunkData of sortedChunks) decrypted.push(await decryptData(chunkData, metadata.encryptionKey));
+  for (const chunkData of sortedChunks) decrypted.push(await decryptData(chunkData, previewKey));
 
   return { blob: new Blob(decrypted, { type: metadata.fileType }), totalChunks: metadata.chunks.length, downloadedChunks: targetChunks.length, isPartial };
 };
 
 export async function resolveFileKeyForShare(fileId: string, encryptionKey: string | null): Promise<string | null> {
   if (!encryptionKey) return null;
+  if (encryptionKey === 'managed_key') {
+    try {
+      return await fetchFileEncryptionKey(fileId);
+    } catch (err) {
+      console.warn('Could not resolve managed key for share:', err);
+      return null;
+    }
+  }
   if (encryptionKey.startsWith('v3_')) {
     const session = await supabase.auth.getSession();
     const userId = session?.data?.session?.user?.id || '';
