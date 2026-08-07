@@ -2,10 +2,11 @@
 
 import {
   jsonResponse, CORS_HEADERS, getOptionalEncryptionKey, validateEncryptionKeyFormat,
-  generateEncryptionKey, decryptData, uint8ToBase64, makeB2Client,
+  generateEncryptionKey,
   ROLE_RANK, requireWorkspaceRole, resolveWorkspaceId, encryptSecretValue, decryptSecretValue,
-  deriveAESKeyFromApiKey, logAudit, B2_ENDPOINT, B2_BUCKET, API_VERSION,
-  verifyStreamToken, StreamToken, signB2Url,
+  deriveAESKeyFromApiKey, logAudit, API_VERSION,
+  verifyStreamToken, StreamToken,
+  invokeCluster, getClusterDownloadUrls, getClusterUploadUrls,
 } from './lib.ts'
 
 // ============================================================
@@ -42,16 +43,38 @@ async function decryptStreamChunk(encryptedData: ArrayBuffer, key: string): Prom
       const header = JSON.parse(new TextDecoder().decode(bin.slice(4, 4 + first4)))
       if (header.version >= 2 && header.chunks > 0 && Array.isArray(header.ivs)) {
         let offset = 4 + first4
-        const chunkSz = header.chunkSize || Math.ceil((bin.byteLength - offset) / header.chunks)
         const parts: ArrayBuffer[] = []
-        for (let i = 0; i < header.chunks; i++) {
-          const iv = typeof header.ivs[i] === 'string'
-            ? Uint8Array.from(atob(header.ivs[i]), c => c.charCodeAt(0))
-            : new Uint8Array(header.ivs[i])
-          const end = Math.min(offset + chunkSz, bin.byteLength)
-          const decrypted = await aesGcmDecrypt(iv, bin.slice(offset, end), key)
-          parts.push(decrypted)
-          offset = end
+        // Canonical client-side RES54 v2: per-part [4B aadLen][aad][4B encLen][ciphertext]
+        const isCanonical = header.ivs.length > 0 &&
+          (typeof header.ivs[0] === 'number' || Array.isArray(header.ivs[0]))
+        if (isCanonical) {
+          const dv = new DataView(bin.buffer, bin.byteOffset, bin.byteLength)
+          for (let i = 0; i < header.chunks; i++) {
+            const iv = new Uint8Array(header.ivs[i])
+            const aadLen = dv.getUint32(offset, true); offset += 4
+            const aad = bin.slice(offset, offset + aadLen); offset += aadLen
+            const encLen = dv.getUint32(offset, true); offset += 4
+            const enc = bin.slice(offset, offset + encLen); offset += encLen
+            const decrypted = await aesGcmDecrypt(iv, enc, key, aad)
+            parts.push(decrypted)
+          }
+        } else {
+          // Legacy API v2 format: bare sub-chunks, base64 ivs, optional explicit sizes
+          const sizes = Array.isArray(header.sizes)
+            ? (header.sizes as number[]).map((s) => Number(s))
+            : null
+          const chunkSz = sizes
+            ? 0
+            : (header.chunkSize || Math.ceil((bin.byteLength - offset) / header.chunks))
+          for (let i = 0; i < header.chunks; i++) {
+            const iv = typeof header.ivs[i] === 'string'
+              ? Uint8Array.from(atob(header.ivs[i]), c => c.charCodeAt(0))
+              : new Uint8Array(header.ivs[i])
+            const end = sizes ? Math.min(offset + sizes[i], bin.byteLength) : Math.min(offset + chunkSz, bin.byteLength)
+            const decrypted = await aesGcmDecrypt(iv, bin.slice(offset, end), key)
+            parts.push(decrypted)
+            offset = end
+          }
         }
         const total = parts.reduce((s, p) => s + p.byteLength, 0)
         const out = new Uint8Array(total)
@@ -79,42 +102,51 @@ async function decryptStreamChunk(encryptedData: ArrayBuffer, key: string): Prom
   }
 }
 
-// Encrypt a single chunk in v2 format (matches SW decrypt exactly)
+// Encrypt a single chunk in the canonical client-side RES54 v2 format
+// [4B header len][JSON header][per part: 4B aadLen][aad][4B encLen][ciphertext]
+// Header: { version: 2, chunks, totalSize, ivs: number[][] } — parseable by the app's decryptData
 async function encryptChunkV2(plaintext: Uint8Array, keyStr: string): Promise<Uint8Array> {
-  // Split into 64KB sub-chunks for v2 format
+  // Split into 64KB sub-chunks to match the client-side format
   const SUB_CHUNK = 64 * 1024
   const numChunks = Math.ceil(plaintext.byteLength / SUB_CHUNK)
   const ivs: Uint8Array[] = []
-  const encryptedParts: Uint8Array[] = []
+  const parts: Array<{ aad: Uint8Array; encrypted: Uint8Array }> = []
+
+  const keyBytes = new TextEncoder().encode(keyStr.slice(0, 32).padEnd(32, '0'))
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt'])
 
   for (let i = 0; i < numChunks; i++) {
     const start = i * SUB_CHUNK
     const end = Math.min(start + SUB_CHUNK, plaintext.byteLength)
     const sub = plaintext.slice(start, end)
     const iv = crypto.getRandomValues(new Uint8Array(12))
-    const enc = await aesGcmEncrypt(iv, sub, keyStr)
+    const aad = new TextEncoder().encode(`chunk-${i}-${numChunks}-${Date.now()}`)
+    const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, key, sub))
     ivs.push(iv)
-    encryptedParts.push(enc)
+    parts.push({ aad, encrypted })
   }
 
-  // Build v2 header
+  // Build v2 header (matches src/lib/encryption.ts encryptLargeData)
   const header = {
     version: 2,
     chunks: numChunks,
-    ivs: ivs.map(iv => btoa(String.fromCharCode(...iv))),
-    chunkSize: SUB_CHUNK,
+    totalSize: plaintext.byteLength,
+    ivs: ivs.map(iv => Array.from(iv)),
   }
   const headerBytes = new TextEncoder().encode(JSON.stringify(header))
 
-  // [4-byte header len][header][encrypted sub-chunks...]
-  const totalSize = 4 + headerBytes.byteLength + encryptedParts.reduce((s, p) => s + p.byteLength, 0)
+  let totalSize = 4 + headerBytes.byteLength
+  for (const part of parts) totalSize += 4 + part.aad.byteLength + 4 + part.encrypted.byteLength
   const result = new Uint8Array(totalSize)
-  new DataView(result.buffer, 0, 4).setUint32(0, headerBytes.byteLength, true)
+  const dv = new DataView(result.buffer)
+  dv.setUint32(0, headerBytes.byteLength, true)
   result.set(headerBytes, 4)
   let offset = 4 + headerBytes.byteLength
-  for (const part of encryptedParts) {
-    result.set(part, offset)
-    offset += part.byteLength
+  for (const part of parts) {
+    dv.setUint32(offset, part.aad.byteLength, true); offset += 4
+    result.set(part.aad, offset); offset += part.aad.byteLength
+    dv.setUint32(offset, part.encrypted.byteLength, true); offset += 4
+    result.set(part.encrypted, offset); offset += part.encrypted.byteLength
   }
 
   return result
@@ -183,19 +215,24 @@ export async function handleFilesAPI(
     if (size > 50 * 1024 * 1024) chunkSize = 2 * 1024 * 1024;
 
     const totalChunks = Math.ceil(size / chunkSize);
-    const b2Client = await makeB2Client();
 
-    const urls: Array<{ index: number; path: string; upload_url: string }> = [];
+    // Universal bucket dispatch: get upload URLs across the shared bucket pool
+    const chunkPaths: Array<{ path: string; index: number }> = [];
     for (let i = 0; i < totalChunks; i++) {
-      const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
-      const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkPath}`);
-      const signedReq = await b2Client.sign(b2Url.toString(), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        aws: { signQuery: true },
-      });
-      urls.push({ index: i, path: chunkPath, upload_url: signedReq.url });
+      chunkPaths.push({ path: `${userId}/uploads/${uploadId}/${i}.bin`, index: i });
     }
+    const { urls, bucketAssignments } = await getClusterUploadUrls(userId, chunkPaths, size);
+    if (!urls.length) {
+      return jsonResponse({ error: 'No storage buckets available', success: false }, 503);
+    }
+
+    const uploadUrls = urls.map(u => ({
+      index: u.index,
+      path: u.path,
+      upload_url: u.uploadUrl,
+      bucket: u.bucket,
+      cluster_id: u.clusterId,
+    }));
 
     await supabase.from('upload_sessions').insert({
       upload_id: uploadId,
@@ -206,6 +243,7 @@ export async function handleFilesAPI(
       total_chunks: totalChunks,
       folder_id: folderId,
       file_type: type,
+      chunk_buckets: bucketAssignments,
     });
 
     return jsonResponse({
@@ -213,9 +251,10 @@ export async function handleFilesAPI(
       upload_id: uploadId,
       file_id: fileId,
       encryption_key: encryptionKey,
-      urls,
+      urls: uploadUrls,
       chunk_size: chunkSize,
       total_chunks: totalChunks,
+      bucket_assignments: bucketAssignments,
       name,
       type,
       size,
@@ -255,21 +294,55 @@ export async function handleFilesAPI(
 
     const encryptionKey = session.encryption_key;
     const fileId = crypto.randomUUID();
-    const b2Client = await makeB2Client();
+    const chunkBuckets: Record<string, string> = session.chunk_buckets || {};
 
-    // Verify all chunks exist
-    const verifiedChunks: Array<{ index: number; path: string; repo: string }> = [];
+    // Fetch each uploaded plaintext chunk from its assigned bucket, encrypt it
+    // (RES54 v2), and store the encrypted chunk on the SAME bucket so download
+    // can resolve per-chunk bucket and decrypt.
+    const verifiedChunks: Array<{ index: number; path: string; repo: string; bucket: string }> = [];
     for (let i = 0; i < session.total_chunks; i++) {
       const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
+      const encPath = `${userId}/encrypted/${fileId}/${i}.bin`;
+      const targetBucket = chunkBuckets[String(i)] || undefined;
       try {
-        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkPath}`);
-        const signedReq = await b2Client.sign(b2Url.toString(), {
-          method: 'HEAD',
-          aws: { signQuery: true },
+        // Signed GET from the assigned bucket
+        const [download] = await getClusterDownloadUrls(userId, [
+          { path: chunkPath, index: i, bucket: targetBucket },
+        ]);
+        if (!download?.downloadUrl) throw new Error(`Chunk ${i} not found`);
+        const getResp = await fetch(download.downloadUrl);
+        if (!getResp.ok) throw new Error(`Chunk ${i} not found (${getResp.status})`);
+        const plaintext = new Uint8Array(await getResp.arrayBuffer());
+
+        const encrypted = await encryptChunkV2(plaintext, encryptionKey);
+
+        // Signed PUT to the same bucket
+        const [upload] = await getClusterUploadUrls(userId, [
+          { path: encPath, index: i },
+        ], encrypted.byteLength, targetBucket);
+        if (!upload?.uploadUrl) throw new Error(`Chunk ${i} write URL failed`);
+        const putResp = await fetch(upload.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: encrypted,
         });
-        const headResp = await fetch(signedReq.url, { method: 'HEAD' });
-        if (!headResp.ok) throw new Error(`Chunk ${i} not found`);
-        verifiedChunks.push({ index: i, path: chunkPath, repo: 'b2' });
+        if (!putResp.ok) throw new Error(`Encrypted chunk ${i} upload failed (${putResp.status})`);
+
+        // Best-effort delete the plaintext staging chunk
+        try {
+          const delReq = await invokeCluster({
+            action: 'delete',
+            userId,
+            path: chunkPath,
+            repo: 'b2',
+            bucket: targetBucket,
+          });
+          if (!delReq?.success) throw new Error('delete failed');
+        } catch {
+          /* best-effort cleanup */
+        }
+
+        verifiedChunks.push({ index: i, path: encPath, repo: 'b2', bucket: upload.bucket });
       } catch (err) {
         return jsonResponse({
           error: `Chunk ${i} verification failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -399,21 +472,24 @@ export async function handleFilesAPI(
       return jsonResponse({ error: 'Encryption key missing', success: false, code: 422 }, 422);
     }
 
-    // Signed mode: return B2 URLs for client-side decryption
+    // Signed mode: return B2 URLs for client-side decryption (bucket-aware)
     if (signed) {
-      const b2Client = await makeB2Client();
-      const signedUrls: string[] = [];
-      for (const chunkMeta of metadata.chunks) {
-        if (chunkMeta.repo === 'b2') {
-          const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkMeta.path}`);
-          const signedReq = await b2Client.sign(b2Url.toString(), {
-            method: 'GET', aws: { signQuery: true },
-          });
-          signedUrls.push(signedReq.url);
-        }
+      const chunks = (metadata.chunks || [])
+        .filter((c: any) => c.repo === 'b2')
+        .map((c: any, i: number) => ({
+          path: c.path,
+          index: typeof c.index === 'number' ? c.index : i,
+          bucket: c.bucket,
+          clusterId: c.clusterId,
+        }));
+      if (chunks.length === 0) {
+        return jsonResponse({ error: 'No B2 chunks found', success: false }, 500);
       }
+      const resolved = await getClusterDownloadUrls(userId, chunks);
+      const signedUrls = resolved.map(r => r.downloadUrl);
       return jsonResponse({
         signed_urls: signedUrls,
+        chunk_buckets: Object.fromEntries(resolved.map(r => [r.index, r.bucket])),
         file_name: file.name,
         file_type: file.type,
         file_size: file.size,
@@ -423,17 +499,25 @@ export async function handleFilesAPI(
     }
 
     // Server-side decrypt all chunks and return plaintext
-    const b2Client = await makeB2Client();
     const decryptedChunks: ArrayBuffer[] = [];
+    const downloadChunks = (metadata.chunks || [])
+      .filter((c: any) => c.repo === 'b2')
+      .map((c: any, i: number) => ({
+        path: c.path,
+        index: typeof c.index === 'number' ? c.index : i,
+        bucket: c.bucket,
+        clusterId: c.clusterId,
+      }));
+    const resolvedDownloads = await getClusterDownloadUrls(userId, downloadChunks);
     for (const chunkMeta of metadata.chunks) {
       try {
         let encryptedBuffer: ArrayBuffer;
         if (chunkMeta.repo === 'b2') {
-          const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkMeta.path}`);
-          const signedReq = await b2Client.sign(b2Url.toString(), {
-            method: 'GET', aws: { signQuery: true },
-          });
-          const b2Response = await fetch(signedReq.url);
+          const resolved = resolvedDownloads.find(
+            (r) => r.index === (typeof chunkMeta.index === 'number' ? chunkMeta.index : metadata.chunks.indexOf(chunkMeta))
+          );
+          if (!resolved) throw new Error('Chunk URL resolution failed');
+          const b2Response = await fetch(resolved.downloadUrl);
           if (!b2Response.ok) throw new Error(`B2 download failed (${b2Response.status})`);
           encryptedBuffer = await b2Response.arrayBuffer();
         } else {
@@ -497,9 +581,8 @@ export async function handleFilesAPI(
 
     const fileId = crypto.randomUUID();
     const encryptionKey = await generateEncryptionKey();
-    const b2Client = await makeB2Client();
 
-    const verifiedChunks: Array<{ index: number; path: string; repo: string }> = [];
+    const verifiedChunks: Array<{ index: number; path: string; repo: string; bucket: string }> = [];
 
     for (const chunk of chunks) {
       // For encrypted upload, client sends plaintext to the upload_url
@@ -515,22 +598,20 @@ export async function handleFilesAPI(
 
         // Generate B2 path for the encrypted chunk
         const encPath = `${userId}/encrypted/${fileId}/${chunk.index}.bin`;
-        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${encPath}`);
-        const signedReq = await b2Client.sign(b2Url.toString(), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/octet-stream' },
-          aws: { signQuery: true },
-        });
+        const [upload] = await getClusterUploadUrls(userId, [
+          { path: encPath, index: chunk.index },
+        ], encrypted.byteLength);
+        if (!upload?.uploadUrl) throw new Error(`B2 upload URL failed for chunk ${chunk.index}`);
 
         // Upload encrypted data to B2
-        const b2Resp = await fetch(signedReq.url, {
+        const b2Resp = await fetch(upload.uploadUrl, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/octet-stream' },
           body: encrypted,
         });
         if (!b2Resp.ok) throw new Error(`B2 upload failed for chunk ${chunk.index}`);
 
-        verifiedChunks.push({ index: chunk.index, path: encPath, repo: 'b2' });
+        verifiedChunks.push({ index: chunk.index, path: encPath, repo: 'b2', bucket: upload.bucket });
       } catch (err) {
         return jsonResponse({
           error: `Chunk ${chunk.index} encryption failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -622,19 +703,22 @@ export async function handleFilesAPI(
     if (size > 50 * 1024 * 1024) chunkSize = 2 * 1024 * 1024;
 
     const totalChunks = Math.ceil(size / chunkSize);
-    const b2Client = await makeB2Client();
 
-    const urls: Array<{ path: string; upload_url: string; index: number }> = [];
+    const chunkPaths: Array<{ path: string; index: number }> = [];
     for (let i = 0; i < totalChunks; i++) {
-      const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
-      const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkPath}`);
-      const signedReq = await b2Client.sign(b2Url.toString(), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        aws: { signQuery: true },
-      });
-      urls.push({ path: chunkPath, upload_url: signedReq.url, index: i });
+      chunkPaths.push({ path: `${userId}/uploads/${uploadId}/${i}.bin`, index: i });
     }
+    const { urls, bucketAssignments } = await getClusterUploadUrls(userId, chunkPaths, size);
+    if (!urls.length) {
+      return jsonResponse({ error: 'No storage buckets available', success: false }, 503);
+    }
+
+    const legacyUrls = urls.map(u => ({
+      path: u.path,
+      upload_url: u.uploadUrl,
+      index: u.index,
+      bucket: u.bucket,
+    }));
 
     const { error: sessionError } = await supabase.from('upload_sessions').insert({
       upload_id: uploadId,
@@ -645,6 +729,7 @@ export async function handleFilesAPI(
       total_chunks: totalChunks,
       folder_id: folderId,
       file_type: type,
+      chunk_buckets: bucketAssignments,
     });
     if (sessionError) {
       console.error('Failed to store upload session:', sessionError);
@@ -653,8 +738,9 @@ export async function handleFilesAPI(
     return jsonResponse({
       success: true,
       upload_id: uploadId,
-      urls,
+      urls: legacyUrls,
       cluster_id: 'b2',
+      bucket_assignments: bucketAssignments,
       chunk_size: chunkSize,
       total_chunks: totalChunks,
       encryption: {
@@ -700,21 +786,24 @@ export async function handleFilesAPI(
       return jsonResponse({ error: 'Encryption key missing. Provide it in the body as encryption_key.', success: false, code: 422 }, 422);
     }
 
-    const b2Client = await makeB2Client();
-
-    const verifiedChunks: Array<{ index: number; path: string; sha256: string; repo: string }> = [];
+    const verifiedChunks: Array<{ index: number; path: string; sha256: string; repo: string; bucket?: string }> = [];
+    const verifyTargets = chunks.map((c, i) => ({
+      path: c.path,
+      index: c.index ?? i,
+      bucket: (c as any).bucket,
+    }));
+    const resolvedVerify = await getClusterDownloadUrls(userId, verifyTargets);
     for (const chunk of chunks) {
       try {
-        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunk.path}`);
-        const signedReq = await b2Client.sign(b2Url.toString(), {
-          method: 'HEAD',
-          aws: { signQuery: true },
-        });
-        const headResp = await fetch(signedReq.url, { method: 'HEAD' });
+        const resolved = resolvedVerify.find(r => r.index === chunk.index);
+        if (!resolved?.downloadUrl) {
+          throw new Error(`Chunk ${chunk.index} not found on storage`);
+        }
+        const headResp = await fetch(resolved.downloadUrl, { method: 'HEAD' });
         if (!headResp.ok) {
           throw new Error(`Chunk ${chunk.index} not found on storage`);
         }
-        verifiedChunks.push({ ...chunk, repo: 'b2' });
+        verifiedChunks.push({ ...chunk, repo: 'b2', bucket: resolved.bucket });
       } catch (err) {
         return jsonResponse({
           error: `Chunk ${chunk.index} verification failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -907,20 +996,19 @@ export async function handleFilesAPI(
       }
 
       if (signed) {
-        const b2Client = await makeB2Client();
-        const signedUrls: string[] = [];
-        for (const chunkMeta of metadata.chunks) {
-          if (chunkMeta.repo === 'b2') {
-            const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkMeta.path}`);
-            const signedReq = await b2Client.sign(b2Url.toString(), {
-              method: 'GET',
-              aws: { signQuery: true },
-            });
-            signedUrls.push(signedReq.url);
-          }
-        }
+        const resolveTargets = (metadata.chunks || [])
+          .filter((c: any) => c.repo === 'b2')
+          .map((c: any, i: number) => ({
+            path: c.path,
+            index: typeof c.index === 'number' ? c.index : i,
+            bucket: c.bucket,
+            clusterId: c.clusterId,
+          }));
+        const resolved = await getClusterDownloadUrls(userId, resolveTargets);
+        const signedUrls = resolved.map(r => r.downloadUrl);
         return jsonResponse({
           signed_urls: signedUrls,
+          chunk_buckets: Object.fromEntries(resolved.map(r => [r.index, r.bucket])),
           file_name: file.name,
           file_type: file.type,
           file_size: file.size,
@@ -931,18 +1019,25 @@ export async function handleFilesAPI(
       }
 
       // Full server-side decryption
-      const b2Client = await makeB2Client();
+      const resolveTargets = (metadata.chunks || [])
+        .filter((c: any) => c.repo === 'b2')
+        .map((c: any, i: number) => ({
+          path: c.path,
+          index: typeof c.index === 'number' ? c.index : i,
+          bucket: c.bucket,
+          clusterId: c.clusterId,
+        }));
+      const resolvedDownloads = await getClusterDownloadUrls(userId, resolveTargets);
       const chunks: ArrayBuffer[] = [];
       for (const chunkMeta of metadata.chunks) {
         try {
           let encryptedBuffer: ArrayBuffer;
           if (chunkMeta.repo === 'b2') {
-            const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkMeta.path}`);
-            const signedReq = await b2Client.sign(b2Url.toString(), {
-              method: 'GET',
-              aws: { signQuery: true },
-            });
-            const b2Response = await fetch(signedReq.url);
+            const resolved = resolvedDownloads.find(
+              (r) => r.index === (typeof chunkMeta.index === 'number' ? chunkMeta.index : metadata.chunks.indexOf(chunkMeta))
+            );
+            if (!resolved) throw new Error('Chunk URL resolution failed');
+            const b2Response = await fetch(resolved.downloadUrl);
             if (!b2Response.ok) throw new Error(`B2 download failed (${b2Response.status})`);
             encryptedBuffer = await b2Response.arrayBuffer();
           } else {
@@ -1297,7 +1392,15 @@ export async function handleStreamAPI(
   const startChunkIdx = Math.floor(startByte / chunkSize);
   const endChunkIdx = Math.floor(endByte / chunkSize);
 
-  const b2Client = await makeB2Client();
+  const streamTargets = chunks
+    .slice(startChunkIdx, endChunkIdx + 1)
+    .map((c: any) => ({
+      path: c.path,
+      index: c.index,
+      bucket: c.bucket,
+      clusterId: c.clusterId,
+    }));
+  const resolvedStream = await getClusterDownloadUrls(userId, streamTargets);
   const decryptedParts: ArrayBuffer[] = [];
 
   for (let ci = startChunkIdx; ci <= endChunkIdx && ci < chunks.length; ci++) {
@@ -1305,12 +1408,9 @@ export async function handleStreamAPI(
     try {
       let encryptedBuffer: ArrayBuffer;
       if (chunkMeta.repo === 'b2') {
-        const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${chunkMeta.path}`);
-        const signedReq = await b2Client.sign(b2Url.toString(), {
-          method: 'GET',
-          aws: { signQuery: true },
-        });
-        const b2Response = await fetch(signedReq.url);
+        const resolved = resolvedStream.find(r => r.index === chunkMeta.index);
+        if (!resolved) throw new Error('Chunk URL resolution failed');
+        const b2Response = await fetch(resolved.downloadUrl);
         if (!b2Response.ok) throw new Error(`B2 chunk ${ci} failed (${b2Response.status})`);
         encryptedBuffer = await b2Response.arrayBuffer();
       } else {
@@ -2211,7 +2311,6 @@ export async function handleSecretsAPI(
     const { encrypted, iv } = await encryptSecretValue(value, key);
 
     if (storageType === 'res54') {
-      const b2Client = await makeB2Client();
       const chunkId = `sv_${Date.now().toString(36)}_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
       const storagePath = `${userId}/secrets/${chunkId}.json`;
 
@@ -2224,14 +2323,14 @@ export async function handleSecretsAPI(
         created_at: new Date().toISOString(),
       };
 
-      const b2Url = new URL(`${B2_ENDPOINT()}/${B2_BUCKET()}/${storagePath}`);
-      const signedReq = await b2Client.sign(b2Url.toString(), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        aws: { signQuery: true },
-      });
+      const [upload] = await getClusterUploadUrls(userId, [
+        { path: storagePath, index: 0 },
+      ], chunkData.length);
+      if (!upload?.uploadUrl) {
+        return jsonResponse({ error: 'No storage buckets available for secret', success: false }, 503);
+      }
 
-      const b2Response = await fetch(signedReq.url, {
+      const b2Response = await fetch(upload.uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: new TextEncoder().encode(JSON.stringify(chunkData)),

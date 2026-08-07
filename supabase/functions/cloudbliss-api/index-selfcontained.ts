@@ -2974,6 +2974,18 @@ async function authenticateApiKey(supabase: any, apiKey: string): Promise<any | 
   return null
 }
 
+// 1. Global API disable
+function configValueToBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true
+    if (['false', '0', 'no', 'off', ''].includes(normalized)) return false
+  }
+  return null
+}
+
 async function checkGuards(supabase: any, userId: string, keyId: string): Promise<{ allowed: boolean; reason?: string; status?: number; code?: string }> {
   // 1. Global API disable
   const { data: globalConfig } = await supabase
@@ -2982,7 +2994,7 @@ async function checkGuards(supabase: any, userId: string, keyId: string): Promis
     .eq('key', 'api_globally_enabled')
     .maybeSingle()
 
-  if (globalConfig && globalConfig.value === false) {
+  if (globalConfig && configValueToBoolean(globalConfig.value) === false) {
     const { data: msg } = await supabase
       .from('api_admin_config')
       .select('value')

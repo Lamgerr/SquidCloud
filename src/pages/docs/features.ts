@@ -560,27 +560,17 @@ manual refresh (auto-refreshes every 30s).
   {
     id: 'ui-admin-console',
     title: 'Admin Console',
-    description: 'Multi-step admin auth and the enterprise control plane.',
+    description: 'The enterprise control plane is hosted on a separate admin platform.',
     icon: Lock,
     category: 'features',
-    tags: ['admin', 'enterprise', 'kza', 'ui'],
-    updated: '2026-07-18',
+    tags: ['admin', 'enterprise', 'ui'],
+    updated: '2026-08-06',
     content: `# Admin Console
 
-Gated behind \`profiles.is_admin\` plus a recent \`admin_access_logs\` step-4
-entry and a \`localStorage\` session marker.
+Admin operations have moved to a dedicated, hardened admin platform
+(separate deployment) with multi-step auth and KZA security layers.
 
-- **Admin Auth** (\`/ad/u1/get_ad/auth\`) — a 4-step multi-layer auth: access
-  key, admin account verification, admin credentials, and an access-purpose
-  statement.
-- **Admin Dashboard** (\`/ad/u1/get_ad/dash\`) — 11 tabbed areas: Supabase
-  control, Analytics, Maintenance mode, Repositories, System tools, Support, Logs,
-  Users, Subscriptions, Subscription Analytics, and a link to the KZA Live
-  dashboard.
-- **KZA Live** (\`/ad/u1/get_ad/kza\`) — the "Kill Zone Authority" security-
-  operations view (\`KZADashboardTab\`).
-
-The CLI does not expose admin functions; this is web-only.
+This consumer platform no longer ships any admin routes or admin UI.
 `,
   },
 

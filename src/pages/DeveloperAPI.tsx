@@ -33,6 +33,7 @@ import ApiRequestLogs from '@/components/ApiRequestLogs';
 import DeveloperAPIMobile from '@/components/DeveloperAPIMobile';
 import { supabase } from '@/integrations/supabase/client';
 import { toast as sonnerToast } from 'sonner';
+import { AI_AGENT_PROMPT } from '@/lib/ai-agent-prompt';
 import {
   Dialog,
   DialogContent,
@@ -64,7 +65,7 @@ const endpoints: Endpoint[] = [
   {
     method: 'POST',
     path: '/upload',
-    description: 'Initialize upload — get signed B2 URLs + encryption key (simple, recommended)',
+    description: 'Initialize upload — get signed B2 URLs + raw encryption key (simple, recommended)',
     scopes: ['write'],
     statusPath: null,
     example: `curl -X POST ${BASE_URL}/upload \\
@@ -74,17 +75,20 @@ const endpoints: Endpoint[] = [
     sampleResponse: `{
   "upload_id": "uuid",
   "file_id": "uuid",
-  "encryption_key": "hex_string",
+  "encryption_key": "64_char_hex",
   "urls": [{"index":0,"upload_url":"https://...","path":"..."}],
-  "chunk_size": 1048576,
-  "total_chunks": 10,
+  "chunk_size": 524288,
+  "total_chunks": 20,
+  "name": "video.mp4",
+  "type": "video/mp4",
+  "size": 10485760,
   "success": true
 }`,
   },
   {
     method: 'POST',
     path: '/upload/complete',
-    description: 'Complete upload — just send upload_id, server verifies and registers file',
+    description: 'Complete upload — just send upload_id; server verifies chunks, re-encrypts them (RES54 v2, AES-256-GCM) and registers the file',
     scopes: ['write'],
     statusPath: null,
     example: `curl -X POST ${BASE_URL}/upload/complete \\
@@ -92,8 +96,15 @@ const endpoints: Endpoint[] = [
   -H "Content-Type: application/json" \\
   -d '{"upload_id":"uuid"}'`,
     sampleResponse: `{
-  "file": {"id":"...","name":"video.mp4","size":10485760},
-  "success": true
+  "success": true,
+  "file": {
+    "id": "uuid",
+    "name": "video.mp4",
+    "type": "video/mp4",
+    "size": 10485760,
+    "created_at": "2026-08-06T00:00:00.000Z"
+  },
+  "credits": {"deducted": 3, "remaining": 48, "used_today": 952, "daily_limit": 1000}
 }`,
   },
   {
@@ -110,10 +121,20 @@ const endpoints: Endpoint[] = [
   {
     method: 'GET',
     path: '/download/:id',
-    description: 'Download file — auto-decrypts encrypted files, returns plaintext (simple, recommended)',
+    description: 'Download file — auto-decrypts encrypted files, returns plaintext. Add ?signed=true to get B2 URLs + raw encryption key for client-side RES54 v2 decryption',
     scopes: ['read'],
     statusPath: null,
     example: `curl -X GET ${BASE_URL}/download/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY" -o file.pdf`,
+    sampleResponse: `// GET /download/FILE_ID?signed=true
+{
+  "signed_urls": ["https://.../encrypted/FILE_ID/0.bin", "..."],
+  "file_name": "video.mp4",
+  "file_type": "video/mp4",
+  "file_size": 10485760,
+  "encryption_key": "64_char_hex",
+  "success": true,
+  "credits": {"deducted": 1, "remaining": 47, "used_today": 953, "daily_limit": 1000}
+}`,
   },
   {
     method: 'GET',
@@ -586,6 +607,7 @@ const endpoints: Endpoint[] = [
   },
 ];
 
+
 const methodBadgeClass = (method: Endpoint['method']) => {
   if (method === 'GET') return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
   if (method === 'POST') return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
@@ -895,7 +917,7 @@ const DeveloperAPI = () => {
               <div className="flex items-center gap-2.5">
                 <Code className="w-4 h-4 text-muted-foreground/70" />
                 <span className="text-[13px] font-medium">SquidCloud API v4.0</span>
-                <span className="text-[11px] text-muted-foreground/50">Credit-based file API with CDN streaming, secrets vault, and workspace collaboration</span>
+                <span className="text-[11px] text-muted-foreground/50">Credit-based file API with RES54 end-to-end encryption, CDN streaming, secrets vault, and workspace collaboration</span>
               </div>
               <div className="h-px bg-border/40" />
               <div className="flex gap-2">
@@ -1300,11 +1322,14 @@ const DeveloperAPI = () => {
               </div>
               <div className="h-px bg-border/40" />
               <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
-                All requests require <code className="text-[11px] text-foreground/80 bg-muted/30 px-1 py-0.5 rounded">X-SquidCloud-Key</code> with a <code className="text-[11px] text-foreground/80 bg-muted/30 px-1 py-0.5 rounded">cb_...</code> API key. Upload and download also support optional caller key input.
+                All requests require <code className="text-[11px] text-foreground/80 bg-muted/30 px-1 py-0.5 rounded">X-SquidCloud-Key</code> with a <code className="text-[11px] text-foreground/80 bg-muted/30 px-1 py-0.5 rounded">cb_...</code> API key (<code className="text-[11px] text-foreground/80 bg-muted/30 px-1 py-0.5 rounded">Authorization: Bearer</code> also works). Upload and download also support optional caller key input.
               </p>
               <div className="space-y-1.5">
                 <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
                   <code className="text-[11px] text-muted-foreground/80">X-SquidCloud-Key: cb_your_api_key_here</code>
+                </div>
+                <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
+                  <code className="text-[11px] text-muted-foreground/80">Authorization: Bearer cb_your_api_key_here (alternative)</code>
                 </div>
                 <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
                   <code className="text-[11px] text-muted-foreground/80">X-SquidCloud-Encryption-Key: optional_user_encryption_key</code>
@@ -1322,6 +1347,37 @@ const DeveloperAPI = () => {
                   <p className="text-[12px] font-medium text-amber-400/90">Security notes</p>
                   <p className="text-[11px] text-amber-400/60 mt-0.5">Invalid encryption key format returns 400. Wrong key for encrypted download returns 422. Opt-in HMAC signing prevents request tampering. Credit deduction info is included in every response.</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.03] p-3 space-y-2">
+              <div className="flex items-center gap-2.5">
+                <Code className="w-4 h-4 text-emerald-400" />
+                <span className="text-[13px] font-medium">AI Agent Prompt</span>
+                <span className="text-[10px] text-emerald-400/60">Copy-paste to any AI agent</span>
+              </div>
+              <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
+                Copy this prompt and paste it into your favorite AI coding assistant (Cursor, Claude, Copilot, GPT…).
+                It contains the complete, verified CloudBliss API spec — the agent will integrate upload, download
+                (including client-side RES54 decryption), streaming, and error handling without guessing.
+              </p>
+              <Textarea
+                readOnly
+                rows={14}
+                value={AI_AGENT_PROMPT}
+                onFocus={(e) => e.currentTarget.select()}
+                className="font-mono text-[10.5px] leading-relaxed resize-y min-h-[140px]"
+              />
+              <div className="flex gap-1.5">
+                <button onClick={() => copyToClipboard(AI_AGENT_PROMPT)}
+                  className="inline-flex items-center gap-1.5 h-7 rounded-md px-3 text-[11px] font-medium text-emerald-500 hover:bg-emerald-500/10 transition-colors border border-emerald-500/20">
+                  <Copy className="w-3 h-3" />
+                  Copy Prompt
+                </button>
+                <button onClick={() => { navigator.clipboard.writeText(AI_AGENT_PROMPT); sonnerToast.success('Prompt copied — paste it into your AI agent'); }}
+                  className="inline-flex items-center gap-1.5 h-7 rounded-md px-3 text-[11px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40">
+                  Copy & Hint
+                </button>
               </div>
             </div>
 

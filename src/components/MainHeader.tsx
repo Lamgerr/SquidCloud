@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard, 
-  Shield, 
   BarChart3, 
   Lock, 
   Settings, 
@@ -209,21 +208,13 @@ const MainHeader: React.FC = () => {
 
                   <div className="w-px h-5 bg-border/50 mx-1.5" aria-hidden="true" />
 
-                  {/* AI & Admin */}
+                  {/* AI */}
                   <div className="flex items-center gap-0.5 px-1">
                     <NavIconButton
                       onClick={() => window.dispatchEvent(new Event('openSquidAI'))}
                       icon={<Sparkles className="text-primary" />}
                       label="Squid AI (⌘K)"
                     />
-                    {profile?.is_admin && (
-                      <NavIconButton
-                        to="/ad/u1/get_ad/dash"
-                        icon={<Shield className="text-amber-500" />}
-                        label="Admin Panel"
-                        isActive={isActiveRoute('/ad')}
-                      />
-                    )}
                   </div>
 
                   <div className="w-px h-5 bg-border/50 mx-1.5" aria-hidden="true" />

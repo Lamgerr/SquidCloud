@@ -16,7 +16,6 @@ import MobileUploadNotification from "@/components/MobileUploadNotification";
 import { SquidGuardOverlay } from "@/components/SquidGuardOverlay";
 import MobileDownloadNotification from "@/components/MobileDownloadNotification";
 import MaintenanceBanner from "@/components/MaintenanceBanner";
-import AdminDevPanel from "@/components/AdminDevPanel";
 import ServiceWorkerManager from "@/utils/serviceWorkerManager";
 import { SignalsBridge } from "@/components/SignalsBridge";
 import { useEffect, lazy, Suspense, type ReactNode } from "react";
@@ -44,9 +43,6 @@ const WebhooksPage = lazy(() => import("./pages/WebhooksPage"));
 import { ErrorBoundary } from "./components/ErrorBoundary";
 const CbCode = lazy(() => import("./pages/cbCode"));
 const PDFViewerPage = lazy(() => import("./pages/PDFViewerPage"));
-const AdminAuth = lazy(() => import("@/pages/AdminAuth"));
-const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
-const KZADashboard = lazy(() => import("@/pages/KZADashboard"));
 const APIStatus = lazy(() => import("./pages/APIStatus"));
 const RepoCreation = lazy(() => import("./pages/RepoCreation"));
 const RepoCreationPassword = lazy(() => import("./pages/RepoCreationPassword"));
@@ -439,27 +435,6 @@ const AppContent = () => {
             </AnimatedRoute>
           } />
 
-          {/* Admin Routes - Hidden and Secure */}
-          <Route path="/ad/u1/get_ad/auth" element={<AnimatedRoute><RouteSuspense><AdminAuth /></RouteSuspense></AnimatedRoute>} />
-          <Route path="/ad/u1/get_ad/dash" element={
-            <AnimatedRoute>
-            <RouteSuspense>
-              <ProtectedRoute>
-                <AdminDashboard />
-              </ProtectedRoute>
-            </RouteSuspense>
-            </AnimatedRoute>
-          } />
-          <Route path="/ad/u1/get_ad/kza" element={
-            <AnimatedRoute>
-            <RouteSuspense>
-              <ProtectedRoute>
-                <KZADashboard />
-              </ProtectedRoute>
-            </RouteSuspense>
-            </AnimatedRoute>
-          } />
-
           {/* Legal Routes */}
           <Route path="/terms" element={<AnimatedRoute><RouteSuspense><TermsOfService /></RouteSuspense></AnimatedRoute>} />
           <Route path="/privacy" element={<AnimatedRoute><RouteSuspense><PrivacyPolicy /></RouteSuspense></AnimatedRoute>} />
@@ -491,7 +466,6 @@ const AppContent = () => {
           <Route path="*" element={<AnimatedRoute><RouteSuspense><NotFound /></RouteSuspense></AnimatedRoute>} />
         </Routes>
             </AnimatePresence>
-            <AdminDevPanel />
             <KeyboardShortcutsOverlay />
           </BYOKProvider>
         </BiometricAuthProvider>

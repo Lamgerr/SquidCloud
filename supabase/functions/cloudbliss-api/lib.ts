@@ -423,6 +423,65 @@ export async function makeB2Client() {
   });
 }
 
+// ============================================================
+// UNIVERSAL BUCKET DISPATCH — delegate to squidcloud-cluster
+// ============================================================
+
+export async function invokeCluster(
+  body: Record<string, unknown>,
+): Promise<Record<string, any>> {
+  const clusterUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/squidcloud-cluster`;
+  const res = await fetch(clusterUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data: any;
+  try { data = JSON.parse(text); } catch { data = null; }
+  if (!res.ok) {
+    throw new Error(`squidcloud-cluster ${res.status}: ${data?.error || text}`);
+  }
+  return data || {};
+}
+
+export async function getClusterDownloadUrls(
+  userId: string,
+  chunks: Array<{ path: string; index: number; bucket?: string; clusterId?: string }>,
+): Promise<Array<{ index: number; path: string; downloadUrl: string; bucket: string; clusterId: string }>> {
+  const data = await invokeCluster({
+    action: 'resolve-download',
+    userId,
+    chunks,
+  });
+  return data?.urls || [];
+}
+
+export async function getClusterUploadUrls(
+  userId: string,
+  chunks: Array<{ path: string; index: number }>,
+  totalSize?: number,
+  preferBucket?: string,
+): Promise<{
+  urls: Array<{ index: number; path: string; uploadUrl: string; bucket: string; clusterId: string; kind: string }>;
+  bucketAssignments: Record<string, string>;
+}> {
+  const data = await invokeCluster({
+    action: 'get-upload-urls',
+    userId,
+    chunks,
+    totalSize,
+    preferBucket,
+  });
+  return {
+    urls: data?.urls || [],
+    bucketAssignments: data?.bucketAssignments || {},
+  };
+}
+
 export const API_VERSION = '4.0'
 
 // ============================================================

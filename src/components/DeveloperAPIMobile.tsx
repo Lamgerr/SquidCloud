@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import ApiKeyManagement from './ApiKeyManagement';
 import ApiUsageChart from './ApiUsageChart';
 import ApiRequestLogs from './ApiRequestLogs';
+import { AI_AGENT_PROMPT } from '@/lib/ai-agent-prompt';
 
 type Endpoint = {
   method: 'GET' | 'POST' | 'DELETE';
@@ -34,19 +35,22 @@ type EndpointHealth = {
 const BASE_URL = 'https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/cloudbliss-api';
 
 const endpoints: Endpoint[] = [
-  { method: 'POST', path: '/upload', description: 'Initialize upload — get signed B2 URLs + encryption key (simple, recommended)', scopes: ['write'], example: `curl -X POST ${BASE_URL}/upload -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"name":"doc.pdf","type":"application/pdf","size":1024}'` },
-  { method: 'POST', path: '/upload/complete', description: 'Complete upload — just send upload_id, server verifies and registers file', scopes: ['write'], example: `curl -X POST ${BASE_URL}/upload/complete -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"upload_id":"uuid"}'` },
-  { method: 'GET', path: '/download/:id', description: 'Download file — auto-decrypts encrypted files, returns plaintext (simple, recommended)', scopes: ['read'], example: `curl -X GET ${BASE_URL}/download/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY" -o file.pdf` },
+  { method: 'POST', path: '/upload', description: 'Initialize upload — get signed B2 URLs + raw encryption key (save it, shown once). Server picks chunk_size: 512KB/1MB/2MB', scopes: ['write'], example: `curl -X POST ${BASE_URL}/upload -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"name":"doc.pdf","type":"application/pdf","size":1024}'` },
+  { method: 'POST', path: '/upload/complete', description: 'Complete upload — server verifies chunks, re-encrypts them (RES54 v2, AES-256-GCM) and registers the file', scopes: ['write'], example: `curl -X POST ${BASE_URL}/upload/complete -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"upload_id":"uuid"}'` },
+  { method: 'GET', path: '/download/:id', description: 'Download decrypted file. Add ?signed=true for B2 URLs + raw key to decrypt client-side (RES54 v2)', scopes: ['read'], example: `curl -X GET "${BASE_URL}/download/FILE_ID?signed=true" -H "X-SquidCloud-Key: YOUR_API_KEY"` },
   { method: 'GET', path: '/files', description: 'List all files and folders', scopes: ['read'], example: `curl -X GET ${BASE_URL}/files -H "X-SquidCloud-Key: YOUR_API_KEY"`, sampleResponse: '{"files":[...],"success":true}' },
   { method: 'GET', path: '/files/:id/metadata', description: 'Get file metadata and encryption info', scopes: ['read'], example: `curl -X GET ${BASE_URL}/files/FILE_ID/metadata -H "X-SquidCloud-Key: YOUR_API_KEY"` },
   { method: 'GET', path: '/files/:id/download', description: 'Download decrypted file (legacy)', scopes: ['read'], example: `curl -X GET ${BASE_URL}/files/FILE_ID/download -H "X-SquidCloud-Key: YOUR_API_KEY" -o file.pdf` },
   { method: 'POST', path: '/files/upload/init', description: 'Legacy: Initialize chunked upload — get signed B2 URLs', scopes: ['write'], example: `curl -X POST ${BASE_URL}/files/upload/init -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"name":"doc.pdf","type":"application/pdf","size":1024}'` },
   { method: 'POST', path: '/files/upload/complete', description: 'Legacy: Complete upload and register file', scopes: ['write'], example: `curl -X POST ${BASE_URL}/files/upload/complete -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"upload_id":"...","file_id":"...","chunks":[...]}'` },
-  { method: 'DELETE', path: '/files/:id', description: 'Soft delete a file', scopes: ['delete'], example: `curl -X DELETE ${BASE_URL}/files/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY"` },
-  { method: 'POST', path: '/stream/init', description: 'Get short-lived streaming session token', scopes: ['write'], example: `curl -X POST ${BASE_URL}/stream/init -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"file_id":"FILE_ID"}'` },
+  { method: 'DELETE', path: '/files/:id', description: 'Soft delete a file (trash)', scopes: ['delete'], example: `curl -X DELETE ${BASE_URL}/files/FILE_ID -H "X-SquidCloud-Key: YOUR_API_KEY"` },
+  { method: 'POST', path: '/stream/init', description: 'Get short-lived streaming session token (120s)', scopes: ['write'], example: `curl -X POST ${BASE_URL}/stream/init -H "X-SquidCloud-Key: YOUR_API_KEY" -H "Content-Type: application/json" -d '{"file_id":"FILE_ID"}'` },
   { method: 'GET', path: '/stream', description: 'Stream encrypted file (Range proxy, server-side decrypt)', scopes: ['read'], example: `curl -X GET "${BASE_URL}/stream?id=FILE_ID&token=STREAM_TOKEN"` },
+  { method: 'GET', path: '/search', description: 'Search files by name, type, or metadata', scopes: ['read'], example: `curl -X GET "${BASE_URL}/search?q=doc&page=1&per_page=20" -H "X-SquidCloud-Key: YOUR_API_KEY"` },
+  { method: 'GET', path: '/user', description: 'Get profile with credit balance and storage usage (alias /whoami)', scopes: ['read'], example: `curl -X GET ${BASE_URL}/user -H "X-SquidCloud-Key: YOUR_API_KEY"` },
   { method: 'GET', path: '/keys', description: 'List your API keys', scopes: ['read'], example: `curl -X GET ${BASE_URL}/keys -H "X-SquidCloud-Key: YOUR_API_KEY"` },
   { method: 'GET', path: '/storage', description: 'Get storage usage and quota', scopes: ['read'], example: `curl -X GET ${BASE_URL}/storage -H "X-SquidCloud-Key: YOUR_API_KEY"` },
+  { method: 'GET', path: '/health', description: 'Health check (no auth required)', scopes: ['read'], example: `curl -X GET ${BASE_URL}/health` },
 ];
 
 const methodBadgeClass = (method: Endpoint['method']) => {
@@ -331,14 +335,41 @@ const DeveloperAPIMobile = () => {
                 <div className="flex items-center h-10 px-3 rounded-xl border border-border/40 bg-muted/20">
                   <code className="text-[11px] text-muted-foreground/80">X-SquidCloud-Encryption-Key: optional</code>
                 </div>
+                <div className="flex items-center h-10 px-3 rounded-xl border border-border/40 bg-muted/20">
+                  <code className="text-[11px] text-muted-foreground/80">Authorization: Bearer cb_your_api_key (also works)</code>
+                </div>
               </div>
               <div className="flex items-start gap-2.5 p-3 rounded-xl border border-amber-500/20 bg-amber-500/5">
                 <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-[12px] font-medium text-amber-400/90">Security notes</p>
-                  <p className="text-[11px] text-amber-400/60 mt-0.5">Invalid encryption key format returns 400. Wrong key for encrypted download returns 422.</p>
+                  <p className="text-[11px] text-amber-400/60 mt-0.5">Invalid encryption key format returns 400. Wrong key for encrypted download returns 422. Every response includes remaining credits.</p>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.03] p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <Code className="w-4 h-4 text-emerald-400" />
+                <span className="text-[13px] font-medium">AI Agent Prompt</span>
+                <span className="text-[10px] text-emerald-400/60 ml-auto">Copy-paste to any AI agent</span>
+              </div>
+              <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
+                Paste this prompt into Cursor, Claude, Copilot or GPT and it will integrate the CloudBliss API —
+                uploads, decryption, streaming, error handling — without guessing.
+              </p>
+              <Textarea
+                readOnly
+                rows={10}
+                value={AI_AGENT_PROMPT}
+                onFocus={(e) => e.currentTarget.select()}
+                className="font-mono text-[10.5px] leading-relaxed resize-y min-h-[120px]"
+              />
+              <button onClick={() => copyToClipboard(AI_AGENT_PROMPT)}
+                className="w-full inline-flex items-center justify-center gap-1.5 h-10 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-500 text-[12px] font-medium">
+                <Copy className="w-3.5 h-3.5" />
+                Copy Prompt
+              </button>
             </div>
 
             <div className="rounded-2xl border border-border/50 bg-card/80 p-4 space-y-2">

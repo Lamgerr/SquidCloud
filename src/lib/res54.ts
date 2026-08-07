@@ -343,6 +343,7 @@ export interface ChunkMetadata {
   accountId?: number;
   clusterId?: string;
   providerId?: string;
+  bucket?: string;
 }
 
 interface Res54FileMetadata {
@@ -534,7 +535,7 @@ export const uploadFileWithRes54 = async (
   if (!accessToken) throw new Error('Authentication required');
   const supabaseUrl = SUPABASE_URL;
 
-  const getUploadUrls = async (chunks: { path: string; index: number }[]) => {
+  const getUploadUrls = async (chunks: { path: string; index: number }[], totalSize?: number) => {
     if (providerId) {
       const { data, error } = await supabase.functions.invoke('s3-storage', {
         body: { action: 'get-upload-urls', providerId, chunks }
@@ -546,7 +547,7 @@ export const uploadFileWithRes54 = async (
     const urlResponse = await fetch(`${supabaseUrl}/functions/v1/squidcloud-cluster`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, chunks })
+      body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, totalSize, chunks })
     });
     const responseData = await urlResponse.json();
     if (!urlResponse.ok || responseData.error) {
@@ -562,7 +563,7 @@ export const uploadFileWithRes54 = async (
     if (u.providerId) {
       metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0, providerId: u.providerId };
     } else {
-      metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0, clusterId: u.clusterId };
+      metadata.chunks[u.index] = { ...metadata.chunks[u.index], repo: 'b2', path: u.path, accountId: 0, clusterId: u.clusterId, bucket: u.bucket };
     }
   };
 
@@ -618,7 +619,7 @@ export const uploadFileWithRes54 = async (
         return { path: getChunkStoragePath(user.id, chunkId), index: chunk.index };
       });
 
-      const { urls } = await getUploadUrls(urlPaths);
+      const { urls } = await getUploadUrls(urlPaths, file.size);
       urls.forEach(assignChunkMeta);
 
       await Promise.all(encryptedBatch.map(async (chunk) => {
@@ -665,7 +666,7 @@ export const uploadFileWithRes54 = async (
       return { path: getChunkStoragePath(user.id, chunkId), index };
     });
 
-    const { urls } = await getUploadUrls(urlPaths);
+    const { urls } = await getUploadUrls(urlPaths, file.size);
     urls.forEach(assignChunkMeta);
 
     const uploadChunkBinary = async (chunkWrap: any): Promise<any> => {
@@ -817,6 +818,7 @@ export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?
           body: {
             action: 'download', path: chunk.path, repo: chunk.repo,
             clusterId: chunk.clusterId,
+            bucket: chunk.bucket,
             ...(shareId ? { shareId } : { userId: session?.user?.id }),
           }
         });

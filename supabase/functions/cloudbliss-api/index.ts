@@ -289,6 +289,17 @@ async function authenticateApiKey(supabase: any, apiKey: string): Promise<any | 
   return null
 }
 
+function configToBool(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true
+    if (['false', '0', 'no', 'off', ''].includes(normalized)) return false
+  }
+  return null
+}
+
 async function checkGuards(supabase: any, userId: string, keyId: string): Promise<{ allowed: boolean; reason?: string; status?: number; code?: string }> {
   const { data: globalConfig } = await supabase
     .from('api_admin_config')
@@ -296,7 +307,7 @@ async function checkGuards(supabase: any, userId: string, keyId: string): Promis
     .eq('key', 'api_globally_enabled')
     .maybeSingle()
 
-  if (globalConfig && globalConfig.value === false) {
+  if (globalConfig && configToBool(globalConfig.value) === false) {
     const { data: msg } = await supabase
       .from('api_admin_config')
       .select('value')
