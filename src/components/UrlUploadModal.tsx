@@ -6,16 +6,11 @@ import {
 import { cn, formatBytes } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { backgroundUploadService } from '@/services/backgroundUpload';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent,
   DialogTitle, DialogDescription, DialogClose,
 } from '@/components/ui/dialog';
-import {
-  Sheet, SheetContent,
-  SheetTitle, SheetDescription, SheetClose,
-} from '@/components/ui/sheet';
 
 interface UrlUploadModalProps {
   open: boolean;
@@ -58,7 +53,6 @@ function sourceIcon(type: string) {
 const UrlUploadModal: React.FC<UrlUploadModalProps> = ({
   open, onOpenChange, currentFolder, onUploadComplete,
 }) => {
-  const isMobile = useIsMobile();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -360,34 +354,12 @@ const UrlUploadModal: React.FC<UrlUploadModalProps> = ({
     </div>
   );
 
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
-          side="bottom"
-          className="w-full max-w-full rounded-t-3xl border-t border-border/20 bg-card/90 backdrop-blur-2xl px-5 pt-5 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]"
-        >
-          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/20" />
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <SheetTitle className="text-base font-semibold text-foreground">Upload from URL</SheetTitle>
-              <SheetDescription className="text-xs text-muted-foreground/60 mt-0.5">
-                Paste a link to upload a file
-              </SheetDescription>
-            </div>
-            <SheetClose className="p-2 rounded-lg hover:bg-muted/40 transition-colors">
-              <X className="w-4 h-4 text-muted-foreground" />
-            </SheetClose>
-          </div>
-          {content}
-        </SheetContent>
-      </Sheet>
-    );
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+      <DialogContent className={cn(
+        "sm:max-w-md p-0 gap-0 overflow-hidden",
+        "max-h-[90vh] overflow-y-auto"
+      )}>
         <div className="flex items-center justify-between px-5 pt-5 pb-0">
           <div>
             <DialogTitle className="text-base font-semibold text-foreground">Upload from URL</DialogTitle>
