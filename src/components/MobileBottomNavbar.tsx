@@ -9,11 +9,13 @@ import {
   Upload,
   Download,
   Home,
-  X
+  X,
+  Link,
 } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import CreateItemDialog from '@/components/CreateItemDialog';
+import UrlUploadModal from '@/components/UrlUploadModal';
 import { useCreateItem } from '@/hooks/use-create-item';
 import type { CreateFileType } from '@/hooks/use-create-item';
 
@@ -76,6 +78,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
     single();
   };
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
+  const [urlUploadOpen, setUrlUploadOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const prevTabRef = useRef(activeTab);
 
@@ -326,6 +329,16 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
               New Folder
             </button>
 
+            <button
+              onClick={() => { setCreateSheetOpen(false); setUrlUploadOpen(true); }}
+              className="flex w-full items-center gap-3 rounded-xl border border-border/20 bg-card/60 backdrop-blur-md px-4 py-3.5 text-sm font-medium active:scale-[0.98] transition-all duration-150 hover:bg-accent/30"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Link className="h-4 w-4" />
+              </span>
+              Upload from URL
+            </button>
+
             <div>
               <h4 className="mb-2.5 mt-4 text-xs font-medium text-muted-foreground/70 px-1">Quick Files</h4>
               <div className="grid grid-cols-2 gap-2.5">
@@ -357,6 +370,12 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
         onSubmit={submit}
         creating={creating}
         currentPath={currentPath}
+      />
+
+      <UrlUploadModal
+        open={urlUploadOpen}
+        onOpenChange={setUrlUploadOpen}
+        currentFolder={currentPath}
       />
     </>
   );

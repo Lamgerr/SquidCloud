@@ -1,7 +1,8 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Plus, Upload, Folder, Github, GitBranch } from '@/lib/icon-map';
+import { Plus, Upload, Folder, Github, GitBranch, Link } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import UploadButton from '@/components/UploadButton';
+import UrlUploadModal from '@/components/UrlUploadModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +61,7 @@ const CreateUploadSegmented: React.FC<CreateUploadSegmentedProps> = ({
 
   const [createDropdownOpen, setCreateDropdownOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [urlUploadOpen, setUrlUploadOpen] = useState(false);
 
   const handleCreateClick = () => {
     if (disabled) {
@@ -186,6 +188,13 @@ const CreateUploadSegmented: React.FC<CreateUploadSegmentedProps> = ({
               <span className="flex-1">Clone from GitHub</span>
               <GitBranch className="w-3 h-3 text-muted-foreground" />
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => { setCreateDropdownOpen(false); setUrlUploadOpen(true); }}
+              className="gap-2 cursor-pointer"
+            >
+              <Link className="w-4 h-4" />
+              <span className="flex-1">Upload from URL</span>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             
             <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">
@@ -246,6 +255,14 @@ const CreateUploadSegmented: React.FC<CreateUploadSegmentedProps> = ({
         onSubmit={submit}
         creating={creating}
         createMode={createMode}
+      />
+
+      {/* Upload from URL Modal */}
+      <UrlUploadModal
+        open={urlUploadOpen}
+        onOpenChange={setUrlUploadOpen}
+        currentFolder={currentFolder}
+        onUploadComplete={onUploadComplete}
       />
 
       {/* Hidden Upload Button */}

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { fetchFileEncryptionKey } from '@/lib/secure-file-metadata';
 
 const PREFETCH_COUNT = 8;
 const BATCH_SIZE = 10;
@@ -19,6 +20,46 @@ export class StreamDecryptorService {
     const p = this._doSeed(fileId, shareId);
     this.seedingPromises.set(fileId, p);
     return p;
+  }
+
+  private static async _getChunkUrl(
+    chunk: any,
+    session: any,
+    shareId?: string
+  ): Promise<string | null> {
+    try {
+      // Custom S3-compatible provider
+      if (chunk.providerId) {
+        const { data, error } = await supabase.functions.invoke('s3-storage', {
+          body: { action: 'get-download-url', providerId: chunk.providerId, path: chunk.path }
+        });
+        if (error || !data?.success) throw new Error(error?.message || 'S3 download error');
+        return data.downloadUrl;
+      }
+
+      const body: any = { action: 'download', path: chunk.path, repo: chunk.repo };
+      if (shareId) body.shareId = shareId;
+      else if (session?.user?.id) body.userId = session.user.id;
+
+      // Legacy GitHub repo path
+      if (chunk.repo && chunk.repo !== 'b2') {
+        if (chunk.accountId) body.nodeId = chunk.accountId - 1;
+      } else {
+        // B2 via squidcloud-cluster universal dispatch
+        if (chunk.clusterId) body.clusterId = chunk.clusterId;
+        if (chunk.bucket) body.bucket = chunk.bucket;
+      }
+
+      const response = await supabase.functions.invoke('squidcloud-cluster', { body });
+      if (response.error) throw new Error(response.error.message);
+
+      const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      if (data.downloadUrl) return data.downloadUrl;
+      throw new Error('No downloadUrl in response');
+    } catch (e) {
+      console.warn(`[Streamer] URL failed chunk ${chunk.index}:`, e);
+      return null;
+    }
   }
 
   private static async _doSeed(fileId: string, shareId?: string): Promise<void> {
@@ -48,6 +89,16 @@ export class StreamDecryptorService {
 
       if (chunks.length === 0) throw new Error('No downloadable chunks found');
 
+      let encryptionKey = fileMeta.encryptionKey;
+      if (encryptionKey === 'managed_key' || !encryptionKey) {
+        try {
+          const fetched = await fetchFileEncryptionKey(fileId);
+          if (fetched) encryptionKey = fetched;
+        } catch (keyError) {
+          console.warn('[Streamer] Managed key fetch failed, streaming decryption will fail:', keyError);
+        }
+      }
+
       const actualChunkSize = chunks.length > 1
         ? chunks[1].offset - chunks[0].offset
         : file.size;
@@ -56,7 +107,7 @@ export class StreamDecryptorService {
         fileId,
         fileSize: file.size,
         fileType: file.type,
-        encryptionKey: fileMeta.encryptionKey,
+        encryptionKey,
         chunks,
         chunkSize: actualChunkSize,
       };
@@ -70,20 +121,8 @@ export class StreamDecryptorService {
       const firstBatch = chunks.slice(0, firstBatchEnd);
 
       await Promise.allSettled(firstBatch.map(async (chunk: any) => {
-        try {
-          const body: any = { action: 'download', path: chunk.path, repo: chunk.repo };
-          if (shareId) body.shareId = shareId;
-          else if (session?.user?.id) body.userId = session.user.id;
-          if (chunk.accountId) body.nodeId = chunk.accountId - 1;
-
-          const response = await supabase.functions.invoke('github-storage', { body });
-          if (response.error) throw new Error(response.error.message);
-
-          const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-          if (data.downloadUrl) urls[chunk.index] = data.downloadUrl;
-        } catch (e) {
-          console.warn(`[Streamer] URL failed chunk ${chunk.index}:`, e);
-        }
+        const url = await this._getChunkUrl(chunk, session, shareId);
+        if (url) urls[chunk.index] = url;
       }));
 
       controller.postMessage({ type: 'SET_URLS', fileId, urls });
@@ -123,20 +162,8 @@ export class StreamDecryptorService {
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(batch.map(async (chunk: any) => {
-        try {
-          const body: any = { action: 'download', path: chunk.path, repo: chunk.repo };
-          if (shareId) body.shareId = shareId;
-          else if (session?.user?.id) body.userId = session.user.id;
-          if (chunk.accountId) body.nodeId = chunk.accountId - 1;
-
-          const response = await supabase.functions.invoke('github-storage', { body });
-          if (response.error) throw new Error(response.error.message);
-
-          const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-          if (data.downloadUrl) urls[chunk.index] = data.downloadUrl;
-        } catch (e) {
-          console.warn(`[Streamer] Background URL failed chunk ${chunk.index}:`, e);
-        }
+        const url = await this._getChunkUrl(chunk, session, shareId);
+        if (url) urls[chunk.index] = url;
       }));
 
       try {
