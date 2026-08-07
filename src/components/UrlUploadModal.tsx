@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Globe, Link, Search, Upload, X, Loader, AlertCircle,
+  Globe, Link, Search, Upload, Loader, AlertCircle,
   FileVideo, FileAudio, FileText, FileImage, Check,
 } from '@/lib/icon-map';
 import { cn, formatBytes } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabaseEnv';
 import { backgroundUploadService } from '@/services/backgroundUpload';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent,
-  DialogTitle, DialogDescription, DialogClose,
+  DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 
 interface UrlUploadModalProps {
@@ -111,7 +112,12 @@ const UrlUploadModal: React.FC<UrlUploadModalProps> = ({
   const uploadFromUrl = async (fileUrl: string, filename: string, folder?: string) => {
     setUploading(true);
     try {
-      const resp = await fetch(fileUrl);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? SUPABASE_ANON_KEY;
+      const proxyUrl = `${SUPABASE_URL}/functions/v1/url-resolve?action=download&url=${encodeURIComponent(fileUrl)}`;
+      const resp = await fetch(proxyUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!resp.ok) throw new Error(`Download failed (${resp.status})`);
 
       const blob = await resp.blob();
@@ -360,16 +366,11 @@ const UrlUploadModal: React.FC<UrlUploadModalProps> = ({
         "sm:max-w-md p-0 gap-0 overflow-hidden",
         "max-h-[90vh] overflow-y-auto"
       )}>
-        <div className="flex items-center justify-between px-5 pt-5 pb-0">
-          <div>
-            <DialogTitle className="text-base font-semibold text-foreground">Upload from URL</DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground/60 mt-0.5">
-              Paste a link to upload a file directly
-            </DialogDescription>
-          </div>
-          <DialogClose className="p-2 rounded-lg hover:bg-muted/40 transition-colors">
-            <X className="w-4 h-4 text-muted-foreground" />
-          </DialogClose>
+        <div className="px-5 pt-5 pb-0 pr-10">
+          <DialogTitle className="text-base font-semibold text-foreground">Upload from URL</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground/60 mt-0.5">
+            Paste a link to upload a file directly
+          </DialogDescription>
         </div>
         <div className="px-5 py-4">
           {content}

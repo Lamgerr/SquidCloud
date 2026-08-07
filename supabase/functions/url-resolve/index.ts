@@ -140,6 +140,36 @@ serve(async (req) => {
       return new Response(null, { status: 204, headers: getCorsHeaders() });
     }
 
+    // ?url=<remote>&action=download — server-side proxy streaming that bypasses CORS
+    if (req.method === "GET") {
+      const params = new URL(req.url).searchParams;
+      if (params.get("action") !== "download") {
+        return jsonResponse({ error: "Method not allowed" }, 405);
+      }
+      const remote = params.get("url");
+      if (!remote) return jsonResponse({ error: "url is required" }, 400);
+      let downloadResp: Response;
+      try {
+        downloadResp = await fetch(remote, {
+          redirect: "follow",
+          signal: AbortSignal.timeout(120000),
+        });
+      } catch (e: any) {
+        return jsonResponse({ error: `Failed to download: ${e?.message || "timeout"}` }, 502);
+      }
+      if (!downloadResp.ok) {
+        return jsonResponse({ error: `Download failed (${downloadResp.status})` }, 502);
+      }
+      const ct = downloadResp.headers.get("content-type") || "application/octet-stream";
+      return new Response(downloadResp.body, {
+        status: 200,
+        headers: {
+          ...getCorsHeaders(),
+          "Content-Type": ct,
+        },
+      });
+    }
+
     if (req.method !== "POST") {
       return jsonResponse({ error: "Method not allowed" }, 405);
     }
