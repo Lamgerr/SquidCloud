@@ -1,235 +1,240 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./cx/SquidCloud%20-%20Secure%20Unlimited%20Cloud%20Storage.png">
-    <img alt="SquidCloud" src="./cx/SquidCloud%20-%20Secure%20Unlimited%20Cloud%20Storage.png" width="120">
-  </picture>
+  <img src="./public/logo.svg" alt="SquidCloud" width="120" />
   <h1>SquidCloud</h1>
-  <p><strong>Secure, Unlimited Cloud Storage with Visual Automation</strong></p>
+  <p><strong>Secure, Unlimited Cloud Storage Platform — <em>v12.0.18</em></strong></p>
 
-  [![Version](https://img.shields.io/badge/v11.0.22-Feijoa-8B5CF6?style=flat-square)](https://squidcloud.vercel.app)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](https://opensource.org/licenses/MIT)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-  [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://reactjs.org/)
-  [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase)](https://supabase.io/)
-  [![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel)](https://vercel.com)
+  [![Version](https://img.shields.io/badge/version-12.0.18-blue.svg)](https://squidcloud.vercel.app)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue?logo=typescript)](https://www.typescriptlang.org/)
+  [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://reactjs.org/)
+  [![PWA](https://img.shields.io/badge/PWA-Ready-5A0FC8?logo=pwa)](https://squidcloud.vercel.app)
 </div>
+
+<br />
+
+> **SquidCloud** is a next-generation, privacy-first cloud storage solution powered by the **Res54 Distributed Architecture**. Uncapped storage capacity, military-grade end-to-end encryption, and high-performance delivery — all seamlessly integrated into a modern web, desktop, and mobile ecosystem.
 
 ---
 
-**SquidCloud** is a next-generation privacy-first cloud storage platform — now with visual automation pipelines and one-click website publishing. Powered by the Res54 distributed architecture, it offers uncapped storage, military-grade encryption, and an integrated automation engine—all from your browser.
+## Latest Version
+
+| Component | Version | Status |
+|---|---|---|
+| Web Platform | 12.0.18 | ✅ Live |
+| Android APK | 11.1.0 | ✅ Available |
+| SquidLab SDK | 1.1.0 | ✅ Stable |
+
+Current release: **v12.0.18** — [squidcloud.vercel.app](https://squidcloud.vercel.app)
 
 ---
 
 ## Table of Contents
 
-- [What Makes SquidCloud Different?](#what-makes-squidcloud-different)
-- [Feature Deep Dives](#feature-deep-dives)
-- [What's New in v11](#whats-new-in-v11)
-- [Platform Preview](#platform-preview)
-- [Security & Privacy](#security--privacy)
+- [What is SquidCloud?](#what-is-squidcloud)
+- [Key Features](#key-features)
+- [Storage Options](#storage-options)
+- [How It Works](#how-it-works)
+- [Architecture](#architecture)
+- [Security](#security)
 - [Getting Started](#getting-started)
-- [Support](#support)
+- [Mobile & Desktop](#mobile--desktop)
+- [Legal](#legal)
 
 ---
 
-## What Makes SquidCloud Different?
+## What is SquidCloud?
 
-| Capability | SquidCloud | Traditional Cloud |
-|---|---|---|
-| Storage Limit | **Unlimited** | 5–15 GB free |
-| File Size Limit | **None** | 5–50 GB |
-| Client-Side Encryption | **AES-256-GCM + Argon2id** | Server-side only |
-| Visual Pipeline Automation | **Built-in drag & drop** | Not available |
-| Website Publishing | **One-click from storage** | Not available |
-| Privacy Model | **Zero-knowledge** | Provider has access |
-| Embedded IDE | **Monaco-powered cbCode** | Not available |
+SquidCloud is a next-generation cloud storage platform that combines the convenience of traditional cloud storage with advanced security features and unlimited capacity. Unlike conventional cloud providers, SquidCloud uses a unique distributed storage system called **Res54** that fragments, encrypts, and distributes your files across multiple secure repositories.
+
+SquidCloud is free to use, independently operated, and built with a privacy-first philosophy. We do not sell your data, run ads, or train AI on your files.
 
 ---
 
-## Feature Deep Dives
+## Key Features
 
-### SquidActions — Visual Automation Pipelines
+### Smart Ingestion
 
-Skip the scripting. Build automated file workflows by dragging components onto a canvas — no coding required.
+**Remote URL Upload**
+Fetch any file directly from a public shareable link. The server handles the download stream, bypassing browser CORS restrictions, with a unified real-time progress indicator. Paste a URL into the upload dialog and the file lands in your workspace — no intermediate downloads, no copy-paste.
 
-- **Visual Pipeline Builder** — React Flow canvas with drag-and-drop components, edge connections, and real-time configuration
-- **100+ Pre-built Components** — Triggers, file operations, notifications, AI/ML, data transformation, networking, security, and more — organized into 12 categories
-- **Auto-YAML Generation** — Every visual change instantly produces executable YAML. Switch between the visual canvas and the raw YAML editor at any time
-- **Smart Variables** — 200+ contextual variables (file metadata, user info, session data, analytics) accessible through a searchable panel. Just click to copy
-- **Sub-Component Config** — Expandable inline configuration forms inside each node — select dropdowns, checkboxes, and text inputs for fine-grained control
-- **Multiple Triggers** — Manual, scheduled (cron), webhook, file change events, or pipeline chaining
-- **Execution History** — Every run is tracked with job and step-level logging
-- **AI-Ready** — Copy the SquidActions AI Skill document into any AI assistant (Claude, ChatGPT, etc.) and it can build complete pipelines for you instantly
+### Instant Preview & Reading
 
-Examples of pipelines you can build in minutes:
+**DeepRead Reader**
+Open any document in an immersive, distraction-free reading mode. DeepRead renders text content with adjustable typography, clean layout, and zero chrome — designed for focused consumption of long documents, notes, and exported content.
 
-- Scan uploaded files for malware, then notify via Slack
-- Create daily compressed backups and push to S3
-- Resize images on upload and publish to a static site
-- Watch a folder for changes and trigger multi-channel notifications
+### Developer Tooling
 
-### SquidSites — One-Click Website Publishing
+**API Keys & Usage Analytics**
+Generate scoped API keys directly from the dashboard. Each key is bound to your account with granular permissions. Access a built-in analytics panel showing request volumes, latency distributions, and usage trends over the last 90 days — all without leaving the platform.
 
-Turn any HTML file in your storage into a published website — instantly.
+### Sharing & Publishing
 
-- **Upload to Publish** — Right-click any `.html` file and select Publish. Your site goes live in seconds
-- **Public & Private Modes** — Choose between publicly accessible or authentication-gated
-- **Smart Routing** — Root requests serve `index.html`, directory requests serve `{dir}/index.html`, explicit file paths resolve directly
-- **Custom Badge** — Published pages include a subtle, closable "Made with SquidCloud" badge (with localStorage persistence)
-- **Manage Published Sites** — Toggle visibility, unpublish, or re-publish from a dedicated management panel on desktop and mobile
-- **Vercel Edge Delivery** — HTML is served through Vercel's global edge network with correct `Content-Type` headers — no rewriting
+**Publish as Website (SquidVeil)**
+Turn any folder in your workspace into a live, publicly accessible static website with one click. SquidVeil handles HTTPS, caching, and CDN delivery. Ideal for documentation, landing pages, and personal sites — your content, your infrastructure, your domain.
 
-### Res54 Distributed Storage
+### Encryption & Zero-Knowledge
 
-The backbone of SquidCloud — a proprietary file distribution system built for unlimited scale and resilience.
+**Bring Your Own Key (BYOK)**
+Supply your own encryption key. All encryption and decryption happens client-side. SquidCloud is cryptographically incapable of reading your data in BYOK mode. Your key is never transmitted to or stored on our servers.
 
-- **Chunking** — Files are split into optimized 1.5–4 MB chunks based on file type
-- **Client-Side Encryption** — Every chunk is encrypted with AES-256-GCM before leaving your device
-- **Distributed Repositories** — Encrypted chunks are spread across multiple Res54 storage repositories
-- **Parallel Transfers** — Uploads and downloads use parallel chunk streaming for maximum throughput
-- **Resume Support** — Interrupted transfers pick up where they left off
-- **Load Balancing** — Automatic distribution ensures no single repository becomes a bottleneck
+### AI & Productivity
 
-### Cross-Platform Ecosystem
+**SquidAI Assistant**
+An integrated AI assistant for workspace tasks — file search, content summarization, and smart suggestions. Accessible from anywhere in the dashboard without leaving your current context.
 
-- **Web App** — Full-featured dashboard in any browser
-- **PWA** — Installable native-like experience
-- **Desktop (Electron)** — System tray, native file integration, offline support
-- **Mobile (Capacitor)** — iOS and Android apps
-- **CLI Tool** — Command-line access for automation
+**Keyboard-First Navigation**
+A comprehensive shortcut map and command palette (⌘K) for power users. Navigate, search, and perform actions at full speed without reaching for the mouse.
 
-### Embedded Development Tools
-
-- **cbCode IDE** — A fully-featured Monaco editor embedded in your workspace environment for scripting, data exploration, and automation
-- **SquidLab SDK** — Build custom extensions with access to SquidCloud APIs
-- **REST API** — Full programmatic access to files, folders, shares, and automation
-- **Smart File Previews** — Built-in viewers for PDFs, images, videos, audio, code, spreadsheets, and 3D models
+**Bookmarks & Favorites**
+Pin important files with color tags and quick-access bookmarks. Build a personalized workspace view that surfaces what matters most.
 
 ---
 
-## What's New in v11
+## Storage Options
 
-### SquidActions — The Automation Engine
+SquidCloud gives you full control over where your data lives.
 
-The centerpiece of the v11 Feijoa release. Build, edit, and run automation pipelines without leaving the dashboard.
+### Native GitHub Storage (Default)
+Your files are chunked, encrypted with AES-256-GCM, serialized as JSON blobs, and stored in GitHub repositories managed by SquidCloud. The stored blobs are opaque — no filename, file type, or content can be identified from them by any party, including GitHub and SquidCloud. Only your account with the correct decryption credentials can reassemble and decrypt the original files.
 
-- **Visual Editor** — Drag components from a categorized palette onto an interactive canvas. Connect them with edges. Configure sub-options inline. All in real-time
-- **YAML Editor** — For power users, a full Monaco YAML editor with syntax highlighting and auto-completion. Changes sync automatically when switching between visual and code views
-- **Pipeline Dashboard** — A dedicated management interface showing all pipelines, their last run status, total runs, and quick-action buttons for trigger, edit, and delete
-- **Component Registry** — 130+ typed components across 12 categories: triggers, file operations, data transformation, networking, security, AI/ML, media processing, notifications, control flow, utilities, external storage, and system
-- **Variable Registry** — 200+ contextual variables extracted from actual platform data structures — file paths, user profiles, share links, analytics summaries, pipeline metadata, and more
-- **Edge Function Backend** — Action-based Supabase Edge Function handles script CRUD, trigger management, run tracking, vault secrets, and template variable resolution
+**Best for:** Zero-configuration setup with no external accounts required.
 
-### SquidSites — Website Publishing
+### Bring Your Own Storage (BYOS)
+Connect your own external storage provider. SquidCloud acts as your interface — your files go directly to your infrastructure, not ours.
 
-Transform any storage HTML file into a live website.
+**Supported providers:**
+- **Tebi.io** — S3-compatible object storage
+- **Cloudflare R2** — zero egress fee object storage
+- **Amazon S3** — industry-standard cloud object storage
 
-- One-click publish from the file context menu
-- Public or authentication-gated visibility
-- Smart URL routing with fallback to `index.html`
-- Vercel Edge Network delivery
-- Full management dashboard for all published sites
-
-### Platform Improvements
-
-- Res54 architecture integration for unlimited storage
-- Enhanced BYOK with per-file multi-key encryption
-- Passkey and biometric authentication (WebAuthn)
-- PIN-based app protection
-- cbCode IDE powered by Monaco Editor
-
----
-
-## Platform Preview
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center"><strong>Pipeline Canvas</strong></td>
-      <td align="center"><strong>Dashboard</strong></td>
-    </tr>
-    <tr>
-      <td><img src="./cx/Screenshot%202026-04-03%20at%2010-48-58%20SquidCloud%20-%20Secure%20Unlimited%20Cloud%20Storage.png" alt="Pipeline Canvas Editor" width="100%"></td>
-      <td><img src="./cx/Screenshot%202026-04-03%20at%2010-48-58%20SquidCloud%20-%20Secure%20Unlimited%20Cloud%20Storage.png" alt="SquidCloud Dashboard" width="100%"></td>
-    </tr>
-  </table>
-</div>
-
----
-
-## Security & Privacy
-
-### Encryption Architecture
-
-All encryption happens client-side in your browser before data leaves your device.
-
-- **AES-256-GCM** — Industry-standard symmetric encryption with unique IV per file
-- **Argon2id Key Derivation** — Memory-hard KDF with configurable time, memory, and parallelism parameters — protects against GPU and ASIC attacks
-- **Per-File Keys** — Each file uses a unique encryption key, independent from others
-- **Zero-Knowledge Architecture** — The server stores encrypted blobs and has no ability to read your data
+**Best for:** Users who want full infrastructure ownership, compliance control, or are already paying for cloud storage.
 
 ### Bring Your Own Key (BYOK)
+Supply your own encryption key for complete zero-knowledge encryption. Your key is never transmitted to or stored by SquidCloud.
 
-Two levels of key control:
+> If you lose your BYOK encryption key, SquidCloud cannot recover your data. Keep a secure independent backup of your key at all times.
 
-| Level | Description |
+**Best for:** Users with strict security requirements, developers, and enterprise use cases.
+
+---
+
+## How It Works
+
+```
+Your File
+    │
+    ▼
+Client-side chunking
+    │
+    ▼
+AES-256-GCM Encryption (Res54 Engine)
+    │
+    ▼
+Serialized as JSON blobs
+    │
+    ├──► Native: GitHub Repositories (opaque blobs)
+    ├──► BYOS: Your S3 / R2 / Tebi bucket
+    └──► BYOK: Encrypted with your own key before any of the above
+```
+
+Metadata (filename, size, type, timestamps) is stored separately in Supabase. File content and metadata are never stored together.
+
+---
+
+## Architecture
+
+| Layer | Technology |
 |---|---|
-| **Account-Level** | Define a master key using Argon2id. Key lives in RAM only — never persisted. Automatic timeout after inactivity |
-| **Per-File** | Assign unique encryption keys to individual files. Perfect for compartmentalized sharing |
+| Frontend | React 18 + TypeScript + Vite |
+| UI | Shadcn/ui + Tailwind CSS |
+| Backend / Auth | Supabase |
+| Native Storage | GitHub API (encrypted blobs) |
+| External Storage | Tebi.io / Cloudflare R2 / Amazon S3 (BYOS) |
+| Encryption | Res54 (AES-256-GCM, block-split, optional entropy) |
+| Hosting | Vercel |
+| Android | Capacitor + signed APK via GitHub Actions |
+| SDK | SquidLab SDK v1.1.0 |
 
-### Authentication Methods
+---
 
-| Method | Details |
+## Security
+
+| Feature | Status |
 |---|---|
-| Email & Password | Standard auth with bcrypt hashing |
-| OAuth SSO | Google, GitHub, Discord |
-| Passkeys (WebAuthn) | Passwordless, phishing-resistant |
-| TOTP MFA | Time-based one-time passwords |
-| PIN Protection | Biometric-friendly app-level security |
+| AES-256-GCM Encryption | ✅ Enabled |
+| Client-side Encryption | ✅ Before upload |
+| BYOK (Zero-knowledge) | ✅ Available |
+| HTTPS Enforced | ✅ Global |
+| Passkey / WebAuthn | ✅ Supported |
+| PIN Authorization | ✅ On share and delete |
+| OAuth PKCE Flow | ✅ Mobile hardened |
+| No plaintext storage | ✅ Guaranteed |
+| No AI training on files | ✅ Never |
+| No data selling | ✅ Never |
 
-### Data Protection
-
-- **TLS 1.3** for all transport
-- **Row-Level Security** on every database table
-- **Session Management** with rolling expiration
-- **SquidVault** — An additional encrypted vault layer for your most sensitive files, with separate password protection and auto-lock
+We do not access, read, or analyze your file content under any circumstance. In BYOK mode, we are cryptographically incapable of doing so.
 
 ---
 
 ## Getting Started
 
-### Two Minutes to First Upload
+### Web
+Visit [squidcloud.vercel.app](https://squidcloud.vercel.app) and create a free account.
 
-| Step | Action |
-|---|---|
-| 1. Visit | [squidcloud.vercel.app](https://squidcloud.vercel.app) |
-| 2. Sign Up | Create an account with email or OAuth |
-| 3. Onboarding | Quick setup wizard introduces the dashboard |
-| 4. Upload | Drag files anywhere on the page, or click the upload button |
-| 5. Publish | Right-click any HTML file → Publish Website |
-| 6. Automate | Head to SquidActions to build your first pipeline |
+### Android
+Download the latest signed APK from the releases section of this repository. Requires Android 7.0 or later.
 
-### Quick Navigation
+### API
+Generate an API key from your dashboard. Every key is scoped to your account and logged for security purposes.
 
-- **`Ctrl/Cmd + K`** — Command palette
-- **`Ctrl/Cmd + U`** — Upload files
-- **`Ctrl/Cmd + F`** — Global search
-- **`Space`** — Quick file preview
-- **`Delete`** — Move to trash
+Full API documentation is available in your dashboard after signing in.
+
+### CLI
+The SquidCloud CLI supports automation and scripting via your API key. See the CLI documentation in your dashboard for setup instructions.
 
 ---
 
-## Support
+## Mobile & Desktop
 
-| Channel | Where |
-|---|---|
-| Documentation | [squidcloud.inflate.live](https://squidcloud.inflate.live) |
-| Issues | [GitHub Issues](https://github.com/NaveenSingh9999/cloudbliss-storage/issues) |
-| Email | hello@inflate.live |
+| Platform | Version | Status |
+|---|---|---|
+| Web (PWA) | 12.0.18 | ✅ Live |
+| Android (APK) | 11.1.0 | ✅ Available |
+| iOS | — | Planned |
+| Desktop (Electron) | — | Planned |
+
+The Android app is built with Capacitor and distributed as a signed APK. It supports full feature parity with the web platform including BYOS, BYOK, file upload with background worker, and OAuth sign-in.
+
+---
+
+## Legal
+
+SquidCloud is an independent project operated by its founders. All services are free to use.
+
+- [Privacy Policy](https://squidcloud.vercel.app/privacy)
+- [Terms of Service](https://squidcloud.vercel.app/terms)
+
+Governed by the laws of India. Compliant with the Digital Personal Data Protection Act, 2023 (DPDP Act).
+
+For support or legal inquiries: **hellosquidcloud@gmail.com**
+
+---
+
+## SquidLab SDK
+
+Build on top of SquidCloud with the SquidLab SDK (v1.1.0). The SDK provides programmatic access to storage, file management, and authentication flows.
+
+See the SDK repository for full documentation and examples.
 
 ---
 
 <div align="center">
-  <p><strong>SquidCloud</strong> — Upload. Automate. Publish.</p>
-  <sub>MIT License</sub>
+  <p>Built and maintained with care by Lamgerr</p>
+  <p>
+    <a href="https://squidcloud.vercel.app">Platform</a> ·
+    <a href="https://squidcloud.vercel.app/privacy">Privacy</a> ·
+    <a href="https://squidcloud.vercel.app/terms">Terms</a> ·
+    <a href="mailto:hellosquidcloud@gmail.com">Contact</a>
+  </p>
+  <p><i>SquidCloud v12.0.18</i></p>
 </div>
