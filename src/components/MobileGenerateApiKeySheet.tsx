@@ -240,7 +240,6 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
         </BottomSheetContent>
       </BottomSheet>
     );
-  }
 }
 
 export default MobileGenerateApiKeySheet;

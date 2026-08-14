@@ -315,7 +315,6 @@ export function MobileCreateFileRequestSheet({
         </BottomSheetContent>
       </BottomSheet>
     );
-  }
 }
 
 export default MobileCreateFileRequestSheet;
