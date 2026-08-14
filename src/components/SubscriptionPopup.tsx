@@ -165,6 +165,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
             </div>
     </PopupShell>
   );
+  }
 
   // ─── TYPE 3: Expiry Imminent (Final Day) ───
   if (stage === 3 || (billing_period === 'monthly' && stage === 4) || (billing_period === 'annual' && stage === 5)) {
@@ -339,6 +340,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
             </button>
     </PopupShell>
   );
+  }
 
   // Fallback for other stages
   return null;
