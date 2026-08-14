@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Check, Fingerprint as FingerprintIcon } from '@/lib/icon-map'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { Drawer, DrawerContent } from '@/components/ui/drawer'
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { biometricAuthService } from '@/services/biometricAuthService'
@@ -177,13 +177,13 @@ const BiometricSetupDialog: React.FC<BiometricSetupDialogProps> = ({ open, onClo
 
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={(open) => { if (!open) onClose() }}>
-        <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
+      <BottomSheet open={open} onOpenChange={(open) => { if (!open) onClose() }}>
+        <BottomSheetContent hideHandle hideClose className="border-none bg-transparent p-0">
           <div className="relative overflow-hidden rounded-t-[28px] bg-[#0A0E1A] min-h-[80vh]">
             {mainContent}
           </div>
-        </DrawerContent>
-      </Drawer>
+        </BottomSheetContent>
+      </BottomSheet>
     )
   }
 

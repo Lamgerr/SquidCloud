@@ -649,6 +649,60 @@ body {
   animation-fill-mode: both;
 }
 
+/* ── Universal BottomSheet (Apple-grade) ────────────── */
+:root {
+  --bs-spring: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Scrim fade */
+.bs-overlay {
+  animation: bs-overlay-in 0.32s var(--bs-spring);
+}
+.bs-overlay[data-vaul-drawer-direction="bottom"][data-state="closed"] {
+  animation: bs-overlay-out 0.3s var(--bs-spring);
+}
+
+/* Sheet spring entrance / exit — vaul drives translate via inline style,
+   this only handles the initial mount curve + opacity for a soft landing. */
+.bs-content {
+  animation: bs-content-in 0.42s var(--bs-spring);
+  will-change: transform;
+}
+.bs-content[data-vaul-drawer-direction="bottom"][data-state="closed"] {
+  animation: bs-content-out 0.3s var(--bs-spring);
+}
+
+@keyframes bs-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes bs-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes bs-content-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bs-content-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(8px); }
+}
+
+/* Drag handle — gentle press feedback */
+.bs-handle {
+  transition: width 0.2s var(--bs-spring), background-color 0.2s ease;
+}
+.bs-handle:active {
+  width: 2.75rem;
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Background scale while a sheet is open (vaul shouldScaleBackground) */
+[data-vaul-drawer-wrapper] {
+  transition: transform 0.42s var(--bs-spring);
+}
+
 /* Safe area support for iPhones */
 .h-safe-area-inset-bottom {
   height: env(safe-area-inset-bottom, 0px);

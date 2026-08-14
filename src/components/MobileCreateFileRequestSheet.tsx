@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Drawer, DrawerContent } from '@/components/ui/drawer';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 
 interface MobileCreateFileRequestSheetProps {
   open: boolean;
@@ -104,8 +104,8 @@ export function MobileCreateFileRequestSheet({
   // Success state
   if (result) {
     return (
-      <Drawer open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
-        <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
+      <BottomSheet open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
+        <BottomSheetContent hideHandle hideClose className="border-none bg-transparent p-0">
           <div className="relative overflow-hidden rounded-t-[28px] bg-background flex flex-col">
             {/* Header */}
             <div className="px-5 pt-5 pb-3">
@@ -175,15 +175,15 @@ export function MobileCreateFileRequestSheet({
               </Button>
             </div>
           </div>
-        </DrawerContent>
-      </Drawer>
+        </BottomSheetContent>
+      </BottomSheet>
     );
   }
 
   // Create form
   return (
-    <Drawer open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
-      <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
+    <BottomSheet open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
+      <BottomSheetContent hideHandle hideClose className="border-none bg-transparent p-0">
         <div className="relative overflow-hidden rounded-t-[28px] bg-background max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="px-5 pt-5 pb-3">
@@ -312,9 +312,10 @@ export function MobileCreateFileRequestSheet({
             </Button>
           </div>
         </div>
-      </DrawerContent>
-    </Drawer>
-  );
+        </BottomSheetContent>
+      </BottomSheet>
+    );
+  }
 }
 
 export default MobileCreateFileRequestSheet;

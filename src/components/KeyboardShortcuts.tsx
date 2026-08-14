@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import { GameSuggestionModal } from '@/components/games/GameSuggestionModal';
 
 // ── Shortcut Definition ────────────────────────────────────────
@@ -165,11 +165,11 @@ export function KeyboardShortcutsOverlay() {
 
   if (isMobile) {
     return (
-      <Sheet open={overlayOpen} onOpenChange={setOverlayOpen}>
-        <SheetContent side="bottom" className="h-[75vh] rounded-t-2xl p-0">
+      <BottomSheet open={overlayOpen} onOpenChange={setOverlayOpen}>
+        <BottomSheetContent hideClose className="h-[75vh] rounded-t-[28px] p-0 bg-[hsl(var(--card)/0.92)]">
           <ShortcutsContent onClose={() => setOverlayOpen(false)} />
-        </SheetContent>
-      </Sheet>
+        </BottomSheetContent>
+      </BottomSheet>
     );
   }
 

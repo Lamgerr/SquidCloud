@@ -41,7 +41,7 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -937,18 +937,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   // Mobile: Use full-screen sheet from bottom
   if (isMobile) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent 
-          side="bottom" 
-          className="flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 rounded-t-2xl [&>button:last-child]:top-3 [&>button:last-child]:right-4"
-        >
-          {/* Handle indicator */}
-          <div className="flex justify-center pt-3 pb-2">
-            <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-          </div>
+      <BottomSheet open={open} onOpenChange={onOpenChange}>
+        <BottomSheetContent className="flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 rounded-t-[28px] bg-[hsl(var(--card)/0.92)]">
           {commandContent}
-        </SheetContent>
-      </Sheet>
+        </BottomSheetContent>
+      </BottomSheet>
     );
   }
 

@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Drawer, DrawerContent } from '@/components/ui/drawer';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Note {
@@ -293,13 +293,13 @@ export function NotesPanel({
 
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={(open) => { if (!open) onClose() }}>
-        <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
+      <BottomSheet open={open} onOpenChange={(open) => { if (!open) onClose() }}>
+        <BottomSheetContent hideHandle hideClose className="border-none bg-transparent p-0">
           <div className="relative overflow-hidden rounded-t-[28px] bg-card min-h-[85vh] flex flex-col animate-fade-up-soft">
             {content}
           </div>
-        </DrawerContent>
-      </Drawer>
+        </BottomSheetContent>
+      </BottomSheet>
     );
   }
 

@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription,
@@ -332,11 +333,11 @@ export function WebhookManager({ open, onClose, standalone = false }: WebhookMan
 
   if (isMobile) {
     return (
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-full h-[90vh] p-0 gap-0 rounded-t-2xl rounded-b-none">
+      <BottomSheet open={open} onOpenChange={onClose}>
+        <BottomSheetContent hideClose className="max-w-full h-[90vh] p-0 gap-0 rounded-t-[28px] rounded-b-none bg-[hsl(var(--card)/0.92)]">
           {content}
-        </DialogContent>
-      </Dialog>
+        </BottomSheetContent>
+      </BottomSheet>
     );
   }
 

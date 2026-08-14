@@ -8,12 +8,53 @@ import {
 } from '@/lib/icon-map';
 import { useAuth } from '@/contexts/AuthContext';
 import type { PendingNotification } from '@/hooks/useSubscriptionNotifications';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 
 interface SubscriptionPopupProps {
   notification: PendingNotification;
   onDismiss: (id: string) => void;
   onAcceptUpsell?: (id: string) => void;
 }
+
+const PopupShell: React.FC<{
+  children: React.ReactNode;
+  panelClassName: string;
+  onClose: () => void;
+}> = ({ children, panelClassName, onClose }) => {
+  const isMobile = window.innerWidth < 768;
+  if (isMobile) {
+    const sheetClassName = panelClassName
+      .replace('overflow-hidden', '')
+      .concat(' max-h-[92vh] overflow-y-auto');
+    return (
+      <BottomSheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+        <BottomSheetContent hideClose className={cn(sheetClassName)}>
+          {children}
+        </BottomSheetContent>
+      </BottomSheet>
+    );
+  }
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          className={cn('relative w-full', panelClassName)}
+        >
+          {children}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 
 const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onDismiss, onAcceptUpsell }) => {
   const navigate = useNavigate();
@@ -23,7 +64,6 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
 
   const { stage, plan_type, billing_period, upsell_offer_shown } = notification;
   const planName = plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter';
-  const isMobile = window.innerWidth < 768;
 
   const handleRenew = (targetPlan?: string, targetBilling?: string) => {
     const p = targetPlan || plan_type;
@@ -47,22 +87,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
   // ─── TYPE 2: Weekly Upsell (Stage 2) ───
   if (billing_period === 'weekly' && stage === 2) {
     return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={cn(
-              'relative w-full max-w-md rounded-2xl border border-white/10 lg-strong shadow-2xl overflow-hidden',
-            )}
-          >
+      <PopupShell panelClassName="relative w-full max-w-md rounded-2xl border border-white/10 lg-strong shadow-2xl overflow-hidden" onClose={() => onDismiss(notification.id)}>
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500" />
             <button
               onClick={() => onDismiss(notification.id)}
@@ -138,11 +163,8 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
                 10 bonus days applied on top of your full 30-day month. Offer available until your current plan expires.
               </p>
             </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    );
-  }
+    </PopupShell>
+  );
 
   // ─── TYPE 3: Expiry Imminent (Final Day) ───
   if (stage === 3 || (billing_period === 'monthly' && stage === 4) || (billing_period === 'annual' && stage === 5)) {
@@ -151,21 +173,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
       : 'today';
 
     return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className={cn(
-              'relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6',
-            )}
-          >
+      <PopupShell panelClassName="relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6" onClose={() => onDismiss(notification.id)}>
             <button
               onClick={() => onDismiss(notification.id)}
               className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
@@ -226,30 +234,14 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
                 I'll do it later
               </button>
             )}
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    );
+    </PopupShell>
+  );
   }
 
   // ─── TYPE 4: Post-Expiry Modal ───
   if (stage >= 4 && stage <= 10) {
     return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={cn(
-              'relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6',
-            )}
-          >
+      <PopupShell panelClassName="relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6" onClose={() => onDismiss(notification.id)}>
             <div className="flex items-center gap-3 mb-4">
               <div className="h-10 w-10 rounded-xl bg-amber-500/15 flex items-center justify-center">
                 <AlertTriangle className="h-5 w-5 text-amber-400" />
@@ -291,27 +283,14 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
             >
               Continue on free plan
             </button>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    );
+    </PopupShell>
+  );
   }
 
   // ─── TYPE 5: Annual to Supporter+ Upsell (Annual Stage 3) ───
   if (billing_period === 'annual' && stage === 3 && plan_type === 'supporter') {
     return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            className={cn('relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6')}
-          >
+      <PopupShell panelClassName="relative w-full max-w-sm rounded-2xl border border-white/10 lg-strong shadow-2xl p-6" onClose={() => onDismiss(notification.id)}>
             <button onClick={() => onDismiss(notification.id)} className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -358,11 +337,8 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({ notification, onD
             >
               Keep my current Supporter plan
             </button>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    );
-  }
+    </PopupShell>
+  );
 
   // Fallback for other stages
   return null;

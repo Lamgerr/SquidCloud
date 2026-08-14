@@ -1,6 +1,10 @@
 import React from 'react';
-import { Drawer, DrawerContent } from '@/components/ui/drawer';
-import { cn } from '@/lib/utils';
+import {
+  BottomSheet,
+  BottomSheetContent,
+  BottomSheetHeader,
+} from '@/components/ui/bottom-sheet';
+import { cn } from '@lib/utils';
 
 interface MobileSheetProps {
   open: boolean;
@@ -9,6 +13,8 @@ interface MobileSheetProps {
   title?: React.ReactNode;
   subtitle?: string;
   className?: string;
+  /** Accessory node in the header row (e.g. an action button). */
+  headerAccessory?: React.ReactNode;
 }
 
 const MobileSheet: React.FC<MobileSheetProps> = ({
@@ -18,30 +24,20 @@ const MobileSheet: React.FC<MobileSheetProps> = ({
   title,
   subtitle,
   className,
+  headerAccessory,
 }) => {
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent>
+    <BottomSheet open={open} onOpenChange={onOpenChange}>
+      <BottomSheetContent className="bg-[hsl(var(--card)/0.92)]">
         {title && (
-          <div className="px-5 pt-4 pb-3">
-            <div className="min-w-0">
-              {typeof title === 'string' ? (
-                <h3 className="text-[17px] font-semibold text-[#E6EDF3]">{title}</h3>
-              ) : (
-                title
-              )}
-              {subtitle && (
-                <p className="text-[13px] text-[#768390] mt-0.5">{subtitle}</p>
-              )}
-            </div>
-          </div>
+          <BottomSheetHeader title={title} subtitle={subtitle} accessory={headerAccessory} />
         )}
-        {title && <div className="h-px bg-[#2D333B]" />}
+        {title && <div className="h-px bg-border/60" />}
         <div className={cn('flex flex-col', className)}>
           {children}
         </div>
-      </DrawerContent>
-    </Drawer>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 };
 

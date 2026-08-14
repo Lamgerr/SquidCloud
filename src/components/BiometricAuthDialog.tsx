@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { Drawer, DrawerContent } from '@/components/ui/drawer'
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet'
 import { BiometricPrompt } from '@/components/BiometricPrompt'
 import { useIsMobile } from '@/hooks/use-mobile'
 
@@ -42,13 +42,13 @@ const BiometricAuthDialog: React.FC<BiometricAuthDialogProps> = ({
 
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={(open) => { if (!open) onClose() }}>
-        <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
+      <BottomSheet open={open} onOpenChange={(open) => { if (!open) onClose() }}>
+        <BottomSheetContent hideHandle hideClose className="border-none bg-transparent p-0">
           <div className="relative overflow-hidden rounded-t-[28px] bg-[#0A0E1A] min-h-[60vh] flex items-center justify-center">
             {content}
           </div>
-        </DrawerContent>
-      </Drawer>
+        </BottomSheetContent>
+      </BottomSheet>
     )
   }
 

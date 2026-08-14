@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Drawer, DrawerContent } from '@/components/ui/drawer';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 
 interface MobileGenerateApiKeySheetProps {
   open: boolean;
@@ -74,8 +74,8 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
   // Success state - show the generated key
   if (generatedKey) {
     return (
-      <Drawer open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
-        <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
+      <BottomSheet open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
+        <BottomSheetContent hideHandle hideClose className="border-none bg-transparent p-0">
           <div className="relative overflow-hidden rounded-t-[28px] bg-background flex flex-col">
             {/* Header */}
             <div className="px-5 pt-5 pb-3">
@@ -156,15 +156,15 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
               </Button>
             </div>
           </div>
-        </DrawerContent>
-      </Drawer>
+        </BottomSheetContent>
+      </BottomSheet>
     );
   }
 
   // Create form
   return (
-    <Drawer open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
-      <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
+    <BottomSheet open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
+      <BottomSheetContent hideHandle hideClose className="border-none bg-transparent p-0">
         <div className="relative overflow-hidden rounded-t-[28px] bg-background flex flex-col">
           {/* Header */}
           <div className="px-5 pt-5 pb-3">
@@ -237,9 +237,10 @@ export function MobileGenerateApiKeySheet({ open, onClose, onCreated }: MobileGe
             </Button>
           </div>
         </div>
-      </DrawerContent>
-    </Drawer>
-  );
+        </BottomSheetContent>
+      </BottomSheet>
+    );
+  }
 }
 
 export default MobileGenerateApiKeySheet;

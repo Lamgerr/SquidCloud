@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 
 interface EmbedModalProps {
@@ -182,11 +183,11 @@ export function SquidEmbedModal({ open, onClose, entityId, entityType, entityNam
 
   if (isMobile) {
     return (
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-full h-[90vh] p-0 gap-0 rounded-t-2xl rounded-b-none overflow-hidden">
+      <BottomSheet open={open} onOpenChange={onClose}>
+        <BottomSheetContent hideClose className="max-w-full h-[90vh] p-0 gap-0 rounded-t-[28px] rounded-b-none overflow-hidden bg-[hsl(var(--card)/0.92)]">
           {content}
-        </DialogContent>
-      </Dialog>
+        </BottomSheetContent>
+      </BottomSheet>
     );
   }
 

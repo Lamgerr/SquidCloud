@@ -14,6 +14,7 @@ import {
 } from '@/lib/icon-map';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { BottomSheet, BottomSheetContent, BottomSheetBody } from '@/components/ui/bottom-sheet';
 import { cn } from '@/lib/utils';
 
 interface MobileFileMenuProps {
@@ -124,32 +125,12 @@ const MobileFileMenu: React.FC<MobileFileMenuProps> = ({
     }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/50 z-50 mobile-menu-backdrop"
-        onClick={handleBackdropClick}
-        style={{ backdropFilter: 'blur(8px)' }}
-      />
-      
-      {/* Bottom Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 mobile-menu-content">
-        <div className="bg-background/98 backdrop-blur-xl rounded-t-2xl shadow-2xl border-t border-border/50 max-h-[70vh] overflow-hidden backdrop-blur-smooth">
-          
-          {/* Handle Bar */}
-          <div className="flex justify-center py-3">
-            <div className="w-10 h-1 bg-muted-foreground/30 rounded-full"></div>
-          </div>
-          
+    <BottomSheet open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
+      <BottomSheetContent hideClose className="max-h-[78vh] p-0">
+        <BottomSheetBody className="p-0">
           {/* File Header */}
-          <div className="px-6 pb-4 border-b border-border/30">
+          <div className="px-6 pb-4 pt-1 border-b border-border/30">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-semibold truncate text-foreground">
@@ -184,41 +165,39 @@ const MobileFileMenu: React.FC<MobileFileMenuProps> = ({
           </div>
           
           {/* Menu Items */}
-          <div className="max-h-96 overflow-y-auto">
-            <div className="py-2">
-              {menuItems.map((item, index) => (
-                <Button
-                  key={item.label}
-                  variant="ghost"
-                  onClick={() => handleItemClick(item.onClick)}
-                  className={cn(
-                    "w-full h-14 px-6 flex items-center gap-4 justify-start rounded-none mobile-touch-target mobile-ripple",
-                    "transition-all duration-200 hover:bg-muted/50 active:scale-95 mobile-menu-item",
-                    item.destructive && "text-destructive hover:text-destructive hover:bg-destructive/10",
-                    item.primary && "font-medium"
-                  )}
-                  style={{ animationDelay: `${index * 40}ms` }}
-                >
-                  <item.icon className={cn(
-                    "h-5 w-5 transition-all duration-200",
-                    item.destructive ? "text-destructive" : "text-muted-foreground",
-                    item.primary && "text-primary"
-                  )} />
-                  <span className="text-base">{item.label}</span>
-                  
-                  {item.label.includes('favorites') && isFavorited && (
-                    <Star className="h-4 w-4 ml-auto text-yellow-500 fill-yellow-500" />
-                  )}
-                </Button>
-              ))}
-            </div>
+          <div className="max-h-96 overflow-y-auto py-2">
+            {menuItems.map((item, index) => (
+              <Button
+                key={item.label}
+                variant="ghost"
+                onClick={() => handleItemClick(item.onClick)}
+                className={cn(
+                  "w-full h-14 px-6 flex items-center gap-4 justify-start rounded-none mobile-touch-target mobile-ripple",
+                  "transition-all duration-200 hover:bg-muted/50 active:scale-95 mobile-menu-item",
+                  item.destructive && "text-destructive hover:text-destructive hover:bg-destructive/10",
+                  item.primary && "font-medium"
+                )}
+                style={{ animationDelay: `${index * 40}ms` }}
+              >
+                <item.icon className={cn(
+                  "h-5 w-5 transition-all duration-200",
+                  item.destructive ? "text-destructive" : "text-muted-foreground",
+                  item.primary && "text-primary"
+                )} />
+                <span className="text-base">{item.label}</span>
+                
+                {item.label.includes('favorites') && isFavorited && (
+                  <Star className="h-4 w-4 ml-auto text-yellow-500 fill-yellow-500" />
+                )}
+              </Button>
+            ))}
           </div>
           
           {/* Safe Area for iPhone */}
-          <div className="h-safe-area-inset-bottom bg-background/50"></div>
-        </div>
-      </div>
-    </>
+          <div className="h-safe-area-inset-bottom bg-background/50" />
+        </BottomSheetBody>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 };
 

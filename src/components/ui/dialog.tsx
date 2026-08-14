@@ -56,23 +56,41 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           isMobile
-            ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] w-full flex-col rounded-t-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 shadow-2xl outline-none duration-200 data-[open]:animate-in data-[open]:fade-in-0 data-[open]:slide-in-from-bottom-4 data-[closed]:animate-out data-[closed]:fade-out-0 data-[closed]:slide-out-to-bottom-4"
+            ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] w-full flex-col rounded-t-[28px] border border-white/10 border-b-0 bg-[hsl(var(--card)/0.92)] p-0 text-sm text-popover-foreground shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.55)] backdrop-blur-2xl outline-none [overscroll-behavior-y:contain]"
             : "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overflow-x-hidden break-words data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
       >
         {isMobile && (
-          <div className="mx-auto mb-3 mt-0.5 h-1 w-10 shrink-0 rounded-full bg-foreground/20" />
+          <div
+            aria-hidden
+            className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-white/25"
+          />
         )}
         {children}
-        {showCloseButton && (
+        {showCloseButton && isMobile && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className="absolute right-3 top-3 h-8 w-8 rounded-full bg-black/30 text-white/90 backdrop-blur-sm hover:bg-black/50 hover:text-white"
+                size="icon-sm"
+              />
+            }
+          >
+            <XIcon className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
+        {showCloseButton && !isMobile && (
+          <DialogPrimitive.Close
+            data-slot="dialog-close"
+            render={
+              <Button
+                variant="ghost"
+                className="absolute right-2 top-2"
                 size="icon-sm"
               />
             }

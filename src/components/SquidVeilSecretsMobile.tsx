@@ -7,7 +7,7 @@ import {
   ShieldAlert, Info, X, Loader2, ExternalLink, Ban, MoreVertical, Pencil,
   ChevronDown, AlertCircle,
 } from '@/lib/icon-map';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import {
   squidveilFetch, squidveilBootstrap, getSquidVeilToken, setSquidVeilToken, clearSquidVeilToken,
   getActiveTokenPrefix, setActiveTokenPrefix, clearActiveTokenPrefix,
@@ -713,8 +713,8 @@ const SquidVeilSecretsMobile = () => {
         </div>
       )}
 
-      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
+      <BottomSheet open={createOpen} onOpenChange={setCreateOpen}>
+        <BottomSheetContent hideClose className="rounded-t-[28px] bg-[#0a0a0f]">
           <div className="p-4 space-y-4">
             <h2 className="text-lg font-semibold text-white">New Secret</h2>
             <div>
@@ -746,11 +746,11 @@ const SquidVeilSecretsMobile = () => {
               Create Secret
             </button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </BottomSheetContent>
+      </BottomSheet>
 
-      <Sheet open={tokenCreateOpen} onOpenChange={o => { if (!o) setRawToken(null); setTokenCreateOpen(o); }}>
-        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
+      <BottomSheet open={tokenCreateOpen} onOpenChange={o => { if (!o) setRawToken(null); setTokenCreateOpen(o); }}>
+        <BottomSheetContent hideClose className="rounded-t-[28px] bg-[#0a0a0f]">
           <div className="p-4 space-y-4">
             <h2 className="text-lg font-semibold text-white">New Access Token</h2>
             {tokens.length >= MAX_TOKENS && (
@@ -798,11 +798,11 @@ const SquidVeilSecretsMobile = () => {
               Create Token
             </button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </BottomSheetContent>
+      </BottomSheet>
 
-      <Sheet open={!!rawToken} onOpenChange={o => !o && setRawToken(null)}>
-        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-violet-500/20">
+      <BottomSheet open={!!rawToken} onOpenChange={o => !o && setRawToken(null)}>
+        <BottomSheetContent hideClose className="rounded-t-[28px] bg-[#0a0a0f] border-violet-500/20">
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -828,11 +828,11 @@ const SquidVeilSecretsMobile = () => {
               Done
             </button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </BottomSheetContent>
+      </BottomSheet>
 
-      <Sheet open={!!actionSecret} onOpenChange={o => !o && setActionSecret(null)}>
-        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
+      <BottomSheet open={!!actionSecret} onOpenChange={o => !o && setActionSecret(null)}>
+        <BottomSheetContent hideClose className="rounded-t-[28px] bg-[#0a0a0f]">
           <div className="p-4 space-y-4">
             {actionSecret && (
               <>
@@ -915,11 +915,11 @@ const SquidVeilSecretsMobile = () => {
               </>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </BottomSheetContent>
+      </BottomSheet>
 
-      <Sheet open={!!deleteTokenId} onOpenChange={o => { if (!o) { setDeleteTokenId(null); setDeleteTokenConfirmName(''); } }}>
-        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0a0a0f] border-t border-white/10">
+      <BottomSheet open={!!deleteTokenId} onOpenChange={o => { if (!o) { setDeleteTokenId(null); setDeleteTokenConfirmName(''); } }}>
+        <BottomSheetContent hideClose className="rounded-t-[28px] bg-[#0a0a0f]">
           <div className="p-4 space-y-4">
             <div className="flex items-center gap-2">
               <Trash2 className="w-5 h-5 text-red-400" />
@@ -967,8 +967,8 @@ const SquidVeilSecretsMobile = () => {
               </button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </BottomSheetContent>
+      </BottomSheet>
     </div>
   );
 };

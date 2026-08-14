@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Drawer, DrawerContent } from '@/components/ui/drawer';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 
 const AVAILABLE_EVENTS = [
   { group: 'File Events', events: [
@@ -103,8 +103,8 @@ export function MobileCreateWebhookSheet({ open, onClose, onCreated }: MobileCre
   };
 
   return (
-    <Drawer open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
-      <DrawerContent className="border-none bg-transparent p-0 [&>div:first-child]:hidden">
+    <BottomSheet open={open} onOpenChange={(open) => { if (!open) handleClose() }}>
+      <BottomSheetContent hideHandle hideClose className="border-none bg-transparent p-0">
         <div className="relative overflow-hidden rounded-t-[28px] bg-background max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="px-5 pt-5 pb-3">
@@ -219,8 +219,8 @@ export function MobileCreateWebhookSheet({ open, onClose, onCreated }: MobileCre
             </Button>
           </div>
         </div>
-      </DrawerContent>
-    </Drawer>
+      </BottomSheetContent>
+    </BottomSheet>
   );
 }
 

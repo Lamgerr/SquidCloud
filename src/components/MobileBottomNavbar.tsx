@@ -13,7 +13,7 @@ import {
   Link,
 } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import CreateItemDialog from '@/components/CreateItemDialog';
 import UrlUploadModal from '@/components/UrlUploadModal';
 import { useCreateItem } from '@/hooks/use-create-item';
@@ -296,10 +296,10 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
       </div>
 
       {/* ═══ SHEET & CREATE DIALOG ═══ */}
-      <Sheet open={createSheetOpen} onOpenChange={setCreateSheetOpen}>
-        <SheetContent
-          side="bottom"
-          className="w-full max-w-full rounded-t-3xl border-t border-border/20 bg-card/90 backdrop-blur-2xl px-5 pt-5 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]"
+      <BottomSheet open={createSheetOpen} onOpenChange={setCreateSheetOpen}>
+        <BottomSheetContent
+          hideHandle
+          className="w-full max-w-full rounded-t-[28px] border-t border-border/20 bg-card/90 backdrop-blur-2xl px-5 pt-5 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]"
         >
           <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-muted-foreground/20" />
 
@@ -358,8 +358,8 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
               </div>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </BottomSheetContent>
+      </BottomSheet>
 
       <CreateItemDialog
         open={dialogOpen}
