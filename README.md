@@ -46,7 +46,7 @@ Current release: **v12.0.18** — [squidcloud.vercel.app](https://squidcloud.ver
 
 SquidCloud is a next-generation cloud storage platform that combines the convenience of traditional cloud storage with advanced security features and unlimited capacity. Unlike conventional cloud providers, SquidCloud uses a unique distributed storage system called **Res54** that fragments, encrypts, and distributes your files across multiple secure repositories.
 
-SquidCloud is free to use, independently operated, and built with a privacy-first philosophy. We do not sell your data, run ads, or train AI on your files.
+SquidCloud offers a free tier, is independently operated, and built with a privacy-first philosophy. We do not sell your data, run ads, or train AI on your files.
 
 ---
 
@@ -69,8 +69,8 @@ Generate scoped API keys directly from the dashboard. Each key is bound to your 
 
 ### Sharing & Publishing
 
-**Publish as Website (SquidVeil)**
-Turn any folder in your workspace into a live, publicly accessible static website with one click. SquidVeil handles HTTPS, caching, and CDN delivery. Ideal for documentation, landing pages, and personal sites — your content, your infrastructure, your domain.
+**Publish as Website**
+Turn any folder in your workspace into a live, publicly accessible static website with one click. HTTPS, caching, and CDN delivery are handled automatically. Ideal for documentation, landing pages, and personal sites — your content, your infrastructure.
 
 ### Encryption & Zero-Knowledge
 
@@ -94,8 +94,8 @@ Pin important files with color tags and quick-access bookmarks. Build a personal
 
 SquidCloud gives you full control over where your data lives.
 
-### Native GitHub Storage (Default)
-Your files are chunked, encrypted with AES-256-GCM, serialized as JSON blobs, and stored in GitHub repositories managed by SquidCloud. The stored blobs are opaque — no filename, file type, or content can be identified from them by any party, including GitHub and SquidCloud. Only your account with the correct decryption credentials can reassemble and decrypt the original files.
+### SquidCloud Storage (Default)
+Your files are chunked, encrypted with AES-256-GCM, serialized as opaque blobs, and stored on Backblaze B2 object storage via SquidCloud's distributed cluster. The stored blobs reveal nothing — no filename, file type, or content can be identified from them by any party. Only your account with the correct decryption credentials can reassemble and decrypt the original files.
 
 **Best for:** Zero-configuration setup with no external accounts required.
 
@@ -103,9 +103,7 @@ Your files are chunked, encrypted with AES-256-GCM, serialized as JSON blobs, an
 Connect your own external storage provider. SquidCloud acts as your interface — your files go directly to your infrastructure, not ours.
 
 **Supported providers:**
-- **Tebi.io** — S3-compatible object storage
-- **Cloudflare R2** — zero egress fee object storage
-- **Amazon S3** — industry-standard cloud object storage
+- **Tebi.io** — S3-compatible object storage (live)
 
 **Best for:** Users who want full infrastructure ownership, compliance control, or are already paying for cloud storage.
 
@@ -130,10 +128,10 @@ Client-side chunking
 AES-256-GCM Encryption (Res54 Engine)
     │
     ▼
-Serialized as JSON blobs
+Serialized as opaque blobs
     │
-    ├──► Native: GitHub Repositories (opaque blobs)
-    ├──► BYOS: Your S3 / R2 / Tebi bucket
+    ├──► SquidCloud Storage: Backblaze B2 (default)
+    ├──► BYOS: Your Tebi.io bucket
     └──► BYOK: Encrypted with your own key before any of the above
 ```
 
@@ -148,9 +146,9 @@ Metadata (filename, size, type, timestamps) is stored separately in Supabase. Fi
 | Frontend | React 18 + TypeScript + Vite |
 | UI | Shadcn/ui + Tailwind CSS |
 | Backend / Auth | Supabase |
-| Native Storage | GitHub API (encrypted blobs) |
-| External Storage | Tebi.io / Cloudflare R2 / Amazon S3 (BYOS) |
-| Encryption | Res54 (AES-256-GCM, block-split, optional entropy) |
+| Native Storage | Backblaze B2 via SquidCloud cluster |
+| External Storage | Tebi.io (BYOS) |
+| Encryption | Res54 (AES-256-GCM, fixed-size chunking, optional entropy) |
 | Hosting | Vercel |
 | Android | Capacitor + signed APK via GitHub Actions |
 | SDK | SquidLab SDK v1.1.0 |
@@ -209,7 +207,7 @@ The Android app is built with Capacitor and distributed as a signed APK. It supp
 
 ## Legal
 
-SquidCloud is an independent project operated by its founders. All services are free to use.
+SquidCloud is an independent project operated by its founders. A free tier is available with optional paid upgrades.
 
 - [Privacy Policy](https://squidcloud.vercel.app/privacy)
 - [Terms of Service](https://squidcloud.vercel.app/terms)
@@ -222,7 +220,7 @@ For support or legal inquiries: **hellosquidcloud@gmail.com**
 
 ## SquidLab SDK
 
-Build on top of SquidCloud with the SquidLab SDK (v1.1.0). The SDK provides programmatic access to storage, file management, and authentication flows.
+Build extensions on top of SquidCloud with the SquidLab SDK (v1.1.0). The SDK provides a CLI, TypeScript/JavaScript libraries, pre-built React components, and a sandboxed extension format (.sqe) for building integrations.
 
 See the SDK repository for full documentation and examples.
 
