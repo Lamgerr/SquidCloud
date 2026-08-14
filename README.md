@@ -100,10 +100,7 @@ Your files are chunked, encrypted with AES-256-GCM, serialized as opaque blobs, 
 **Best for:** Zero-configuration setup with no external accounts required.
 
 ### Bring Your Own Storage (BYOS)
-Connect your own external storage provider. SquidCloud acts as your interface — your files go directly to your infrastructure, not ours.
-
-**Supported providers:**
-- **Tebi.io** — S3-compatible object storage (live)
+Connect your own external storage provider. SquidCloud acts as your interface — your files go directly to your infrastructure, not ours. Any S3-compatible provider works, including AWS S3, Cloudflare R2, Wasabi, Backblaze B2, Google Cloud Storage, Azure Blob Storage, and more.
 
 **Best for:** Users who want full infrastructure ownership, compliance control, or are already paying for cloud storage.
 
@@ -131,7 +128,7 @@ AES-256-GCM Encryption (Res54 Engine)
 Serialized as opaque blobs
     │
     ├──► SquidCloud Storage: Backblaze B2 (default)
-    ├──► BYOS: Your Tebi.io bucket
+    ├──► BYOS: Your S3-compatible bucket (AWS, R2, Wasabi, GCP, etc.)
     └──► BYOK: Encrypted with your own key before any of the above
 ```
 
@@ -147,7 +144,7 @@ Metadata (filename, size, type, timestamps) is stored separately in Supabase. Fi
 | UI | Shadcn/ui + Tailwind CSS |
 | Backend / Auth | Supabase |
 | Native Storage | Backblaze B2 via SquidCloud cluster |
-| External Storage | Tebi.io (BYOS) |
+| External Storage | Any S3-compatible provider (AWS, R2, Wasabi, GCP, Azure, etc.) (BYOS) |
 | Encryption | Res54 (AES-256-GCM, fixed-size chunking, optional entropy) |
 | Hosting | Vercel |
 | Android | Capacitor + signed APK via GitHub Actions |
