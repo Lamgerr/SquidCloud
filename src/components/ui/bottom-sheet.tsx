@@ -2,8 +2,6 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
 
 const BottomSheet = ({
   shouldScaleBackground = true,
@@ -42,12 +40,10 @@ const BottomSheetContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content> & {
     /** Hide the drag handle (e.g. for full-bleed content). */
     hideHandle?: boolean
-    /** Hide the floating close button in the top-right corner. */
+    /** Kept for backward compatibility; the floating close button was removed. */
     hideClose?: boolean
-    /** Accessory node rendered on the right side of the header row. */
-    headerAccessory?: React.ReactNode
   }
->(({ className, children, hideHandle, hideClose, headerAccessory, ...props }, ref) => (
+>(({ className, children, hideHandle, hideClose: _hideClose, ...props }, ref) => (
   <BottomSheetPortal>
     <BottomSheetOverlay />
     <DrawerPrimitive.Content
@@ -66,20 +62,6 @@ const BottomSheetContent = React.forwardRef<
         />
       )}
       {children}
-      {!hideClose && (
-        <BottomSheetClose
-          render={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-3 top-3 z-10 h-8 w-8 rounded-full bg-black/30 text-white/90 backdrop-blur-sm hover:bg-black/50 hover:text-white"
-            />
-          }
-        >
-          <XIcon className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </BottomSheetClose>
-      )}
     </DrawerPrimitive.Content>
   </BottomSheetPortal>
 ))
@@ -116,9 +98,7 @@ const BottomSheetHeader = ({
       )}
       {!title && !subtitle && props.children}
     </div>
-    {(accessory || headerAccessory) && (
-      <div className="shrink-0">{accessory || headerAccessory}</div>
-    )}
+    {accessory && <div className="shrink-0">{accessory}</div>}
   </div>
 )
 BottomSheetHeader.displayName = "BottomSheetHeader"
