@@ -4,7 +4,7 @@ import {
   BottomSheetContent,
   BottomSheetHeader,
 } from '@/components/ui/bottom-sheet';
-import { cn } from '@lib/utils';
+import { cn } from '@/lib/utils';
 
 interface MobileSheetProps {
   open: boolean;
