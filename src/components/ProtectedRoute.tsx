@@ -40,7 +40,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     };
 
     checkOnboarding();
-  }, [user, location.pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, location.pathname]);
 
   if (loading) {
     return (

@@ -1,2 +1,0 @@
-var o=new Set([".html",".css",".js",".mjs",".json",".svg",".png",".jpg",".jpeg",".gif",".webp",".avif",".ico",".woff",".woff2",".ttf",".otf",".eot",".mp4",".webm",".ogg",".mp3",".wav",".pdf",".txt",".xml",".map"]);function n(t){let e=t.toLowerCase().slice(t.lastIndexOf("."));return e?o.has(e):false}function s(){return [...o]}export{n as a,s as b};//# sourceMappingURL=chunk-F6Z2OAHW.js.map
-//# sourceMappingURL=chunk-F6Z2OAHW.js.map

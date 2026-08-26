@@ -1,2 +1,0 @@
-import {c as c$1}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function c(e){let r=c$1(`Purging CDN cache for ${e}...`);r.start(),await d(`/api/v1/sites/${e}/purge`,{},{authenticated:true}),r.succeed(),s(`CDN cache purged for ${e}`);}export{c as a};//# sourceMappingURL=chunk-OWUWBBTM.js.map
-//# sourceMappingURL=chunk-OWUWBBTM.js.map

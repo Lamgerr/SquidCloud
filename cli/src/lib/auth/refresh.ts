@@ -4,9 +4,7 @@ import os from 'node:os'
 import { SquidSession } from '../crypto/ssp.js'
 import { computeDeviceFingerprint } from './fingerprint.js'
 import { loadSession, saveSession, clearSession } from './session.js'
-
-const SUPABASE_URL = 'https://aouqcwbdoyrccjcrhzzi.supabase.co'
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvdXFjd2Jkb3lyY2NqY3JoenppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NjAyMTEsImV4cCI6MjA1ODUzNjIxMX0.b_VHC6uP3Efw3o_yibCoZKmsCIVZgOJ4FUF1NK-nd7U'
+import { SUPABASE_URL, getAnonKey } from './constants.js'
 
 const LOCK_FILE = path.join(os.homedir(), '.squidcloud', '.refresh.lock')
 
@@ -71,7 +69,7 @@ export async function refreshAccessToken(): Promise<SquidSession | null> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': ANON_KEY,
+        'apikey': getAnonKey(),
       },
       body: JSON.stringify({ refresh_token: session.refresh_token }),
     })

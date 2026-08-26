@@ -1,2 +1,0 @@
-import {b}from'./chunk-WRKYGGYI.js';import {s}from'./chunk-BC3STHFS.js';async function f(t,o){let r=b(),i=o==="true"?true:o==="false"?false:isNaN(Number(o))?o:Number(o);r.set(t,i),s(`Config ${t} set to ${o}`);}export{f as a};//# sourceMappingURL=chunk-XBUJYUM3.js.map
-//# sourceMappingURL=chunk-XBUJYUM3.js.map

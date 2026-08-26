@@ -1,1 +1,0 @@
-{"version":3,"file":"storage-share.d.ts","sourceRoot":"","sources":["../../../src/commands/storage/storage-share.ts"],"names":[],"mappings":"AAQA,wBAA8B,YAAY,CAAC,IAAI,EAAE,MAAM,EAAE,OAAO,CAAC,EAAE;IAAE,OAAO,CAAC,EAAE,MAAM,CAAC;IAAC,QAAQ,CAAC,EAAE,MAAM,CAAC;IAAC,KAAK,CAAC,EAAE,MAAM,CAAC;IAAC,IAAI,CAAC,EAAE,OAAO,CAAA;CAAE,GAAG,OAAO,CAAC,IAAI,CAAC,CAyBzJ"}

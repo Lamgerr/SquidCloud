@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s as s$1}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function s(t){let e=c(`Enabling "${t}"...`);e.start(),await d(`/api/v1/scripts/${t}/enable`,{},{authenticated:true}),e.succeed(),s$1(`Pipeline "${t}" enabled`);}export{s as a};//# sourceMappingURL=chunk-RNCPG3CD.js.map
-//# sourceMappingURL=chunk-RNCPG3CD.js.map

@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s,t}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function i(t$1){let o=c(`Attempting to unlock ${t$1}...`);o.start();try{(await d("/api/v1/time/unlock",{path:t$1},{authenticated:!0})).unlocked?(o.succeed(),s(`Unlocked ${t$1}`)):(o.fail(),t("Cannot unlock yet \u2014 lock time has not passed"),process.exit(1));}catch{throw o.fail(),new Error("Cannot unlock yet \u2014 lock time has not passed")}}export{i as a};//# sourceMappingURL=chunk-NCD7PEEP.js.map
-//# sourceMappingURL=chunk-NCD7PEEP.js.map

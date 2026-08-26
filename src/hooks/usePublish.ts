@@ -14,6 +14,20 @@ import {
 
 const SITES_BUCKET = 'squid-sites';
 
+const PUBLISH_STEP_TIMEOUT_MS = 120_000;
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)),
+      ms,
+    );
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+
 const MIME_MAP: Record<string, string> = {
   html: 'text/html',
   htm: 'text/html',
@@ -129,13 +143,21 @@ export function usePublish() {
   ): Promise<{ fileCount: number; totalBytes: number }> => {
     onProgress?.({ current: 0, total: 1, stage: 'Downloading file', percent: 10 });
 
-    const blob = await downloadFile(fileId, (progress, stage) => {
-      onProgress?.({ current: 0, total: 1, stage: stage || 'Downloading', percent: Math.round(progress / 2) });
-    });
+    const blob = await withTimeout(
+      downloadFile(fileId, (progress, stage) => {
+        onProgress?.({ current: 0, total: 1, stage: stage || 'Downloading', percent: Math.round(progress / 2) });
+      }),
+      PUBLISH_STEP_TIMEOUT_MS,
+      'Downloading file',
+    );
 
     onProgress?.({ current: 0, total: 1, stage: 'Uploading to site', percent: 60 });
 
-    await uploadFileToSite(slug, 'index.html', blob);
+    await withTimeout(
+      uploadFileToSite(slug, 'index.html', blob),
+      PUBLISH_STEP_TIMEOUT_MS,
+      'Uploading to site',
+    );
 
     onProgress?.({ current: 1, total: 1, stage: 'Complete', percent: 100 });
     return { fileCount: 1, totalBytes: blob.size };
@@ -224,7 +246,11 @@ export function usePublish() {
         percent: Math.round((completed / folderFiles.length) * 50),
       });
 
-      const blob = await downloadFile(file.id);
+      const blob = await withTimeout(
+        downloadFile(file.id),
+        PUBLISH_STEP_TIMEOUT_MS,
+        `Downloading ${file.name}`,
+      );
 
       const folderRelPath = folderPathMap.get(file.parent_folder) || '';
       const uploadPath = folderRelPath ? `${folderRelPath}/${file.name}` : file.name;
@@ -236,7 +262,11 @@ export function usePublish() {
         percent: 50 + Math.round((completed / folderFiles.length) * 50),
       });
 
-      await uploadFileToSite(slug, uploadPath, blob);
+      await withTimeout(
+        uploadFileToSite(slug, uploadPath, blob),
+        PUBLISH_STEP_TIMEOUT_MS,
+        `Uploading ${file.name}`,
+      );
       totalBytes += blob.size;
       completed++;
     }
@@ -268,10 +298,15 @@ export function usePublish() {
 
       let stats: { fileCount: number; totalBytes: number };
 
+      const forwardProgress = (p: PublishProgress) => {
+        setProgress(p);
+        params.onProgress?.(p);
+      };
+
       if (params.resourceType === 'file') {
-        stats = await publishSingleFile(params.resourceId, siteSlug, params.onProgress);
+        stats = await publishSingleFile(params.resourceId, siteSlug, forwardProgress);
       } else {
-        stats = await publishFolder(params.resourceId, siteSlug, params.onProgress);
+        stats = await publishFolder(params.resourceId, siteSlug, forwardProgress);
       }
 
       const publication = await updatePublication(siteSlug, {
@@ -310,10 +345,15 @@ export function usePublish() {
     try {
       let stats: { fileCount: number; totalBytes: number };
 
+      const forwardProgress = (p: PublishProgress) => {
+        setProgress(p);
+        params.onProgress?.(p);
+      };
+
       if (params.resourceType === 'file') {
-        stats = await publishSingleFile(params.resourceId, slug, params.onProgress);
+        stats = await publishSingleFile(params.resourceId, slug, forwardProgress);
       } else {
-        stats = await publishFolder(params.resourceId, slug, params.onProgress);
+        stats = await publishFolder(params.resourceId, slug, forwardProgress);
       }
 
       const publication = await updatePublication(slug, {

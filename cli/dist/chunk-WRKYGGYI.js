@@ -1,2 +1,0 @@
-import {b}from'./chunk-52WHEL73.js';import {q,y}from'./chunk-BC3STHFS.js';import a from'conf';var n=new a({projectName:"squidcloud",defaults:{defaultEnvironment:"production",autoCopyUrl:true,outputFormat:"text",checkUpdates:true}});function d(){return n}async function c(){let o=Object.entries(n.store);if(q()){y(Object.fromEntries(o));return}let i=o.map(([s,u])=>({key:s,value:String(u)}));console.log(b(i,[{key:"key",label:"Key"},{key:"value",label:"Value"}]));}export{n as a,d as b,c};//# sourceMappingURL=chunk-WRKYGGYI.js.map
-//# sourceMappingURL=chunk-WRKYGGYI.js.map

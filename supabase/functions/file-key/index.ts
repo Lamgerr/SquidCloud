@@ -54,57 +54,99 @@ async function aes256GcmDecrypt(ciphertextB64: string, ivB64: string, key: Uint8
   return new Uint8Array(pt);
 }
 
+/** Opaque SquidCloud CLI tokens authenticate via cli_devices.token_hash. */
+async function resolveCliUserId(supabase: any, token: string): Promise<string | null> {
+  if (!token || token.includes('.')) return null;
+  const hash = await sha256Hex(encoder.encode(token));
+  const { data: dev } = await supabase
+    .from('cli_devices')
+    .select('user_id')
+    .eq('token_hash', hash)
+    .maybeSingle();
+  return dev?.user_id ?? null;
+}
+
+async function handleForUser(userId: string, fileId: string): Promise<Response> {
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  const body = { fileId };
+
+  const { data: fileRow, error: fileError } = await supabase
+    .from("files")
+    .select("*")
+    .eq("id", body.fileId)
+    .single();
+
+  if (fileError || !fileRow) {
+    return jsonResponse({ success: false, error: "File not found" }, 404);
+  }
+
+  if (fileRow.user_id !== userId) {
+    return jsonResponse({ success: false, error: "Forbidden" }, 403);
+  }
+
+  const { data: vaultRow } = await supabase
+    .from("file_key_vault")
+    .select("wrapped_key, iv")
+    .eq("file_id", body.fileId)
+    .maybeSingle();
+
+  if (!vaultRow?.wrapped_key || !vaultRow?.iv) {
+    return jsonResponse({ success: false, error: "File key is not available" }, 404);
+  }
+
+  try {
+    const kek = await getFileKeyKek(SERVICE_KEY);
+    const plain = await aes256GcmDecrypt(vaultRow.wrapped_key, vaultRow.iv, kek);
+    return jsonResponse({ success: true, key: decoder.decode(plain) });
+  } catch (e) {
+    console.error('[file-key] unwrap failed:', e instanceof Error ? e.message : e);
+    return jsonResponse({
+      success: false,
+      error: 'Failed to decrypt file key',
+      diag: { reason: e instanceof Error ? e.message.slice(0, 60) : 'unknown', master_env: !!Deno.env.get('SQUIDVEIL_MASTER_KEY') },
+    }, 500);
+  }
+}
+
 serve(async (req) => {
-  return withPrelGateway(req, { functionId: 'file-key', operation: 'default' }, async (ctx: PrelContext) => {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return new Response("Server configuration error", { status: 500, headers: getCorsHeaders() });
+  // Browser preflight must short-circuit before anything else.
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: getCorsHeaders() });
+  }
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response("Server configuration error", { status: 500, headers: getCorsHeaders() });
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  const authHeader = req.headers.get("authorization") || "";
+  let userId: string | null = null;
+  let fileId = '';
+  try { fileId = ((await req.json()) as any)?.fileId ?? ''; } catch {}
+
+  if (!fileId) return jsonResponse({ success: false, error: 'fileId is required' }, 400);
+
+  if (authHeader.startsWith('Bearer ')) {
+    const tok = authHeader.slice(7);
+    if (!tok.includes('.')) {
+      // opaque SquidCloud CLI device token
+      userId = await resolveCliUserId(supabase, tok);
+    } else {
+      // real Supabase JWT from the dashboard — validate directly so the
+      // PREL session/f2fa layer can never block key retrieval.
+      const { data: { user }, error: uerr } = await supabase.auth.getUser(tok);
+      if (!uerr && user) userId = user.id;
     }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    let body: { fileId?: string };
-    try {
-      body = await req.json();
-    } catch {
-      return new Response("Invalid JSON payload", { status: 400, headers: getCorsHeaders() });
-    }
-
-    if (!body.fileId) {
-      return jsonResponse({ success: false, error: "fileId is required" }, 400);
-    }
-
-    const { data: fileRow, error: fileError } = await supabase
-      .from("files")
-      .select("*")
-      .eq("id", body.fileId)
-      .single();
-
-    if (fileError || !fileRow) {
-      return jsonResponse({ success: false, error: "File not found" }, 404);
-    }
-
-    if (fileRow.user_id !== ctx.userId) {
-      return jsonResponse({ success: false, error: "Forbidden" }, 403);
-    }
-
-    const { data: vaultRow, error: vaultError } = await supabase
-      .from("file_key_vault")
-      .select("wrapped_key, iv")
-      .eq("file_id", body.fileId)
-      .maybeSingle();
-
-    if (vaultError || !vaultRow?.wrapped_key || !vaultRow?.iv) {
-      return jsonResponse({ success: false, error: "File key is not available" }, 404);
-    }
-
-    try {
-      const kek = await getFileKeyKek(supabaseServiceKey);
-      const plain = await aes256GcmDecrypt(vaultRow.wrapped_key, vaultRow.iv, kek);
-      return jsonResponse({ success: true, key: decoder.decode(plain) });
-    } catch {
-      return jsonResponse({ success: false, error: "Failed to decrypt file key" }, 500);
-    }
-  });
+  }
+  if (!userId) {
+    // fall back to PREL/JWT path for web sessions
+    const prel = await import('../_shared/kza-prel.ts');
+    return prel.withPrelGateway(req, { functionId: 'file-key', operation: 'default' }, async (ctx) => {
+      return handleForUser(ctx.userId, fileId);
+    });
+  }
+  return handleForUser(userId, fileId);
 });

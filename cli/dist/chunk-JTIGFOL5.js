@@ -1,2 +1,0 @@
-import {b}from'./chunk-WRKYGGYI.js';import {s}from'./chunk-BC3STHFS.js';async function t(o){b().delete(o),s(`Config ${o} deleted`);}export{t as a};//# sourceMappingURL=chunk-JTIGFOL5.js.map
-//# sourceMappingURL=chunk-JTIGFOL5.js.map

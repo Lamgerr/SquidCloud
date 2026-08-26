@@ -80,6 +80,14 @@
   pointer-events: none;
 }
 
+/* ── Universal mobile bottom sheet (vaul) ─────────────── */
+/* Let vaul own the transform/opacity transitions so the global
+   `* { transition: transform }` rule never makes drag feel laggy. */
+.vaul-sheet-content,
+.vaul-sheet-overlay {
+  transition-property: none;
+}
+
 /* ── Dialog / Modal shadows ───────────────────────────── */
 [role="dialog"],
 [role="alertdialog"] {

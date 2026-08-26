@@ -13,11 +13,11 @@ interface StatsPanelProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  Images:    '#3b82f6',
-  Video:     '#8b5cf6',
-  Documents: '#10b981',
-  Audio:     '#f59e0b',
-  Other:     '#6b7280',
+  Images:    '#e4e4e7',
+  Documents: '#a1a1aa',
+  Video:     '#71717a',
+  Audio:     '#52525b',
+  Other:     '#3f3f46',
 };
 
 function categorize(files: FileItemType[]) {

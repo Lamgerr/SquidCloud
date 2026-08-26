@@ -28,6 +28,7 @@ import { useSharedUpload } from "@/shared/useSharedUpload";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAnimationConfig } from "@/hooks/use-animation-config";
 import { KeyboardShortcutsProvider, KeyboardShortcutsOverlay } from "@/components/KeyboardShortcuts";
+import BlackoutOverlay from "@/components/BlackoutOverlay";
 
 const queryClient = new QueryClient();
 
@@ -65,8 +66,11 @@ const RunHistory = lazy(() => import("./pages/RunHistory"));
 const ScriptEditor = lazy(() => import("./pages/ScriptEditor"));
 const ManageSharesPage = lazy(() => import("./pages/ManageSharesPage"));
 const CLIDocs = lazy(() => import("./pages/CLIDocs"));
+const CliDevice = lazy(() => import("./pages/CliDevice"));
+const CliAuthorize = lazy(() => import("./pages/CliAuthorize"));
 const SquidVeilDocs = lazy(() => import("./pages/SquidVeilDocs"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
+const SquidFSPage = lazy(() => import("./pages/SquidFSPage"));
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const EmbedPage = lazy(() => import("./pages/EmbedPage"));
 const HybridNoteEditor = lazy(() => import("./components/drawing/HybridNoteEditor"));
@@ -447,6 +451,8 @@ const AppContent = () => {
 
           {/* CLI Docs */}
           <Route path="/cli" element={<AnimatedRoute><RouteSuspense><CLIDocs /></RouteSuspense></AnimatedRoute>} />
+          <Route path="/cli/device" element={<AnimatedRoute><RouteSuspense><CliDevice /></RouteSuspense></AnimatedRoute>} />
+          <Route path="/cli/authorize" element={<AnimatedRoute><RouteSuspense><CliAuthorize /></RouteSuspense></AnimatedRoute>} />
 
           {/* Documentation & Help Routes */}
           <Route path="/help/docs" element={<AnimatedRoute><RouteSuspense><Documentation /></RouteSuspense></AnimatedRoute>} />
@@ -458,6 +464,9 @@ const AppContent = () => {
 
           {/* SquidVeil Docs */}
           <Route path="/help/squidveil" element={<AnimatedRoute><RouteSuspense><SquidVeilDocs /></RouteSuspense></AnimatedRoute>} />
+
+          {/* SquidFS Docs */}
+          <Route path="/squidfs" element={<AnimatedRoute><RouteSuspense><SquidFSPage /></RouteSuspense></AnimatedRoute>} />
 
           {/* SquidEmbed public embed viewer */}
           <Route path="/embed/:token" element={<AnimatedRoute><RouteSuspense><EmbedPage /></RouteSuspense></AnimatedRoute>} />
@@ -488,6 +497,7 @@ function App() {
       }}
     >
       <QueryClientProvider client={queryClient}>
+        <BlackoutOverlay />
         <ThemeProvider>
           <SquidsetThemeProvider>
             <TooltipProvider>

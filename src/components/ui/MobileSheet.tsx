@@ -1,20 +1,18 @@
-import React from 'react';
+import React from "react"
+
+import { cn } from "@/lib/utils"
 import {
   BottomSheet,
   BottomSheetContent,
-  BottomSheetHeader,
-} from '@/components/ui/bottom-sheet';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/bottom-sheet"
 
 interface MobileSheetProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  children: React.ReactNode;
-  title?: React.ReactNode;
-  subtitle?: string;
-  className?: string;
-  /** Accessory node in the header row (e.g. an action button). */
-  headerAccessory?: React.ReactNode;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  children: React.ReactNode
+  title?: React.ReactNode
+  subtitle?: React.ReactNode
+  className?: string
 }
 
 const MobileSheet: React.FC<MobileSheetProps> = ({
@@ -24,21 +22,18 @@ const MobileSheet: React.FC<MobileSheetProps> = ({
   title,
   subtitle,
   className,
-  headerAccessory,
 }) => {
   return (
     <BottomSheet open={open} onOpenChange={onOpenChange}>
-      <BottomSheetContent className="bg-[hsl(var(--card)/0.92)]">
-        {title && (
-          <BottomSheetHeader title={title} subtitle={subtitle} accessory={headerAccessory} />
-        )}
-        {title && <div className="h-px bg-border/60" />}
-        <div className={cn('flex flex-col', className)}>
-          {children}
-        </div>
+      <BottomSheetContent
+        title={title}
+        subtitle={subtitle}
+        className={cn("gap-0", className)}
+      >
+        {children}
       </BottomSheetContent>
     </BottomSheet>
-  );
-};
+  )
+}
 
-export default MobileSheet;
+export default MobileSheet

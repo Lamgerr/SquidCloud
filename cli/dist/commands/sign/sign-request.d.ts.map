@@ -1,1 +1,0 @@
-{"version":3,"file":"sign-request.d.ts","sourceRoot":"","sources":["../../../src/commands/sign/sign-request.ts"],"names":[],"mappings":"AAOA,wBAA8B,WAAW,CAAC,IAAI,EAAE,MAAM,EAAE,OAAO,EAAE;IAAE,EAAE,CAAC,EAAE,MAAM,GAAG,MAAM,EAAE,CAAC;IAAC,KAAK,CAAC,EAAE,OAAO,CAAA;CAAE,GAAG,OAAO,CAAC,IAAI,CAAC,CA0B3H"}

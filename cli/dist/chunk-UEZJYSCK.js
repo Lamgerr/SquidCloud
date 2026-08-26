@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {q,y,s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function a(r,c$1){let e=c(`Creating file request "${r}"...`);e.start();let t=await d("/api/v1/forms",{name:r,folder:c$1?.folder},{authenticated:true});if(e.succeed(),q()){y(t);return}s(`File request "${r}" created (${t.id.slice(0,8)})`);}export{a};//# sourceMappingURL=chunk-UEZJYSCK.js.map
-//# sourceMappingURL=chunk-UEZJYSCK.js.map

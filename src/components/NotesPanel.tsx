@@ -167,7 +167,7 @@ export function NotesPanel({
           </div>
         ) : notes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-up-soft">
-            <div className="w-16 h-16 rounded-2xl bg-muted/20 border border-border/30 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-lg bg-muted/20 border border-border/30 flex items-center justify-center mb-4">
               <MessageSquare className="w-7 h-7 text-muted-foreground/40" />
             </div>
             <p className="text-sm font-medium text-foreground/80">No notes yet</p>

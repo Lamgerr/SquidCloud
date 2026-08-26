@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function e(t,i){let o=c(`Copying ${t} \u2192 ${i}...`);o.start(),await d("/api/v1/storage/copy",{source:t,destination:i},{authenticated:true}),o.succeed(),s(`Copied ${t} \u2192 ${i}`);}export{e as a};//# sourceMappingURL=chunk-YRA3NRLD.js.map
-//# sourceMappingURL=chunk-YRA3NRLD.js.map

@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function a(t,i){let o=c(`Moving ${t} \u2192 ${i}...`);o.start(),await d("/api/v1/storage/move",{source:t,destination:i},{authenticated:true}),o.succeed(),s(`Moved ${t} \u2192 ${i}`);}export{a};//# sourceMappingURL=chunk-TE7L3ICT.js.map
-//# sourceMappingURL=chunk-TE7L3ICT.js.map

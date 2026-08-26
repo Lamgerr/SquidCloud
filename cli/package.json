@@ -1,16 +1,47 @@
 {
   "name": "squidcloudctl",
-  "version": "1.0.0",
-  "description": "SquidCloud CLI - zero-exposure secrets management",
-  "main": "squidlink.mjs",
+  "version": "3.1.9",
+  "description": "SquidCloud CLI (squidcloudctl) — encrypted storage, shares and secrets from your terminal",
+  "main": "dist/bin/squidcloud.js",
   "bin": {
-    "squidcloudctl": "squidlink.mjs"
+    "squidcloudctl": "dist/bin/squidcloud.js",
+    "squidcloud": "dist/bin/squidcloud.js"
   },
   "type": "module",
-  "files": ["squidlink.mjs", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
-    "test": "node squidlink.mjs --help"
+    "build": "tsc -p tsconfig.build.json && node ./scripts/fix-shebang.mjs",
+    "postbuild": "node ./scripts/fix-shebang.mjs",
+    "test": "node dist/bin/squidcloud.js --version"
   },
-  "keywords": ["squidcloud", "squidveil", "secrets", "cli"],
-  "license": "MIT"
+  "keywords": [
+    "squidcloud",
+    "squidveil",
+    "secrets",
+    "cli",
+    "encrypted-storage"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "sucrase": "^3.35.1",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.3.0",
+    "@noble/curves": "^2.3.0",
+    "@noble/ed25519": "^2.3.0",
+    "@noble/hashes": "^2.3.0",
+    "chalk": "^6.0.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^15.0.0",
+    "gradient-string": "^3.0.0",
+    "ora": "^9.4.1"
+  },
+  "optionalDependencies": {
+    "@napi-rs/keyring": "^1.1.0"
+  }
 }

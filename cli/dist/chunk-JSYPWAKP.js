@@ -1,2 +1,0 @@
-import {q,y}from'./chunk-BC3STHFS.js';import {readFileSync}from'fs';import {dirname,resolve}from'path';import {fileURLToPath}from'url';import o from'chalk';var a=dirname(fileURLToPath(import.meta.url)),i=JSON.parse(readFileSync(resolve(a,"../package.json"),"utf-8"));async function l(){if(q()){y({version:i.version,name:"squidcloudctl"});return}console.log(o.hex("#4FC3F7")("squidcloud.vercel.app")+o.dim(" CLI ")+o.dim("v"+i.version));}var v=l;export{l as a,v as b};//# sourceMappingURL=chunk-JSYPWAKP.js.map
-//# sourceMappingURL=chunk-JSYPWAKP.js.map

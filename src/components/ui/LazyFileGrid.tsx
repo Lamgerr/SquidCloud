@@ -14,23 +14,23 @@ interface LazyFileGridProps {
 const INCREMENT = 48;
 
 const GridSkeleton = () => (
-  <div className="rounded-2xl border border-white/[0.06] bg-[#1a1a24]/50 p-4 overflow-hidden animate-pulse">
+  <div className="rounded-lg border border-border/40 bg-muted/20 p-4 overflow-hidden animate-pulse">
     <div className="flex flex-col items-center gap-3">
-      <div className="w-14 h-16 rounded-xl bg-white/[0.05] flex-shrink-0" />
+      <div className="w-14 h-16 rounded-xl bg-muted/40 flex-shrink-0" />
       <div className="w-full space-y-2 pt-1 text-center">
-        <div className="h-3 bg-white/[0.08] rounded w-3/4 mx-auto" />
-        <div className="h-2 bg-white/[0.04] rounded w-1/2 mx-auto" />
+        <div className="h-3 bg-muted/60 rounded w-3/4 mx-auto" />
+        <div className="h-2 bg-muted/30 rounded w-1/2 mx-auto" />
       </div>
     </div>
   </div>
 );
 
 const ListSkeleton = () => (
-  <div className="flex items-center gap-3 px-4 h-11 rounded-xl border border-white/[0.03] bg-white/[0.02] animate-pulse">
-    <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex-shrink-0" />
-    <div className="flex-1 h-3 bg-white/[0.06] rounded max-w-[220px]" />
-    <div className="w-20 h-2.5 bg-white/[0.04] rounded hidden md:block" />
-    <div className="w-24 h-2.5 bg-white/[0.04] rounded hidden lg:block" />
+  <div className="flex items-center gap-3 px-4 h-11 rounded-md border border-border/40 bg-muted/20 animate-pulse">
+    <div className="w-7 h-7 rounded-lg bg-muted/50 flex-shrink-0" />
+    <div className="flex-1 h-3 bg-muted/50 rounded max-w-[220px]" />
+    <div className="w-20 h-2.5 bg-muted/30 rounded hidden md:block" />
+    <div className="w-24 h-2.5 bg-muted/30 rounded hidden lg:block" />
   </div>
 );
 
@@ -75,8 +75,8 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
   }, [loadMore]);
 
   const getGridClass = () => {
-    if (isCompact) return 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5';
-    if (isGrid) return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3.5';
+    if (isCompact) return 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2';
+    if (isGrid) return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2.5';
     return 'space-y-0.5';
   };
 
@@ -101,7 +101,7 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
     <div className="w-full select-none">
       {/* macOS Finder Table Headers (List Mode Only) */}
       {isList && (
-        <div className="grid grid-cols-[1fr_100px_140px_36px] md:grid-cols-[1fr_110px_150px_100px_36px] items-center px-4 py-2 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider border-b border-white/[0.06] mb-1">
+        <div className="grid grid-cols-[1fr_100px_140px_36px] md:grid-cols-[1fr_110px_150px_100px_36px] items-center px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 mb-1">
           <span>Name</span>
           <span className="hidden md:block">Kind</span>
           <span>Date Modified</span>

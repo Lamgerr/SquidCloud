@@ -98,6 +98,8 @@ export function logErrorJSON(data: { message: string; code?: string }): void {
   console.error(JSON.stringify({ error: data }))
 }
 
+export const logger = { log, logSuccess, logError, logWarn, logInfo, logBrand, logRaw, logJSON, logErrorJSON, writeAudit, setJsonMode, isJsonMode }
+
 export function writeAudit(command: string, args: string, exitCode: number): void {
   const auditDir = path.join(os.homedir(), '.squidcloud')
   const auditFile = path.join(auditDir, 'audit.log')

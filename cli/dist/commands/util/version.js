@@ -1,16 +1,17 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import chalk from 'chalk';
-import { isJsonMode, logJSON } from '../../lib/output/logger.js';
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const pkg = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf-8'));
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { renderBanner } from '../../lib/output/banner.js'
+import { muted } from '../../lib/output/brand.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
 export async function showVersion() {
-    if (isJsonMode()) {
-        logJSON({ version: pkg.version, name: 'squidcloudctl' });
-        return;
-    }
-    console.log(chalk.hex('#4FC3F7')('squidcloud.vercel.app') + chalk.dim(' CLI ') + chalk.dim('v' + pkg.version));
+  let version = '3.0.0'
+  try {
+    const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../../package.json'), 'utf-8'))
+    version = pkg.version || version
+  } catch (e) {}
+  console.log(renderBanner({ tagline: true }))
+  console.log(`  ${muted(`squidcloudctl v${version} · node ${process.version} · ${process.platform}-${process.arch}`)}`)
 }
-export default showVersion;
-//# sourceMappingURL=version.js.map

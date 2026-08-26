@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {c as c$1}from'./chunk-5TMR6Y7L.js';import n from'fs';import p from'path';async function a(){let o=c("Exporting logs...");o.start();let i=await c$1("/api/v1/logs/export",{authenticated:true});o.succeed();let t=p.join(process.cwd(),`squidcloud-logs-${Date.now()}.jsonl`);n.writeFileSync(t,i.jsonl,"utf-8"),s(`Exported to ${t}`);}export{a};//# sourceMappingURL=chunk-IBYIEHIZ.js.map
-//# sourceMappingURL=chunk-IBYIEHIZ.js.map

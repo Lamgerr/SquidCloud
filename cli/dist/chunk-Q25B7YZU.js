@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {f}from'./chunk-5TMR6Y7L.js';import n from'inquirer';async function m(o){let{confirm:t}=await n.prompt([{type:"confirm",name:"confirm",message:"Delete ALL submissions for this file request? This cannot be undone.",default:false}]);if(!t)return;let e=c("Clearing submissions...");e.start(),await f(`/api/v1/forms/${o}/submissions`,{authenticated:true}),e.succeed(),s("All submissions cleared");}export{m as a};//# sourceMappingURL=chunk-Q25B7YZU.js.map
-//# sourceMappingURL=chunk-Q25B7YZU.js.map

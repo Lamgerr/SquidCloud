@@ -13,9 +13,9 @@ import { Separator } from '@/components/ui/separator';
 import { isPasskeyAvailable, registerPasskey, authenticateWithPasskey } from '@/lib/webauthn';
 import BiometricSetupDialog from '@/components/BiometricSetupDialog';
 import { biometricAuthService } from '@/services/biometricAuthService';
-import { useBiometricAuthContext } from '@/contexts/BiometricAuthContext';
 import { BYOKSettingsCard } from '@/components/encryption';
 import ApiKeyManagement from '@/components/ApiKeyManagement';
+import CliDevicesSection from '@/components/settings/CliDevicesSection';
 import { WebhookManager } from '@/components/WebhookManager';
 import {
   User, Mail, Key, Shield, Fingerprint, CheckCircle2, AlertCircle,
@@ -98,6 +98,7 @@ const DEFAULT_ACCOUNT_PREFERENCES: AccountPreferenceSettings = {
 const SETTINGS_CATEGORIES = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'security', label: 'Security', icon: Shield },
+  { id: 'devices', label: 'CLI Devices', icon: Smartphone },
   { id: 'developer', label: 'Developer API', icon: Code },
   { id: 'webhooks', label: 'Webhooks', icon: Repeat },
   { id: 'plans', label: 'Plans & Subscription', icon: Crown },
@@ -140,6 +141,9 @@ const AccountSettings = () => {
   const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false);
   const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
   const [paymentLogsLoading, setPaymentLogsLoading] = useState(false);
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [banDeviceId, setBanDeviceId] = useState('');
+  const [banReason, setBanReason] = useState('');
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [notifPrefs, setNotifPrefs] = useState({ email_enabled: true, popup_enabled: true, warning_lead_days: 7, do_not_contact: false });
 
@@ -159,6 +163,10 @@ const AccountSettings = () => {
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [animating, setAnimating] = useState(false);
+  const mountedRef = useRef(false);
+  const devicesFetchedRef = useRef(false);
+  const paymentLogsFetchedRef = useRef(false);
+  const notifPrefsFetchedRef = useRef(false);
 
   const mc = (extra = '') => cn('lg-card', isMobile ? 'p-4' : 'p-5', extra);
 
@@ -183,8 +191,6 @@ const AccountSettings = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 150);
   };
-
-  useBiometricAuthContext();
 
   const preferenceCategories = useMemo<AccountPreferenceCategory[]>(() => [
     {
@@ -244,6 +250,8 @@ const AccountSettings = () => {
   ], []);
 
   useEffect(() => {
+    if (mountedRef.current) return;
+    mountedRef.current = true;
     checkPasskeyAvailability();
     checkUserPasskey();
     checkBiometricStatus();
@@ -251,7 +259,8 @@ const AccountSettings = () => {
     loadPreferences();
     fetchLatestMigration();
     loadMfaFactors();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadMfaFactors = async () => {
     const factors = await mfaService.listFactors();
@@ -636,15 +645,21 @@ const AccountSettings = () => {
   };
 
   useEffect(() => {
-    if (isPremium && user) fetchPaymentLogs();
+    if (isPremium && user && !paymentLogsFetchedRef.current) {
+      paymentLogsFetchedRef.current = true;
+      fetchPaymentLogs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPremium, user?.id]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || notifPrefsFetchedRef.current) return;
+    notifPrefsFetchedRef.current = true;
     supabase.from('user_notification_prefs').select('*').eq('user_id', user.id).maybeSingle().then(({ data }) => {
       if (data) setNotifPrefs({ email_enabled: data.email_enabled ?? true, popup_enabled: data.popup_enabled ?? true, warning_lead_days: data.warning_lead_days ?? 7, do_not_contact: data.do_not_contact ?? false });
     }).catch(() => {});
   }, [user?.id]);
+
 
   const updateNotifPref = async (key: string, value: boolean | number) => {
     setNotifPrefs(prev => ({ ...prev, [key]: value }));
@@ -1298,6 +1313,10 @@ const AccountSettings = () => {
     );
   }
 
+  function renderDevicesSection() {
+    return <CliDevicesSection />;
+  }
+
   function renderPreferencesSection() {
     return (
       <div className={mc()}>
@@ -1389,6 +1408,7 @@ const AccountSettings = () => {
     plans: renderPlansSection,
     byok: () => <BYOKSettingsCard className="rounded-xl" />,
     preferences: renderPreferencesSection,
+    devices: renderDevicesSection,
   };
 
   return (

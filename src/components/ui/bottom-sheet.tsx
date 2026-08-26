@@ -1,173 +1,203 @@
 import * as React from "react"
-import { Drawer as DrawerPrimitive } from "vaul"
+import { Drawer } from "vaul"
 
 import { cn } from "@/lib/utils"
 
-const BottomSheet = ({
-  shouldScaleBackground = true,
+function BottomSheet({
+  open,
+  onOpenChange,
+  children,
+  dismissible = true,
+  shouldScaleBackground = false,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    {...props}
-  />
-)
-BottomSheet.displayName = "BottomSheet"
-
-const BottomSheetTrigger = DrawerPrimitive.Trigger
-
-const BottomSheetPortal = DrawerPrimitive.Portal
-
-const BottomSheetClose = DrawerPrimitive.Close
-
-const BottomSheetOverlay = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-[100] bg-black/40 backdrop-blur-[3px] bs-overlay",
-      className
-    )}
-    {...props}
-  />
-))
-BottomSheetOverlay.displayName = DrawerPrimitive.Overlay.displayName
-
-const BottomSheetContent = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content> & {
-    /** Hide the drag handle (e.g. for full-bleed content). */
-    hideHandle?: boolean
-    /** Kept for backward compatibility; the floating close button was removed. */
-    hideClose?: boolean
-  }
->(({ className, children, hideHandle, hideClose: _hideClose, ...props }, ref) => (
-  <BottomSheetPortal>
-    <BottomSheetOverlay />
-    <DrawerPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-[101] mt-16 flex h-auto max-h-[94dvh] flex-col rounded-t-[28px] border border-white/10 border-b-0 shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.55)] backdrop-blur-2xl [overscroll-behavior-y:contain] bs-content",
-        className
-      )}
-      style={{ paddingBottom: "max(20px, env(safe-area-inset-bottom))" }}
+}: React.ComponentProps<typeof Drawer.Root>) {
+  return (
+    <Drawer.Root
+      open={open}
+      onOpenChange={onOpenChange}
+      dismissible={dismissible}
+      shouldScaleBackground={shouldScaleBackground}
       {...props}
     >
-      {!hideHandle && (
-        <div
-          aria-hidden
-          className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-white/25 bs-handle"
-        />
-      )}
       {children}
-    </DrawerPrimitive.Content>
-  </BottomSheetPortal>
-))
-BottomSheetContent.displayName = "BottomSheetContent"
+    </Drawer.Root>
+  )
+}
 
-const BottomSheetHeader = ({
-  className,
-  title,
-  subtitle,
-  accessory,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement> & {
+const SHEET_CONTENT_CLASS =
+  "fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-[28px] border-t border-border/60 bg-[hsl(var(--card)/0.94)] text-[hsl(var(--card-foreground))] shadow-2xl outline-none backdrop-blur-2xl max-h-[94vh] pb-[env(safe-area-inset-bottom)]"
+
+interface BottomSheetContentProps
+  extends React.ComponentProps<typeof Drawer.Content> {
+  hideHandle?: boolean
+  hideClose?: boolean
   title?: React.ReactNode
   subtitle?: React.ReactNode
-  accessory?: React.ReactNode
-}) => (
-  <div
-    className={cn(
-      "flex items-start justify-between gap-3 px-5 pb-3 pt-1",
-      className
-    )}
-    {...props}
-  >
-    <div className="min-w-0 flex-1">
-      {title && (
-        <h3 className="truncate text-[17px] font-semibold leading-tight tracking-tight text-foreground">
-          {title}
-        </h3>
+}
+
+function BottomSheetContent({
+  className,
+  children,
+  hideHandle = false,
+  hideClose,
+  title,
+  subtitle,
+  ...props
+}: BottomSheetContentProps) {
+  const hasHeader = Boolean(title) || Boolean(subtitle)
+
+  return (
+    <Drawer.Portal>
+      <Drawer.Overlay className="vaul-sheet-overlay fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+      <Drawer.Content
+        className={cn("vaul-sheet-content", SHEET_CONTENT_CLASS, className)}
+        {...props}
+      >
+        <Drawer.Title className="sr-only">
+          {typeof title === "string" ? title : "Sheet"}
+        </Drawer.Title>
+        <Drawer.Description className="sr-only">
+          {typeof subtitle === "string" ? subtitle : ""}
+        </Drawer.Description>
+
+        {!hideHandle && (
+          <div
+            data-vaul-no-drag
+            className="flex shrink-0 justify-center px-5 pt-3 pb-1.5"
+          >
+            <div className="h-1.5 w-10 rounded-full bg-border/70" />
+          </div>
+        )}
+
+        {hasHeader && (
+          <div
+            data-vaul-no-drag
+            className="shrink-0 px-5 pb-3 pt-1"
+          >
+            {title && (
+              <h3 className="text-[17px] font-semibold leading-tight tracking-tight text-[hsl(var(--foreground))]">
+                {title}
+              </h3>
+            )}
+            {subtitle && (
+              <p className="mt-0.5 text-[13px] text-muted-foreground">
+                {subtitle}
+              </p>
+            )}
+          </div>
+        )}
+
+        {hasHeader && (
+          <div data-vaul-no-drag className="h-px shrink-0 bg-border/60" />
+        )}
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {children}
+        </div>
+      </Drawer.Content>
+    </Drawer.Portal>
+  )
+}
+
+function BottomSheetBody({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return <div className={cn(className)} {...props} />
+}
+
+function BottomSheetHeader({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-vaul-no-drag
+      className={cn(
+        "shrink-0 px-5 pb-3 pt-1",
+        className
       )}
-      {subtitle && (
-        <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-          {subtitle}
-        </p>
+      {...props}
+    />
+  )
+}
+
+function BottomSheetFooter({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-vaul-no-drag
+      className={cn(
+        "shrink-0 border-t border-border/60 bg-[hsl(var(--card)/0.6)] px-5 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]",
+        className
       )}
-      {!title && !subtitle && props.children}
+      {...props}
+    />
+  )
+}
+
+function BottomSheetTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof Drawer.Title>) {
+  return (
+    <Drawer.Title
+      className={cn(
+        "text-[17px] font-semibold leading-tight tracking-tight text-[hsl(var(--foreground))]",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function BottomSheetDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof Drawer.Description>) {
+  return (
+    <Drawer.Description
+      className={cn("text-[13px] text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
+function BottomSheetHandle({ className }: { className?: string }) {
+  return (
+    <div
+      data-vaul-no-drag
+      className="flex shrink-0 justify-center px-5 pt-3 pb-1.5"
+    >
+      <div
+        className={cn("h-1.5 w-10 rounded-full bg-border/70", className)}
+      />
     </div>
-    {accessory && <div className="shrink-0">{accessory}</div>}
-  </div>
-)
-BottomSheetHeader.displayName = "BottomSheetHeader"
+  )
+}
 
-const BottomSheetBody = ({
+function BottomSheetClose({
   className,
+  children,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "min-h-0 flex-1 overflow-y-auto px-5 py-1 [-webkit-overflow-scrolling:touch]",
-      className
-    )}
-    {...props}
-  />
-)
-BottomSheetBody.displayName = "BottomSheetBody"
-
-const BottomSheetFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "shrink-0 border-t border-border/60 bg-card/40 px-5 pb-1 pt-3",
-      className
-    )}
-    {...props}
-  />
-)
-BottomSheetFooter.displayName = "BottomSheetFooter"
-
-const BottomSheetTitle = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Title
-    ref={ref}
-    className={cn(
-      "text-[17px] font-semibold leading-none tracking-tight text-foreground",
-      className
-    )}
-    {...props}
-  />
-))
-BottomSheetTitle.displayName = DrawerPrimitive.Title.displayName
-
-const BottomSheetDescription = React.forwardRef<
-  React.ElementRef<typeof DrawerPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-))
-BottomSheetDescription.displayName = DrawerPrimitive.Description.displayName
+}: React.ComponentProps<typeof Drawer.Close>) {
+  return (
+    <Drawer.Close className={className} {...props}>
+      {children}
+    </Drawer.Close>
+  )
+}
 
 export {
   BottomSheet,
-  BottomSheetPortal,
-  BottomSheetOverlay,
-  BottomSheetTrigger,
-  BottomSheetClose,
   BottomSheetContent,
-  BottomSheetHeader,
   BottomSheetBody,
+  BottomSheetHeader,
   BottomSheetFooter,
   BottomSheetTitle,
   BottomSheetDescription,
+  BottomSheetHandle,
+  BottomSheetClose,
 }

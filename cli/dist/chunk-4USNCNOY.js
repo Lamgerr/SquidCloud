@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function a(r){let e=c(`Creating folder ${r}...`);e.start(),await d("/api/v1/storage/mkdir",{path:r},{authenticated:true}),e.succeed(),s(`Created folder ${r}`);}export{a};//# sourceMappingURL=chunk-4USNCNOY.js.map
-//# sourceMappingURL=chunk-4USNCNOY.js.map

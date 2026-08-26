@@ -1,11 +1,11 @@
 import os from 'node:os'
 import path from 'node:path'
 import fs from 'node:fs'
-import { randomBytes } from '@noble/hashes/utils'
-import { sha256 } from '@noble/hashes/sha256'
-import { hkdf } from '@noble/hashes/hkdf'
-import { blake3 } from '@noble/hashes/blake3'
-import { gcm } from '@noble/ciphers/aes'
+import { randomBytes } from '@noble/hashes/utils.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { blake3 } from '@noble/hashes/blake3.js'
+import { gcm } from '@noble/ciphers/aes.js'
 import { bytesToHex, hexToBytes } from '../crypto/ssp.js'
 import { computeDeviceFingerprint } from './fingerprint.js'
 
@@ -15,7 +15,7 @@ const FALLBACK_FILE = path.join(FALLBACK_DIR, '.session')
 function getFallbackKey(): Uint8Array {
   const fingerprint = computeDeviceFingerprint()
   const ikm = new TextEncoder().encode(fingerprint)
-  return hkdf(sha256, ikm, new Uint8Array(32), 'squidcloud-fallback-v1', 32)
+  return hkdf(sha256, ikm, new Uint8Array(32), new TextEncoder().encode('squidcloud-fallback-v1'), 32)
 }
 
 export async function storeSession(sessionJson: string): Promise<void> {

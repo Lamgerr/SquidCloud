@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {q,y,s}from'./chunk-BC3STHFS.js';import {a}from'./chunk-OSI5H2T5.js';import {d}from'./chunk-5TMR6Y7L.js';async function m(){let r=c("Scanning for orphaned files...");r.start();let e=await d("/api/v1/storage/clean",{orphaned:true},{authenticated:true});if(r.succeed(),q()){y(e);return}s(`Cleaned ${e.deleted} orphaned files (${a(e.freed_bytes)})`);}export{m as a};//# sourceMappingURL=chunk-F6IK5BFP.js.map
-//# sourceMappingURL=chunk-F6IK5BFP.js.map

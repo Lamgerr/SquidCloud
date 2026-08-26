@@ -38,6 +38,7 @@ Current release: **v12.0.18** — [squidcloud.vercel.app](https://squidcloud.ver
 - [Security](#security)
 - [Getting Started](#getting-started)
 - [Mobile & Desktop](#mobile--desktop)
+- [SquidFS — Mount as Local Disk](#squidfs--mount-as-local-disk)
 - [Legal](#legal)
 
 ---
@@ -199,6 +200,50 @@ The SquidCloud CLI supports automation and scripting via your API key. See the C
 | Desktop (Electron) | — | Planned |
 
 The Android app is built with Capacitor and distributed as a signed APK. It supports full feature parity with the web platform including BYOS, BYOK, file upload with background worker, and OAuth sign-in.
+
+---
+
+## SquidFS — Mount as Local Disk
+
+**SquidFS** lets you mount your SquidCloud storage as a local filesystem on any operating system. Access your files directly from your file manager, terminal, or any application — just like a local hard drive.
+
+| Platform | Method | Status |
+|---|---|---|
+| Linux (x86_64, ARM64) | FUSE | ✅ Available |
+| macOS (Intel, Apple Silicon) | FUSE | ✅ Available |
+| Windows (x86_64, ARM64) | WebDAV | ✅ Available |
+| Termux / Android | WebDAV | ✅ Available |
+
+### Quick Start
+
+```bash
+# Linux / macOS (FUSE)
+squidfs -key cb_your_api_key_here -mount /mnt/squidfs
+
+# Windows / Termux (WebDAV)
+squidfs -key cb_your_api_key_here -webdav
+```
+
+### Features
+
+- **FUSE on Linux/macOS** — Native filesystem performance with kernel-level caching
+- **WebDAV fallback** — Works everywhere, including Windows and Termux
+- **BYOK encryption** — Optional Bring Your Own Key for zero-knowledge access
+- **V3 HKDF key hierarchy** — Per-file and per-chunk key derivation
+- **Local cache** — Smart caching with LRU eviction for fast repeated access
+- **Cross-platform** — Pre-built binaries for all major architectures
+
+### Installation
+
+Download the latest binary for your platform from the [releases page](https://github.com/NaveenSingh9999/squidfs/releases) or build from source:
+
+```bash
+git clone https://github.com/NaveenSingh9999/squidfs.git
+cd squidfs
+make install
+```
+
+For full documentation, visit [squidcloud.vercel.app/squidfs](https://squidcloud.vercel.app/squidfs).
 
 ---
 

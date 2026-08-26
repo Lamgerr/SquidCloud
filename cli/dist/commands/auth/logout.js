@@ -1,18 +1,20 @@
-import { clearSession } from '../../lib/auth/session.js';
-import { apiPost } from '../../lib/api/client.js';
-import { createSpinner } from '../../lib/output/spinner.js';
-import { logSuccess } from '../../lib/output/logger.js';
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { SUPABASE_URL } from '../../lib/auth/constants.js'
+import { clearOAuthSession, authToken } from '../../lib/auth/oauth-session.js'
+import { success, muted } from '../../lib/output/brand.js'
+
 export default async function logout() {
-    const spinner = createSpinner('Revoking session...');
-    spinner.start();
+  if (authToken) {
     try {
-        await apiPost('/api/auth/ssp/revoke', {}, { authenticated: true });
-    }
-    catch {
-        // Proceed with local cleanup regardless
-    }
-    await clearSession();
-    spinner.succeed();
-    logSuccess('Logged out successfully');
+      await fetch(`${SUPABASE_URL}/functions/v1/cli-oauth/revoke`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: authToken }),
+      })
+    } catch (e) { /* local sign-out still safe */ }
+  }
+  clearOAuthSession()
+  try { fs.rmSync(path.join(os.homedir(), '.squidcloud', 'cache', 'files.json'), { force: true }) } catch (e2) {}
+  console.log(`\n  ${success('Signed out.')} Local credentials removed.`)
+  console.log(`  ${muted('Run `squidcloudctl login` to authenticate again.')}\n`)
 }
-//# sourceMappingURL=logout.js.map

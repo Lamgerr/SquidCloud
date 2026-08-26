@@ -1,43 +1,54 @@
-import ora from 'ora';
-import chalk from 'chalk';
-import { isCI, isJsonMode } from './index.js';
-const SPINNER_FRAMES = {
-    dots: { spinner: 'dots' },
-    moon: { spinner: 'moon' },
-    arc: { spinner: 'arc' },
-    bounce: { spinner: 'bounce' },
-    shark: { spinner: { interval: 120, frames: ['▸   ', '▸▸  ', '▸▸▸ ', '▸▸▸▸', ' ▸▸▸▸', '  ▸▸▸', '   ▸▸', '    ▸'] } },
-};
-export function createSpinner(text, style = 'shark') {
-    if (isCI() || isJsonMode()) {
-        const silent = {
-            ...ora({ text, spinner: 'dots' }),
-            start: () => { if (!isCI())
-                console.log(text); return silent; },
-            stop: () => { if (!isCI())
-                console.log(); return silent; },
-            succeed: () => { if (!isCI())
-                console.log(`${chalk.green('✓')} ${text}`); return silent; },
-            fail: () => { if (!isCI())
-                console.log(`${chalk.red('✗')} ${text}`); return silent; },
-            warn: () => { if (!isCI())
-                console.log(`${chalk.hex('#FF9800')('⚠')} ${text}`); return silent; },
-            info: () => { if (!isCI())
-                console.log(`${chalk.hex('#4FC3F7')('ℹ')} ${text}`); return silent; },
-            stopAndPersist: () => { if (!isCI())
-                console.log(`${text}`); return silent; },
-            clear: () => { return silent; },
-            render: () => { return silent; },
-            frame: () => ' ',
-            text,
-            isSpinning: false,
-            indent: 0,
-            color: 'cyan',
-            prefixText: '',
-            spinner: { interval: 100, frames: [''] },
-        };
-        return silent;
-    }
-    return ora({ text, ...SPINNER_FRAMES[style] }).start();
+import chalk from 'chalk'
+
+/** Dependency-free spinner — no ora, no native deps, CI-safe. */
+const FRAMES = ['▸   ', '▸▸  ', '▸▸▸ ', '▸▸▸▸', ' ▸▸▸▸', '  ▸▸▸', '   ▸▸', '    ▸']
+
+
+
+
+
+
+
+
+export function createSpinner(text) {
+  const enabled = process.stdout.isTTY && !isCI()
+  let frame = 0
+  let current = text
+  let timer = null
+
+  const draw = () => {
+    if (!enabled) return
+    process.stdout.write(`\r\x1b[2K${chalk.cyan(FRAMES[frame % FRAMES.length])} ${current}`)
+    frame++
+  }
+
+  if (enabled) {
+    timer = setInterval(draw, 110)
+    draw()
+  } else {
+    console.log(`• ${current}`)
+  }
+
+  return {
+    text(t) {
+      current = t
+      draw()
+    },
+    succeed(suffix) {
+      this.stop()
+      console.log(`${enabled ? '\r\x1b[2K' : ''}✓ ${suffix ? `${current} — ${chalk.green(suffix)}` : chalk.green(current)}`)
+    },
+    fail(suffix) {
+      this.stop()
+      console.log(`${enabled ? '\r\x1b[2K' : ''}✗ ${suffix ? `${current} — ${chalk.red(suffix)}` : chalk.red(current)}`)
+    },
+    stop() {
+      if (timer) clearInterval(timer)
+      timer = null
+    },
+  }
 }
-//# sourceMappingURL=spinner.js.map
+
+function isCI() {
+  return !!(process.env.CI || process.env.GITHUB_ACTIONS || process.env.GITLAB_CI || process.env.CIRCLECI)
+}

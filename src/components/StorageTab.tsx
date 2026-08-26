@@ -13,7 +13,7 @@ const StorageTab = () => {
 
   return (
     <div className="space-y-5">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500/10 via-sky-500/5 to-transparent border border-sky-500/20 p-5">
+      <div className="relative overflow-hidden rounded-lg bg-card border border-sky-500/20 p-5">
         <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
         <div className="relative z-10 flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 shadow-sm">
@@ -25,7 +25,7 @@ const StorageTab = () => {
           </div>
         </div>
       </div>
-      <div className="rounded-2xl bg-white/[0.04] border border-white/10 overflow-hidden backdrop-blur-sm">
+      <div className="rounded-lg bg-card/50 border border-border overflow-hidden">
         <EnhancedFileManager />
       </div>
     </div>

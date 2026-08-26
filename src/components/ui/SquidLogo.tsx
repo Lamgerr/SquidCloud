@@ -6,10 +6,32 @@ interface SquidLogoProps {
   size?: number;
   className?: string;
   showBg?: boolean;
+  /** Pure black-on-white brand mark — no gradients, no color. */
+  mono?: boolean;
 }
 
-const SquidLogo: React.FC<SquidLogoProps> = ({ size = 32, className, showBg = true }) => {
+const SquidLogo: React.FC<SquidLogoProps> = ({ size = 32, className, showBg = true, mono = false }) => {
   const iconSize = Math.round(size * 0.625);
+
+  if (mono) {
+    return (
+      <div
+        className={cn('flex items-center justify-center shrink-0 rounded-[6px] bg-white', className)}
+        style={{ width: size, height: size }}
+      >
+        <svg viewBox="0 0 512 512" width={Math.round(size * 0.72)} height={Math.round(size * 0.72)} fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M208 160 C260 120 340 130 360 180 C380 230 360 270 320 290 C280 310 240 300 220 280 C200 260 190 240 200 210 C210 180 240 170 270 180"
+            fill="none" stroke="#000000" strokeWidth={44} strokeLinecap="round" strokeLinejoin="round"
+          />
+          <path
+            d="M320 290 C350 310 370 340 360 370"
+            fill="none" stroke="#000000" strokeWidth={28} strokeLinecap="round" opacity={0.75}
+          />
+        </svg>
+      </div>
+    );
+  }
 
   // In the native Android app, render the bundled PNG app icon instead of the inline SVG.
   if (isNativePlatform()) {

@@ -45,8 +45,8 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
         "fixed z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl",
         "animate-in slide-in-from-bottom-5 duration-200",
         isMobile
-          ? "bottom-20 left-3 right-3 rounded-2xl"
-          : "bottom-8 left-1/2 -translate-x-1/2 rounded-2xl max-w-4xl"
+          ? "bottom-20 left-3 right-3 rounded-lg"
+          : "bottom-8 left-1/2 -translate-x-1/2 rounded-lg max-w-4xl"
       )}
     >
       <div className={cn(

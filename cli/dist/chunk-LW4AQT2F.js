@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';import n from'inquirer';async function m(e){let{confirm:a}=await n.prompt([{type:"confirm",name:"confirm",message:`Remove yourself from "${e}"?`,default:false}]);if(!a)return;let t=c(`Leaving "${e}"...`);t.start(),await d("/api/v1/collab/leave",{folder:e},{authenticated:true}),t.succeed(),s(`You left "${e}"`);}export{m as a};//# sourceMappingURL=chunk-LW4AQT2F.js.map
-//# sourceMappingURL=chunk-LW4AQT2F.js.map

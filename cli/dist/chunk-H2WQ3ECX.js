@@ -1,2 +1,0 @@
-import {c as c$1}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function c(i,e){let t=e.public?"public":e.private?"private":"public",o=c$1(`Setting ${i} visibility to ${t}...`);o.start(),await d(`/api/v1/sites/${i}/visibility`,{visibility:t},{authenticated:true}),o.succeed(),s(`Site ${i} is now ${t}`);}export{c as a};//# sourceMappingURL=chunk-H2WQ3ECX.js.map
-//# sourceMappingURL=chunk-H2WQ3ECX.js.map

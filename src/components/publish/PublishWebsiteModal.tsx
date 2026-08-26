@@ -78,7 +78,6 @@ export const PublishWebsiteModal: React.FC<PublishWebsiteModalProps> = ({
         resourceType,
         siteName: siteName || undefined,
         visibility,
-        onProgress: (p) => {},
       });
       setPublishResult({ slug: result.slug, url: result.url });
       toast({ title: 'Published!', description: `Your site is live at ${result.url}` });

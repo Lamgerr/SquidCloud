@@ -1,12 +1,12 @@
 import { getPublicKey, sign, verify, etc, utils as edUtils } from '@noble/ed25519'
 import { x25519 } from '@noble/curves/ed25519.js'
-import { sha256 } from '@noble/hashes/sha256'
-import { sha512 } from '@noble/hashes/sha512'
-import { hmac } from '@noble/hashes/hmac'
-import { hkdf } from '@noble/hashes/hkdf'
-import { blake3 } from '@noble/hashes/blake3'
-import { randomBytes, concatBytes } from '@noble/hashes/utils'
-import { gcm } from '@noble/ciphers/aes'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { sha512 } from '@noble/hashes/sha2.js'
+import { hmac } from '@noble/hashes/hmac.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { blake3 } from '@noble/hashes/blake3.js'
+import { randomBytes, concatBytes } from '@noble/hashes/utils.js'
+import { gcm } from '@noble/ciphers/aes.js'
 import { pbkdf2Sync } from 'node:crypto'
 import { hostname, platform, arch } from 'node:os'
 
@@ -66,7 +66,7 @@ export function hashPassword(password: string, email: string): Buffer {
 
 export function computeDeviceFingerprint(machineId: string): string {
   const data = `${machineId}:${hostname()}:${platform()}:${arch()}`
-  return Buffer.from(blake3(data)).toString('hex')
+  return Buffer.from(blake3(new TextEncoder().encode(data))).toString('hex')
 }
 
 export function computeSignPayload(clientNonce: Uint8Array, serverNonce: Uint8Array, clientPub: Uint8Array, timestamp: number): Uint8Array {
@@ -88,7 +88,7 @@ export function deriveEncryptionKey(ecdhSecret: Uint8Array, clientNonce: Uint8Ar
   const salt = new Uint8Array(clientNonce.length + serverNonce.length)
   salt.set(clientNonce, 0)
   salt.set(serverNonce, clientNonce.length)
-  return hkdf(sha256, ecdhSecret, salt, HKDF_INFO, 32)
+  return hkdf(sha256, ecdhSecret, salt, new TextEncoder().encode(HKDF_INFO), 32)
 }
 
 export function encryptSession(session: SquidSession, key: Uint8Array): { ciphertext: Uint8Array; iv: Uint8Array; tag: Uint8Array } {
@@ -110,16 +110,16 @@ export function decryptSession(encrypted: Uint8Array, iv: Uint8Array, tag: Uint8
   return JSON.parse(new TextDecoder().decode(plaintext)) as SquidSession
 }
 
-export function verifyServerSignature(signature: Uint8Array, payload: Uint8Array, serverPub: Uint8Array): Promise<boolean> {
+export function verifyServerSignature(signature: Uint8Array, payload: Uint8Array, serverPub: Uint8Array): boolean {
   return verify(signature, payload, serverPub)
 }
 
-export function signPayload(priv: Uint8Array, payload: Uint8Array): Promise<Uint8Array> {
+export function signPayload(priv: Uint8Array, payload: Uint8Array): Uint8Array {
   return sign(payload, priv)
 }
 
 export function computeHMAC(key: Uint8Array, data: string): string {
-  return Buffer.from(hmac(sha256, key, data)).toString('hex')
+  return Buffer.from(hmac(sha256, key, new TextEncoder().encode(data))).toString('hex')
 }
 
 export function bytesToHex(buf: Uint8Array): string {

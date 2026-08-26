@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { securityService } from '@/services/security-service';
@@ -388,24 +388,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const contextValue = useMemo(() => ({
+    session,
+    user,
+    profile,
+    loading,
+    isNewUser,
+    aalLevel,
+    mfaRequired,
+    signIn,
+    signUp,
+    signOut,
+    githubSignIn,
+    refreshSession,
+    refreshProfile,
+    refreshAalLevel,
+    completeMfaChallenge
+  }), [session, user, profile, loading, isNewUser, aalLevel, mfaRequired, signIn, signUp, signOut, githubSignIn, refreshSession, refreshProfile, refreshAalLevel, completeMfaChallenge]);
+
   return (
-    <AuthContext.Provider value={{
-      session,
-      user,
-      profile,
-      loading,
-      isNewUser,
-      aalLevel,
-      mfaRequired,
-      signIn,
-      signUp,
-      signOut,
-      githubSignIn,
-      refreshSession,
-      refreshProfile,
-      refreshAalLevel,
-      completeMfaChallenge
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {mfaRequired ? (
         <MfaChallengeScreen
           onVerified={completeMfaChallenge}

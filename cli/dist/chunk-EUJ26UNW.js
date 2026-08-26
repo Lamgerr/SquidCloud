@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {x}from'./chunk-BC3STHFS.js';import {c as c$1}from'./chunk-5TMR6Y7L.js';async function i(t){let o=c(`Fetching ${t}...`);o.start();let a=await c$1(`/api/v1/storage/cat?path=${encodeURIComponent(t)}`,{authenticated:true});o.stop(),x(a.content);}export{i as a};//# sourceMappingURL=chunk-EUJ26UNW.js.map
-//# sourceMappingURL=chunk-EUJ26UNW.js.map

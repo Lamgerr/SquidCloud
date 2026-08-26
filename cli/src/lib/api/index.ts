@@ -1,2 +1,1 @@
-export { apiRequest, apiGet, apiPost, apiPut, apiDelete, apiUpload, ApiError } from './client.js'
-export { getApiBase } from './cert-pin.js'
+export { apiRaw, apiRequest, apiGet, apiPost, apiPut, apiPatch, apiDelete, ApiError, buildHeaders, API_BASE } from './client.js'

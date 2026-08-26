@@ -25,7 +25,7 @@ export default defineConfig({
     'commands/logs/index': 'src/commands/logs/index.ts',
   },
   format: ['esm'],
-  dts: true,
+  dts: false,
   sourcemap: true,
   clean: true,
   minify: true,

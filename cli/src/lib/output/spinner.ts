@@ -1,37 +1,54 @@
-import ora, { Ora } from 'ora'
 import chalk from 'chalk'
-import { isCI, isJsonMode } from './index.js'
 
-const SPINNER_FRAMES: Record<string, ora.Options> = {
-  dots: { spinner: 'dots' },
-  moon: { spinner: 'moon' },
-  arc: { spinner: 'arc' },
-  bounce: { spinner: 'bounce' },
-  shark: { spinner: { interval: 120, frames: ['▸   ', '▸▸  ', '▸▸▸ ', '▸▸▸▸', ' ▸▸▸▸', '  ▸▸▸', '   ▸▸', '    ▸'] } },
+/** Dependency-free spinner — no ora, no native deps, CI-safe. */
+const FRAMES = ['▸   ', '▸▸  ', '▸▸▸ ', '▸▸▸▸', ' ▸▸▸▸', '  ▸▸▸', '   ▸▸', '    ▸']
+
+export interface Spinner {
+  text(t: string): void
+  succeed(suffix?: string): void
+  fail(suffix?: string): void
+  stop(): void
 }
 
-export function createSpinner(text: string, style: keyof typeof SPINNER_FRAMES = 'shark'): Ora {
-  if (isCI() || isJsonMode()) {
-    const silent: Ora = {
-      ...ora({ text, spinner: 'dots' }),
-      start: () => { if (!isCI()) console.log(text); return silent },
-      stop: () => { if (!isCI()) console.log(); return silent },
-      succeed: () => { if (!isCI()) console.log(`${chalk.green('✓')} ${text}`); return silent },
-      fail: () => { if (!isCI()) console.log(`${chalk.red('✗')} ${text}`); return silent },
-      warn: () => { if (!isCI()) console.log(`${chalk.hex('#FF9800')('⚠')} ${text}`); return silent },
-      info: () => { if (!isCI()) console.log(`${chalk.hex('#4FC3F7')('ℹ')} ${text}`); return silent },
-      stopAndPersist: () => { if (!isCI()) console.log(`${text}`); return silent },
-      clear: () => { return silent },
-      render: () => { return silent },
-      frame: () => ' ',
-      text,
-      isSpinning: false,
-      indent: 0,
-      color: 'cyan',
-      prefixText: '',
-      spinner: { interval: 100, frames: [''] },
-    } as unknown as Ora
-    return silent
+export function createSpinner(text: string): Spinner {
+  const enabled = process.stdout.isTTY && !isCI()
+  let frame = 0
+  let current = text
+  let timer: ReturnType<typeof setInterval> | null = null
+
+  const draw = () => {
+    if (!enabled) return
+    process.stdout.write(`\r\x1b[2K${chalk.cyan(FRAMES[frame % FRAMES.length])} ${current}`)
+    frame++
   }
-  return ora({ text, ...SPINNER_FRAMES[style] }).start()
+
+  if (enabled) {
+    timer = setInterval(draw, 110)
+    draw()
+  } else {
+    console.log(`• ${current}`)
+  }
+
+  return {
+    text(t: string) {
+      current = t
+      draw()
+    },
+    succeed(suffix?: string) {
+      this.stop()
+      console.log(`${enabled ? '\r\x1b[2K' : ''}✓ ${suffix ? `${current} — ${chalk.green(suffix)}` : chalk.green(current)}`)
+    },
+    fail(suffix?: string) {
+      this.stop()
+      console.log(`${enabled ? '\r\x1b[2K' : ''}✗ ${suffix ? `${current} — ${chalk.red(suffix)}` : chalk.red(current)}`)
+    },
+    stop() {
+      if (timer) clearInterval(timer)
+      timer = null
+    },
+  }
+}
+
+function isCI(): boolean {
+  return !!(process.env.CI || process.env.GITHUB_ACTIONS || process.env.GITLAB_CI || process.env.CIRCLECI)
 }

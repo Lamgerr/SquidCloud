@@ -1,17 +1,18 @@
 import { loadSession } from '../auth/session.js'
-import { refreshAccessToken } from '../auth/refresh.js'
-import { getApiBase } from './cert-pin.js'
+import { authToken as oauthToken, anonKey as oauthAnonKey } from '../auth/oauth-session.js'
+
+export const API_BASE =
+  process.env.SQUIDCLOUD_API_BASE ||
+  'https://squidcloud.vercel.app/api/v1'
 
 const MAX_RETRIES = 3
-const BASE_DELAY = 1000
-const RATE_LIMIT_WINDOW = 1000
-const API_BASE = getApiBase()
+const BASE_DELAY = 600
+const RATE_LIMIT_WINDOW = 170
 
 interface RequestOptions {
   method?: string
   headers?: Record<string, string>
   body?: unknown
-  authenticated?: boolean
   retries?: number
 }
 
@@ -21,79 +22,30 @@ async function rateLimit(): Promise<void> {
   const now = Date.now()
   const elapsed = now - lastRequestTime
   if (elapsed < RATE_LIMIT_WINDOW) {
-    await new Promise(r => setTimeout(r, RATE_LIMIT_WINDOW - elapsed))
+    await new Promise((r) => setTimeout(r, RATE_LIMIT_WINDOW - elapsed))
   }
   lastRequestTime = Date.now()
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', headers = {}, body, authenticated = false, retries = MAX_RETRIES } = options
-
-  await rateLimit()
-
-  const reqHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...headers,
-  }
-
-  if (authenticated) {
+/** Auth header chain: OAuth session token → SQUIDCLOUD_API_KEY env → stored api key. */
+async function authHeaders(): Promise<Record<string, string>> {
+  if (oauthToken) return { Authorization: `Bearer ${oauthToken}` }
+  const envKey = process.env.SQUIDCLOUD_API_KEY
+  if (envKey) return { 'X-SquidCloud-Key': envKey }
+  try {
     const session = await loadSession()
-    if (session?.api_key) {
-      reqHeaders['x-squidcloud-key'] = session.api_key
-    } else if (session?.access_token) {
-      const newSession = await refreshAccessToken()
-      if (newSession?.api_key) {
-        reqHeaders['x-squidcloud-key'] = newSession.api_key
-      }
-    }
+    if (session?.api_key) return { 'X-SquidCloud-Key': session.api_key }
+    if (session?.access_token) return { Authorization: `Bearer ${session.access_token}` }
+  } catch {
+    /* unauthenticated */
   }
-
-  const url = `${API_BASE}${path}`
-  const fetchOptions: RequestInit = {
-    method,
-    headers: reqHeaders,
-  }
-
-  if (body && method !== 'GET') {
-    fetchOptions.body = JSON.stringify(body)
-  }
-
-  let lastError: Error | null = null
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const response = await fetch(url, fetchOptions)
-      return handleResponse<T>(response)
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err))
-      if (attempt < retries) {
-        const delay = BASE_DELAY * Math.pow(2, attempt) * (0.5 + Math.random() * 0.5)
-        await new Promise(r => setTimeout(r, delay))
-      }
-    }
-  }
-
-  throw lastError || new Error(`Request failed: ${path}`)
+  return {}
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (response.status === 204) {
-    return undefined as T
-  }
-  const contentType = response.headers.get('content-type') || ''
-  if (contentType.includes('application/json')) {
-    const data = await response.json()
-    if (!response.ok) {
-      const message = data?.error?.message || data?.message || `HTTP ${response.status}`
-      throw new ApiError(message, response.status, data?.error)
-    }
-    return data as T
-  }
-  if (!response.ok) {
-    const text = await response.text()
-    throw new ApiError(text || `HTTP ${response.status}`, response.status)
-  }
-  const text = await response.text()
-  return text as unknown as T
+export async function buildHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
+  const auth = await authHeaders()
+  if (oauthAnonKey && !auth['X-SquidCloud-Key']) auth['apikey'] = oauthAnonKey
+  return { 'Content-Type': 'application/json', ...auth, ...extra }
 }
 
 export class ApiError extends Error {
@@ -105,6 +57,73 @@ export class ApiError extends Error {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+function extractError(body: unknown, status: number): ApiError {
+  if (body && typeof body === 'object') {
+    const b = body as Record<string, any>
+    const msg = b?.error?.message || b?.error || b?.message || `HTTP ${status}`
+    return new ApiError(typeof msg === 'string' ? msg : JSON.stringify(msg), status, b?.error?.code ?? b?.code)
+  }
+  return new ApiError(`HTTP ${status}`, status)
+}
+
+export async function apiRaw(path: string, options: RequestOptions = {}): Promise<Response> {
+  const { method = 'GET', headers = {}, body, retries = MAX_RETRIES } = options
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    await rateLimit()
+    const reqHeaders = await buildHeaders(headers)
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers: reqHeaders,
+        body:
+          body === undefined || ['GET', 'HEAD'].includes(method)
+            ? undefined
+            : typeof body === 'string' || body instanceof Uint8Array || body instanceof ArrayBuffer
+              ? (body as any)
+              : JSON.stringify(body),
+      })
+      // Retry transient failures only.
+      if (res.status >= 500 && attempt < retries) {
+        lastError = new ApiError(`HTTP ${res.status}`, res.status)
+        await sleepBackoff(attempt)
+        continue
+      }
+      if (res.status === 429 && attempt < retries) {
+        const retryAfter = Number(res.headers.get('Retry-After')) || 2
+        lastError = new ApiError('Rate limited', 429)
+        await new Promise((r) => setTimeout(r, retryAfter * 1000))
+        continue
+      }
+      return res
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (attempt < retries) await sleepBackoff(attempt)
+    }
+  }
+  throw lastError || new Error(`Request failed: ${path}`)
+}
+
+function sleepBackoff(attempt: number): Promise<void> {
+  const delay = BASE_DELAY * Math.pow(2, attempt) * (0.5 + Math.random() * 0.5)
+  return new Promise((r) => setTimeout(r, delay))
+}
+
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const res = await apiRaw(path, options)
+  if (res.status === 204) return undefined as T
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    const data = await res.json().catch(() => null)
+    if (!res.ok) throw extractError(data, res.status)
+    return data as T
+  }
+  const text = await res.text()
+  if (!res.ok) throw new ApiError(text.slice(0, 400) || `HTTP ${res.status}`, res.status)
+  return text as unknown as T
 }
 
 export async function apiGet<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -119,30 +138,10 @@ export async function apiPut<T>(path: string, body?: unknown, options?: RequestO
   return apiRequest<T>(path, { ...options, method: 'PUT', body })
 }
 
-export async function apiDelete<T>(path: string, options?: RequestOptions): Promise<T> {
-  return apiRequest<T>(path, { ...options, method: 'DELETE' })
+export async function apiPatch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  return apiRequest<T>(path, { ...options, method: 'PATCH', body })
 }
 
-export async function apiUpload<T>(path: string, formData: FormData, options?: RequestOptions): Promise<T> {
-  const { method = 'POST', headers = {}, authenticated = false } = options || {}
-
-  const reqHeaders: Record<string, string> = {
-    ...headers,
-  }
-
-  if (authenticated) {
-    const session = await loadSession()
-    if (session?.api_key) {
-      reqHeaders['x-squidcloud-key'] = session.api_key
-    }
-  }
-
-  const url = `${API_BASE}${path}`
-  const response = await fetch(url, {
-    method,
-    headers: reqHeaders,
-    body: formData,
-  })
-
-  return handleResponse<T>(response)
+export async function apiDelete<T>(path: string, options?: RequestOptions): Promise<T> {
+  return apiRequest<T>(path, { ...options, method: 'DELETE' })
 }

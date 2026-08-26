@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import os from 'node:os'
 import { readFileSync, existsSync } from 'node:fs'
-import { blake3 } from '@noble/hashes/blake3'
+import { blake3 } from '@noble/hashes/blake3.js'
 import { bytesToHex } from '../crypto/ssp.js'
 
 const MACHINE_ID_PATHS = [
@@ -34,7 +34,7 @@ export function computeDeviceFingerprint(): string {
     os.release(),
   ]
   const data = components.join(':')
-  return bytesToHex(blake3(data))
+  return bytesToHex(blake3(new TextEncoder().encode(data)))
 }
 
 export function generateDeviceId(): string {

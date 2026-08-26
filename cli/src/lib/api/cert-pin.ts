@@ -5,7 +5,9 @@ const PINNED_PUB_KEY_HASHES: string[] = [
   // SHA-256 hash of the expected server public key
 ]
 
-const API_BASE = process.env.SQUIDCLOUD_API_BASE || 'https://squidcloud.vercel.app'
+const API_BASE =
+  process.env.SQUIDCLOUD_API_BASE ||
+  'https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/cloudbliss-api'
 
 export function addPinnedKeyHash(hash: string): void {
   PINNED_PUB_KEY_HASHES.push(hash.toLowerCase())

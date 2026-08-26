@@ -1,39 +1,22 @@
-import { loadSession, getTimeUntilExpiry } from '../../lib/auth/session.js';
-import { computeDeviceFingerprint } from '../../lib/auth/fingerprint.js';
-import { logError, logJSON, logRaw } from '../../lib/output/logger.js';
-import { isJsonMode } from '../../lib/output/logger.js';
-import chalk from 'chalk';
-import { formatCountdown } from '../../lib/utils/format.js';
+ function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import fs from 'node:fs'
+import os from 'node:os'
+import chalk from 'chalk'
+import { apiGet } from '../../lib/api/client.js'
+import { success, warn as warnMark, muted } from '../../lib/output/brand.js'
+import { isJsonMode } from '../../lib/output/logger.js'
+import { tokenExpiresAt, getCredentialsPath } from '../../lib/auth/oauth-session.js'
+
 export default async function authStatus() {
-    const session = await loadSession();
-    if (!session) {
-        logError('Not authenticated');
-        process.exit(1);
-    }
-    const currentFingerprint = computeDeviceFingerprint();
-    const fingerprintMatch = session.device_fingerprint === currentFingerprint;
-    const timeLeft = getTimeUntilExpiry(session);
-    const needsRefresh = timeLeft <= 2 * 60 * 1000;
-    if (isJsonMode()) {
-        logJSON({
-            authenticated: true,
-            session_id: session.session_id,
-            expires_in_ms: timeLeft,
-            fingerprint_match: fingerprintMatch,
-            needs_refresh: needsRefresh,
-            user: session.user,
-        });
-        return;
-    }
-    logRaw('');
-    logRaw(`${chalk.bold('Session Health')}`);
-    logRaw(`${chalk.dim('───'.repeat(15))}`);
-    logRaw(`  ${chalk.bold('Session ID:')}    ${chalk.dim(session.session_id)}`);
-    logRaw(`  ${chalk.bold('User:')}          ${session.user.email} (${session.user.username})`);
-    logRaw(`  ${chalk.bold('Plan:')}          ${chalk.hex('#7C4DFF')(session.user.plan)}`);
-    logRaw(`  ${chalk.bold('Expires:')}       ${timeLeft > 0 ? formatCountdown(timeLeft) : chalk.red('expired')}`);
-    logRaw(`  ${chalk.bold('Fingerprint:')}   ${fingerprintMatch ? chalk.green('✓ match') : chalk.red('✗ mismatch')}`);
-    logRaw(`  ${chalk.bold('Refresh:')}       ${needsRefresh ? chalk.yellow('needed soon') : chalk.green('ok')}`);
-    logRaw('');
+  const credsExist = fs.existsSync(getCredentialsPath())
+  const minsLeft = tokenExpiresAt ? Math.round((tokenExpiresAt - Date.now()) / 60000) : null
+  let apiOk = false, email = null
+  try { const r = await apiGet('/user/whoami'); apiOk = !!r; email = _optionalChain([r, 'optionalAccess', _ => _.email]) || null } catch (e) {}
+
+  if (isJsonMode()) { console.log(JSON.stringify({ authenticated: apiOk, email, credentials: credsExist, minutes_left: minsLeft }, null, 2)); return }
+  console.log()
+  console.log(`  ${chalk.bold('session')}      ${apiOk ? success('valid') : warnMark('invalid or expired')}`)
+  console.log(`  ${chalk.bold('account')}      ${email || muted('unknown')}`)
+  console.log(`  ${chalk.bold('credentials')}  ${credsExist ? muted('~/.squidcloud/credentials') : warnMark('none — run `squidcloudctl login`')}`)
+  if (minsLeft !== null) console.log(`  ${chalk.bold('expires in')}    ${minsLeft > 1440 ? `${Math.round(minsLeft / 1440)}d` : minsLeft > 60 ? `${Math.round(minsLeft / 60)}h` : `${minsLeft}m`}`)
+  console.log(`  ${chalk.bold('host')}         ${muted(os.hostname())}\n`)
 }
-//# sourceMappingURL=auth-status.js.map

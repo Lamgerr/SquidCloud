@@ -15,16 +15,19 @@ import { formatFileSize } from '@/lib/utils';
 import { revokeFileShare, getShareAnalytics, updateShareOptions } from '@/lib/api';
 import { buildPublicUrl } from '@/lib/appLinks';
 import { useShareSurveillance } from '@/hooks/use-share-surveillance';
+import { Folder } from '@/lib/icon-map';
 
 interface ShareRow {
-  id: string; file_id: string; share_id: string; created_at: string;
+  id: string; file_id: string | null; folder_id: string | null; share_id: string; created_at: string;
   expires_at: string | null; share_views: number; download_count: number;
   is_active: boolean; view_only: boolean; burn_after_reading: boolean;
   max_views: number | null; max_downloads: number | null;
   allowed_countries: string[] | null; blocked_countries: string[] | null;
   device_fingerprint: string | null; watermark_email: boolean;
   require_email: boolean; access_code: string | null;
-  file: { id: string; name: string; type: string; size: number; };
+  file: { id: string; name: string; type: string; size: number; } | null;
+  folder: { id: string; name: string; } | null;
+  is_folder_share: boolean;
 }
 
 interface ShareManagementDialogProps {
@@ -139,14 +142,31 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
-      const { data, error } = await supabase
-        .from('shares')
-        .select(`id, file_id, share_id, created_at, expires_at, share_views, download_count, is_active, view_only, burn_after_reading, max_views, max_downloads, allowed_countries, blocked_countries, device_fingerprint, watermark_email, require_email, access_code, file:files(id, name, type, size)`)
-        .eq('user_id', user.id)
-        .not('share_id', 'is', null)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setSharedFiles(data as any || []);
+
+      const [fileSharesRes, folderSharesRes] = await Promise.all([
+        supabase
+          .from('shares')
+          .select(`id, file_id, folder_id, share_id, created_at, expires_at, share_views, download_count, is_active, view_only, burn_after_reading, max_views, max_downloads, allowed_countries, blocked_countries, device_fingerprint, watermark_email, require_email, access_code, file:files(id, name, type, size)`)
+          .eq('user_id', user.id)
+          .not('share_id', 'is', null)
+          .is('folder_id', null)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('shares')
+          .select(`id, file_id, folder_id, share_id, created_at, expires_at, share_views, download_count, is_active, view_only, burn_after_reading, max_views, max_downloads, allowed_countries, blocked_countries, device_fingerprint, watermark_email, require_email, access_code, folder:folders(id, name)`)
+          .eq('user_id', user.id)
+          .not('share_id', 'is', null)
+          .not('folder_id', 'is', null)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (fileSharesRes.error) throw fileSharesRes.error;
+      if (folderSharesRes.error) throw folderSharesRes.error;
+
+      const fileShares = (fileSharesRes.data || []).map((s: any) => ({ ...s, is_folder_share: false }));
+      const folderShares = (folderSharesRes.data || []).map((s: any) => ({ ...s, is_folder_share: true, file: null }));
+
+      setSharedFiles([...fileShares, ...folderShares].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) as any || []);
     } catch (error: any) {
       toast({ title: "Failed to load shares", description: error.message, variant: "destructive" });
     } finally { setLoading(false); }
@@ -157,10 +177,15 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
     toast({ title: "Link copied" });
   };
 
-  const handleRevokeShare = async (fileId: string, fileName: string) => {
+  const handleRevokeShare = async (share: ShareRow) => {
     try {
-      await revokeFileShare(fileId);
-      toast({ title: "Share revoked", description: `"${fileName}" disabled` });
+      if (share.is_folder_share) {
+        await supabase.from('shares').delete().eq('share_id', share.share_id);
+      } else {
+        await revokeFileShare(share.file_id!);
+      }
+      const name = share.is_folder_share ? share.folder?.name : share.file?.name;
+      toast({ title: "Share revoked", description: `"${name}" disabled` });
       fetchSharedFiles();
     } catch (error: any) {
       toast({ title: "Revoke failed", description: error.message, variant: "destructive" });
@@ -176,7 +201,10 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
       const expired = s.expires_at && new Date(s.expires_at) < new Date();
       if (!expired) return false;
     }
-    if (search && !s.file.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const name = s.is_folder_share ? s.folder?.name : s.file?.name;
+      if (!name?.toLowerCase().includes(search.toLowerCase())) return false;
+    }
     return true;
   });
 
@@ -210,8 +238,8 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
       ) : filtered.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           <Share2 className="h-8 w-8 mx-auto mb-2 opacity-20" />
-          <p className="text-sm">No shared files</p>
-          <p className="text-xs mt-1">Share files from the file context menu</p>
+          <p className="text-sm">No shared items</p>
+          <p className="text-xs mt-1">Share files or folders from the context menu</p>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
@@ -223,7 +251,14 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
                 <div className="flex items-center justify-between px-3 py-2.5 hover:bg-muted/10 transition-colors">
                   <div className="flex-1 min-w-0 mr-3">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-medium text-sm text-foreground truncate">{share.file.name}</h4>
+                      {share.is_folder_share ? (
+                        <h4 className="font-medium text-sm text-foreground truncate flex items-center gap-1.5">
+                          <Folder className="w-3.5 h-3.5 text-primary shrink-0" />
+                          {share.folder?.name || 'Unnamed folder'}
+                        </h4>
+                      ) : (
+                        <h4 className="font-medium text-sm text-foreground truncate">{share.file?.name}</h4>
+                      )}
                       {surveillanceAlerts.has(share.share_id) && (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/20 animate-pulse shrink-0">
                           <ShieldAlert className="w-2.5 h-2.5 mr-0.5" /> Alert
@@ -241,7 +276,11 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
                       )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                      <span>{formatFileSize(share.file.size)}</span>
+                      {share.is_folder_share ? (
+                        <span className="flex items-center gap-1"><Folder className="h-3 w-3" />Folder</span>
+                      ) : (
+                        <span>{formatFileSize(share.file?.size || 0)}</span>
+                      )}
                       <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{share.share_views || 0}</span>
                       <span className="flex items-center gap-1"><DownloadIcon className="h-3 w-3" />{share.download_count || 0}</span>
                       {share.expires_at && (
@@ -268,7 +307,7 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
                     </Button>
                     {confirmRevoke === share.share_id ? (
                       <div className="flex gap-1">
-                        <Button size="sm" className="h-7 px-2 text-[10px]" onClick={() => handleRevokeShare(share.file_id, share.file.name)}>Confirm</Button>
+                        <Button size="sm" className="h-7 px-2 text-[10px]" onClick={() => handleRevokeShare(share)}>Confirm</Button>
                         <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => setConfirmRevoke(null)}>Cancel</Button>
                       </div>
                     ) : (

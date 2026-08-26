@@ -1,11 +1,12 @@
-import { apiPost } from '../../lib/api/client.js';
-import { createSpinner } from '../../lib/output/spinner.js';
-import { logSuccess } from '../../lib/output/logger.js';
-export default async function storageMkdir(path) {
-    const spinner = createSpinner(`Creating folder ${path}...`);
-    spinner.start();
-    await apiPost('/api/v1/storage/mkdir', { path }, { authenticated: true });
-    spinner.succeed();
-    logSuccess(`Created folder ${path}`);
+import chalk from 'chalk'
+import { createFolder } from './folders-helpers.js'
+import { success } from '../../lib/output/brand.js'
+import { isJsonMode } from '../../lib/output/logger.js'
+
+export default async function foldersCreate(...args) {
+  const name = (args.filter((a) => typeof a === 'string')[0] ) || ''
+  if (!name) throw new Error('Usage: squidcloudctl folders mkdir <name>')
+  const folder = await createFolder(name)
+  if (isJsonMode()) { console.log(JSON.stringify(folder, null, 2)); return }
+  console.log(`\n  ${success('created')} ${chalk.bold(folder.name || name)} · ${folder.id}\n`)
 }
-//# sourceMappingURL=storage-mkdir.js.map

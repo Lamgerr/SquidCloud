@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function m(i,e){let t=c(`Inviting ${e.email} to "${i}" as ${e.role}...`);t.start(),await d("/api/v1/collab/invite",{folder:i,email:e.email,role:e.role},{authenticated:true}),t.succeed(),s(`Invited ${e.email} to "${i}" as ${e.role}`);}export{m as a};//# sourceMappingURL=chunk-JCZENRYY.js.map
-//# sourceMappingURL=chunk-JCZENRYY.js.map

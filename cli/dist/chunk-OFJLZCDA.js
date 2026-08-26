@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s as s$1}from'./chunk-BC3STHFS.js';import {f}from'./chunk-5TMR6Y7L.js';async function s(e){let r=c(`Revoking share links for ${e}...`);r.start(),await f(`/api/v1/storage/share?path=${encodeURIComponent(e)}`,{authenticated:true}),r.succeed(),s$1(`All share links revoked for ${e}`);}export{s as a};//# sourceMappingURL=chunk-OFJLZCDA.js.map
-//# sourceMappingURL=chunk-OFJLZCDA.js.map

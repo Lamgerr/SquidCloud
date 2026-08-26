@@ -38,6 +38,7 @@ interface FolderFileItem {
   file_id: string; file_name: string; file_type: string;
   file_size: number; file_created_at: string; file_updated_at: string;
   is_encrypted: boolean; shared_encryption_key: string;
+  storage_path?: string;
 }
 
 function getCleanFileName(name: string): string {
@@ -235,13 +236,18 @@ const SharePage: React.FC = () => {
       backgroundDownloadService.startTask({ id: taskId, fileName, fileSize: fd.file_size || 0 });
       toast({ title: "Download started" });
 
+      const isSingleFile = fileId === fd.file_id;
+      const folderFile = !isSingleFile ? folderFiles.find(f => f.file_id === fileId) : null;
+
       const blob = await downloadFileWithRes54(fileId, (progress) => {
         backgroundDownloadService.updateProgress(taskId, progress);
       }, {
-        decryptionKey: decryptionKey || undefined,
+        decryptionKey: decryptionKey || (folderFile?.shared_encryption_key) || undefined,
         shareId: actualShareId,
-        ...(fileId === fd.file_id ? {
+        ...(isSingleFile ? {
           fileRecord: { name: fd.file_name, type: fd.file_type, size: fd.file_size, tags: fd.file_tags, encryption_key: fd.file_encryption_key, storage_path: fd.storage_path, created_at: fd.file_created_at, user_id: fd.owner_id },
+        } : folderFile ? {
+          fileRecord: { name: folderFile.file_name, type: folderFile.file_type, size: folderFile.file_size, storage_path: folderFile.storage_path, created_at: folderFile.file_created_at },
         } : {}),
       });
 

@@ -1,2 +1,0 @@
-import {b}from'./chunk-WRKYGGYI.js';import {q,y}from'./chunk-BC3STHFS.js';async function f(o){let i=b().get(o);if(q()){y({[o]:i});return}console.log(String(i??""));}export{f as a};//# sourceMappingURL=chunk-5DXTXML2.js.map
-//# sourceMappingURL=chunk-5DXTXML2.js.map

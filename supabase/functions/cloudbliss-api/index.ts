@@ -58,6 +58,9 @@ serve(async (req) => {
     // ===== AUTH LAYER =====
     keyData = await authenticateApiKey(supabase, rawApiKey)
     if (!keyData) {
+      keyData = await authenticateCliToken(supabase, rawApiKey)
+    }
+    if (!keyData) {
       return errorResponse('Invalid SquidCloud API key', 401, 'INVALID_API_KEY')
     }
 
@@ -287,6 +290,34 @@ async function authenticateApiKey(supabase: any, apiKey: string): Promise<any | 
   }
 
   return null
+}
+
+async function hashCliToken(token: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(token))
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function authenticateCliToken(supabase: any, token: string): Promise<any | null> {
+  const tokenHash = await hashCliToken(token)
+
+  const { data: device, error } = await supabase
+    .from('cli_devices')
+    .select('id, user_id, status, token_hash, scope')
+    .eq('token_hash', tokenHash)
+    .maybeSingle()
+
+  if (error || !device || device.status !== 'active' || !device.user_id) return null
+
+  return {
+    id: device.id,
+    user_id: device.user_id,
+    is_active: true,
+    scopes: device.scope || 'read write',
+    allow_hmac: false,
+    request_timestamp_max_age: null,
+    via_cli_oauth: true,
+  }
 }
 
 function configToBool(value: unknown): boolean | null {

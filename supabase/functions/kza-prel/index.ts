@@ -185,6 +185,37 @@ async function handleGateway(req: Request, supabase: any): Promise<Response> {
     }
   }
 
+  // Opaque SquidCloud CLI device token (no dots, no cb_ prefix): resolved via
+  // cli_devices.token_hash so squidcloudctl privileged commands can obtain
+  // PREL tokens through the same gateway as browser sessions.
+  if (!userId && token && !token.includes('.') && !token.startsWith('cb_')) {
+    const cliTokenHash = await sha256(token)
+    const { data: cliDevice } = await supabase
+      .from('cli_devices')
+      .select('id, user_id, machine_id, is_banned')
+      .eq('token_hash', cliTokenHash)
+      .maybeSingle()
+    if (cliDevice?.user_id) {
+      // Banned instruments cannot mint leases — otherwise a stolen seed from
+      // a banned device would keep renewing privileged access forever.
+      const banOr: string[] = [`and(entity_type.eq.DEVICE,entity_value.eq.${cliDevice.id})`]
+      if (cliDevice.machine_id) banOr.push(`and(entity_type.eq.MACHINE,entity_value.eq.${cliDevice.machine_id})`)
+      const { count: devBanCount } = await supabase
+        .from('kza_banned_entities')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .or(banOr.join(','))
+      if ((devBanCount ?? 0) > 0 || cliDevice.is_banned) {
+        return jsonResponse({
+          error: 'This device has been permanently banned after repeated TOTP failures.',
+          code: 'KZA_DEVICE_BANNED',
+        }, 403)
+      }
+      userId = cliDevice.user_id
+      authMethod = 'cli_device'
+    }
+  }
+
   // Real HMAC: verified server-side with the function's per-function key
   if (!userId && (registry.required_auth_level === 'hmac' || registry.required_auth_level === 'hmac_gateway' || registry.required_auth_level === 'hmac_jwt')) {
     if (registry.required_auth_level === 'hmac_gateway') {
@@ -887,9 +918,14 @@ async function verifyF2FA(
 
 async function computeF2FACode(seed: string, functionId: string, window: number): Promise<string> {
   const encoder = new TextEncoder()
+  // True uint64 little-endian window. NB: `window >> (i*8)` would wrap at
+  // int32 and repeat the low 4 bytes — the wire format was broken until this
+  // fix, so both encoder and clients must use explicit unsigned division.
   const windowBytes = new Uint8Array(8)
+  let w = Math.floor(window)
   for (let i = 0; i < 8; i++) {
-    windowBytes[i] = (window >> (i * 8)) & 0xff
+    windowBytes[i] = w % 256
+    w = Math.floor(w / 256)
   }
 
   const input = encoder.encode(seed + functionId)
@@ -897,14 +933,13 @@ async function computeF2FACode(seed: string, functionId: string, window: number)
   combined.set(input)
   combined.set(windowBytes, input.length)
 
-  const hashBuffer = await crypto.subtle.digest('SHA-256', combined)
-  const hashArray = new Uint8Array(hashBuffer)
+  const hashBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', combined))
+  const view = new DataView(hashBytes.buffer)
 
   let code = 0
   for (let i = 0; i < 3; i++) {
-    const block = new DataView(hashArray.slice(i * 8, i * 8 + 8).buffer)
-    code ^= block.getUint32(0, true)
-    code ^= block.getUint32(4, true)
+    code ^= view.getUint32(i * 8, true)
+    code ^= view.getUint32((i * 8) + 4, true)
   }
 
   return String(code % 100000000).padStart(8, '0')

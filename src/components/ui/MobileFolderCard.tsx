@@ -7,6 +7,7 @@ import { FolderItem } from '@/lib/api';
 import MobileMoveToFolderSheet from '@/components/MobileMoveToFolderSheet';
 import { usePublishState } from '@/hooks/usePublish';
 import { PublishWebsiteModal } from '@/components/publish/PublishWebsiteModal';
+import MobileEnhancedShareDialog from '@/components/MobileEnhancedShareDialog';
 
 interface MobileFolderCardProps {
   folder: FolderItem;
@@ -16,10 +17,11 @@ interface MobileFolderCardProps {
   onRename?: (name: string) => void;
   onMove?: () => void;
   onDownload?: () => void;
+  onShare?: () => void;
 }
 
 const MobileFolderCard: React.FC<MobileFolderCardProps> = ({
-  folder, viewMode = 'list', onOpen, onDelete, onRename, onMove, onDownload
+  folder, viewMode = 'list', onOpen, onDelete, onRename, onMove, onDownload, onShare
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -27,6 +29,7 @@ const MobileFolderCard: React.FC<MobileFolderCardProps> = ({
   const [renameValue, setRenameValue] = useState(folder.name);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const { publication: pubStatus } = usePublishState(!publishModalOpen ? folder.id : null);
   const longPressRef = useRef<ReturnType<typeof setTimeout>>();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +62,7 @@ const MobileFolderCard: React.FC<MobileFolderCardProps> = ({
     <>
       {isGrid ? (
         <div
-          className="bg-card border border-border/40 rounded-xl p-3 cursor-pointer active:scale-[0.97] transition-all duration-150"
+          className="bg-card/50 border border-border/60 rounded-[10px] p-3 cursor-pointer active:bg-accent/50 transition-colors duration-150"
           onClick={onOpen}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -67,7 +70,7 @@ const MobileFolderCard: React.FC<MobileFolderCardProps> = ({
           onContextMenu={(e) => { e.preventDefault(); setSheetOpen(true); }}
         >
           <div className="flex items-start justify-between mb-2.5">
-            <div className="w-11 h-11 rounded-xl bg-muted/60 border border-border/40 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-md bg-muted/40 border border-border/50 flex items-center justify-center shrink-0">
               <Folder className="w-5 h-5 text-muted-foreground" />
             </div>
             <button
@@ -168,6 +171,14 @@ const MobileFolderCard: React.FC<MobileFolderCardProps> = ({
             <Download className="w-5 h-5 text-muted-foreground" /> Download
           </button>
         )}
+        {onShare && (
+          <button
+            onClick={() => { setSheetOpen(false); setTimeout(() => setShowShareDialog(true), 150); }}
+            className="flex items-center gap-4 w-full h-14 px-5 border-b border-border/50 text-base text-foreground font-normal transition-colors active:bg-muted/60"
+          >
+            <Share2 className="w-5 h-5 text-muted-foreground" /> Share
+          </button>
+        )}
         <button
           onClick={() => { setSheetOpen(false); setDeleteConfirmOpen(true); }}
           className="flex items-center gap-4 w-full h-14 px-5 text-base text-destructive font-normal transition-colors active:bg-muted/60"
@@ -215,6 +226,13 @@ const MobileFolderCard: React.FC<MobileFolderCardProps> = ({
         resourceType="folder"
         resourceName={folder.name}
       />
+
+      <MobileEnhancedShareDialog
+        open={showShareDialog}
+        onClose={() => setShowShareDialog(false)}
+        file={{ ...folder, type: 'folder' } as any}
+        onShareChange={() => setShowShareDialog(false)}
+      />
     </>
   );
 };
@@ -228,11 +246,12 @@ interface MobileFolderListProps {
   onRename?: (folder: FolderItem, name: string) => void;
   onMove?: (folder: FolderItem) => void;
   onDownload?: (folder: FolderItem) => void;
+  onShare?: (folder: FolderItem) => void;
   onCreateFolder?: () => void;
 }
 
 export const MobileFolderList: React.FC<MobileFolderListProps> = ({
-  folders, loading, viewMode = 'list', onOpen, onDelete, onRename, onMove, onDownload, onCreateFolder
+  folders, loading, viewMode = 'list', onOpen, onDelete, onRename, onMove, onDownload, onShare, onCreateFolder
 }) => {
   const [expanded, setExpanded] = useState(true);
   const showEmpty = !loading && folders.length === 0;
@@ -324,6 +343,7 @@ export const MobileFolderList: React.FC<MobileFolderListProps> = ({
               onRename={(name) => onRename?.(f, name)}
               onMove={() => onMove?.(f)}
               onDownload={() => onDownload?.(f)}
+              onShare={() => onShare?.(f)}
             />
           ))}
         </div>

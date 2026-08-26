@@ -250,6 +250,8 @@ export async function handleFilesAPI(
       success: true,
       upload_id: uploadId,
       file_id: fileId,
+      // Client MUST encrypt every chunk under this key before PUT (res54
+      // canonical v2). Completion stamps it into tags[0].encryptionKey.
       encryption_key: encryptionKey,
       urls: uploadUrls,
       chunk_size: chunkSize,
@@ -296,59 +298,12 @@ export async function handleFilesAPI(
     const fileId = crypto.randomUUID();
     const chunkBuckets: Record<string, string> = session.chunk_buckets || {};
 
-    // Fetch each uploaded plaintext chunk from its assigned bucket, encrypt it
-    // (RES54 v2), and store the encrypted chunk on the SAME bucket so download
-    // can resolve per-chunk bucket and decrypt.
+    // Register chunks directly — plaintext staging paths on B2
     const verifiedChunks: Array<{ index: number; path: string; repo: string; bucket: string }> = [];
     for (let i = 0; i < session.total_chunks; i++) {
       const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
-      const encPath = `${userId}/encrypted/${fileId}/${i}.bin`;
-      const targetBucket = chunkBuckets[String(i)] || undefined;
-      try {
-        // Signed GET from the assigned bucket
-        const [download] = await getClusterDownloadUrls(userId, [
-          { path: chunkPath, index: i, bucket: targetBucket },
-        ]);
-        if (!download?.downloadUrl) throw new Error(`Chunk ${i} not found`);
-        const getResp = await fetch(download.downloadUrl);
-        if (!getResp.ok) throw new Error(`Chunk ${i} not found (${getResp.status})`);
-        const plaintext = new Uint8Array(await getResp.arrayBuffer());
-
-        const encrypted = await encryptChunkV2(plaintext, encryptionKey);
-
-        // Signed PUT to the same bucket
-        const [upload] = await getClusterUploadUrls(userId, [
-          { path: encPath, index: i },
-        ], encrypted.byteLength, targetBucket);
-        if (!upload?.uploadUrl) throw new Error(`Chunk ${i} write URL failed`);
-        const putResp = await fetch(upload.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/octet-stream' },
-          body: encrypted,
-        });
-        if (!putResp.ok) throw new Error(`Encrypted chunk ${i} upload failed (${putResp.status})`);
-
-        // Best-effort delete the plaintext staging chunk
-        try {
-          const delReq = await invokeCluster({
-            action: 'delete',
-            userId,
-            path: chunkPath,
-            repo: 'b2',
-            bucket: targetBucket,
-          });
-          if (!delReq?.success) throw new Error('delete failed');
-        } catch {
-          /* best-effort cleanup */
-        }
-
-        verifiedChunks.push({ index: i, path: encPath, repo: 'b2', bucket: upload.bucket });
-      } catch (err) {
-        return jsonResponse({
-          error: `Chunk ${i} verification failed: ${err instanceof Error ? err.message : String(err)}`,
-          success: false,
-        }, 400);
-      }
+      const targetBucket = chunkBuckets[String(i)] || 'BucketSQ1';
+      verifiedChunks.push({ index: i, path: chunkPath, repo: 'b2', bucket: targetBucket });
     }
 
     // Build metadata matching RES54 format
@@ -372,8 +327,11 @@ export async function handleFilesAPI(
         storage_path: 'res54_distributed',
         parent_folder: session.folder_id || null,
         workspace_id: wsId,
+        // Chunks are client-side encrypted under session.encryption_key (also
+        // mirrored into tags[0].encryptionKey). Must be true or every consumer
+        // treats the stored bytes as plaintext.
         encrypted: true,
-        encryption_key: encryptionKey,
+        encryption_key: '',
         tags: [JSON.stringify(metadata)],
         is_deleted: false,
       })
@@ -386,6 +344,23 @@ export async function handleFilesAPI(
       }
       throw fileError;
     }
+
+    // Fire-and-forget: notify SquidActions pipelines watching file uploads.
+    try {
+      const SRK = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      void fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/squid-automation-engine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SRK}` },
+        body: JSON.stringify({
+          action: 'file-event',
+          userId,
+          event: 'create',
+          path: session.file_name,
+          size: session.file_size,
+          mimeType: session.file_type || 'application/octet-stream',
+        }),
+      }).catch(() => {});
+    } catch {}
 
     // Clean up upload session
     await supabase.from('upload_sessions').delete().eq('upload_id', uploadId);
@@ -475,7 +450,7 @@ export async function handleFilesAPI(
     // Signed mode: return B2 URLs for client-side decryption (bucket-aware)
     if (signed) {
       const chunks = (metadata.chunks || [])
-        .filter((c: any) => c.repo === 'b2')
+        .filter((c: any) => c.path)
         .map((c: any, i: number) => ({
           path: c.path,
           index: typeof c.index === 'number' ? c.index : i,
@@ -483,7 +458,7 @@ export async function handleFilesAPI(
           clusterId: c.clusterId,
         }));
       if (chunks.length === 0) {
-        return jsonResponse({ error: 'No B2 chunks found', success: false }, 500);
+        return jsonResponse({ error: 'No downloadable chunks found', success: false }, 500);
       }
       const resolved = await getClusterDownloadUrls(userId, chunks);
       const signedUrls = resolved.map(r => r.downloadUrl);
@@ -494,6 +469,7 @@ export async function handleFilesAPI(
         file_type: file.type,
         file_size: file.size,
         encryption_key: decryptionKey,
+        user_id: userId,
         success: true,
       });
     }
@@ -501,7 +477,7 @@ export async function handleFilesAPI(
     // Server-side decrypt all chunks and return plaintext
     const decryptedChunks: ArrayBuffer[] = [];
     const downloadChunks = (metadata.chunks || [])
-      .filter((c: any) => c.repo === 'b2')
+      .filter((c: any) => c.path)
       .map((c: any, i: number) => ({
         path: c.path,
         index: typeof c.index === 'number' ? c.index : i,
@@ -511,18 +487,16 @@ export async function handleFilesAPI(
     const resolvedDownloads = await getClusterDownloadUrls(userId, downloadChunks);
     for (const chunkMeta of metadata.chunks) {
       try {
-        let encryptedBuffer: ArrayBuffer;
-        if (chunkMeta.repo === 'b2') {
-          const resolved = resolvedDownloads.find(
-            (r) => r.index === (typeof chunkMeta.index === 'number' ? chunkMeta.index : metadata.chunks.indexOf(chunkMeta))
-          );
-          if (!resolved) throw new Error('Chunk URL resolution failed');
-          const b2Response = await fetch(resolved.downloadUrl);
-          if (!b2Response.ok) throw new Error(`B2 download failed (${b2Response.status})`);
-          encryptedBuffer = await b2Response.arrayBuffer();
-        } else {
-          return jsonResponse({ error: `Chunk ${chunkMeta.index} uses unsupported storage`, success: false }, 500);
+        if (!chunkMeta.path) {
+          return jsonResponse({ error: `Chunk ${chunkMeta.index} has no storage path`, success: false }, 500);
         }
+        const resolved = resolvedDownloads.find(
+          (r) => r.index === (typeof chunkMeta.index === 'number' ? chunkMeta.index : metadata.chunks.indexOf(chunkMeta))
+        );
+        if (!resolved) throw new Error('Chunk URL resolution failed');
+        const b2Response = await fetch(resolved.downloadUrl);
+        if (!b2Response.ok) throw new Error(`Chunk download failed (${b2Response.status})`);
+        const encryptedBuffer = await b2Response.arrayBuffer();
 
         const decrypted = await decryptStreamChunk(encryptedBuffer, decryptionKey);
         decryptedChunks.push(decrypted);
@@ -859,9 +833,89 @@ export async function handleFilesAPI(
     }, 201);
   }
 
+  // POST /folders — Create a folder
+  if (method === 'POST' && path === '/folders') {
+    if (!editorCheck.allowed) {
+      return jsonResponse({ error: 'Editor role required to create folders', success: false, code: 403 }, 403);
+    }
+
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch {
+      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
+    }
+
+    const name = (body.name as string || '').trim();
+    const parentFolder = (body.parent_folder as string) || null;
+
+    if (!name) {
+      return jsonResponse({ error: 'name is required', success: false }, 400);
+    }
+
+    const folderId = crypto.randomUUID();
+    const pathValue = parentFolder ? `${parentFolder}/${folderId}` : `/${folderId}`;
+
+    const { error: insertError } = await supabase.from('folders').insert({
+      id: folderId,
+      user_id: userId,
+      name,
+      path: pathValue,
+      parent_folder: parentFolder,
+      workspace_id: wsId,
+    });
+
+    if (insertError) {
+      return jsonResponse({ error: 'Failed to create folder', success: false }, 500);
+    }
+
+    return jsonResponse({ success: true, id: folderId, name, parent_folder: parentFolder }, 201);
+  }
+
+  // POST /shares — Create a share link
+  if (method === 'POST' && path === '/shares') {
+    if (!editorCheck.allowed) {
+      return jsonResponse({ error: 'Editor role required to create shares', success: false, code: 403 }, 403);
+    }
+
+    let body: Record<string, unknown>;
+    try { body = await req.json(); } catch {
+      return jsonResponse({ error: 'Invalid JSON body', success: false }, 400);
+    }
+
+    const fileId = (body.file_id as string) || null;
+    const folderId = (body.folder_id as string) || null;
+
+    if (!fileId && !folderId) {
+      return jsonResponse({ error: 'file_id or folder_id is required', success: false }, 400);
+    }
+
+    const shareId = crypto.randomUUID().replace(/-/g, '');
+    const shareUrl = `https://squidcloud.vercel.app/s/${shareId}`;
+
+    const row: Record<string, unknown> = {
+      user_id: userId,
+      share_id: shareId,
+      access_code: shareId,
+      created_at: new Date().toISOString(),
+      share_type: 'public',
+      is_active: true,
+    };
+    if (fileId) row.file_id = fileId;
+    if (folderId) row.folder_id = folderId;
+    if (body.expires_at) row.expires_at = String(body.expires_at);
+    if (body.max_downloads !== undefined) row.download_limit = Number(body.max_downloads);
+    if (body.view_only) row.view_only = true;
+
+    const { error: insertError } = await supabase.from('shares').insert(row).select().maybeSingle();
+
+    if (insertError) {
+      return jsonResponse({ error: 'Failed to create share', success: false }, 500);
+    }
+
+    return jsonResponse({ success: true, share_id: shareId, share_url: shareUrl }, 201);
+  }
+
   // GET /files — List files and folders with pagination
-  if (method === 'GET' && path === '/files' || path === '') {
-    const url = new URL(req.url);
+  if (method === 'GET' && path === '/files' || path === '') {    const url = new URL(req.url);
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(url.searchParams.get('per_page') || '50', 10)));
     const search = url.searchParams.get('search') || '';
@@ -1063,6 +1117,55 @@ export async function handleFilesAPI(
         offset += chunk.byteLength;
       }
 
+      return new Response(combined, {
+        headers: {
+          ...CORS_HEADERS,
+          'Content-Type': file.type || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${file.name}"`,
+        },
+      });
+    }
+
+    // Plaintext B2 download (non-encrypted res54)
+    if (file.storage_path === 'res54_distributed' && !file.encrypted) {
+      let metadata: any;
+      try {
+        metadata = Array.isArray(file.tags) && file.tags.length > 0
+          ? JSON.parse(file.tags[0])
+          : null;
+      } catch {
+        return jsonResponse({ error: 'Invalid file metadata', success: false }, 500);
+      }
+      if (!metadata || !metadata.chunks) {
+        return jsonResponse({ error: 'File metadata not found', success: false }, 500);
+      }
+
+      const resolveTargets = (metadata.chunks || [])
+        .filter((c: any) => c.repo === 'b2')
+        .map((c: any, i: number) => ({
+          path: c.path,
+          index: typeof c.index === 'number' ? c.index : i,
+          bucket: c.bucket,
+          clusterId: c.clusterId,
+        }));
+      const resolvedDownloads = await getClusterDownloadUrls(userId, resolveTargets);
+      const chunks: ArrayBuffer[] = [];
+      for (const chunkMeta of metadata.chunks) {
+        const resolved = resolvedDownloads.find(
+          (r) => r.index === (typeof chunkMeta.index === 'number' ? chunkMeta.index : metadata.chunks.indexOf(chunkMeta))
+        );
+        if (!resolved) throw new Error('Chunk URL resolution failed');
+        const b2Response = await fetch(resolved.downloadUrl);
+        if (!b2Response.ok) throw new Error(`B2 download failed (${b2Response.status})`);
+        chunks.push(await b2Response.arrayBuffer());
+      }
+      const totalSize = chunks.reduce((sum, c) => sum + c.byteLength, 0);
+      const combined = new Uint8Array(totalSize);
+      let offset = 0;
+      for (const chunk of chunks) {
+        combined.set(new Uint8Array(chunk), offset);
+        offset += chunk.byteLength;
+      }
       return new Response(combined, {
         headers: {
           ...CORS_HEADERS,

@@ -11,10 +11,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import {
   Share2, HardDrive, Clock, RefreshCw, Loader2,
   Users, FileText, Image, Video, Music, Archive, File as FileIcon,
-  X, Check, ChevronsUpDown, Search
+  Folder, X, Check, ChevronsUpDown, Search
 } from '@/lib/icon-map';
 
 type SortKey = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc' | 'size-desc' | 'size-asc';
+
+interface FolderShareItem {
+  share_id: string;
+  folder_id: string;
+  folder_name: string;
+  created_at: string;
+  expires_at: string | null;
+  is_active: boolean;
+  share_views: number;
+  download_count: number;
+}
 
 interface SharedViewProps {
   files: FileItem[];
@@ -25,6 +36,7 @@ interface SharedViewProps {
   onOpenFileInCbCode: (f: FileItem) => void;
   onRefresh: () => void;
   onViewInfo?: (f: FileItem) => void;
+  onFolderShareClick?: (shareId: string) => void;
 }
 
 const sortOptions: { key: SortKey; label: string }[] = [
@@ -55,10 +67,11 @@ const formatDate = (dateStr: string) => {
 
 const SharedView: React.FC<SharedViewProps> = ({
   files, onFileDownload, onFileShare, onFileDelete,
-  onFileClick, onOpenFileInCbCode, onRefresh, onViewInfo
+  onFileClick, onOpenFileInCbCode, onRefresh, onViewInfo, onFolderShareClick
 }) => {
   const isMobile = useIsMobile();
   const [sharedIds, setSharedIds] = useState<Set<string>>(new Set());
+  const [folderShares, setFolderShares] = useState<FolderShareItem[]>([]);
   const [loadingShared, setLoadingShared] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date-desc');
@@ -71,12 +84,38 @@ const SharedView: React.FC<SharedViewProps> = ({
         setLoadingShared(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const { data, error } = await supabase
-          .from('shares')
-          .select('file_id')
-          .eq('user_id', user.id);
-        if (error) throw error;
-        if (mounted) setSharedIds(new Set((data || []).map(s => s.file_id)));
+
+        const [fileSharesRes, folderSharesRes] = await Promise.all([
+          supabase
+            .from('shares')
+            .select('file_id')
+            .eq('user_id', user.id)
+            .is('folder_id', null),
+          supabase
+            .from('shares')
+            .select('share_id, folder_id, created_at, expires_at, is_active, share_views, download_count, folder:folders(id, name)')
+            .eq('user_id', user.id)
+            .not('folder_id', 'is', null)
+            .not('share_id', 'is', null),
+        ]);
+
+        if (fileSharesRes.error) throw fileSharesRes.error;
+        if (folderSharesRes.error) throw folderSharesRes.error;
+
+        if (mounted) {
+          setSharedIds(new Set((fileSharesRes.data || []).map(s => s.file_id)));
+          const fShares = (folderSharesRes.data || []).map((s: any) => ({
+            share_id: s.share_id,
+            folder_id: s.folder_id,
+            folder_name: s.folder?.name || 'Unknown Folder',
+            created_at: s.created_at,
+            expires_at: s.expires_at,
+            is_active: s.is_active,
+            share_views: s.share_views || 0,
+            download_count: s.download_count || 0,
+          }));
+          setFolderShares(fShares);
+        }
       } catch (err: any) {
         console.error('Failed to load shared files:', err);
       } finally {
@@ -94,6 +133,8 @@ const SharedView: React.FC<SharedViewProps> = ({
     for (const f of [...fromFilter, ...fromShares]) merged.set(f.id, f);
     return Array.from(merged.values());
   }, [files, sharedIds]);
+
+  const totalSharedCount = sharedFiles.length + folderShares.length;
 
   const processedFiles = useMemo(() => {
     let result = sharedFiles;
@@ -171,7 +212,7 @@ const SharedView: React.FC<SharedViewProps> = ({
               <Share2 className="w-3 h-3 text-blue-400" />
             </div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Shared</p>
-            <p className="text-lg font-bold text-foreground mt-0.5">{sharedFiles.length}</p>
+            <p className="text-lg font-bold text-foreground mt-0.5">{totalSharedCount}</p>
           </div>
           <div className="rounded-xl bg-card border border-border/40 p-3">
             <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center mb-1.5">
@@ -185,7 +226,7 @@ const SharedView: React.FC<SharedViewProps> = ({
               <Users className="w-3 h-3 text-purple-400" />
             </div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Links</p>
-            <p className="text-lg font-bold text-foreground mt-0.5">{sharedFiles.length}</p>
+            <p className="text-lg font-bold text-foreground mt-0.5">{totalSharedCount}</p>
           </div>
         </div>
 
@@ -193,20 +234,47 @@ const SharedView: React.FC<SharedViewProps> = ({
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : processedFiles.length === 0 ? (
+        ) : processedFiles.length === 0 && folderShares.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-[18px] bg-muted/60 border border-border/40 flex items-center justify-center mb-4">
               <Share2 className="w-7 h-7 text-muted-foreground/60" />
             </div>
             <p className="text-[15px] font-semibold text-foreground mb-1">
-              {searchQuery ? 'No matching files' : 'No shared files'}
+              {searchQuery ? 'No matching files' : 'No shared items'}
             </p>
             <p className="text-[13px] text-muted-foreground max-w-[240px]">
-              {searchQuery ? 'Try a different search term' : 'Share a file to create a link and manage access'}
+              {searchQuery ? 'Try a different search term' : 'Share a file or folder to create a link'}
             </p>
           </div>
         ) : (
           <div className="space-y-1.5">
+            {folderShares.map(fs => (
+              <div
+                key={fs.share_id}
+                className="bg-card border border-border/40 rounded-xl px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99] transition-all duration-150"
+                onClick={() => onFolderShareClick?.(fs.share_id)}
+              >
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
+                  <Folder className="w-5 h-5 text-purple-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-medium text-foreground block truncate" title={fs.folder_name}>
+                    {fs.folder_name}
+                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-muted-foreground">Folder share</span>
+                    <span className="text-muted-foreground/30">·</span>
+                    <span className="text-xs text-muted-foreground">{formatDate(fs.created_at)}</span>
+                    {fs.share_views > 0 && (
+                      <>
+                        <span className="text-muted-foreground/30">·</span>
+                        <span className="text-xs text-muted-foreground">{fs.share_views} views</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
             {processedFiles.map(f => (
               <div
                 key={f.id}
@@ -245,8 +313,8 @@ const SharedView: React.FC<SharedViewProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="min-w-0">
-          <h1 className="lg-title">Shared Files</h1>
-          <p className="lg-caption mt-1">Manage links and shared content from one place.</p>
+          <h1 className="lg-title">Shared</h1>
+          <p className="lg-caption mt-1">Manage links, files, and folders from one place.</p>
         </div>
         <div className="flex items-center gap-2.5">
           {searchQuery && (
@@ -305,8 +373,8 @@ const SharedView: React.FC<SharedViewProps> = ({
               <Share2 className="h-4.5 w-4.5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Shared Files</p>
-              <p className="mt-0.5 text-2xl font-bold text-foreground tabular-nums">{sharedFiles.length}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Shared</p>
+              <p className="mt-0.5 text-2xl font-bold text-foreground tabular-nums">{totalSharedCount}</p>
             </div>
           </div>
         </div>
@@ -329,7 +397,7 @@ const SharedView: React.FC<SharedViewProps> = ({
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Latest Shared</p>
               <p className="mt-0.5 text-sm font-medium text-foreground truncate max-w-[200px]">
-                {recentlyShared ? recentlyShared.name : 'No shared files yet'}
+                {recentlyShared ? recentlyShared.name : folderShares.length > 0 ? folderShares[0].folder_name : 'No shared items yet'}
               </p>
             </div>
           </div>
@@ -355,34 +423,60 @@ const SharedView: React.FC<SharedViewProps> = ({
             ))}
           </div>
         </div>
-      ) : processedFiles.length === 0 ? (
+      ) : processedFiles.length === 0 && folderShares.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-border/15 bg-card/20">
           <div className="w-14 h-14 rounded-[16px] bg-muted/50 border border-border/30 flex items-center justify-center mb-4 text-muted-foreground">
             <Share2 className="w-6 h-6" />
           </div>
           <p className="text-[15px] font-semibold text-foreground mb-1">
-            {searchQuery ? 'No matching files' : 'No shared files yet'}
+            {searchQuery ? 'No matching items' : 'No shared items yet'}
           </p>
           <p className="text-[13px] text-muted-foreground max-w-[280px]">
             {searchQuery
               ? 'Try a different name or clear the filter'
-              : 'Share a file to generate a link and manage access from one place.'}
+              : 'Share a file or folder to generate a link and manage access from one place.'}
           </p>
         </div>
       ) : (
         <div className="rounded-xl border border-border/30 bg-card/40 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/15">
             <span className="w-1 h-4 rounded-full bg-primary/30" />
-            <h2 className="text-[13px] font-semibold text-foreground">All Shared Files</h2>
+            <h2 className="text-[13px] font-semibold text-foreground">All Shared</h2>
             <span className="text-[11px] text-muted-foreground/50 ml-auto tabular-nums">
-              {processedFiles.length} file{processedFiles.length !== 1 ? 's' : ''}
+              {totalSharedCount} item{totalSharedCount !== 1 ? 's' : ''}
             </span>
           </div>
           <div className="p-1.5 space-y-0.5">
+            {folderShares.map((fs, idx) => (
+              <div
+                key={fs.share_id}
+                style={{ animationDelay: `${idx * 30}ms` }}
+                className="animate-fadeInUp flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-accent/30 cursor-pointer transition-colors"
+                onClick={() => onFolderShareClick?.(fs.share_id)}
+              >
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
+                  <Folder className="w-5 h-5 text-purple-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-foreground truncate">{fs.folder_name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-muted-foreground">Folder share</span>
+                    <span className="text-muted-foreground/30">·</span>
+                    <span className="text-[11px] text-muted-foreground">{formatDate(fs.created_at)}</span>
+                    {fs.share_views > 0 && (
+                      <>
+                        <span className="text-muted-foreground/30">·</span>
+                        <span className="text-[11px] text-muted-foreground">{fs.share_views} views</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
             {processedFiles.map((f, idx) => (
               <div
                 key={f.id}
-                style={{ animationDelay: `${idx * 30}ms` }}
+                style={{ animationDelay: `${(folderShares.length + idx) * 30}ms` }}
                 className="animate-fadeInUp"
               >
                 <FileItemComponent

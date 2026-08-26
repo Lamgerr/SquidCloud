@@ -340,11 +340,17 @@ serve(async (req) => {
         return createErrorResponse("No storage buckets configured", 503);
       }
 
+      console.log(`[cluster] resolve-download: ${clusters.length} clusters, buckets: ${clusters.map(c => c.bucket).join(', ')}`);
+
       const results = await Promise.all(
         chunks.map(async (chunk: { path: string; index: number; bucket?: string; clusterId?: string }, i: number) => {
           const cluster =
             (await resolveClusterByBucket(clusters, chunk.bucket, chunk.clusterId)) ||
             clusters[0];
+          if (!cluster) {
+            throw new Error(`No cluster found for bucket=${chunk.bucket} clusterId=${chunk.clusterId}`);
+          }
+          console.log(`[cluster] resolve chunk ${i}: path=${chunk.path} bucket=${cluster.bucket} endpoint=${cluster.endpoint}`);
           const downloadUrl = await signUrl(cluster, chunk.path, "GET");
           return {
             index: typeof chunk.index === "number" ? chunk.index : i,

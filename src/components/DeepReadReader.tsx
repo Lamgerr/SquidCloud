@@ -424,7 +424,7 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
         {showUI && (
           <motion.header
             initial={{ y: -100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -100, opacity: 0 }} transition={{ duration: 0.2 }}
-            className="absolute top-0 inset-x-0 h-16 bg-[#0A0A0A]/95 backdrop-blur-2xl border-b border-zinc-800/80 flex items-center justify-between px-4 sm:px-6 z-50 shadow-2xl"
+            className="absolute top-0 inset-x-0 h-16 bg-[#0A0A0A]/95 border-b border-zinc-800/80 flex items-center justify-between px-4 sm:px-6 z-50 shadow-2xl"
           >
             <div className="flex items-center gap-2 sm:gap-4">
               <button onClick={onClose} className="flex items-center gap-1 sm:gap-2 text-zinc-400 hover:text-white transition-colors p-1.5 sm:p-0 rounded-lg hover:bg-white/5 sm:hover:bg-transparent">
@@ -453,7 +453,7 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
               <button onClick={toggleFullscreen} className="flex w-9 h-9 sm:w-10 sm:h-10 rounded-xl items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
                 {isFullscreen ? <Shrink className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
               </button>
-              <button onClick={() => setIsAnnotating(!isAnnotating)} className={cn("hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-sans font-bold transition-all ml-2", isAnnotating ? "bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white")}>
+              <button onClick={() => setIsAnnotating(!isAnnotating)} className={cn("hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-sans font-bold transition-all ml-2", isAnnotating ? "bg-emerald-500 text-black " : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white")}>
                 <PenTool className="w-4 h-4" /> Annotate
               </button>
             </div>
@@ -622,7 +622,7 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
                 transition={{ duration: 0.2 }}
                 className={cn(
                   "absolute bottom-0 inset-x-0 flex flex-col z-[45] pt-16 pb-6 px-4 sm:px-8 pointer-events-none",
-                  theme === 'dark' ? "bg-gradient-to-t from-black via-black/80 to-transparent" : "bg-gradient-to-t from-white via-white/80 to-transparent",
+                  theme === 'dark' ? "bg-card" : "bg-card",
                   isMobile && "pb-8"
                 )}
               >
@@ -634,7 +634,7 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
                     </button>
 
                     <div className="flex-1 flex flex-col items-center gap-2">
-                      <div className="w-full h-1 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden backdrop-blur-sm">
+                      <div className="w-full h-1 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden">
                         <div className={cn("h-full transition-all duration-300", theme === 'dark' ? "bg-white" : "bg-black")} style={{ width: `${progressPct}%` }} />
                       </div>
                     </div>

@@ -82,11 +82,11 @@ export default function DeepReadCatalog({ files, onBookOpen, onUpload }: { files
     <div className="flex-1 flex flex-col h-full bg-[#0A0A0A] text-white overflow-hidden">
       
       {/* ═══ RESPONSIVE HEADER ═══ */}
-      <header className="shrink-0 bg-[#0A0A0A]/95 backdrop-blur-2xl border-b border-zinc-800/80 z-30">
+      <header className="shrink-0 bg-[#0A0A0A]/95 border-b border-zinc-800/80 z-30">
         <div className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-6">
           {!showMobileSearch && (
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white text-black flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.15)] shrink-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-lg bg-white text-black flex items-center justify-center  shrink-0">
                 <Library className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
@@ -167,7 +167,7 @@ export default function DeepReadCatalog({ files, onBookOpen, onUpload }: { files
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 sm:p-8">
             {userBooks.length === 0 ? (
               <div className="mt-10 sm:mt-20 w-full max-w-md mx-auto p-8 sm:p-12 rounded-[2rem] border border-dashed border-zinc-800 flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mb-4"><Bookmark className="w-8 h-8 text-zinc-600" /></div>
+                <div className="w-16 h-16 bg-zinc-900 rounded-lg flex items-center justify-center mb-4"><Bookmark className="w-8 h-8 text-zinc-600" /></div>
                 <h3 className="text-lg font-bold text-white mb-2">Your library is empty</h3>
                 <p className="text-zinc-500 text-sm mb-6">Upload a PDF or EPUB file from your device, or discover thousands of free classics.</p>
                 <button onClick={() => setActiveTab('discover')} className="px-6 py-3 bg-white text-black font-bold rounded-xl text-sm shadow-lg active:scale-95 transition-all">
@@ -179,7 +179,7 @@ export default function DeepReadCatalog({ files, onBookOpen, onUpload }: { files
                 {userBooks.map(file => (
                   <div key={file.id} className="relative group flex flex-col gap-2.5">
                     <div 
-                      className="aspect-[2/3] w-full rounded-2xl bg-[#121212] border border-zinc-800/80 overflow-hidden cursor-pointer transition-all duration-300 group-hover:border-zinc-500 group-hover:shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)]"
+                      className="aspect-[2/3] w-full rounded-lg bg-[#121212] border border-zinc-800/80 overflow-hidden cursor-pointer transition-all duration-300 group-hover:border-zinc-500 group-hover:shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)]"
                       onClick={() => onBookOpen(file, 'local')}
                     >
                       <div className="w-full h-full flex flex-col items-center justify-center text-zinc-700 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-900 to-[#121212]">
@@ -230,10 +230,10 @@ export default function DeepReadCatalog({ files, onBookOpen, onUpload }: { files
                     className="relative group flex flex-col gap-2.5 cursor-pointer"
                     onClick={() => { setSelectedBook(book); setInfoDialogOpen(true); }}
                   >
-                    <div className="aspect-[2/3] w-full rounded-2xl bg-[#121212] border border-zinc-800/80 overflow-hidden transition-all duration-300 group-hover:shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] group-hover:border-zinc-500 relative">
+                    <div className="aspect-[2/3] w-full rounded-lg bg-[#121212] border border-zinc-800/80 overflow-hidden transition-all duration-300 group-hover:shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] group-hover:border-zinc-500 relative">
                       <img src={getCover(book)} alt={book.title} className="w-full h-full object-cover" loading="lazy" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                        <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white"><Info className="w-5 h-5" /></div>
+                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white"><Info className="w-5 h-5" /></div>
                       </div>
                     </div>
                     <div className="px-1">
@@ -260,7 +260,7 @@ export default function DeepReadCatalog({ files, onBookOpen, onUpload }: { files
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              className="absolute inset-0 bg-black/80"
               onClick={() => setInfoDialogOpen(false)}
             />
             
@@ -268,7 +268,7 @@ export default function DeepReadCatalog({ files, onBookOpen, onUpload }: { files
               initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className={cn(
                 "relative z-10 w-full bg-[#121212] border border-zinc-800 shadow-[0_30px_60px_rgba(0,0,0,0.6)] overflow-hidden text-white flex flex-col",
-                isMobile ? "max-w-md rounded-3xl p-6" : "max-w-2xl rounded-[2.5rem] p-8"
+                isMobile ? "max-w-md rounded-lg p-6" : "max-w-2xl rounded-[2.5rem] p-8"
               )}
             >
               <button onClick={() => setInfoDialogOpen(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-zinc-900 rounded-full text-zinc-400 hover:text-white">
@@ -297,7 +297,7 @@ export default function DeepReadCatalog({ files, onBookOpen, onUpload }: { files
                           setInfoDialogOpen(false);
                           onBookOpen({ name: selectedBook.title + '.epub', url: selectedBook.formats['application/epub+zip'] }, 'remote');
                         }}
-                        className="flex items-center justify-center gap-2 w-full bg-white text-black py-4 sm:py-3.5 rounded-xl font-bold hover:bg-zinc-200 transition-all active:scale-95 shadow-[0_0_15px_rgba(255,255,255,0.2)] text-base sm:text-sm"
+                        className="flex items-center justify-center gap-2 w-full bg-white text-black py-4 sm:py-3.5 rounded-xl font-bold hover:bg-zinc-200 transition-all active:scale-95  text-base sm:text-sm"
                       >
                         <BookOpen className="w-5 h-5 sm:w-4 sm:h-4" /> Read Book Now
                       </button>

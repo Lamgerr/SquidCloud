@@ -305,6 +305,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
     }
   }, []);
   const [shareFile, setShareFile] = useState<FileItemType | null>(null);
+  const [shareFolder, setShareFolder] = useState<FolderItem | null>(null);
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
   const [moveDialogFile, setMoveDialogFile] = useState<{ ids: string[] } | null>(null);
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
@@ -1018,6 +1019,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
     setShareFile(file);
   }, []);
 
+  const handleFolderShare = useCallback((folder: FolderItem) => {
+    setShareFolder(folder);
+  }, []);
+
   const handleFileMoveToFolder = useCallback((file: FileItemType) => {
     setMoveDialogFile({ ids: [file.id] });
   }, []);
@@ -1329,6 +1334,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   onFileShare={handleFileShare}
                   onFileMoveToFolder={handleFileMoveToFolder}
                   onFolderDelete={handleFolderDelete}
+                  onFolderShare={handleFolderShare}
                   onVaultOpen={() => setShowVaultAuth(true)}
                   bookmarks={bookmarks}
                   getColor={getColor}
@@ -1352,7 +1358,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
               )}
 
               {activeTab === 'trash' && (
-                <div className="rounded-2xl border border-border/50 bg-card/80 p-3">
+                <div className="rounded-lg border border-border/50 bg-card/80 p-3">
                   <TrashTab workspaceId={activeWorkspaceId} />
                 </div>
               )}
@@ -1366,7 +1372,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
               {activeTab === 'file-requests' && (
                 profile?.is_premium ? (
                   <div className="space-y-3">
-                    <div className="rounded-2xl border border-border/50 bg-card/80 p-3">
+                    <div className="rounded-lg border border-border/50 bg-card/80 p-3">
                       <div className="flex items-center justify-between mb-3">
                         <div className="min-w-0">
                           <h2 className="text-sm font-semibold text-foreground">File Requests</h2>
@@ -1392,7 +1398,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   </div>
                 ) : (
                   <div className="pt-8 px-4 text-center">
-                    <div className="rounded-2xl border border-border/40 bg-card p-6">
+                    <div className="rounded-lg border border-border/40 bg-card p-6">
                       <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
                         <Crown className="h-5 w-5 text-amber-400" />
                       </div>
@@ -1418,6 +1424,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   onOpenFileInCbCode={handleOpenFileInCbCode}
                   onRefresh={fetchFiles}
                   onViewInfo={handleViewInfo}
+                  onFolderShareClick={(shareId) => window.open(`/s/${shareId}`, '_blank')}
                 />
               )}
               {activeTab === 'books' && (
@@ -1800,7 +1807,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
       >
         {/* Drop overlay */}
         {isDragActive && (
-          <div className="fixed inset-0 z-[100] bg-primary/5 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="fixed inset-0 z-[100] bg-primary/5 flex items-center justify-center pointer-events-none">
             <div className="bg-card border-2 border-dashed border-primary rounded-[20px] p-10 text-center shadow-2xl">
               <Upload className="w-8 h-8 text-primary mx-auto mb-3" />
               <p className="text-base font-semibold">Drop to upload</p>
@@ -1830,37 +1837,39 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
           />
 
           {/* Main content */}
-          <div className="flex-1 min-w-0 flex h-screen flex-col overflow-hidden bg-gradient-to-b from-background via-background to-muted/10">
-            <div className="sticky top-0 z-20 border-b border-muted/30 bg-card/40 backdrop-blur-2xl">
-              <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between px-6 lg:px-8">
+          <div className="flex-1 min-w-0 flex h-screen flex-col overflow-hidden bg-background">
+            <div className="sticky top-0 z-20 border-b border-border/70 bg-background">
+              <div className="flex h-11 w-full items-center justify-between px-4 lg:px-5">
                 <div className="flex items-center gap-2.5">
                   <button
                     onClick={() => setIsStorageManagerOpen(true)}
-                    className="inline-flex h-9 items-center gap-2.5 rounded-full bg-accent/50 border border-border/50 px-3.5 text-left transition-all duration-200 hover:bg-accent/80 hover:border-border active:scale-[0.98]"
+                    className="inline-flex h-7 items-center gap-2 rounded-md px-2 text-left transition-colors duration-150 hover:bg-accent"
                   >
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <span className="flex items-center justify-center text-muted-foreground">
                       <HardDrive className="h-3.5 w-3.5" />
                     </span>
-                    <div className="leading-tight">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-medium">Storage</p>
-                      <p className="max-w-[180px] truncate text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-1.5 leading-tight min-w-0">
+                      <span className="text-[13px] font-medium text-foreground">Storage</span>
+                      <span className="text-neutral-600">·</span>
+                      <span className="max-w-[160px] truncate text-[13px] text-muted-foreground">
                         {activeProviderType === 'squidcloud' ? 'SquidCloud' : activeProviderId ? 'Custom Bucket' : 'SquidCloud'}
-                      </p>
+                      </span>
                     </div>
                     <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />
                   </button>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="inline-flex h-9 items-center gap-2.5 rounded-full bg-accent/50 border border-border/50 px-3.5 text-left transition-all duration-200 hover:bg-accent/80 hover:border-border active:scale-[0.98]">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      <button className="inline-flex h-7 items-center gap-2 rounded-md px-2 text-left transition-colors duration-150 hover:bg-accent">
+                        <span className="flex items-center justify-center text-muted-foreground">
                           <Briefcase className="h-3.5 w-3.5" />
                         </span>
                         <div className="leading-tight">
-                          <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-medium">Workspace</p>
-                          <p className="max-w-[180px] truncate text-sm font-medium text-foreground">
-                            {activeWorkspace?.name || 'Loading...'}
-                          </p>
+                          <span className="text-[13px] font-medium text-foreground">Workspace</span>
+                          <span className="text-neutral-600">·</span>
+                        <span className="max-w-[160px] truncate text-[13px] text-muted-foreground">
+                          {activeWorkspace?.name || '…'}
+                        </span>
                         </div>
                         <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />
                       </button>
@@ -1895,10 +1904,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   </DropdownMenu>
                 </div>
                 <div className="flex items-center gap-2">
-                  <SignalsBell className="h-8 w-8 rounded-xl" iconClassName="h-4 w-4" />
+                  <SignalsBell className="h-7 w-7 rounded-md" iconClassName="h-4 w-4" />
                   <button
                     onClick={() => setIsSpotlightOpen(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50 lg-press-subtle transition-all"
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent lg-press-subtle transition-all"
                     title="Search (⌘K)"
                   >
                     <Search className="h-4 w-4" />
@@ -1914,7 +1923,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                 onSnooze={snoozeNotification}
               />
             ))}
-            <main data-scroll-container="true" className="flex-1 overscroll-y-contain overflow-y-auto px-6 pb-8 pt-6 lg:px-8">
+            <main data-scroll-container="true" className="flex-1 overscroll-y-contain overflow-y-auto px-4 lg:px-5 pb-10 pt-4">
               <div className="mx-auto w-full max-w-[1400px]">
 
               {/* ── Files tab ── */}
@@ -1946,6 +1955,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                     onFileShare={handleFileShare}
                     onFileMoveToFolder={handleFileMoveToFolder}
                     onFolderDelete={handleFolderDelete}
+                    onFolderShare={handleFolderShare}
                     onVaultOpen={() => setShowVaultAuth(true)}
                     onRefresh={fetchFiles}
                     bookmarks={bookmarks}
@@ -1982,6 +1992,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   onOpenFileInCbCode={handleOpenFileInCbCode}
                   onRefresh={fetchFiles}
                   onViewInfo={handleViewInfo}
+                  onFolderShareClick={(shareId) => window.open(`/s/${shareId}`, '_blank')}
                 />
               )}
 
@@ -2026,7 +2037,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   </div>
                 ) : (
                   <div className="max-w-lg mx-auto pt-16 text-center">
-                    <div className="rounded-2xl border border-border/40 bg-card p-8">
+                    <div className="rounded-lg border border-border/40 bg-card p-8">
                       <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
                         <Crown className="h-6 w-6 text-amber-400" />
                       </div>
@@ -2205,6 +2216,15 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
         />
       )}
 
+      {shareFolder && (
+        <EnhancedShareDialog
+          open
+          onClose={() => setShareFolder(null)}
+          file={{ ...shareFolder, type: 'folder' } as any}
+          onShareChange={() => { setShareFolder(null); fetchFiles(); }}
+        />
+      )}
+
       <input
         ref={uploadInputRef}
         type="file"
@@ -2305,6 +2325,7 @@ interface FilesViewProps {
   onFileShare: (f: FileItemType) => void;
   onFileMoveToFolder: (f: FileItemType) => void;
   onFolderDelete: (f: FolderItem) => void;
+  onFolderShare: (f: FolderItem) => void;
   onVaultOpen: () => void;
   onRefresh: () => void;
   bookmarks: any[];
@@ -2336,7 +2357,7 @@ const FilesView: React.FC<FilesViewProps> = ({
   onGoBack, onNavigateTo, onOpenFolder,
   onOpenFolderInCbCode, onFileClick, onOpenFileInCbCode,
   onFileDownload, onFileDelete, onFileShare, onFileMoveToFolder,
-  onFolderDelete, onVaultOpen, onRefresh,
+  onFolderDelete, onFolderShare, onVaultOpen, onRefresh,
   bookmarks, getColor, isBookmarked, onToggleBookmark, onSetColor,
   selectionMode, selectedFiles, onToggleSelection, onToggleSelect, onSelectAll,
   onFileCreated, onUploadComplete,
@@ -2453,13 +2474,14 @@ const FilesView: React.FC<FilesViewProps> = ({
     <div className="space-y-5" ref={kbdContainerRef} onMouseMove={handleKbdMouseMove}>
 
       {/* ── Page header ── */}
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <h1 className="lg-title">Storage Explorer</h1>
-          <p className="lg-caption mt-1">
-            {folders.length} folder{folders.length !== 1 ? 's' : ''}, {files.length} file{files.length !== 1 ? 's' : ''}
-            {sharedFiles.length > 0 && <> &middot; {sharedFiles.length} shared</>}
-          </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-2.5">
+          <div className="flex items-baseline gap-3 min-w-0">
+            <h1 className="text-[15px] font-semibold tracking-tight text-foreground truncate">Storage</h1>
+            <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+              {folders.length} folders · {files.length} files{sharedFiles.length > 0 ? ` · ${sharedFiles.length} shared` : ''}
+            </span>
+          </div>
           <PathBar currentFolder={currentFolder} onNavigate={onNavigateTo} />
         </div>
         <div className="hidden sm:flex items-center gap-3">
@@ -2475,7 +2497,7 @@ const FilesView: React.FC<FilesViewProps> = ({
       </div>
 
       {/* ── Toolbar ── */}
-      <div className="lg-raised flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/50">
         <div className="flex items-center gap-2">
           {currentFolder && (
             <Button
@@ -2501,7 +2523,7 @@ const FilesView: React.FC<FilesViewProps> = ({
             onClick={onToggleSelection}
             className={cn(
               'h-8 gap-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 lg-press-subtle',
-              selectionMode && 'bg-primary/15 text-primary hover:bg-primary/25'
+              selectionMode && 'bg-foreground text-background hover:bg-foreground/90'
             )}
           >
             <CheckSquare className="w-4 h-4" />
@@ -2526,7 +2548,7 @@ const FilesView: React.FC<FilesViewProps> = ({
                 <DropdownMenuItem
                   key={value}
                   onClick={() => onSortChange(value)}
-                  className={cn(sortBy === value && 'bg-primary/20 text-primary')}
+                  className={cn(sortBy === value && 'bg-accent text-foreground font-medium')}
                 >
                   {label}
                   {sortBy === value && <Check className="ml-auto h-3.5 w-3.5" />}
@@ -2579,7 +2601,7 @@ const FilesView: React.FC<FilesViewProps> = ({
 
       {/* ── Error state ── */}
       {error && (
-        <div className="flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4">
+        <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
           <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
           <p className="text-sm text-red-300">{error}</p>
           <Button variant="outline" size="sm" onClick={onRefresh} className="ml-auto">
@@ -2599,6 +2621,7 @@ const FilesView: React.FC<FilesViewProps> = ({
           viewMode={viewMode}
           onOpen={onOpenFolder}
           onDelete={onFolderDelete}
+          onShare={onFolderShare}
           onCreateFolder={onCreateFolder}
         />
       )}
@@ -2666,7 +2689,7 @@ const MobileFilesView: React.FC<any> = ({
   viewMode, setViewMode,
   onRefresh,
   onGoBack, onOpenFolder, onOpenFolderInCbCode, onFileClick, onOpenFileInCbCode, onFileDownload,
-  onFileDelete, onFileShare, onFileMoveToFolder, onFolderDelete, onVaultOpen,
+  onFileDelete, onFileShare, onFileMoveToFolder, onFolderDelete, onFolderShare, onVaultOpen,
   getColor, isBookmarked, onToggleBookmark, onSetColor,
   onViewInfo,
   onCreateFolder,
@@ -2707,7 +2730,7 @@ const MobileFilesView: React.FC<any> = ({
           </svg>
         </div>
       )}
-      <section className="rounded-2xl border border-border/50 bg-card/75 p-3">
+      <section className="rounded-lg border border-border/50 bg-card/75 p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold text-foreground">{activeTitle}</h2>
@@ -2770,11 +2793,12 @@ const MobileFilesView: React.FC<any> = ({
           viewMode={viewMode}
           onOpen={onOpenFolder}
           onDelete={onFolderDelete}
+          onShare={onFolderShare}
           onCreateFolder={onCreateFolder}
         />
       )}
 
-      <section className="rounded-2xl border border-border/50 bg-card/75 p-2.5">
+      <section className="rounded-lg border border-border/50 bg-card/75 p-2.5">
         <button
           onClick={() => setFilesCollapsed(!filesCollapsed)}
           className="flex items-center gap-2 px-1 pb-2 w-full"

@@ -1,196 +1,77 @@
-import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Terminal, Copy, Check } from '@/lib/icon-map';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Copy, Check, Terminal, Shield, HardDrive, Server, KeyRound, Zap } from '@/lib/icon-map';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { Helmet } from 'react-helmet';
 
-const commands = `
-## Installation
-
-\`\`\`bash
-npm install -g squidcloudctl
-\`\`\`
-
-## Authentication
-
-\`\`\`
-squidcloud auth login      # Login with email/password
-squidcloud whoami           # Show current user
-squidcloud auth status      # Session health check
-squidcloud logout           # Clear session
-\`\`\`
-
-## Storage Operations
-
-\`\`\`
-squidcloud storage ls       # List files and folders
-squidcloud storage upload   # Upload files
-squidcloud storage download # Download files (alias: dl)
-squidcloud storage cat      # Print file to terminal
-squidcloud storage info     # Show file metadata
-squidcloud storage rm       # Delete files
-squidcloud storage mkdir    # Create folder
-squidcloud storage cp       # Copy files
-squidcloud storage mv       # Move/rename files
-squidcloud storage search   # Search files by name
-squidcloud storage share    # Generate share link
-squidcloud storage unshare  # Revoke share links
-squidcloud storage tag      # Add/remove file tags
-squidcloud storage diff     # Compare local/remote
-squidcloud storage clean    # Clean orphaned files
-\`\`\`
-
-## Site Management
-
-\`\`\`
-squidcloud deploy           # Deploy a static site (alias: squidsite deploy)
-squidcloud sites list       # List published sites
-squidcloud sites info       # Show site details
-squidcloud sites logs       # Stream site access logs
-squidcloud sites analytics  # View traffic analytics
-squidcloud sites deploys    # Deployment history
-squidcloud sites rollback   # Rollback deployment
-squidcloud sites rename     # Rename site slug
-squidcloud sites purge      # Purge CDN cache
-squidcloud sites visibility # Toggle public/private
-squidcloud sites open       # Open in browser
-squidcloud sites unpublish  # Take site offline
-squidcloud sites delete     # Permanently delete
-\`\`\`
-
-## File Requests (Forms)
-
-\`\`\`
-squidcloud filereq list         # List file requests
-squidcloud filereq create       # Create a file request
-squidcloud filereq info         # View request details
-squidcloud filereq submissions  # View submissions
-squidcloud filereq export       # Export as CSV
-squidcloud filereq embed        # Get HTML embed snippet
-squidcloud filereq clear        # Clear submissions
-squidcloud filereq delete       # Delete request
-\`\`\`
-
-## Scripts & Pipelines
-
-\`\`\`
-squidcloud scripts list     # List registered scripts
-squidcloud scripts run      # Run a pipeline
-squidcloud scripts logs     # View run logs
-squidcloud scripts status   # Pipeline status
-squidcloud scripts validate # Validate .squid.yml
-squidcloud scripts init     # Create new pipeline
-squidcloud scripts enable   # Enable pipeline
-squidcloud scripts disable  # Disable pipeline
-squidcloud scripts delete   # Delete pipeline
-squidcloud scripts cancel   # Cancel running
-squidcloud scripts watch    # Watch for changes
-\`\`\`
-
-## Time-Lock
-
-\`\`\`
-squidcloud time lock        # Time-lock a file
-squidcloud time unlock      # Unlock time-locked file
-squidcloud time status      # Check lock status
-squidcloud time list        # List time-locked files
-squidcloud time proof       # Export existence proof
-\`\`\`
-
-## Collaboration
-
-\`\`\`
-squidcloud collab invite    # Invite collaborator
-squidcloud collab list      # List collaborators
-squidcloud collab remove    # Remove collaborator
-squidcloud collab activity  # View activity feed
-squidcloud collab leave     # Leave shared folder
-squidcloud collab transfer  # Transfer ownership
-\`\`\`
-
-## Digital Signatures
-
-\`\`\`
-squidcloud sign request     # Request signature
-squidcloud sign status      # Check request status
-squidcloud sign list        # List signing requests
-squidcloud sign cancel      # Cancel request
-squidcloud sign verify      # Verify signed document
-squidcloud sign download    # Download signed doc
-\`\`\`
-
-## Monitoring & Logs
-
-\`\`\`
-squidcloud monitor               # Health dashboard
-squidcloud monitor sites         # Site health
-squidcloud monitor pipelines     # Pipeline health
-squidcloud monitor storage       # Storage health
-squidcloud monitor automations   # Automation health
-squidcloud logs tail             # Stream live logs
-squidcloud logs search           # Search historical logs
-squidcloud logs export           # Export logs
-\`\`\`
-
-## Utility
-
-\`\`\`
-squidcloud doctor           # System diagnostics
-squidcloud -v, --version    # Show version
-squidcloud config list      # Show configuration
-squidcloud config set       # Set config value
-squidcloud config get       # Get config value
-squidcloud completion       # Shell completion
-squidcloud feedback         # Submit feedback
-squidcloud update           # Self-update
-\`\`\`
-
-## Global Options
-
-| Flag | Description |
-|------|-------------|
-| \`--output json\` | JSON output mode (CI-safe) |
-| \`-v, --version\` | Show CLI version |
-| \`-h, --help\` | Show help |
-
-## Examples
-
-### List storage files
-\`\`\`bash
-squidcloud storage ls
-squidcloud storage ls --long   # With details
-squidcloud storage ls --output json
-\`\`\`
-
-### Download a file
-\`\`\`bash
-squidcloud storage dl report.pdf
-squidcloud storage download report.pdf ./downloads/
-\`\`\`
-
-### Deploy a website
-\`\`\`bash
-squidcloud deploy
-# Follow interactive prompts
-\`\`\`
-`
-
-function CopyButton({ text }: { text: string }) {
+function Code({ children }: { children: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
-      onClick={() => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }}
-      className="absolute right-2 top-2 p-1.5 rounded-md bg-background/80 hover:bg-background border border-border text-muted-foreground hover:text-foreground transition-all"
-      aria-label="Copy code"
-    >
-      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-    </button>
+    <div className="relative group my-4">
+      <pre className="overflow-x-auto rounded-xl border border-border bg-black/40 p-4 font-mono text-[13px] leading-relaxed text-foreground/90">
+        {children}
+      </pre>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(children);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1800);
+        }}
+        className="absolute right-2 top-2 rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground opacity-0 transition-all hover:text-foreground group-hover:opacity-100"
+        aria-label="Copy"
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+    </div>
   );
 }
+
+function Section({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string }>; title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-14">
+      <h2 className="flex items-center gap-2.5 text-xl font-bold tracking-tight">
+        <Icon className="h-5 w-5 text-primary" />
+        {title}
+      </h2>
+      <div className="mt-4 space-y-3 text-[15px] leading-relaxed text-muted-foreground">{children}</div>
+    </section>
+  );
+}
+
+const QUICK = `# install
+npm install -g squidcloudctl
+
+# authenticate once — browser opens, you approve, done
+squidcloudctl login
+
+# every command after this just works
+squidcloudctl files ls`;
+
+const NUMBERED = `squidcloudctl files ls
+# [  1] q3-report.pdf     2.4MB  2026-08-23   9f3ac2e1…
+# [  2] notes.md          12KB   2026-08-22   b41d90aa…
+
+squidcloudctl files dl 1            # by number
+squidcloudctl storage rm 2          # any command accepts #n
+squidcloudctl share create 1 --burn --max-downloads 1`;
+
+const HOST_API = `# hardened local API server on :8065 — your account behind it
+squidcloudctl host api --profile paranoid --mode keyed --hmac-secret "$(openssl rand -hex 32)"
+
+# ✓ Local API host listening http://127.0.0.1:8065
+# ✓ micro-redis on :8066 · keys shown once · audit log tailing
+
+curl -s http://127.0.0.1:8065/v1/files \\
+  -H "Authorization: Bearer sk_local-…" \\
+  -H "X-Timestamp: $(date +%s%3N)" \\
+  -H "X-Nonce: $(uuidgen)" \\
+  -H "X-Signature: …"`;
+
+const EMBED = `// your Node service talks to YOUR machine, not a rate-limited cloud API
+const files = await fetch('http://127.0.0.1:8065/v1/files').then(r => r.json());
+
+// stream a decrypted file straight into your pipeline
+const blob = await fetch(\`http://127.0.0.1:8065/v1/download/\${ref}\`).then(r => r.blob());`;
 
 export default function CLIDocs() {
   const navigate = useNavigate();
@@ -198,74 +79,95 @@ export default function CLIDocs() {
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
-        <title>CLI Reference — SquidCloud</title>
+        <title>CLI — squidcloudctl Reference | SquidCloud</title>
+        <meta name="description" content="squidcloudctl — encrypted storage, numbered files, FUSE mounts and a hardened localhost API server. Free to use." />
       </Helmet>
 
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
-        <div className="flex items-center gap-3 mb-8">
+      <div className="container mx-auto max-w-4xl px-4 py-12">
+        <div className="mb-10 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-              <Terminal className="h-5 w-5 text-[#4FC3F7]" />
-              CLI Reference
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              squidcloud.vercel.app CLI — complete command reference
-            </p>
+            <h1 className="text-3xl font-bold tracking-tight">squidcloudctl</h1>
+            <p className="text-sm text-muted-foreground">The entire platform, in your terminal. Free tier included.</p>
           </div>
         </div>
 
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <div className="rounded-lg border border-border bg-card p-5 mb-8">
-            <h3 className="text-sm font-semibold text-foreground mb-2">Quick Install</h3>
-            <div className="relative">
-              <pre className="bg-muted rounded-md p-3 text-sm overflow-x-auto">
-                <code>npm install -g squidcloudctl</code>
-              </pre>
-              <CopyButton text="npm install -g squidcloudctl" />
-            </div>
-          </div>
+        <Code>{QUICK}</Code>
 
-          {commands.split('## ').slice(1).map((section) => {
-            const title = section.split('\n')[0]?.trim();
-            const body = section.split('\n').slice(1).join('\n').trim();
-            if (!title) return null;
-
-            const isCodeSection = body.startsWith('```');
-            return (
-              <div key={title} className="mb-10">
-                <h2 className="text-lg font-bold text-foreground mb-4 pb-2 border-b border-border">
-                  {title}
-                </h2>
-                <div className="space-y-3">
-                  {isCodeSection ? (
-                    <div className="relative">
-                      <pre className="bg-muted rounded-lg p-4 text-sm overflow-x-auto leading-relaxed">
-                        <code>{body.replace(/```(bash)?\n?/g, '').trim()}</code>
-                      </pre>
-                      <CopyButton text={body.replace(/```(bash)?\n?/g, '').trim()} />
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap font-mono text-[13px]">
-                      {body}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-16 pt-8 border-t border-border text-center">
-          <p className="text-xs text-muted-foreground">
-            <Link to="/" className="hover:text-foreground transition-colors">SquidCloud</Link>
-            {' '}| Published as{' '}
-            <code className="text-[#4FC3F7] bg-muted px-1.5 py-0.5 rounded text-xs">squidcloudctl</code>
-            {' '}on npm
+        <Section icon={Terminal} title="Numbered files — no more ID juggling">
+          <p>
+            Listings are cached locally and every file gets a stable number. Reference it anywhere:
           </p>
-        </div>
+          <Code>{NUMBERED}</Code>
+          <p>Ambiguous names open an arrow-key picker. Full UUIDs and unique prefixes work everywhere too.</p>
+        </Section>
+
+        <Section icon={Zap} title="Transfers & storage">
+          <Code>{`files up ./dir/                    # folders expand automatically
+files dl 3 -o ./copy.pdf           # progress: bar · speed · eta
+storage ls / info / rm / mv / cp / search / mkdir
+share create 2 --expires 7d --max-downloads 5 --view-only`}</Code>
+        </Section>
+
+        <Section icon={KeyRound} title="Secrets">
+          <Code>{`echo "sk-live-…" | squidcloudctl secrets create STRIPE_KEY -
+squidcloudctl secrets list
+squidcloudctl secrets verify STRIPE_KEY sk-live-… && echo match`}</Code>
+        </Section>
+
+        <Section icon={HardDrive} title="SquidFS — mount the cloud as a disk">
+          <Code>{`squidcloudctl fs mount /mnt/squidfs   # FUSE (Linux/macOS)
+squidcloudctl fs webdav               # WebDAV everywhere else
+squidcloudctl fs status | fs stop`}</Code>
+          <p>
+            The CLI provisions the official <code className="font-mono text-xs">squidfs</code> binary for you and mints a
+            scoped key. Files written through the mount use the same res54 envelopes as the web app — they decrypt in both
+            places with correct MIME types.
+          </p>
+        </Section>
+
+        <Section icon={Server} title="host api — your machine IS the API">
+          <p>
+            Run a hardened REST server on loopback backed by your SquidCloud account. Your apps talk to{' '}
+            <code className="font-mono text-xs">localhost:8065</code> — no platform rate limits in between, responses
+            served through the exact same engine as the CLI.
+          </p>
+          <Code>{HOST_API}</Code>
+          <div className="mt-4 overflow-hidden rounded-xl border border-border">
+            <table className="w-full text-sm">
+              <tbody>
+                {[
+                  ['standard', 'open loopback dev server · 50 rps · body ≤ 512MB'],
+                  ['hardened', 'local keys required · timestamps + nonce replay guard · 120 rps'],
+                  ['paranoid', 'HMAC-signed requests enforced · lockouts after 3 misses · 200 rps · body ≤ 64MB'],
+                ].map(([name, desc]) => (
+                  <tr key={name} className="border-b border-border last:border-0">
+                    <td className="px-4 py-2.5 font-mono text-xs font-semibold">{name}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Code>{EMBED}</Code>
+          <p className="text-sm">
+            Manage keys with <code className="font-mono text-xs">host keys add / list / revoke</code>, stop with{' '}
+            <code className="font-mono text-xs">host stop</code>. Every request is written to{' '}
+            <code className="font-mono text-xs">~/.squidcloud/host-audit.log</code>.
+          </p>
+        </Section>
+
+        <Section icon={Shield} title="Trust model">
+          <p>
+            Credentials live in <code className="font-mono text-xs">~/.squidcloud/credentials</code> (chmod 600). Uploads
+            are chunked and sealed client-side before any byte leaves your device. BYOK mode keeps the server permanently
+            unable to read your data.
+          </p>
+          <Code>{`SQUIDCLOUD_API_KEY=cb_…    # CI / headless auth
+--output json              # stable JSON on most commands`}</Code>
+        </Section>
       </div>
     </div>
   );

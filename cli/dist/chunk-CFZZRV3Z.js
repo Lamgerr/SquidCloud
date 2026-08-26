@@ -1,2 +1,0 @@
-function e(){return !!(process.env.CI||process.env.GITHUB_ACTIONS||process.env.GITLAB_CI||process.env.CIRCLECI||process.env.TRAVIS||process.env.JENKINS_HOME)}function r(){return e()?false:process.stdout.isTTY&&process.stdin.isTTY}function n(){return process.env.GITHUB_ACTIONS?"github-actions":process.env.GITLAB_CI?"gitlab-ci":process.env.CIRCLECI?"circleci":process.env.TRAVIS?"travis":process.env.JENKINS_HOME?"jenkins":process.env.CI?"unknown-ci":null}export{e as a,r as b,n as c};//# sourceMappingURL=chunk-CFZZRV3Z.js.map
-//# sourceMappingURL=chunk-CFZZRV3Z.js.map

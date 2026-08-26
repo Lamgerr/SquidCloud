@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function a(e){let i=c(`Cancelling request ${e.slice(0,8)}...`);i.start(),await d(`/api/v1/sign/${e}/cancel`,{},{authenticated:true}),i.succeed(),s(`Signing request ${e.slice(0,8)} cancelled`);}export{a};//# sourceMappingURL=chunk-LSYYM7EZ.js.map
-//# sourceMappingURL=chunk-LSYYM7EZ.js.map

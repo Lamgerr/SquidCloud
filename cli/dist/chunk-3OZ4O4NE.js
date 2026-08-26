@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function o(e,i){let m=c(`Removing ${i.email} from "${e}"...`);m.start(),await d("/api/v1/collab/remove",{folder:e,email:i.email},{authenticated:true}),m.succeed(),s(`Removed ${i.email} from "${e}"`);}export{o as a};//# sourceMappingURL=chunk-3OZ4O4NE.js.map
-//# sourceMappingURL=chunk-3OZ4O4NE.js.map

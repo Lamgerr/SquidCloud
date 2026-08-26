@@ -1,2 +1,0 @@
-import {b}from'./chunk-WRKYGGYI.js';import {s}from'./chunk-BC3STHFS.js';import r from'inquirer';async function i(){let{confirm:t}=await r.prompt([{type:"confirm",name:"confirm",message:"Reset all configuration to defaults?",default:false}]);t&&(b().clear(),s("Configuration reset to defaults"));}export{i as a};//# sourceMappingURL=chunk-HJWONDZI.js.map
-//# sourceMappingURL=chunk-HJWONDZI.js.map

@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function o(i){let t=c(`Disabling "${i}"...`);t.start(),await d(`/api/v1/scripts/${i}/disable`,{},{authenticated:true}),t.succeed(),s(`Pipeline "${i}" disabled`);}export{o as a};//# sourceMappingURL=chunk-XTV6ABCU.js.map
-//# sourceMappingURL=chunk-XTV6ABCU.js.map

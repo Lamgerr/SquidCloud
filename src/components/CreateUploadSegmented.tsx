@@ -147,7 +147,7 @@ const CreateUploadSegmented: React.FC<CreateUploadSegmentedProps> = ({
     >
       <div
         className={cn(
-          "relative inline-flex items-center rounded-2xl border p-1 shadow-sm transition-all duration-200",
+          "relative inline-flex items-center rounded-lg border p-1 shadow-sm transition-all duration-200",
           isDragging
             ? "border-primary/60 bg-primary/5 ring-2 ring-primary/20"
             : "border-border/60 bg-card/70 backdrop-blur"

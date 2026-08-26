@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';import {h}from'./chunk-BQGHHBGH.js';async function i(){let o=c("Revoking session...");o.start();try{await d("/api/auth/ssp/revoke",{},{authenticated:!0});}catch{}await h(),o.succeed(),s("Logged out successfully");}export{i as a};//# sourceMappingURL=chunk-23ZOP633.js.map
-//# sourceMappingURL=chunk-23ZOP633.js.map

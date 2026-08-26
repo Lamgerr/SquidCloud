@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s as s$1}from'./chunk-BC3STHFS.js';import {c as c$1}from'./chunk-5TMR6Y7L.js';import s from'fs';import c$2 from'path';async function d(o){let n=c("Downloading signed document...");n.start();let t=await c$1(`/api/v1/sign/${o}/download`,{authenticated:true});n.succeed();let e=c$2.join(process.cwd(),`signed-${t.filename||`${o.slice(0,8)}.pdf`}`);s.writeFileSync(e,Buffer.from(t.content,"base64")),s$1(`Downloaded to ${e}`);}export{d as a};//# sourceMappingURL=chunk-NKEQVDH2.js.map
-//# sourceMappingURL=chunk-NKEQVDH2.js.map

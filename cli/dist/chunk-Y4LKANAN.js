@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {q,y,s as s$1}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function s(i,t){let n=c(`Time-locking ${i} until ${t.until}...`);n.start();let u=await d("/api/v1/time/lock",{path:i,unlock_at:t.until},{authenticated:true});if(n.succeed(),q()){y(u);return}s$1(`Time-locked until ${t.until}`);}export{s as a};//# sourceMappingURL=chunk-Y4LKANAN.js.map
-//# sourceMappingURL=chunk-Y4LKANAN.js.map

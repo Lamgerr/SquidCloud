@@ -2,8 +2,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { emitWebhookEvent } from "../_shared/webhook-emitter.ts";
 
+import { sendEmail } from "../_shared/gmail-email.ts";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") as string;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
+const adminDb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -154,29 +157,28 @@ function resolveVars(template: string, ctx: Record<string, string>): string {
 
 // ── Step Executor ────────────────────────────────────────────────────────────
 
-const ACTION_HANDLERS: Record<string, (step: ParsedStep, ctx: Record<string, string>) => Promise<{ status: string; output: Record<string, unknown> }>> = {
+const ACTION_HANDLERS: Record<string, (step: ParsedStep, ctx: Record<string, string>) => Promise<{ status: string; output: Record<string, unknown>; error?: string }>> = {
   'squidcloud/echo': async (step, ctx) => {
     return { status: 'success', output: { message: resolveVars(step.with.message || '', ctx), success: true } };
   },
   'squidcloud/log': async (step, ctx) => {
-    return { status: 'success', output: { level: step.with.level || 'info', message: resolveVars(step.with.message || '', ctx), logged: true } };
+    return { status: 'success', output: { logged: resolveVars(step.with.message || '', ctx), success: true } };
   },
   'squidcloud/scan': async (step, ctx) => {
-    const scanType = step.with.scan_type || 'meta';
-    const path = resolveVars(step.with.path || '', ctx);
-    const mockResults: Record<string, string> = {
-      malware: 'clean',
-      mime: 'application/octet-stream',
-      meta: JSON.stringify({ size: 1024, created: new Date().toISOString() }),
-    };
-    return { status: 'success', output: { path, scan_type: scanType, result: mockResults[scanType] || 'ok', success: true } };
+    const filter = resolveVars(step.with.filter || '', ctx);
+    const uid = ctx['squid.user.id'];
+    let q = adminDb.from('files').select('id, name, size').eq('user_id', uid).eq('is_deleted', false).limit(100);
+    if (filter) q = q.ilike('name', `%${filter}%`);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return { status: 'success', output: { found: data?.length ?? 0, names: data?.map(f => f.name) ?? [], ids: data?.map(f => f.id) ?? [], success: true } };
   },
   'squidcloud/condition': async (step, ctx) => {
     const variable = resolveVars(step.with.variable || '', ctx);
-    const operator = step.with.operator || 'eq';
+    const op = step.with.operator || 'eq';
     const value = resolveVars(step.with.value || '', ctx);
     let passed = false;
-    switch (operator) {
+    switch (op) {
       case 'eq': passed = variable === value; break;
       case 'neq': passed = variable !== value; break;
       case 'contains': passed = variable.includes(value); break;
@@ -186,66 +188,113 @@ const ACTION_HANDLERS: Record<string, (step: ParsedStep, ctx: Record<string, str
       case 'lte': passed = Number(variable) <= Number(value); break;
       case 'matches': try { passed = new RegExp(value).test(variable); } catch { passed = false; } break;
     }
-    return { status: 'success', output: { variable, operator, value, passed, success: true } };
-  },
-  'squidcloud/slack': async (step, ctx) => {
-    return { status: 'success', output: { channel: step.with.channel || 'default', message: resolveVars(step.with.message || '', ctx), sent: true, success: true } };
-  },
-  'squidcloud/email-send': async (step, ctx) => {
-    return { status: 'success', output: { to: step.with.to || '', subject: resolveVars(step.with.subject || '', ctx), sent: true, success: true } };
-  },
-  'squidcloud/discord': async (step, ctx) => {
-    return { status: 'success', output: { message: resolveVars(step.with.message || '', ctx), sent: true, success: true } };
-  },
-  'squidcloud/file-move': async (step, ctx) => {
-    return { status: 'success', output: { source: resolveVars(step.with.source || '', ctx), destination: resolveVars(step.with.destination || '', ctx), moved: true, success: true } };
-  },
-  'squidcloud/file-copy': async (step, ctx) => {
-    return { status: 'success', output: { source: resolveVars(step.with.source || '', ctx), destination: resolveVars(step.with.destination || '', ctx), copied: true, success: true } };
+    if (!passed) throw new Error('CONDITION_NOT_MET');
+    return { status: 'success', output: { condition: 'met', success: true } };
   },
   'squidcloud/file-delete': async (step, ctx) => {
-    return { status: 'success', output: { path: resolveVars(step.with.path || '', ctx), permanent: !!step.with.permanent, deleted: true, success: true } };
+    const filter = resolveVars(step.with.filter || step.with.name || '', ctx);
+    const uid = ctx['squid.user.id'];
+    let q = adminDb.from('files').select('id').eq('user_id', uid).eq('is_deleted', false);
+    if (filter) q = q.ilike('name', `%${filter}%`);
+    const { data } = await q;
+    const ids = (data ?? []).map(r => r.id);
+    if (!ids.length) return { status: 'success', output: { deleted: 0, success: true } };
+    const { error } = await adminDb.from('files').update({ is_deleted: true, deleted_at: new Date().toISOString() }).in('id', ids);
+    if (error) throw new Error(error.message);
+    return { status: 'success', output: { deleted: ids.length, success: true } };
   },
-  'squidcloud/compress': async (step, ctx) => {
-    return { status: 'success', output: { source: resolveVars(step.with.source || '', ctx), format: step.with.format || 'zip', compressed: true, success: true } };
+  'squidcloud/file-move': async (step, ctx) => {
+    const filter = resolveVars(step.with.filter || '', ctx);
+    const folderName = resolveVars(step.with.folder || '', ctx);
+    const uid = ctx['squid.user.id'];
+    const { data: folder } = await adminDb.from('folders').select('id').eq('user_id', uid).ilike('name', folderName).limit(1).maybeSingle();
+    if (!folder) throw new Error(`Folder not found: ${folderName}`);
+    let q = adminDb.from('files').select('id').eq('user_id', uid).eq('is_deleted', false);
+    if (filter) q = q.ilike('name', `%${filter}%`);
+    const { data } = await q;
+    const ids = (data ?? []).map(r => r.id);
+    if (!ids.length) return { status: 'success', output: { moved: 0, success: true } };
+    const { error } = await adminDb.from('files').update({ parent_folder: folder.id }).in('id', ids);
+    if (error) throw new Error(error.message);
+    return { status: 'success', output: { moved: ids.length, folder: folderName, success: true } };
   },
-  'squidcloud/s3-upload': async (step, ctx) => {
-    return { status: 'success', output: { bucket: resolveVars(step.with.bucket || '', ctx), key: resolveVars(step.with.key || '', ctx), uploaded: true, success: true } };
-  },
-  'squidcloud/s3-download': async (step, ctx) => {
-    return { status: 'success', output: { bucket: resolveVars(step.with.bucket || '', ctx), key: resolveVars(step.with.key || '', ctx), downloaded: true, success: true } };
-  },
-  'squidcloud/file-sync': async (step, ctx) => {
-    return { status: 'success', output: { source: resolveVars(step.with.source || '', ctx), destination: resolveVars(step.with.destination || '', ctx), direction: step.with.direction || 'push', synced: true, success: true } };
-  },
-  'squidcloud/image-resize': async (step, ctx) => {
-    return { status: 'success', output: { source: resolveVars(step.with.source || '', ctx), width: Number(step.with.width || 0), height: Number(step.with.height || 0), resized: true, success: true } };
-  },
-  'squidcloud/image-convert': async (step, ctx) => {
-    return { status: 'success', output: { source: resolveVars(step.with.source || '', ctx), format: step.with.format || 'webp', converted: true, success: true } };
-  },
-  'squidcloud/video-convert': async (step, ctx) => {
-    return { status: 'success', output: { source: resolveVars(step.with.source || '', ctx), format: step.with.format || 'mp4', converted: true, success: true } };
-  },
-  'squidcloud/media-extract': async (step, ctx) => {
-    return { status: 'success', output: { source: resolveVars(step.with.source || '', ctx), type: step.with.type || 'thumbnail', extracted: true, success: true } };
+  'squidcloud/file-copy': async (step, ctx) => {
+    const filter = resolveVars(step.with.filter || '', ctx);
+    const uid = ctx['squid.user.id'];
+    let q = adminDb.from('files').select('*').eq('user_id', uid).eq('is_deleted', false);
+    if (filter) q = q.ilike('name', `%${filter}%`);
+    const { data } = await q;
+    let copied = 0;
+    for (const row of data ?? []) {
+      const copy = { ...row, id: crypto.randomUUID(), name: `${row.name} (copy)`, created_at: undefined, updated_at: undefined };
+      delete copy.created_at; delete copy.updated_at;
+      const { error } = await adminDb.from('files').insert(copy);
+      if (!error) copied++;
+    }
+    return { status: 'success', output: { copied, success: true } };
   },
   'squidcloud/file-tag': async (step, ctx) => {
-    return { status: 'success', output: { path: resolveVars(step.with.path || '', ctx), tagged: true, success: true } };
+    const filter = resolveVars(step.with.filter || '', ctx);
+    const tag = resolveVars(step.with.tag || 'scripted', ctx);
+    const uid = ctx['squid.user.id'];
+    let q = adminDb.from('files').select('id, tags').eq('user_id', uid).eq('is_deleted', false);
+    if (filter) q = q.ilike('name', `%${filter}%`);
+    const { data } = await q;
+    let tagged = 0;
+    for (const row of data ?? []) {
+      const tags = Array.isArray(row.tags) ? [...row.tags] : [];
+      if (!tags.includes(tag)) { tags.push(tag); 
+        const { error } = await adminDb.from('files').update({ tags }).eq('id', row.id);
+        if (!error) tagged++;
+      }
+    }
+    return { status: 'success', output: { tagged, tag, success: true } };
   },
-  'squidcloud/ai-classify': async (step, ctx) => {
-    const cats = step.with.categories || '';
-    const categories = cats ? cats.split(',').map((s: string) => s.trim()) : ['unknown'];
-    return { status: 'success', output: { data: resolveVars(step.with.data || '', ctx), classification: categories[0], confidence: 0.85, success: true } };
+  'squidcloud/slack': async (step, ctx) => {
+    const url = resolveVars(step.with.webhook_url || '', ctx);
+    const message = resolveVars(step.with.message || '', ctx);
+    if (!url) return { status: 'skipped', output: { reason: 'no webhook_url provided' } };
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: message }) });
+    if (!res.ok) throw new Error(`Slack webhook HTTP ${res.status}`);
+    return { status: 'success', output: { delivered: true, success: true } };
+  },
+  'squidcloud/discord': async (step, ctx) => {
+    const url = resolveVars(step.with.webhook_url || '', ctx);
+    const message = resolveVars(step.with.message || '', ctx);
+    if (!url) return { status: 'skipped', output: { reason: 'no webhook_url provided' } };
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: message }) });
+    if (!res.ok) throw new Error(`Discord webhook HTTP ${res.status}`);
+    return { status: 'success', output: { delivered: true, success: true } };
+  },
+  'squidcloud/email-send': async (step, ctx) => {
+    const to = resolveVars(step.with.to || ctx['squid.user.email'] || '', ctx);
+    const subject = resolveVars(step.with.subject || 'SquidActions pipeline notification', ctx);
+    const body = resolveVars(step.with.body || step.with.message || '', ctx);
+    if (!to) return { status: 'skipped', output: { reason: 'no recipient' } };
+    try {
+      await sendEmail(to, subject, body, `<p>${body}</p>`);
+      return { status: 'success', output: { sent_to: to, success: true } };
+    } catch (e) {
+      return { status: 'skipped', output: { reason: 'email provider not configured (' + (e.message || '').slice(0, 60) + ')' } };
+    }
   },
   'squidcloud/transform': async (step, ctx) => {
-    return { status: 'success', output: { format: step.with.format || 'json', operation: step.with.operation || 'convert', success: true } };
+    return { status: 'success', output: { format: step.with.format || 'json', operation: step.with.operation || 'convert', note: 'metadata transform recorded', success: true } };
   },
   'squidcloud/delay': async (step, ctx) => {
     const ms = (Number(step.with.duration) || 1) * 1000;
     await new Promise(r => setTimeout(r, Math.min(ms, 30000)));
     return { status: 'success', output: { duration: step.with.duration, success: true } };
   },
+  // Platform-dependent actions — reported honestly until their backends ship.
+  ...Object.fromEntries([
+    'squidcloud/compress', 'squidcloud/s3-upload', 'squidcloud/s3-download',
+    'squidcloud/file-sync', 'squidcloud/image-resize', 'squidcloud/image-convert',
+    'squidcloud/video-convert', 'squidcloud/media-extract', 'squidcloud/ai-classify',
+  ].map(action => [action, async (step: ParsedStep) => ({
+    status: 'skipped',
+    output: { reason: `${action.split('/')[1]} requires a worker backend that is not enabled for this workspace`, success: false as boolean },
+  })])),
 };
 
 async function executeStep(step: ParsedStep, ctx: Record<string, string>): Promise<{ status: string; output: Record<string, unknown>; error?: string }> {
@@ -258,6 +307,40 @@ async function executeStep(step: ParsedStep, ctx: Record<string, string>): Promi
   } catch (err: any) {
     return { status: 'failed', output: {}, error: err.message || 'Step execution error' };
   }
+}
+
+
+// ── Trigger sync: persist `on:` block from YAML as real trigger rows ─────────
+
+function syncTriggersFromYaml(supabase: any, scriptId: string, yamlContent: string): Promise<void> {
+  const lines = yamlContent.split('\n');
+  let inOn = false;
+  const wantsFileUpload = { enabled: false, path: '**/*' };
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (/^on:\s*$/.test(line)) { inOn = true; continue; }
+    if (inOn && /^\S/.test(line) && line.trim()) inOn = false;           // next top-level key ends the block
+    if (!inOn) continue;
+    const m = line.match(/^\s{2}(file-upload|manual|schedule|webhook):\s*(.*)$/);
+    if (!m) continue;
+    if (m[1] === 'file-upload') {
+      wantsFileUpload.enabled = true;
+      const val = m[2].trim().replace(/^["']|["']$/g, '');
+      if (val && val !== 'true') wantsFileUpload.path = val;
+    }
+  }
+
+  return (async () => {
+    await supabase.from('squid_script_triggers').delete().eq('script_id', scriptId).eq('trigger_type', 'file_change');
+    if (wantsFileUpload.enabled) {
+      await supabase.from('squid_script_triggers').insert({
+        script_id: scriptId,
+        trigger_type: 'file_change',
+        config: { path: wantsFileUpload.path, events: ['create'] },
+        is_active: true,
+      });
+    }
+  })();
 }
 
 // ── Pipeline Executor ────────────────────────────────────────────────────────
@@ -384,11 +467,25 @@ serve(async (req) => {
   const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   if (!jwt) return json({ error: 'Unauthorized' }, 401);
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
-  if (authError || !user) return json({ error: 'Invalid token' }, 401);
-
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch {}
+
+  // Internal service-role calls may act on behalf of a user (file-event fan-in).
+  const isInternal = jwt === SUPABASE_SERVICE_ROLE_KEY;
+  let user: any;
+
+  if (isInternal) {
+    if ((body.action as string) !== 'file-event') {
+      return json({ error: 'Internal token only supports file-event' }, 403);
+    }
+    const uid = body.userId as string;
+    if (!uid) return json({ error: 'userId required for internal file-event' }, 400);
+    user = { id: uid, email: '', user_metadata: {} };
+  } else {
+    const { data: { user: jwtUser }, error: authError } = await supabase.auth.getUser(jwt);
+    if (authError || !jwtUser) return json({ error: 'Invalid token' }, 401);
+    user = jwtUser;
+  }
 
   const action = (body.action as string) || '';
 
@@ -436,6 +533,7 @@ serve(async (req) => {
           .single();
 
         if (insertError) return json({ error: insertError.message }, 500);
+        await syncTriggersFromYaml(supabase, script.id, yamlContent as string);
         return json({ script });
       }
 
@@ -457,6 +555,8 @@ serve(async (req) => {
           .eq('user_id', user.id)
           .select()
           .single();
+
+        if (body.yamlContent) await syncTriggersFromYaml(supabase, scriptId, body.yamlContent as string);
 
         if (updateError) return json({ error: updateError.message }, 500);
         return json({ script });
@@ -647,7 +747,14 @@ serve(async (req) => {
           if (!watchEvents.includes(event)) continue;
 
           // Simple glob match
-          const pathMatch = watchPath === '**/*' || watchPath === '*' || filePath.startsWith(watchPath.replace('*', '').replace('**', ''));
+          let pathMatch = false;
+          if (watchPath === '**/*' || watchPath === '*') pathMatch = true;
+          else if (watchPath.includes('*')) {
+            try {
+              const rx = new RegExp('^' + watchPath.split('*').map(seg => seg.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+              pathMatch = rx.test(filePath);
+            } catch { pathMatch = false; }
+          } else pathMatch = filePath.startsWith(watchPath);
           if (!pathMatch) continue;
 
           // Found a matching pipeline — execute
@@ -657,15 +764,25 @@ serve(async (req) => {
             .eq('id', trigger.script_id)
             .single();
 
-          if (!script || script.user_id !== trigger.user_id) continue;
+          // Ownership flows through the parent script — squid_script_triggers
+          // has no user_id column, so comparing against it skipped every match.
+          if (!script) continue;
+          if (!script.is_active) continue;
+          if (script.user_id !== (body.userId as string)) continue;
 
+          const fileName = filePath.split('/').pop() || filePath;
           const fileCtx: Record<string, string> = {
             'path': filePath,
-            'name': filePath.split('/').pop() || filePath,
-            'extension': filePath.includes('.') ? filePath.split('.').pop() || '' : '',
+            'name': fileName,
+            'extension': fileName.includes('.') ? fileName.split('.').pop() || '' : '',
             'event': event,
             'size': String(body.size || 0),
             'mime_type': body.mimeType as string || 'application/octet-stream',
+            'squid.event': event,
+            'squid.file.path': filePath,
+            'squid.file.name': fileName,
+            'squid.file.size': String(body.size || 0),
+            'squid.file.mime': body.mimeType as string || 'application/octet-stream',
           };
 
           const { data: run } = await supabase.from('squid_script_runs').insert({

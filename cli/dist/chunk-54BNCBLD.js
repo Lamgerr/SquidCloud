@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {c as c$1}from'./chunk-5TMR6Y7L.js';import n from'fs';import p from'path';async function m(t){let o=c("Exporting submissions...");o.start();let c$2=await c$1(`/api/v1/forms/${t}/export`,{authenticated:true});o.succeed();let s$1=p.join(process.cwd(),`filereq-${t.slice(0,8)}-submissions.csv`);n.writeFileSync(s$1,c$2.csv,"utf-8"),s(`Exported to ${s$1}`);}export{m as a};//# sourceMappingURL=chunk-54BNCBLD.js.map
-//# sourceMappingURL=chunk-54BNCBLD.js.map

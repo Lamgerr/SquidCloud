@@ -165,6 +165,7 @@ export const EnterpriseFolderCard: React.FC<FolderCardProps> = ({
             onClose={closeContextMenu}
             onView={onOpen}
             onDelete={handleDeleteClick}
+            onShare={() => { closeContextMenu(); setShowEnhancedShareDialog(true); }}
             onPublish={() => setPublishModalOpen(true)}
             isPublished={pubStatus?.status === 'live'}
           />
@@ -220,6 +221,7 @@ export const EnterpriseFolderCard: React.FC<FolderCardProps> = ({
           onClose={closeContextMenu}
           onView={onOpen}
           onDelete={handleDeleteClick}
+          onShare={() => { closeContextMenu(); setShowEnhancedShareDialog(true); }}
           onPublish={() => setPublishModalOpen(true)}
           isPublished={pubStatus?.status === 'live'}
         />

@@ -1,2 +1,0 @@
-import {c}from'./chunk-YZWZNR6K.js';import {s}from'./chunk-BC3STHFS.js';import {d}from'./chunk-5TMR6Y7L.js';async function n(e){let c$1=c(`Cancelling run ${e.slice(0,8)}...`);c$1.start(),await d(`/api/v1/scripts/runs/${e}/cancel`,{},{authenticated:true}),c$1.succeed(),s(`Run ${e.slice(0,8)} cancelled`);}export{n as a};//# sourceMappingURL=chunk-JTMKKTKL.js.map
-//# sourceMappingURL=chunk-JTMKKTKL.js.map

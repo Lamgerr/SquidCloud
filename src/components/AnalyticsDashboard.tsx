@@ -61,7 +61,7 @@ interface MetricCardProps {
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, icon, className = '' }) => (
-  <div className={`rounded-2xl bg-white/[0.06] border border-white/10 p-5 backdrop-blur-sm ${className}`}>
+  <div className={`rounded-lg bg-card/50 border border-border p-5 ${className}`}>
     <div className="flex items-center justify-between">
       <div className="space-y-2">
         <p className="text-[11px] uppercase tracking-[0.1em] text-white/40">{title}</p>
@@ -78,7 +78,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, icon, cla
           )}
         </div>
       </div>
-      <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary shadow-sm">
+      <div className="h-11 w-11 rounded-lg bg-muted/50 border border-border/50 flex items-center justify-center text-muted-foreground">
         {icon}
       </div>
     </div>
@@ -186,7 +186,7 @@ const AnalyticsDashboard = () => {
       <div className="min-h-screen pb-24">
         {/* Mobile Header */}
         <div className="sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
-          <div className="bg-card/80 backdrop-blur-2xl border-b border-white/5">
+          <div className="bg-card/80 border-b border-white/5">
             <div className="px-4 py-3 flex items-center gap-3">
               <Button
                 variant="ghost"
@@ -249,7 +249,7 @@ const AnalyticsDashboard = () => {
           {activeTab === 'overview' && (
             <div className="space-y-4 animate-in fade-in duration-300">
               <div className="grid grid-cols-2 gap-3">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 p-4">
+                <div className="relative overflow-hidden rounded-lg bg-card/60 border border-border/60 p-4">
                   <div className="absolute -top-4 -right-4 w-20 h-20 bg-primary/10 rounded-full blur-2xl" />
                   <div className="relative z-10">
                     <BarChart3 className="h-5 w-5 text-primary mb-2" />
@@ -261,7 +261,7 @@ const AnalyticsDashboard = () => {
                     </div>
                   </div>
                 </div>
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-600/5 border border-purple-500/20 p-4">
+                <div className="relative overflow-hidden rounded-lg bg-card/60 border border-border/60 p-4">
                   <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl" />
                   <div className="relative z-10">
                     <HardDrive className="h-5 w-5 text-purple-400 mb-2" />
@@ -273,14 +273,14 @@ const AnalyticsDashboard = () => {
                     </div>
                   </div>
                 </div>
-                <div className="rounded-2xl bg-white/[0.05] border border-white/10 p-4">
+                <div className="rounded-lg bg-card/50 border border-border p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Eye className="h-4 w-4 text-emerald-400" />
                     <span className="text-[10px] uppercase tracking-wider text-white/40">Views</span>
                   </div>
                   <div className="text-2xl font-bold text-white">{activityMetrics?.views || 0}</div>
                 </div>
-                <div className="rounded-2xl bg-white/[0.05] border border-white/10 p-4">
+                <div className="rounded-lg bg-card/50 border border-border p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Download className="h-4 w-4 text-orange-400" />
                     <span className="text-[10px] uppercase tracking-wider text-white/40">Downloads</span>
@@ -289,7 +289,7 @@ const AnalyticsDashboard = () => {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-sm">
+              <div className="rounded-lg bg-card/50 border border-border p-4">
                 <h3 className="text-sm font-medium text-white mb-4 flex items-center gap-2">
                   <Activity className="h-4 w-4 text-primary" />
                   Activity Over Time
@@ -310,7 +310,7 @@ const AnalyticsDashboard = () => {
                 </ResponsiveContainer>
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-sm">
+              <div className="rounded-lg bg-card/50 border border-border p-4">
                 <h3 className="text-sm font-medium text-white mb-4 flex items-center gap-2">
                   <PieChart className="h-4 w-4 text-purple-400" />
                   Storage
@@ -343,14 +343,14 @@ const AnalyticsDashboard = () => {
                   { label: 'Used', value: formatBytes(storageMetrics?.usedStorage || 0), color: 'text-primary' },
                   { label: 'Free', value: storageMetrics?.availableStorage === -1 ? '∞' : formatBytes(storageMetrics?.availableStorage || 0), color: 'text-emerald-400' },
                 ].map(stat => (
-                  <div key={stat.label} className="rounded-2xl bg-white/[0.05] border border-white/10 p-3.5 text-center backdrop-blur-sm">
+                  <div key={stat.label} className="rounded-lg bg-card/50 border border-border p-3.5 text-center">
                     <div className={cn('text-lg font-bold', stat.color)}>{stat.value}</div>
                     <div className="text-[10px] uppercase tracking-wider text-white/40 mt-0.5">{stat.label}</div>
                   </div>
                 ))}
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-sm">
+              <div className="rounded-lg bg-card/50 border border-border p-4">
                 <h3 className="text-sm font-medium text-white mb-4">File Types</h3>
                 <div className="space-y-3">
                   {fileTypeData.slice(0, 5).map((item, index) => (
@@ -365,7 +365,7 @@ const AnalyticsDashboard = () => {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-sm">
+              <div className="rounded-lg bg-card/50 border border-border p-4">
                 <h3 className="text-sm font-medium text-white mb-4">Storage by Type</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={storageByTypeData}>
@@ -383,15 +383,15 @@ const AnalyticsDashboard = () => {
             <div className="space-y-4 animate-in fade-in duration-300">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { icon: Upload, label: 'Uploads', value: activityMetrics?.uploads || 0, gradient: 'from-primary/20 to-primary/5', border: 'border-primary/20', iconColor: 'text-primary' },
-                  { icon: Download, label: 'Downloads', value: activityMetrics?.downloads || 0, gradient: 'from-emerald-500/20 to-emerald-600/5', border: 'border-emerald-500/20', iconColor: 'text-emerald-400' },
-                  { icon: Share2, label: 'Shares', value: activityMetrics?.shares || 0, gradient: 'from-purple-500/20 to-purple-600/5', border: 'border-purple-500/20', iconColor: 'text-purple-400' },
-                  { icon: Eye, label: 'Views', value: activityMetrics?.views || 0, gradient: 'from-orange-500/20 to-orange-600/5', border: 'border-orange-500/20', iconColor: 'text-orange-400' },
+                  { icon: Upload, label: 'Uploads', value: activityMetrics?.uploads || 0, border: 'border-border/60', iconColor: 'text-muted-foreground' },
+                  { icon: Download, label: 'Downloads', value: activityMetrics?.downloads || 0, border: 'border-border/60', iconColor: 'text-muted-foreground' },
+                  { icon: Share2, label: 'Shares', value: activityMetrics?.shares || 0, border: 'border-border/60', iconColor: 'text-muted-foreground' },
+                  { icon: Eye, label: 'Views', value: activityMetrics?.views || 0, border: 'border-border/60', iconColor: 'text-muted-foreground' },
                 ].map(stat => {
                   const StatIcon = stat.icon;
                   return (
-                    <div key={stat.label} className={cn('relative overflow-hidden rounded-2xl bg-gradient-to-br p-4 border', stat.gradient, stat.border)}>
-                      <div className="absolute -top-3 -right-3 w-16 h-16 bg-white/[0.03] rounded-full blur-xl" />
+                    <div key={stat.label} className={cn('relative overflow-hidden rounded-lg p-4 border', stat.border)}>
+                      <div className="absolute -top-3 -right-3 w-16 h-16 bg-card/50 rounded-full blur-xl" />
                       <div className="relative z-10">
                         <StatIcon className={cn('h-5 w-5 mb-2', stat.iconColor)} />
                         <div className="text-2xl font-bold text-white">{stat.value}</div>
@@ -402,22 +402,22 @@ const AnalyticsDashboard = () => {
                 })}
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-sm">
+              <div className="rounded-lg bg-card/50 border border-border p-4">
                 <h3 className="text-sm font-medium text-white mb-4">Popular Files</h3>
                 <div className="space-y-2">
                   {activityMetrics?.popularFiles.slice(0, 5).map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-card/50 border border-white/5">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">{file.name}</p>
                         <p className="text-xs text-white/40">{file.views} views &bull; {file.downloads} downloads</p>
                       </div>
-                      <span className="inline-flex items-center rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/50">{file.views + file.downloads}</span>
+                      <span className="inline-flex items-center rounded-full bg-card/50 px-2.5 py-0.5 text-xs text-white/50">{file.views + file.downloads}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-sm">
+              <div className="rounded-lg bg-card/50 border border-border p-4">
                 <h3 className="text-sm font-medium text-white mb-4">Access Patterns (24h)</h3>
                 <ResponsiveContainer width="100%" height={150}>
                   <BarChart data={activityMetrics?.accessPatterns || []}>
@@ -435,15 +435,15 @@ const AnalyticsDashboard = () => {
             <div className="space-y-4 animate-in fade-in duration-300">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { icon: Upload, label: 'Upload Speed', value: `${performanceMetrics?.avgUploadSpeed || 0} MB/s`, gradient: 'from-primary/20 to-primary/5', border: 'border-primary/20', iconColor: 'text-primary' },
-                  { icon: Download, label: 'Download Speed', value: `${performanceMetrics?.avgDownloadSpeed || 0} MB/s`, gradient: 'from-emerald-500/20 to-emerald-600/5', border: 'border-emerald-500/20', iconColor: 'text-emerald-400' },
-                  { icon: Server, label: 'Uptime', value: `${performanceMetrics?.uptime || 0}%`, gradient: 'from-purple-500/20 to-purple-600/5', border: 'border-purple-500/20', iconColor: 'text-purple-400' },
-                  { icon: AlertTriangle, label: 'Error Rate', value: `${performanceMetrics?.errorRate || 0}%`, gradient: 'from-red-500/20 to-red-600/5', border: 'border-red-500/20', iconColor: 'text-red-400' },
+                  { icon: Upload, label: 'Upload Speed', value: `${performanceMetrics?.avgUploadSpeed || 0} MB/s`, border: 'border-border/60', iconColor: 'text-muted-foreground' },
+                  { icon: Download, label: 'Download Speed', value: `${performanceMetrics?.avgDownloadSpeed || 0} MB/s`, border: 'border-border/60', iconColor: 'text-muted-foreground' },
+                  { icon: Server, label: 'Uptime', value: `${performanceMetrics?.uptime || 0}%`, border: 'border-border/60', iconColor: 'text-muted-foreground' },
+                  { icon: AlertTriangle, label: 'Error Rate', value: `${performanceMetrics?.errorRate || 0}%`, border: 'border-border/60', iconColor: 'text-muted-foreground' },
                 ].map(stat => {
                   const StatIcon = stat.icon;
                   return (
-                    <div key={stat.label} className={cn('relative overflow-hidden rounded-2xl bg-gradient-to-br p-4 border', stat.gradient, stat.border)}>
-                      <div className="absolute -bottom-3 -right-3 w-16 h-16 bg-white/[0.03] rounded-full blur-xl" />
+                    <div key={stat.label} className={cn('relative overflow-hidden rounded-lg p-4 border', stat.border)}>
+                      <div className="absolute -bottom-3 -right-3 w-16 h-16 bg-card/50 rounded-full blur-xl" />
                       <div className="relative z-10">
                         <StatIcon className={cn('h-5 w-5 mb-2', stat.iconColor)} />
                         <div className="text-lg font-bold text-white">{stat.value}</div>
@@ -454,7 +454,7 @@ const AnalyticsDashboard = () => {
                 })}
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-sm">
+              <div className="rounded-lg bg-card/50 border border-border p-4">
                 <h3 className="text-sm font-medium text-white mb-4 flex items-center gap-2">
                   <Wifi className="h-4 w-4 text-emerald-400" />
                   System Health
@@ -465,7 +465,7 @@ const AnalyticsDashboard = () => {
                     ['Response Time', `${performanceMetrics?.responseTime || 0}ms`, false],
                     ['Uptime', `${performanceMetrics?.uptime || 0}%`, false],
                   ].map(([label, value, isHealth]) => (
-                    <div key={label as string} className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.03]">
+                    <div key={label as string} className="flex items-center justify-between py-2 px-3 rounded-xl bg-card/50">
                       <span className="text-sm text-white/60">{label as string}</span>
                       {isHealth ? (
                         <span className={cn(
@@ -483,7 +483,7 @@ const AnalyticsDashboard = () => {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 backdrop-blur-sm">
+              <div className="rounded-lg bg-card/50 border border-border p-4">
                 <h3 className="text-sm font-medium text-white mb-4">Bandwidth Usage</h3>
                 <ResponsiveContainer width="100%" height={150}>
                   <RechartsLineChart data={performanceMetrics?.bandwidthUsage || []}>
@@ -502,7 +502,7 @@ const AnalyticsDashboard = () => {
             </div>
           )}
 
-          <div className="rounded-2xl bg-primary/10 border border-primary/20 p-4 backdrop-blur-sm">
+          <div className="rounded-lg bg-primary/10 border border-primary/20 p-4">
             <div className="flex items-start gap-3">
               <HardDrive className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
               <div>
@@ -520,12 +520,12 @@ const AnalyticsDashboard = () => {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/20 p-5">
+      <div className="relative overflow-hidden rounded-lg bg-card border border-primary/20 p-5">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -translate-x-1/4 translate-y-1/4" />
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-sm shadow-primary/20">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-foreground">
               <BarChart3 className="h-6 w-6 text-primary-foreground" />
             </div>
             <div>
@@ -540,7 +540,7 @@ const AnalyticsDashboard = () => {
             onClick={refreshAnalytics}
             disabled={refreshing}
             variant="outline"
-            className="gap-2 rounded-xl bg-white/[0.06] border-white/10 text-white/70 hover:text-white hover:bg-white/[0.1]"
+            className="gap-2 rounded-md bg-card/50 border-border text-muted-foreground hover:text-foreground hover:bg-accent"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -549,7 +549,7 @@ const AnalyticsDashboard = () => {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-5">
-        <TabsList className="inline-flex h-10 items-center gap-1 rounded-2xl bg-white/[0.04] border border-white/10 p-1">
+        <TabsList className="inline-flex h-10 items-center gap-1 rounded-lg bg-card/50 border border-border p-1">
           <TabsTrigger value="overview" className="rounded-xl text-[13px] text-white/50 data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-sm">Overview</TabsTrigger>
           <TabsTrigger value="storage" className="rounded-xl text-[13px] text-white/50 data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-sm">Storage</TabsTrigger>
           <TabsTrigger value="activity" className="rounded-xl text-[13px] text-white/50 data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-sm">Activity</TabsTrigger>
@@ -565,7 +565,7 @@ const AnalyticsDashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 backdrop-blur-sm">
+            <div className="rounded-lg bg-card/50 border border-border p-5">
               <h3 className="text-sm font-medium text-white mb-4 flex items-center gap-2">
                 <Activity className="h-4 w-4 text-blue-400" />
                 Activity Over Time
@@ -589,7 +589,7 @@ const AnalyticsDashboard = () => {
               </ResponsiveContainer>
             </div>
 
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 backdrop-blur-sm">
+            <div className="rounded-lg bg-card/50 border border-border p-5">
               <h3 className="text-sm font-medium text-white mb-4 flex items-center gap-2">
                 <PieChart className="h-4 w-4 text-purple-400" />
                 Storage Distribution
@@ -624,7 +624,7 @@ const AnalyticsDashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 backdrop-blur-sm">
+            <div className="rounded-lg bg-card/50 border border-border p-5">
               <h3 className="text-sm font-medium text-white mb-4">File Types Distribution</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsPieChart>
@@ -635,7 +635,7 @@ const AnalyticsDashboard = () => {
                 </RechartsPieChart>
               </ResponsiveContainer>
             </div>
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 backdrop-blur-sm">
+            <div className="rounded-lg bg-card/50 border border-border p-5">
               <h3 className="text-sm font-medium text-white mb-4">Storage by File Type</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={storageByTypeData}>
@@ -659,7 +659,7 @@ const AnalyticsDashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 backdrop-blur-sm">
+            <div className="rounded-lg bg-card/50 border border-border p-5">
               <h3 className="text-sm font-medium text-white mb-4">Access Patterns (24h)</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={activityMetrics?.accessPatterns || []}>
@@ -671,16 +671,16 @@ const AnalyticsDashboard = () => {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 backdrop-blur-sm">
+            <div className="rounded-lg bg-card/50 border border-border p-5">
               <h3 className="text-sm font-medium text-white mb-4">Popular Files</h3>
               <div className="space-y-2">
                 {activityMetrics?.popularFiles.slice(0, 5).map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                  <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-card/50 border border-white/5">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">{file.name}</p>
                       <p className="text-xs text-white/40">{file.views} views &bull; {file.downloads} downloads</p>
                     </div>
-                    <span className="inline-flex items-center rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/50">{file.views + file.downloads}</span>
+                    <span className="inline-flex items-center rounded-full bg-card/50 px-2.5 py-0.5 text-xs text-white/50">{file.views + file.downloads}</span>
                   </div>
                 ))}
               </div>
@@ -697,7 +697,7 @@ const AnalyticsDashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 backdrop-blur-sm">
+            <div className="rounded-lg bg-card/50 border border-border p-5">
               <h3 className="text-sm font-medium text-white mb-4 flex items-center gap-2">
                 <Wifi className="h-4 w-4 text-emerald-400" />
                 System Health
@@ -709,7 +709,7 @@ const AnalyticsDashboard = () => {
                   ['Uptime', `${performanceMetrics?.uptime || 0}%`, false],
                   ['Error Rate', `${performanceMetrics?.errorRate || 0}%`, false],
                 ].map(([label, value, isBadge]) => (
-                  <div key={label as string} className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.03]">
+                  <div key={label as string} className="flex items-center justify-between py-2 px-3 rounded-xl bg-card/50">
                     <span className="text-sm text-white/60">{label as string}</span>
                     {isBadge ? (
                       <span className={cn(
@@ -726,7 +726,7 @@ const AnalyticsDashboard = () => {
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 backdrop-blur-sm">
+            <div className="rounded-lg bg-card/50 border border-border p-5">
               <h3 className="text-sm font-medium text-white mb-4">Bandwidth Usage</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsLineChart data={performanceMetrics?.bandwidthUsage || []}>
@@ -747,7 +747,7 @@ const AnalyticsDashboard = () => {
         </TabsContent>
       </Tabs>
 
-      <div className="rounded-2xl bg-primary/10 border border-primary/20 p-4 backdrop-blur-sm">
+      <div className="rounded-lg bg-primary/10 border border-primary/20 p-4">
         <div className="flex items-start gap-3">
           <HardDrive className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
           <div>

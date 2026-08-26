@@ -1,2 +1,0 @@
-export{a as default}from'./chunk-SA36QQCL.js';import'./chunk-BC3STHFS.js';import'./chunk-CFZZRV3Z.js';import'./chunk-5TMR6Y7L.js';import'./chunk-NDB6KXYI.js';import'./chunk-IJ3JNWT6.js';import'./chunk-BQGHHBGH.js';import'./chunk-6VDGYAGT.js';//# sourceMappingURL=doctor-ZYU3JBJF.js.map
-//# sourceMappingURL=doctor-ZYU3JBJF.js.map
