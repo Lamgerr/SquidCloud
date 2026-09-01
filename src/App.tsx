@@ -68,6 +68,7 @@ const ManageSharesPage = lazy(() => import("./pages/ManageSharesPage"));
 const CLIDocs = lazy(() => import("./pages/CLIDocs"));
 const CliDevice = lazy(() => import("./pages/CliDevice"));
 const CliAuthorize = lazy(() => import("./pages/CliAuthorize"));
+const BetaSubstrate = lazy(() => import("./pages/BetaSubstrate"));
 const SquidVeilDocs = lazy(() => import("./pages/SquidVeilDocs"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const SquidFSPage = lazy(() => import("./pages/SquidFSPage"));
@@ -447,6 +448,8 @@ const AppContent = () => {
 
           {/* Pricing & Checkout */}
           <Route path="/pricing" element={<AnimatedRoute><RouteSuspense><PricingPage /></RouteSuspense></AnimatedRoute>} />
+          <Route path="/beta" element={<AnimatedRoute><RouteSuspense><BetaSubstrate /></RouteSuspense></AnimatedRoute>} />
+          <Route path="/beta/substrate" element={<AnimatedRoute><RouteSuspense><BetaSubstrate /></RouteSuspense></AnimatedRoute>} />
           <Route path="/checkout" element={<AnimatedRoute><RouteSuspense><CheckoutPage /></RouteSuspense></AnimatedRoute>} />
 
           {/* CLI Docs */}
