@@ -87,7 +87,7 @@ export default function BetaSubstrate() {
           {[
             { icon: Globe, t: 'Any surface, one API', d: 'DHT puts, gossip retention, swarm pins — the router picks what fits the chunk, not what you configured.' },
             { icon: Layers, t: 'Runs in parallel', d: 'Your B2/S3 buckets keep working exactly as today. Deep copies are *additional* redundancy.' },
-            { icon: HardDrive, t: .No bucket to create., d: 'Zero setup. If you can reach the internet, you can store. The network *is* the filesystem.' },
+            { icon: HardDrive, t: 'No bucket to create.', d: 'Zero setup. If you can reach the internet, you can store. The network *is* the filesystem.' },
           ].map(c => (
             <div key={c.t} className="rounded-xl border border-[#30363d]/60 bg-[#161b22]/60 p-6">
               <c.icon className="h-5 w-5 text-[#58a6ff]" />
