@@ -16,15 +16,14 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 
 if (typeof window !== 'undefined' && 'Worker' in window) {
-  try {
-    pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(
-      new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url),
-      { type: 'module' }
-    );
-  } catch {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-  }
+  import('pdfjs-dist/build/pdf.worker.mjs?worker')
+    .then((m) => {
+      pdfjsLib.GlobalWorkerOptions.workerPort = new m.default();
+    })
+    .catch(() => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    });
 }
 
 const CACHE_MAX = 60;

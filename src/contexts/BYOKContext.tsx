@@ -33,7 +33,6 @@ import {
   deriveKeyWithArgon2id,
   base64ToArrayBuffer,
 } from '@/services/byok-encryption';
-import { sessionKeyManager } from '@/services/session-key-manager';
 
 export type KeySelectionHandler = (result: KeySelectionResult) => void;
 

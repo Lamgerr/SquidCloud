@@ -56,6 +56,7 @@ interface EnhancedInstantPreviewModalProps {
   onPrevious?: () => void; hasNext?: boolean; hasPrevious?: boolean;
   currentIndex?: number; totalFiles?: number; shareId?: string;
   onOpenEpubReader?: (file: any) => void;
+  onShareChange?: () => void;
 }
 
 const getFileTypeLabel = (file: any) => {
@@ -72,7 +73,7 @@ const getFileTypeLabel = (file: any) => {
 const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = ({
   file, isOpen, onClose, onDownload, onShare, onNext, onPrevious,
   hasNext = false, hasPrevious = false, currentIndex, totalFiles, shareId,
-  onOpenEpubReader,
+  onOpenEpubReader, onShareChange,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -279,15 +280,16 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   }, [decodedBlob, file?.name, file?.id, onDownload, toast]);
 
   const handleShare = useCallback(async () => {
-    if (onShare) { await onShare(); return; }
+    if (onShare) { await onShare(); onShareChange?.(); return; }
     try {
       const { shareUrl } = await createFileShare(file.id);
       await navigator.clipboard.writeText(shareUrl);
       toast({ title: 'Share Link Copied' });
+      onShareChange?.();
     } catch (error: any) {
-      toast({ title: 'Share failed', description: error?.message, variant: 'destructive' });
+      toast({ title: 'Share failed', description: error.message, variant: "destructive" });
     }
-  }, [file?.id, onShare, toast]);
+  }, [file?.id, onShare, onShareChange, toast]);
 
   if (!file) return null;
 

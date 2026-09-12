@@ -17,6 +17,7 @@ interface MobilePreviewModalProps {
   onClose: () => void;
   onDownload?: () => void;
   onShare?: () => void;
+  onShareChange?: () => void;
 }
 
 const MobilePreviewModal: React.FC<MobilePreviewModalProps> = ({
@@ -25,6 +26,7 @@ const MobilePreviewModal: React.FC<MobilePreviewModalProps> = ({
   onClose,
   onDownload,
   onShare,
+  onShareChange,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +76,7 @@ const MobilePreviewModal: React.FC<MobilePreviewModalProps> = ({
   const handleShare = () => {
     if (onShare) {
       onShare();
+      onShareChange?.();
     }
   };
 
@@ -207,7 +210,7 @@ const MobilePreviewModal: React.FC<MobilePreviewModalProps> = ({
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent
         side="bottom"
-        hideCloseButton
+        showCloseButton={false}
         className={cn(
           "p-0 rounded-t-3xl",
           "bg-[#0a0a12] border-t border-[#1f1f2e]",

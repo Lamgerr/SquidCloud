@@ -141,7 +141,7 @@ const MainHeader: React.FC = () => {
   const isActiveRoute = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   return (
-      <TooltipProvider delayDuration={200}>
+      <TooltipProvider delay={200}>
       <header 
         className={cn(
           "sticky top-0 z-50 w-full",

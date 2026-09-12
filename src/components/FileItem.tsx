@@ -19,6 +19,12 @@ interface FileItemProps {
   onShare?: (file: FileItemType) => void;
   onDownload?: (file: FileItemType) => void;
   onMoveToFolder?: (file: FileItemType) => void;
+  // Accepted for caller compatibility; FileItem has no internal share/info
+  // UI, so these are intentionally not consumed here.
+  onViewInfo?: (file: FileItemType) => void;
+  onOpenInCbCode?: (file: FileItemType) => void;
+  onShareRevoked?: (id: string) => void;
+  onShareChange?: (id: string) => void;
 }
 
 const getFileConfig = (name: string, type: string) => {

@@ -71,9 +71,9 @@ const Navbar: React.FC = () => {
           <div className="flex items-center gap-4">
             {user && (
               <div className="flex items-center">
-                <Button variant="ghost" asChild>
-                  <Link to="/developer-api" className="text-sm">Developer API</Link>
-                </Button>
+                <Link to="/developer-api" className="inline-flex items-center justify-center rounded-lg px-2.5 h-8 text-sm font-medium hover:bg-muted hover:text-foreground">
+                  Developer API
+                </Link>
               </div>
             )}
             

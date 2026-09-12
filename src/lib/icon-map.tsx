@@ -1,7 +1,7 @@
 import React from 'react';
 import * as P from '@phosphor-icons/react';
 
-export type Icon = React.ComponentType<{ className?: string; size?: number; weight?: string; color?: string }>;
+export type Icon = React.ComponentType<{ className?: string; size?: number; weight?: string; color?: string; strokeWidth?: string | number; style?: React.CSSProperties; onClick?: React.MouseEventHandler<SVGSVGElement> }>;
 
 export const Activity = P.ChartLine as Icon;
 export const Airplay = P.Airplay as Icon;

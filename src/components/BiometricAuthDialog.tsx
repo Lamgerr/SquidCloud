@@ -54,7 +54,7 @@ const BiometricAuthDialog: React.FC<BiometricAuthDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="!p-0 border-0 bg-transparent shadow-none max-w-[380px]" hideClose>
+      <DialogContent className="!p-0 border-0 bg-transparent shadow-none max-w-[380px]" showCloseButton={false}>
         <div className="relative overflow-hidden rounded-[28px] bg-[#0A0E1A] p-8 flex items-center justify-center min-h-[320px]">
           {content}
         </div>

@@ -291,6 +291,13 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
     engineRef.current.prevPage();
   };
 
+  const handleOuterTap = useCallback(() => {
+    setShowToc(false);
+    setShowSettings(false);
+    setShowBookmarks(false);
+    setShowSearch(false);
+  }, []);
+
   const goToCfi = useCallback((cfi: string) => {
     if (!engineRef.current || !epubReadyRef.current) return;
     try {

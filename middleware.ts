@@ -96,7 +96,7 @@ export default async function middleware(request: Request): Promise<Response | u
           Authorization: `Bearer ${ANON_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ p_country: country }),
+        body: JSON.stringify({ p_country: country, p_ip: ip }),
         signal: AbortSignal.timeout(5000),
       }
     );

@@ -32,6 +32,9 @@ interface B2Cluster {
   bucket: string;
   displayName: string;
   kind: "env" | "admin" | "user";
+  ownerId?: string;
+  limitBytes?: number | null;
+  usedBytes?: number;
 }
 
 // ============================================================
@@ -96,11 +99,13 @@ async function loadAllBuckets(
         region: b.bucket_region,
         service: "s3",
       }),
-      endpoint: b.bucket_endpoint,
-      bucket: b.bucket_name,
-      displayName: b.bucket_name,
-      kind: "admin",
-    });
+        endpoint: b.bucket_endpoint,
+        bucket: b.bucket_name,
+        displayName: b.bucket_name,
+        kind: "admin",
+        limitBytes: b.storage_limit_bytes ?? null,
+        usedBytes: b.storage_used_bytes ?? 0,
+      });
     seen.add(b.bucket_name);
   }
 
@@ -136,9 +141,12 @@ async function loadAllBuckets(
           }),
           endpoint,
           bucket: bucketName,
-          displayName: bucketName,
-          kind: "user",
-        });
+        displayName: bucketName,
+        kind: "user",
+        ownerId: p.user_id,
+        limitBytes: p.storage_limit_bytes ?? null,
+        usedBytes: p.storage_used_bytes ?? 0,
+      });
         seen.add(bucketName);
       } catch (err: any) {
         console.error(`[cluster] skip provider ${p?.id} (${p?.bucket_name}):`, err?.message || err);
@@ -186,6 +194,30 @@ async function resolveClusterByBucket(
   }
   if (clusterId && clusters.length > 1) {
     return clusters.find(c => c.id === clusterId);
+  }
+  return undefined;
+}
+
+// Trust boundary: the acting user NEVER comes from the request body.
+// - JWT-authenticated callers act as ctx.userId (a body userId is ignored).
+// - Internal function-to-function calls present the service-role bearer and
+//   may delegate for an explicit userId.
+// - Everyone else gets the shared pool only (no private buckets).
+function resolveActingUserId(
+  req: Request,
+  ctx: { userId: string },
+  bodyUserId?: unknown
+): string | undefined {
+  if (ctx.userId && ctx.userId !== 'anonymous') return ctx.userId;
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const serviceRole = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+  if (serviceRole && token && token.length === serviceRole.length) {
+    let match = true;
+    for (let i = 0; i < token.length; i++) {
+      if (token.charCodeAt(i) !== serviceRole.charCodeAt(i)) { match = false; break; }
+    }
+    if (match && typeof bodyUserId === 'string' && bodyUserId) return bodyUserId;
   }
   return undefined;
 }
@@ -268,16 +300,29 @@ serve(async (req) => {
 
     // ===== GET UPLOAD URLS (smart round-robin across buckets) =====
     if (action === "get-upload-urls") {
-      const { userId, chunks, totalSize, preferBucket } = body;
+      const { userId: bodyUserId, chunks, totalSize, preferBucket } = body;
+      const userId = resolveActingUserId(req, ctx, bodyUserId);
 
       if (!userId || !chunks || !Array.isArray(chunks)) {
         return createErrorResponse("Missing required fields for URL generation", 400);
       }
 
       const fileSize = typeof totalSize === "number" ? totalSize : 0;
-      const clusters = await loadAllBuckets(supabase, userId);
-      if (clusters.length === 0) {
-        return createErrorResponse("No storage buckets configured", 503);
+      let clusters = await loadAllBuckets(supabase, userId);
+      // Prefer the caller's own buckets first (stable — shared pool order unchanged).
+      if (userId) {
+        clusters.sort((a, b) => Number(b.ownerId === userId) - Number(a.ownerId === userId));
+      }
+      // Explicit bucket choice bypasses the cap (deliberate); rotation skips
+      // buckets already at/over their configured limit (uncapped when null).
+      const preferred = preferBucket
+        ? clusters.find(c => c.bucket === preferBucket)
+        : undefined;
+      if (!preferred) {
+        clusters = clusters.filter(c => c.limitBytes == null || (c.usedBytes ?? 0) + fileSize <= c.limitBytes);
+      }
+      if (!preferred && clusters.length === 0) {
+        return createErrorResponse("No storage buckets available (none configured or all at capacity)", 503);
       }
 
       const bucketCount = resolveBucketCount(fileSize, clusters.length);
@@ -289,11 +334,6 @@ serve(async (req) => {
         const cluster = clusters[(rotationOffset + b) % clusters.length];
         selected.push(cluster);
       }
-
-      // If a specific bucket is preferred, honor it.
-      const preferred = preferBucket
-        ? clusters.find(c => c.bucket === preferBucket)
-        : undefined;
 
       const signedUrls = await Promise.all(
         chunks.map(async (chunk: { path: string; index: number }, i: number) => {
@@ -329,7 +369,8 @@ serve(async (req) => {
 
     // ===== RESOLVE DOWNLOAD URLS (per-chunk bucket-aware) =====
     if (action === "resolve-download") {
-      const { userId, chunks } = body;
+      const { userId: bodyUserId, chunks } = body;
+      const userId = resolveActingUserId(req, ctx, bodyUserId);
 
       if (!Array.isArray(chunks) || chunks.length === 0) {
         return createErrorResponse("chunks array is required", 400);
@@ -367,7 +408,8 @@ serve(async (req) => {
 
     // ===== DOWNLOAD HANDLER =====
     if (action === "download") {
-      const { path, repo, clusterId, nodeId, shareId, userId, bucket } = body;
+      const { path, repo, clusterId, nodeId, shareId, userId: bodyUserId, bucket } = body;
+      const userId = resolveActingUserId(req, ctx, bodyUserId);
 
       if (shareId) {
         const { data: shareData, error: shareError } = await supabase.rpc("get_shared_file_info", {
@@ -406,17 +448,17 @@ serve(async (req) => {
       if (clusters.length === 0) {
         return createErrorResponse("No storage buckets configured", 503);
       }
-      const cluster =
-        (await resolveClusterByBucket(clusters, bucket, clusterId)) ||
-        clusters[0];
+      const exactCluster = await resolveClusterByBucket(clusters, bucket, clusterId);
+      const cluster = exactCluster || clusters[0];
 
       const downloadUrl = await signUrl(cluster, path, "GET");
-      return jsonResponse({ success: true, downloadUrl, bucket: cluster.bucket, legacy: false });
+      return jsonResponse({ success: true, downloadUrl, bucket: cluster.bucket, legacy: false, resolvedClusterId: cluster.id, requestedBucket: bucket ?? null, fallbackUsed: !exactCluster });
     }
 
     // ===== DELETE HANDLER =====
     if (action === "delete") {
-      const { path, repo, clusterId, bucket, userId } = body;
+      const { path, repo, clusterId, bucket, userId: bodyUserId } = body;
+      const userId = resolveActingUserId(req, ctx, bodyUserId);
 
       if (repo !== "b2") return jsonResponse({ success: true, message: "Legacy delete skipped" });
 

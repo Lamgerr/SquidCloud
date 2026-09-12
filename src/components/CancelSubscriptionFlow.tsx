@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Crown, Sparkles, AlertTriangle } from '@/lib/icon-map';
+import { Crown, Sparkles, AlertTriangle, Loader2 } from '@/lib/icon-map';
 
 interface CancelSubscriptionFlowProps {
   userId: string;
@@ -83,7 +83,8 @@ const CancelSubscriptionFlow: React.FC<CancelSubscriptionFlowProps> = ({
           ))}
         </div>
         <div className="flex gap-2 pt-1">
-          <Button size="sm" variant="destructive" className="flex-1 rounded-xl h-9 text-xs" onClick={handleCancel} loading={loading}>
+          <Button size="sm" variant="destructive" className="flex-1 rounded-xl h-9 text-xs" onClick={handleCancel} disabled={loading}>
+            {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Confirm cancellation
           </Button>
           <Button size="sm" variant="ghost" className="rounded-xl h-9 text-xs" onClick={() => setStep('pause')}>

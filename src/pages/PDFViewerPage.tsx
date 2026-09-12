@@ -272,8 +272,7 @@ const PDFViewerPage: React.FC = () => {
 
         await page.render({
           canvasContext: context,
-          viewport: viewport,
-          canvas: canvas
+          viewport: viewport
         }).promise;
 
         const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
@@ -743,7 +742,7 @@ const PDFViewerPage: React.FC = () => {
             {/* Left: Back + Filename */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <TooltipProvider>
-                <Tooltip delayDuration={500}>
+                <Tooltip delay={500}>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
@@ -777,7 +776,7 @@ const PDFViewerPage: React.FC = () => {
             <div className="flex items-center gap-1">
               {!presentationMode && (
                 <TooltipProvider>
-                  <Tooltip delayDuration={500}>
+                  <Tooltip delay={500}>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
@@ -794,7 +793,7 @@ const PDFViewerPage: React.FC = () => {
               )}
 
               <TooltipProvider>
-                <Tooltip delayDuration={500}>
+                <Tooltip delay={500}>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
@@ -814,7 +813,7 @@ const PDFViewerPage: React.FC = () => {
 
               {presentationMode && (
                 <TooltipProvider>
-                  <Tooltip delayDuration={500}>
+                  <Tooltip delay={500}>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
@@ -842,7 +841,7 @@ const PDFViewerPage: React.FC = () => {
               {/* Left: Page Navigation */}
               <div className="flex items-center gap-1.5">
                 <TooltipProvider>
-                  <Tooltip delayDuration={500}>
+                  <Tooltip delay={500}>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
@@ -877,7 +876,7 @@ const PDFViewerPage: React.FC = () => {
                 </div>
               
                 <TooltipProvider>
-                  <Tooltip delayDuration={500}>
+                  <Tooltip delay={500}>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
@@ -897,7 +896,7 @@ const PDFViewerPage: React.FC = () => {
             {/* Center: Zoom Controls */}
             <div className="flex items-center gap-1">
               <TooltipProvider>
-                <Tooltip delayDuration={500}>
+                <Tooltip delay={500}>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
@@ -918,7 +917,7 @@ const PDFViewerPage: React.FC = () => {
               </span>
               
               <TooltipProvider>
-                <Tooltip delayDuration={500}>
+                <Tooltip delay={500}>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
@@ -935,7 +934,7 @@ const PDFViewerPage: React.FC = () => {
               </TooltipProvider>
 
               <TooltipProvider>
-                <Tooltip delayDuration={500}>
+                <Tooltip delay={500}>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
@@ -952,7 +951,7 @@ const PDFViewerPage: React.FC = () => {
               </TooltipProvider>
 
               <TooltipProvider>
-                <Tooltip delayDuration={500}>
+                <Tooltip delay={500}>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
@@ -980,7 +979,7 @@ const PDFViewerPage: React.FC = () => {
                   className="w-36 h-8 text-sm"
                 />
                 <TooltipProvider>
-                  <Tooltip delayDuration={500}>
+                  <Tooltip delay={500}>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
@@ -998,7 +997,7 @@ const PDFViewerPage: React.FC = () => {
               </div>
 
               <TooltipProvider>
-                <Tooltip delayDuration={500}>
+                <Tooltip delay={500}>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
@@ -1015,7 +1014,7 @@ const PDFViewerPage: React.FC = () => {
               </TooltipProvider>
               
               <TooltipProvider>
-                <Tooltip delayDuration={500}>
+                <Tooltip delay={500}>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
