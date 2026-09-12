@@ -85,6 +85,7 @@ import ManageFileRequests from '@/components/ManageFileRequests';
 import { MoveToFolderDialog } from '@/components/MoveToFolderDialog';
 import { EnhancedShareDialog } from '@/components/EnhancedShareDialog';
 import SharedView from '@/components/SharedView';
+import Overview from '@/components/DashboardOverview';
 import SquidVeilSecrets from '@/components/SquidVeilSecrets';
 import SquidVeilSecretsMobile from '@/components/SquidVeilSecretsMobile';
 import GitHubRepoCloneDialog from '@/components/GitHubRepoCloneDialog';
@@ -96,7 +97,7 @@ import {
   FileText, Image, Video, Music, Archive, Code,
   AlertCircle, Shield, Lock, ChevronsUpDown, Check, Briefcase,
   FileStack, Users, Activity, Book, Database, Settings2, Cloud, Inbox,
-  LogOut, Key, User, Clock, Loader2, Crown
+  LogOut, Key, User, Clock, Loader2, Crown, LayoutGrid
 } from '@/lib/icon-map';
 
 // ─────────────────────────────────────────────────────────
@@ -247,7 +248,7 @@ VaultCard.displayName = 'VaultCard';
 
 const EmptyState = memo(({ searchQuery }: { searchQuery: string }) => (
   <div className="flex flex-col items-center justify-center py-16 text-center">
-    <div className="w-14 h-14 rounded-[14px] bg-muted/50 border border-border/50 flex items-center justify-center mb-4 text-muted-foreground">
+    <div className="w-14 h-14 rounded-[14px] bg-[#c8f04b]/[0.07] border border-[#c8f04b]/20 flex items-center justify-center mb-4 text-[#c8f04b]">
       <Files className="w-6 h-6" />
     </div>
     <h3 className="lg-body font-semibold mb-1">
@@ -266,7 +267,7 @@ EmptyState.displayName = 'EmptyState';
 // Main Dashboard
 // ─────────────────────────────────────────────────────────
 
-const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
+const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   // ── State ──────────────────────────────────────────────
   const [files, setFiles]               = useState<FileItemType[]>([]);
   const [folders, setFolders]           = useState<FolderItem[]>([]);
@@ -1310,6 +1311,22 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
             ))}
 
             <main className="px-3 pb-24 pt-2">
+              {activeTab === 'home' && (
+                <Overview
+                  files={files}
+                  folders={folders}
+                  totalSize={totalSize}
+                  displayName={profile?.full_name || user?.email?.split('@')[0] || 'there'}
+                  planLabel={profile?.is_premium ? (profile?.tier === 'supporter-plus' ? 'Supporter+' : 'Supporter') : 'Free'}
+                  onFileClick={handleFileClick}
+                  onOpenFolder={handleOpenFolder}
+                  onGoToTab={(t) => { setActiveTab(t); }}
+                  onSearchOpen={() => setIsSpotlightOpen(true)}
+                  onFilterChange={setFilterMode}
+                  activeFilter={filterMode}
+                />
+              )}
+
               {activeTab === 'files' && (
                 <MobileFilesView
                   loading={loading}
@@ -1486,6 +1503,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                   <div data-scroll-container="true" className="flex-1 overscroll-y-contain overflow-y-auto px-3 py-3">
                     <div className="space-y-1">
                       {[
+                        { id: 'home', label: 'Home', icon: Home },
                         { id: 'files', label: 'Files', icon: FileStack },
                         { id: 'shared', label: 'Shared', icon: Users },
                         { id: 'books', label: 'Books', icon: Book },
@@ -1838,7 +1856,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
 
           {/* Main content */}
           <div className="flex-1 min-w-0 flex h-screen flex-col overflow-hidden bg-background">
-            <div className="sticky top-0 z-20 border-b border-border/70 bg-background">
+            <div className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-md">
               <div className="flex h-11 w-full items-center justify-between px-4 lg:px-5">
                 <div className="flex items-center gap-2.5">
                   <button
@@ -1864,7 +1882,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                         <span className="flex items-center justify-center text-muted-foreground">
                           <Briefcase className="h-3.5 w-3.5" />
                         </span>
-                        <div className="leading-tight">
+                        <div className="flex items-center gap-1.5 leading-tight min-w-0">
                           <span className="text-[13px] font-medium text-foreground">Workspace</span>
                           <span className="text-neutral-600">·</span>
                         <span className="max-w-[160px] truncate text-[13px] text-muted-foreground">
@@ -1903,11 +1921,27 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <SignalsBell className="h-7 w-7 rounded-md" iconClassName="h-4 w-4" />
                   <button
+                    onClick={() => setViewMode(viewMode === 'compact' ? 'list' : 'compact')}
+                    className="sq-press flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+                    title={viewMode === 'compact' ? 'Comfortable density' : 'Compact density'}
+                  >
+                    {viewMode === 'compact' ? <List className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+                  </button>
+                  <button
                     onClick={() => setIsSpotlightOpen(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent lg-press-subtle transition-all"
+                    className="sq-press hidden h-8 items-center gap-2 rounded-md border border-border/70 bg-card/60 pl-2.5 pr-1.5 text-muted-foreground hover:border-white/20 hover:text-foreground sm:flex"
+                    title="Search (⌘K)"
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                    <span className="text-[12.5px]">Search</span>
+                    <kbd className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
+                  </button>
+                  <button
+                    onClick={() => setIsSpotlightOpen(true)}
+                    className="sq-press flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent sm:hidden"
                     title="Search (⌘K)"
                   >
                     <Search className="h-4 w-4" />
@@ -1924,7 +1958,24 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'files' }) => {
               />
             ))}
             <main data-scroll-container="true" className="flex-1 overscroll-y-contain overflow-y-auto px-4 lg:px-5 pb-10 pt-4">
-              <div className="mx-auto w-full max-w-[1400px]">
+              <div className="mx-auto w-full max-w-[1680px]">
+
+              {/* ── Home overview ── */}
+              {activeTab === 'home' && (
+                  <Overview
+                    files={files}
+                    folders={folders}
+                    totalSize={totalSize}
+                    displayName={profile?.full_name || user?.email?.split('@')[0] || 'there'}
+                    planLabel={profile?.is_premium ? (profile?.tier === 'supporter-plus' ? 'Supporter+' : 'Supporter') : 'Free'}
+                    onFileClick={handleFileClick}
+                    onOpenFolder={handleOpenFolder}
+                    onGoToTab={setActiveTab}
+                    onSearchOpen={() => setIsSpotlightOpen(true)}
+                    onFilterChange={setFilterMode}
+                    activeFilter={filterMode}
+                  />
+              )}
 
               {/* ── Files tab ── */}
               {activeTab === 'files' && (

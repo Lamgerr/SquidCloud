@@ -670,6 +670,80 @@ export const uploadFile = async (
   if (!file) {
     throw new Error("No file provided");
   }
+
+  // SDE beta mode — check DB for user preference
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (authUser) {
+    try {
+      const { data: encSettings, error: encErr } = await supabase
+        .from('user_encryption_settings')
+        .select('settings')
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+      if (encErr) console.error('[SDE] settings query error:', encErr.message);
+      const sdeEnabled = encSettings?.settings?.sde_enabled === true;
+      console.log('[SDE] user:', authUser.id, 'sde_enabled:', sdeEnabled);
+
+      if (sdeEnabled) {
+        const { SDE } = await import('sde/sdk/SDE');
+        const { SDEBrain } = await import('sde/brain/SDEBrain');
+        const { DHTSubstrate } = await import('sde/substrates/deep/DHT');
+        console.log('[SDE] modules loaded, starting upload...');
+        const brain = new SDEBrain([new DHTSubstrate()]);
+        const sde = new SDE(brain);
+        onProgress?.(0, 'dispersing');
+        const { recallToken, fileHash } = await sde.upload(file, (i, total) => {
+          onProgress?.(Math.round((i / total) * 100), 'dispersing');
+        });
+        console.log('[SDE] upload done, inserting file record...');
+        const activeWorkspaceId = getActiveWorkspaceId();
+        const { data, error } = await supabase.from('files').insert({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          storage_path: 'sde',
+          processor: 'sde',
+          user_id: authUser.id,
+          parent_folder: folderPath || null,
+          encrypted: true,
+          shared: false,
+          encryption_key: 'managed_key',
+          ...(activeWorkspaceId ? { workspace_id: activeWorkspaceId } : {}),
+        }).select('*').single();
+        if (error) {
+          console.error('[SDE] direct insert failed, trying RPC:', error.message);
+          const { data: rpcData, error: rpcError } = await supabase.rpc('create_file_record', {
+            p_name: file.name,
+            p_type: file.type || 'application/octet-stream',
+            p_size: file.size,
+            p_storage_path: 'sde',
+            p_user_id: authUser.id,
+            p_encrypted: true,
+            p_encryption_key: 'managed_key',
+            p_metadata: JSON.stringify({ processor: 'sde' }),
+          } as any);
+          if (rpcError || !rpcData) {
+            console.error('[SDE] RPC also failed:', rpcError?.message);
+            throw rpcError || new Error('Failed to create file record');
+          }
+          Object.assign(data ?? {}, rpcData);
+          await supabase.from('files').update({ processor: 'sde' }).eq('id', rpcData.id);
+        }
+        console.log('[SDE] file inserted, storing recall token...');
+        const { error: rtErr } = await supabase.from('sde_recall_tokens').insert({
+          file_id: data.id,
+          user_id: authUser.id,
+          recall_token: recallToken,
+          file_hash: fileHash,
+        });
+        if (rtErr) console.error('[SDE] recall token insert error:', rtErr.message);
+        onProgress?.(100, 'complete');
+        return data as FileItem;
+      }
+    } catch (e: any) {
+      console.error('[SDE] FAILED:', e?.message ?? e, e?.stack);
+    }
+  }
   
   try {
     const activeWorkspaceId = getActiveWorkspaceId();
@@ -828,7 +902,7 @@ export async function downloadFile(fileId: string, onProgress?: (progress: numbe
   try {
     const { data: fileRow, error: fileError } = await supabase
       .from('files')
-      .select('id, storage_path, storage_provider_id, external_object_key, name, type, tags')
+      .select('id, storage_path, storage_provider_id, external_object_key, name, type, tags, processor')
       .eq('id', fileId)
       .single();
 
@@ -919,6 +993,40 @@ export async function downloadFile(fileId: string, onProgress?: (progress: numbe
       return blob;
     }
 
+    // SDE dispersal engine download
+    if (fileRow.processor === 'sde' || fileRow.storage_path === 'sde') {
+      onProgress?.(5, 'fetching recall token');
+      const { data: tokenRow, error: tokenError } = await supabase
+        .from('sde_recall_tokens')
+        .select('recall_token')
+        .eq('file_id', fileId)
+        .single();
+      if (tokenError || !tokenRow) {
+        throw new Error('SDE recall token not found: ' + (tokenError?.message || 'missing'));
+      }
+
+      onProgress?.(10, 'deriving keys');
+      const { SDE } = await import('sde/sdk/SDE');
+      const { SDEBrain } = await import('sde/brain/SDEBrain');
+      const { DHTSubstrate } = await import('sde/substrates/deep/DHT');
+      const dht = new DHTSubstrate();
+      const brain = new SDEBrain([dht]);
+      const sde = new SDE(brain);
+
+      let lastProgress = 10;
+      const blob = await sde.download(
+        tokenRow.recall_token,
+        (_chunk) => {
+          lastProgress = Math.min(lastProgress + 2, 95);
+          onProgress?.(lastProgress, 'decrypting chunks');
+        },
+        { fileName: fileRow.name, mimeType: fileRow.type || 'application/octet-stream' }
+      );
+
+      onProgress?.(100, 'complete');
+      return blob;
+    }
+
     // Use optimized Res54 technology for parallel downloads
     const blob = await downloadFileWithRes54(fileId, onProgress);
     return blob;
@@ -926,6 +1034,23 @@ export async function downloadFile(fileId: string, onProgress?: (progress: numbe
     console.error("Error downloading file:", error);
     throw new Error(error.message || "Failed to download file");
   }
+}
+
+export async function smartDownload(
+  fileId: string,
+  opts?: { reason?: string; fileName?: string; shareId?: string; onProgress?: (p: number, s: string) => void }
+): Promise<Blob> {
+  const { data: row, error } = await supabase
+    .from("files")
+    .select("processor, storage_path")
+    .eq("id", fileId)
+    .single();
+  if (error || !row) throw new Error(error?.message || "File not found");
+
+  if (row.processor === "sde" || row.storage_path === "sde") {
+    return downloadFile(fileId, opts?.onProgress);
+  }
+  return downloadFileWithRes54(fileId, opts as any);
 }
 
 export async function deleteFile(id: string): Promise<void> {

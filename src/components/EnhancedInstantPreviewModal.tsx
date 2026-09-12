@@ -9,6 +9,7 @@ import {
 } from '@/lib/icon-map';
 import { cn, formatFileSize } from '@/lib/utils';
 import { downloadFileWithRes54, downloadFilePreview } from '@/lib/res54';
+import { smartDownload } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
 import CBVideoPlayer from './cbVideoPlayer';
@@ -196,7 +197,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
           setLoading(false);
 
           if (preview.isPartial) {
-            downloadFileWithRes54(file.id, { reason: 'preview', fileName: file.name, shareId }).then((fullBlob) => {
+            smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId }).then((fullBlob) => {
               if (loadGenRef.current !== gen) return;
               const fullUrl = URL.createObjectURL(fullBlob);
               
@@ -226,7 +227,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     const load = async () => {
       setLoading(true); setError(null);
       try {
-        const blob = await downloadFileWithRes54(file.id, { reason: 'preview', fileName: file.name, shareId });
+        const blob = await smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId });
         if (loadGenRef.current !== gen) return;
         const nextUrl = URL.createObjectURL(blob);
         
@@ -262,7 +263,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     if (onDownload) { onDownload(); return; }
     if (!decodedBlob && file?.id) {
       try {
-        const blob = await downloadFileWithRes54(file.id, { reason: 'download', fileName: file.name, shareId });
+        const blob = await smartDownload(file.id, { reason: 'download', fileName: file.name, shareId });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = file.name;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);

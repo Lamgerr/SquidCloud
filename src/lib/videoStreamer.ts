@@ -99,9 +99,26 @@ export class StreamDecryptorService {
         }
       }
 
-      const actualChunkSize = chunks.length > 1
-        ? chunks[1].offset - chunks[0].offset
-        : file.size;
+      // Chunk layout varies by upload pipeline: newer records carry per-chunk
+      // offsets, older ones only a top-level chunkSize (or per-chunk size).
+      // Never allow NaN/0 through — SW findChunk would 416 every request and
+      // the player would fail the file after 8 blind retries.
+      const o1 = chunks.length > 1 ? chunks[1]?.offset : undefined;
+      const o0 = chunks.length > 0 ? chunks[0]?.offset : undefined;
+      let actualChunkSize =
+        typeof o1 === 'number' && typeof o0 === 'number' ? o1 - o0 : NaN;
+      if (!Number.isFinite(actualChunkSize) || actualChunkSize <= 0) {
+        const metaChunkSize = (fileMeta as any)?.chunkSize;
+        actualChunkSize =
+          typeof metaChunkSize === 'number' && metaChunkSize > 0 ? metaChunkSize : NaN;
+      }
+      if (!Number.isFinite(actualChunkSize) || actualChunkSize <= 0) {
+        const s0 = chunks[0]?.size;
+        actualChunkSize =
+          typeof s0 === 'number' && s0 > 0
+            ? s0
+            : Math.max(1, Math.floor(file.size / Math.max(1, chunks.length)));
+      }
 
       const meta = {
         fileId,

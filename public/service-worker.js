@@ -94,9 +94,46 @@ async function decryptChunk(rawData, encryptionKey) {
   const first4 = dv.getUint32(0, true);
 
   if (first4 > 0 && first4 < 1000 && first4 < bin.byteLength - 4) {
+    let header = null;
     try {
-      const header = JSON.parse(new TextDecoder().decode(bin.slice(4, 4 + first4)));
-      if (header.version >= 2 && header.chunks > 0 && Array.isArray(header.ivs)) {
+      header = JSON.parse(new TextDecoder().decode(bin.slice(4, 4 + first4)));
+    } catch {}
+    if (header && header.version >= 2 && header.chunks > 0 && Array.isArray(header.ivs) && header.ivs.length >= header.chunks) {
+      // (a1) Canonical framed v2 — v4 API / CLI uploads: per part
+      // [u32 aadLen][aad][u32 encLen][enc], decrypted WITH aad, ivs are
+      // number arrays in the JSON header. Mirrors decryptLargeData.
+      try {
+        const keyBytes = new TextEncoder().encode(encryptionKey.slice(0, 32).padEnd(32, '0'));
+        const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+        let offset = 4 + first4;
+        const parts = [];
+        for (let i = 0; i < header.chunks; i++) {
+          if (offset + 4 > bin.byteLength) throw new Error('bad aad framing');
+          const aadLen = dv.getUint32(offset, true); offset += 4;
+          if (aadLen > 4096 || offset + aadLen + 4 > bin.byteLength) throw new Error('bad aad framing');
+          const aad = bin.slice(offset, offset + aadLen); offset += aadLen;
+          const encLen = dv.getUint32(offset, true); offset += 4;
+          if (encLen <= 0 || offset + encLen > bin.byteLength) throw new Error('bad enc framing');
+          const enc = bin.slice(offset, offset + encLen); offset += encLen;
+          const ivRaw = header.ivs[i];
+          const iv = typeof ivRaw === 'string'
+            ? Uint8Array.from(atob(ivRaw), c => c.charCodeAt(0))
+            : new Uint8Array(ivRaw);
+          if (iv.byteLength !== 12) throw new Error('bad iv');
+          const plain = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv, additionalData: aad, tagLength: 128 }, key, enc);
+          parts.push(new Uint8Array(plain));
+        }
+        const total = parts.reduce((s, p) => s + p.byteLength, 0);
+        if (typeof header.totalSize === 'number' && header.totalSize > 0 && total !== header.totalSize) throw new Error('size mismatch');
+        if (total === 0) throw new Error('empty plaintext');
+        const out = new Uint8Array(total);
+        let pos = 0;
+        for (const p of parts) { out.set(p, pos); pos += p.byteLength; }
+        return out.buffer;
+      } catch {}
+      // (a2) Legacy equal-slice v2 fallback (no per-part framing, no AAD).
+      try {
         let offset = 4 + first4;
         const chunkSz = header.chunkSize || Math.ceil((bin.byteLength - offset) / header.chunks);
         const parts = [];
@@ -113,8 +150,8 @@ async function decryptChunk(rawData, encryptionKey) {
         let pos = 0;
         for (const p of parts) { out.set(p, pos); pos += p.byteLength; }
         return out.buffer;
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
   try {
@@ -162,6 +199,10 @@ async function fetchDecrypt(fileId, chunkIdx, encryptionKey, urls) {
 }
 
 function findChunk(chunks, fileSize, chunkSize, startByte) {
+  if (!Number.isFinite(chunkSize) || chunkSize <= 0 || !Number.isFinite(startByte) || startByte < 0) {
+    console.warn('[SW] invalid chunk layout', { chunkSize, startByte, chunks: chunks?.length, fileSize });
+    return null;
+  }
   let off = 0;
   for (let i = 0; i < chunks.length; i++) {
     const sz = i === chunks.length - 1 ? (fileSize % chunkSize || chunkSize) : chunkSize;
@@ -173,6 +214,10 @@ function findChunk(chunks, fileSize, chunkSize, startByte) {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  // Never intercept third-party requests (IPFS gateways, Supabase, etc.) —
+  // the SW cache only holds same-origin entries, so a cross-origin fallback
+  // would resolve to undefined and crash respondWith.
+  if (url.origin !== self.location.origin) return;
   if (!url.pathname.startsWith('/virtual-stream/')) {
     // The app shell and hashed assets must always come from the network so a
     // redeploy never serves a stale HTML referencing purged bundle hashes.
@@ -183,7 +228,7 @@ self.addEventListener('fetch', (event) => {
     if (event.request.mode === 'navigate') {
       event.respondWith(fetch(event.request, {cache: 'no-store'}));
     } else {
-      event.respondWith(fetch(event.request, {cache: 'no-store'}).catch(() => caches.match(event.request)));
+      event.respondWith(fetch(event.request, {cache: 'no-store'}).catch(() => caches.match(event.request).then((r) => r || new Response('offline', { status: 503 }))));
     }
     return;
   }

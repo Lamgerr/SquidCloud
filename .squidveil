@@ -1,0 +1,14 @@
+# .squidveil
+[project]
+id = "proj_cafa9d341aa7"
+name = "cloudbliss-storage-fresh-main"
+environment = "production"
+
+[policy]
+fail_closed = true
+audit = true
+ref_ttl = 60
+ref_max_uses = 1
+
+[secrets]
+allow = ["*"]

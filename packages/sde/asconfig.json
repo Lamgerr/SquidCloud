@@ -1,0 +1,22 @@
+{
+  "targets": {
+    "release": {
+      "outFile": "build/sde.wasm",
+      "textFile": "build/sde.wat",
+      "sourceMap": true,
+      "optimizeLevel": 3,
+      "shrinkLevel": 1,
+      "converge": true,
+      "noAssert": false
+    },
+    "debug": {
+      "outFile": "build/sde.debug.wasm",
+      "textFile": "build/sde.debug.wat",
+      "sourceMap": true,
+      "debug": true
+    }
+  },
+  "options": {
+    "bindings": "esm"
+  }
+}

@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "sde": path.resolve(__dirname, "./packages/sde/src"),
       path: "path-browserify",
       fs: "browserify-fs",
     },
@@ -56,7 +57,7 @@ export default defineConfig(({ mode }) => ({
     sourcemap: false,
     reportCompressedSize: false,
     minify: 'esbuild',
-    target: 'es2018',
+    target: 'es2020',
     rollupOptions: {
       external: [
       // Mark Node.js built-ins as external since we're building for browser
@@ -66,6 +67,8 @@ export default defineConfig(({ mode }) => ({
         'path',
         'fs',
         'buffer',
+        // SDE substrates — Node-only, not bundled in browser
+        'bittorrent-dht',
       ],
       output: {
         manualChunks: undefined,

@@ -16,8 +16,8 @@
  *   VITE_KZA_CLIENT_ID=squidcloud-web
  */
 
-import { supabase } from '@/lib/supabaseClient' // adjust path to your supabase client
-import { SUPABASE_URL as PROJECT_URL, SUPABASE_ANON_KEY } from '@/lib/supabaseEnv'
+import { supabase } from '@/integrations/supabase/client';
+import { SUPABASE_URL as PROJECT_URL, SUPABASE_ANON_KEY } from '@/lib/supabaseEnv';
 
 const SECRET    = import.meta.env.VITE_KZA_CLIENT_SECRET as string
 const CLIENT_ID = (import.meta.env.VITE_KZA_CLIENT_ID ?? 'squidcloud-web') as string
@@ -54,6 +54,8 @@ export interface KzaResult {
   score?: number
   tier?: string | null
   code?: string
+  country?: string
+  reason?: string
 }
 
 // ── Core check ──────────────────────────────────────────────────────────────
@@ -71,9 +73,6 @@ export async function kzaCheck(
 ): Promise<KzaResult> {
   const { data: { session } } = await supabase.auth.getSession()
   const token = session?.access_token ?? ''
-
-  const { data: { user: { app_metadata: { supabaseUrl } = {} } = {} } = {} } =
-    await supabase.auth.getUser().catch(() => ({ data: {} as any }))
 
   const projectUrl = PROJECT_URL
   const anonKey    = SUPABASE_ANON_KEY
@@ -94,9 +93,18 @@ export async function kzaCheck(
       body: JSON.stringify({ url, method, body_snapshot: body.substring(0, 500) }),
     })
 
-    if (!res.ok) {
+    // Only an explicit 403/KZA_BLOCKED verdict blocks. Every other
+    // non-OK status (404 shadow canary, 429 tracking, 5xx, unsigned
+    // 401s, CORS/edge errors) is NOT a verdict — fail open so legit
+    // users are never locked out by sentinel availability issues.
+    if (res.status === 403) {
       const data = await res.json().catch(() => ({}))
-      return { ok: false, blocked: true, code: data.code ?? 'KZA_BLOCKED' }
+      return { ok: false, blocked: true, code: data.code ?? 'KZA_BLOCKED', country: data.country, reason: data.reason }
+    }
+
+    if (!res.ok) {
+      console.warn(`[KZA] Sentinel status ${res.status} is not a block verdict — failing open`)
+      return { ok: true, blocked: false }
     }
 
     const data = await res.json()

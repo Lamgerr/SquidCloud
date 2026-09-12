@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { X, Maximize2, Minimize2, Download, Share2 } from '@/lib/icon-map';
-import { downloadFileWithRes54 } from '@/lib/res54';
+import { smartDownload } from '@/lib/api';
 import { formatFileSize, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
@@ -41,7 +41,7 @@ const MobilePreviewModal: React.FC<MobilePreviewModalProps> = ({
       setError(null);
       
       try {
-        const blob = await downloadFileWithRes54(file.id, {
+        const blob = await smartDownload(file.id, {
           reason: 'preview',
           fileName: file.name,
         });

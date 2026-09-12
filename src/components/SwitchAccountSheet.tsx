@@ -21,8 +21,11 @@ const SwitchAccountSheet: React.FC<SwitchAccountSheetProps> = ({ open, onOpenCha
   const { user, profile, signOut } = useAuth();
   const [removing, setRemoving] = useState(false);
 
-  const handleAddAccount = () => {
+  const handleAddAccount = async () => {
     onOpenChange(false);
+    // End the current session first — otherwise /auth sees a live
+    // session and bounces straight back to the dashboard.
+    await signOut();
     navigate('/auth');
   };
 

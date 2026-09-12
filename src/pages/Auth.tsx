@@ -15,6 +15,7 @@ import { INKModal } from '@/components/INKModal';
 import { useINK } from '@/hooks/useINK';
 import { isPasskeyAvailable, authenticateWithPasskey } from '@/lib/webauthn';
 import { getOAuthRedirectUrl, getPasswordRecoveryRedirectUrl } from '@/lib/appLinks';
+import { getClientIp } from '@/lib/clientIp';
 import { emitSignal } from '@/lib/api';
 
 const Auth = () => {
@@ -198,11 +199,7 @@ const Auth = () => {
   };
 
   const getCurrentIP = async (): Promise<string> => {
-    try {
-      const response = await fetch('https://api.ipify.org?format=json');
-      const data = await response.json();
-      return data.ip || 'unknown';
-    } catch { return 'unknown'; }
+    return getClientIp();
   };
 
   const handleOAuthSignIn = async (provider: 'github' | 'google' | 'discord') => {

@@ -55,7 +55,7 @@ Deterministic from `DMS + file_hash`. Given DMS + recall token, engine reconstru
 | 40-41 | `version:u16BE = 1` |
 | 42-57 | `verifier = HKDF(blob_secret,"verify",16)[0:16]` — confirms correct DMS |
 | 58-89 | `nonce:32` random — makes two tokens for same file look unrelated; IV for optional token-encrypt |
-| 90-95 | `HMAC-SHA256(rtsign, bytes0-89)[0:16]` — **hardened: was 6B (48-bit) → 16B (128-bit)** |
+| 90-95 | `HMAC-SHA256(rtsign, bytes0-89)[0:6]` — 48-bit HMAC (v1.1 stays 6B for 96B compact token; **v2 upgrades to 16B at 80-95 in a 112B token** for 128-bit security) |
 
 Human form: `base58(96 bytes)`. Contains **nothing** about backends, count, identity, device, time, name, type. Without DMS, token reveals nothing; verifier is meaningless without DMS.
 

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getClientIp } from '@/lib/clientIp';
 
 export interface SecurityEvent {
   id: string;
@@ -534,13 +535,7 @@ class SecurityService {
   }
 
   private async getCurrentIP(): Promise<string> {
-    try {
-      const response = await fetch('https://api.ipify.org?format=json');
-      const data = await response.json();
-      return data.ip;
-    } catch (error) {
-      return 'unknown';
-    }
+    return getClientIp();
   }
 
   private getDefaultEncryptionSettings(): EncryptionSettings {

@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { isPasskeyAvailable, registerPasskey, authenticateWithPasskey } from '@/lib/webauthn';
 import BiometricSetupDialog from '@/components/BiometricSetupDialog';
 import { biometricAuthService } from '@/services/biometricAuthService';
-import { BYOKSettingsCard } from '@/components/encryption';
+import { BYOKSettingsCard, SDESettingsCard } from '@/components/encryption';
 import ApiKeyManagement from '@/components/ApiKeyManagement';
 import CliDevicesSection from '@/components/settings/CliDevicesSection';
 import { WebhookManager } from '@/components/WebhookManager';
@@ -1406,7 +1406,12 @@ const AccountSettings = () => {
     webhooks: renderWebhooksSection,
     migration: renderMigrationSection,
     plans: renderPlansSection,
-    byok: () => <BYOKSettingsCard className="rounded-xl" />,
+    byok: () => (
+      <div className="space-y-6">
+        <BYOKSettingsCard className="rounded-xl" />
+        <SDESettingsCard className="rounded-xl" />
+      </div>
+    ),
     preferences: renderPreferencesSection,
     devices: renderDevicesSection,
   };

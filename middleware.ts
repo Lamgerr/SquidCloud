@@ -1,34 +1,41 @@
 const SUPABASE_URL = 'https://aouqcwbdoyrccjcrhzzi.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvdXFjd2Jkb3lyY2NqY3JoenppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NjAyMTEsImV4cCI6MjA1ODUzNjIxMX0.b_VHC6uP3Efw3o_yibCoZKmsCIVZgOJ4FUF1NK-nd7U';
 
-const BLOCK_PAGE_CSS = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#e6edf3;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}.card{max-width:480px;width:100%;background:#161b22;border:1px solid #21262d;border-radius:16px;padding:40px 32px;text-align:center}.icon{width:56px;height:56px;margin:0 auto 20px;background:#1c2128;border:1px solid #373e47;border-radius:14px;display:flex;align-items:center;justify-content:center}.icon svg{width:28px;height:28px;color:#f85149}h1{font-size:22px;font-weight:600;margin-bottom:8px}.badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500;margin-bottom:16px}.badge.blocked{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:#f85149}.badge.reputation{background:rgba(187,128,9,.1);border:1px solid rgba(187,128,9,.3);color:#d29922}.reason{font-size:14px;color:#8b949e;line-height:1.6;margin-bottom:24px;padding:16px;background:#0d1117;border:1px solid #21262d;border-radius:10px}.meta{font-size:12px;color:#484f58;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:24px}.meta span{padding:4px 10px;background:#1c2128;border:1px solid #373e47;border-radius:6px}hr{border:none;border-top:1px solid #21262d;margin:24px 0}.footer{font-size:12px;color:#484f58;line-height:1.5}`;
+const BLOCK_PAGE_CSS = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#060607;color:#e6edf3;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}.card{max-width:480px;width:100%;text-align:center}.icon{width:64px;height:64px;margin:0 auto 24px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);border-radius:50%;display:flex;align-items:center;justify-content:center}.icon svg{width:32px;height:32px;color:#f85149}h1{font-size:24px;font-weight:700;margin-bottom:10px;letter-spacing:-.02em}.subtitle{font-size:14px;color:#8b949e;line-height:1.6;margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto}.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;margin-bottom:20px}.badge.blocked{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);color:#f85149}.info-box{background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:20px;margin-bottom:24px;text-align:left}.info-box h3{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#484f58;margin-bottom:12px;font-weight:600}.info-box ul{list-style:none;padding:0}.info-box li{font-size:13px;color:#8b949e;padding:6px 0;display:flex;align-items:flex-start;gap:8px;line-height:1.5}.info-box li::before{content:'';width:4px;height:4px;border-radius:50%;background:#30363d;margin-top:7px;flex-shrink:0}.meta{font-size:11px;color:#484f58;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:24px}.meta span{padding:4px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;font-family:monospace}.contact{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#0d1117;border:1px solid #21262d;border-radius:8px;color:#58a6ff;font-size:13px;text-decoration:none;transition:all .15s}.contact:hover{background:#161b22;border-color:#30363d}.contact svg{width:14px;height:14px}`;
 
-function blockPage(type: 'geo' | 'reputation', ip: string, country: string, reason: string): Response {
-  const title = type === 'geo' ? 'Access Restricted' : 'Connection Blocked';
-  const badge = type === 'geo' ? 'badge blocked' : 'badge reputation';
-  const badgeText = type === 'geo' ? 'Region Blocked' : 'Security Block';
-  const iconSvg = type === 'geo'
-    ? '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>'
-    : '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+const REGION_LABELS: Record<string, string> = {
+  US: 'United States', SG: 'Singapore', AU: 'Australia', CA: 'Canada',
+  FR: 'France', GB: 'United Kingdom', DE: 'Germany', IR: 'Iran',
+  KP: 'North Korea', IN: 'India',
+};
 
+function blockPage(ip: string, country: string, reason: string): Response {
+  const regionName = REGION_LABELS[country] ?? country;
   const html = `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — SquidCloud</title><style>${BLOCK_PAGE_CSS}</style></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Access Restricted — SquidCloud</title><style>${BLOCK_PAGE_CSS}</style></head>
 <body>
 <div class="card">
-<div class="icon">${iconSvg}</div>
-<h1>${title}</h1>
-<div class="${badge}">${badgeText}</div>
-<p class="reason">${reason}</p>
-<div class="meta">
-<span>IP: ${ip}</span>
-${country ? `<span>${country}</span>` : ''}
-<span>${type === 'geo' ? 'Geo-fence' : 'IP Reputation'}</span>
+<div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+<h1>Access Restricted</h1>
+<div class="badge blocked">Region Blocked</div>
+<p class="subtitle">SquidCloud is not available in your region due to regulatory compliance.</p>
+<div class="meta"><span>${regionName}</span><span>${country}</span></div>
+<div class="info-box">
+<h3>What to do</h3>
+<ul>
+<li>Disable any active VPN, proxy, or network anonymizer</li>
+<li>Connect from a supported region and refresh</li>
+<li>For business access requests, contact support</li>
+</ul>
 </div>
-<p class="footer">If you believe this is an error, contact support with your IP address.</p>
+<a class="contact" href="mailto:hellosquidcloud@gmail.com?subject=Access%20Request">
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+hellosquidcloud@gmail.com
+</a>
 </div>
 </body>
 </html>`;
-
   return new Response(html, {
     status: 403,
     headers: {
@@ -50,6 +57,9 @@ export const config = {
 
 const CRAWLER_RE = /Googlebot|google-extended|bingbot|DuckDuckBot|YandexBot|Baiduspider|Slurp|facebookexternalhit|Twitterbot|LinkedInBot|Pinterest|AhrefsBot|SemrushBot|Moz|GPTBot|OAI-SearchBot|CCBot|Applebot|bytespider/i;
 
+const geoCache = new Map<string, { blocked: boolean; reason: string; expires: number }>();
+const CACHE_TTL = 5 * 60 * 1000;
+
 export default async function middleware(request: Request): Promise<Response | undefined> {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -61,38 +71,50 @@ export default async function middleware(request: Request): Promise<Response | u
   }
 
   const ua = request.headers.get('user-agent') || '';
-  if (CRAWLER_RE.test(ua)) {
-    return undefined;
-  }
+  if (CRAWLER_RE.test(ua)) return undefined;
 
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || request.headers.get('x-real-ip')
     || '';
-
   if (!ip) return undefined;
 
-  const country = request.headers.get('x-vercel-ip-country') || '';
+  const country = (request.headers.get('x-vercel-ip-country') || '').toUpperCase();
+  if (!country) return undefined;
+
+  const cached = geoCache.get(country);
+  if (cached && cached.expires > Date.now()) {
+    return cached.blocked ? blockPage(ip, country, cached.reason) : undefined;
+  }
 
   try {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/kza-enforce`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ip, country }),
-      signal: AbortSignal.timeout(8000),
-    });
-
-    if (!resp.ok) return undefined;
-
-    const result = await resp.json();
-    if (result.blocked) {
-      if (result.type === 'geo') {
-        return blockPage('geo', ip, country, result.reason);
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/kza_check_country_block`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: ANON_KEY,
+          Authorization: `Bearer ${ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_country: country }),
+        signal: AbortSignal.timeout(5000),
       }
-      return blockPage('reputation', ip, country, result.reason);
+    );
+
+    if (!res.ok) {
+      geoCache.set(country, { blocked: true, reason: 'Unable to verify region', expires: Date.now() + 30_000 });
+      return blockPage(ip, country, 'Unable to verify region. Please try again later.');
     }
 
-    return undefined;
+    const data = await res.json() as { blocked: boolean; reason?: string; country?: string };
+    const blocked = data.blocked === true;
+    const reason = data.reason || 'Region not supported';
+
+    geoCache.set(country, { blocked, reason, expires: Date.now() + CACHE_TTL });
+
+    return blocked ? blockPage(ip, country, reason) : undefined;
   } catch {
-    return undefined;
+    geoCache.set(country, { blocked: true, reason: 'Unable to verify region', expires: Date.now() + 30_000 });
+    return blockPage(ip, country, 'Unable to verify region. Please try again later.');
   }
 }

@@ -1,0 +1,25 @@
+{
+  "name": "sde",
+  "version": "0.1.0",
+  "description": "SquidCloud Dispersal Engine — phantom-routed, WASM-encrypted dispersal across the internet",
+  "type": "module",
+  "scripts": {
+    "asbuild": "asc assembly/index.ts --target release --outFile build/sde.wasm --textFile build/sde.wat --sourceMap --exportTable --runtime stub",
+    "asbuild:debug": "asc assembly/index.ts --target debug --outFile build/sde.debug.wasm --textFile build/sde.debug.wat --sourceMap --debug",
+    "build": "npm run asbuild && tsc -p tsconfig.json",
+    "test": "node --test",
+    "dev": "npm run asbuild:debug -- --watch"
+  },
+  "dependencies": {
+    "helia": "^5.0.0",
+    "bittorrent-dht": "^10.0.0",
+    "nostr-tools": "^2.0.0",
+    "webtorrent": "^2.0.0",
+    "matrix-js-sdk": "^34.0.0",
+    "arweave": "^1.15.0"
+  },
+  "devDependencies": {
+    "assemblyscript": "^0.27.0",
+    "typescript": "^5.9.0"
+  }
+}

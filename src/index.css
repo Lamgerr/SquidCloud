@@ -192,7 +192,7 @@
   }
 
   .dark {
-    /* ── Dark Theme — Neutral grayscale with white primary ──────────── */
+    /* ── Dark Theme — near-black canvas, signal-lime primary ─────── */
     --background: 0 0% 4%;
     --foreground: 0 0% 93%;
 
@@ -202,8 +202,8 @@
     --popover: 0 0% 9%;
     --popover-foreground: 0 0% 93%;
 
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 4%;
+    --primary: 80 85% 62%;
+    --primary-foreground: 80 60% 8%;
 
     --secondary: 0 0% 11%;
     --secondary-foreground: 0 0% 93%;
@@ -219,18 +219,18 @@
 
     --border: 0 0% 13%;
     --input: 0 0% 13%;
-    --ring: 0 0% 70%;
+    --ring: 80 85% 62%;
 
-    --brand: 217 91% 60%;
+    --brand: 80 85% 62%;
 
-    --sidebar-background: 0 0% 4%;
+    --sidebar-background: 0 0% 3%;
     --sidebar-foreground: 0 0% 85%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 0 0% 4%;
-    --sidebar-accent: 0 0% 11%;
+    --sidebar-primary: 80 85% 62%;
+    --sidebar-primary-foreground: 80 60% 8%;
+    --sidebar-accent: 0 0% 10%;
     --sidebar-accent-foreground: 0 0% 93%;
-    --sidebar-border: 0 0% 11%;
-    --sidebar-ring: 0 0% 70%;
+    --sidebar-border: 0 0% 10%;
+    --sidebar-ring: 80 85% 62%;
 
     /* ── Elevation Scale (dark) ────────────────────── */
     --elevation-1: 0 1px 2px hsl(0 0% 0% / 0.3);
@@ -251,6 +251,61 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  ::selection {
+    background: hsl(80 85% 62% / 0.85);
+    color: hsl(80 60% 8%);
+  }
+  :focus-visible {
+    outline: 2px solid hsl(80 85% 62% / 0.7);
+    outline-offset: 2px;
+  }
+}
+
+/* ── SquidCloud comfort layer: calm motion + slim chrome ── */
+.sq-tab-enter {
+  animation: sq-tab-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes sq-tab-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sq-press {
+  transition: transform 0.12s ease, background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.sq-press:active {
+  transform: scale(0.97);
+}
+.sq-live-dot {
+  animation: sq-pulse 2.2s ease-in-out infinite;
+}
+@keyframes sq-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+/* Skeleton shimmer for loading rows/cards */
+.sq-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: hsl(var(--muted) / 0.6);
+}
+.sq-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, hsl(0 0% 100% / 0.06) 50%, transparent 80%);
+  animation: sq-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes sq-shimmer {
+  to { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sq-tab-enter, .sq-live-dot, .sq-skeleton::after {
+    animation: none;
+  }
+  .sq-press:active {
+    transform: none;
   }
 }
 

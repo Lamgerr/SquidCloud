@@ -7,7 +7,7 @@ import {
   BookmarkPlus, BookmarkCheck, Focus, AlertCircle, PenTool
 } from 'lucide-react';
 import { EpubEngine, EpubPageInfo, EpubTocItem } from '@/lib/epub-engine';
-import { downloadFileWithRes54 } from '@/lib/res54';
+import { smartDownload } from '@/lib/api';
 import { saveReadingProgress, loadReadingProgress } from '@/lib/deepread-service';
 import type { FileItem as FileItemType } from '@/lib/api';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -127,7 +127,7 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
 
       try {
         if (source === 'local' && file?.id) {
-          const blob = await downloadFileWithRes54(file.id);
+          const blob = await smartDownload(file.id);
           if (isMounted) setDecryptedBlob(blob);
         } else if (source === 'remote' && file?.url) {
           let fetchUrl = file.url;

@@ -77,7 +77,8 @@ const constantTimeEqual = (a: string, b: string): boolean => {
 }
 
 serve(async (req) => {
-  return withPrelGateway(req, { functionId: 'kza-sentinel', operation: 'default' }, async (ctx: PrelContext) => {
+  try {
+  return await withPrelGateway(req, { functionId: 'kza-sentinel', operation: 'default' }, async (ctx: PrelContext) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const KZA_ENABLED = (Deno.env.get('KZA_ENABLED') ?? 'true').toLowerCase() === 'true'
@@ -140,23 +141,22 @@ serve(async (req) => {
   const referer = req.headers.get('referer') ?? ''
   const acceptLanguage = req.headers.get('accept-language') ?? ''
   const acceptEncoding = req.headers.get('accept-encoding') ?? ''
-  const country = req.headers.get('cf-ipcountry') ?? req.headers.get('x-country') ?? 'UNKNOWN'
+  let country = req.headers.get('cf-ipcountry') ?? req.headers.get('x-country') ?? 'UNKNOWN'
   const sessionId = req.headers.get('x-kza-session') ?? crypto.randomUUID()
   const endpoint = normalizePath(url)
 
   // ===== VEIL =====
-  const { data: ipHash } = await supabase.rpc('kza_veil_ip_hash', { p_ip: ipAddress }).catch(() => ({ data: null }))
+  let ipHash: string | null = null
+  try { const r = await supabase.rpc('kza_veil_ip_hash', { p_ip: ipAddress }); ipHash = r.data } catch { /* skip */ }
 
   const encryptSnapshot = async (payload: Record<string, unknown>): Promise<{ ct: string | null; nonce: string | null }> => {
     if (veilNoLog) return { ct: null, nonce: null }
-    const { data } = await supabase.rpc('kza_veil_encrypt_snapshot', { p_payload: payload }).catch(() => ({ data: null }))
-    return { ct: data?.ciphertext ?? null, nonce: data?.nonce ?? null }
+    try { const { data } = await supabase.rpc('kza_veil_encrypt_snapshot', { p_payload: payload }); return { ct: data?.ciphertext ?? null, nonce: data?.nonce ?? null } } catch { return { ct: null, nonce: null } }
   }
 
   const decryptSnapshot = async (ct: string, nonce: string): Promise<Record<string, any> | null> => {
     if (!ct || !nonce) return null
-    const { data } = await supabase.rpc('kza_veil_decrypt_snapshot', { p_ciphertext: ct, p_nonce: nonce }).catch(() => ({ data: null }))
-    return data ?? null
+    try { const { data } = await supabase.rpc('kza_veil_decrypt_snapshot', { p_ciphertext: ct, p_nonce: nonce }); return data ?? null } catch { return null }
   }
 
   // Registry: no-log mode for privacy-sensitive functions
@@ -704,6 +704,46 @@ serve(async (req) => {
     }
   }
 
+  // ===== COUNTRY RESOLUTION (ip-api.com) =====
+  if (country === 'UNKNOWN' && ipAddress !== 'unknown') {
+    try {
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 3000)
+      const resp = await fetch(`http://ip-api.com/json/${ipAddress}?fields=countryCode`, { signal: ctrl.signal })
+      clearTimeout(timer)
+      if (resp.ok) {
+        const d = await resp.json()
+        if (d.countryCode) country = d.countryCode.toUpperCase()
+      }
+    } catch { /* fail open */ }
+  }
+
+  // ===== KZA GEO-FENCE (kza_geo_fence table) =====
+  let geoAction: string | null = null
+  let geoReason: string | null = null
+  if (country !== 'UNKNOWN' && !adminSession) {
+    const { data: geoRules } = await supabase
+      .from('kza_geo_fence')
+      .select('country_code, action, reason')
+    const rules = (geoRules ?? []).map((r: any) => ({
+      cc: String(r.country_code ?? '').toUpperCase(),
+      action: r.action,
+      reason: String(r.reason ?? ''),
+    }))
+    const hit = rules.find((r) => r.cc === country.toUpperCase())
+    if (hit?.action === 'block') {
+      threatScore += 100
+      threatFlags.push('GEO_FENCE_BLOCK')
+      geoAction = 'GEO_FENCE'
+      geoReason = hit.reason || null
+    } else if (!hit && rules.some((r) => r.action === 'allow')) {
+      threatScore += 100
+      threatFlags.push('GEO_FENCE_DENY')
+      geoAction = 'GEO_FENCE'
+      geoReason = 'Region not supported'
+    }
+  }
+
   const totalScore = threatScore
   let tier: string | null = null
   if (totalScore >= BLACK_THRESHOLD) tier = 'BLACK'
@@ -901,9 +941,26 @@ serve(async (req) => {
       }).catch(() => null)
     }
 
-    return jsonResponseEx({ error: 'Access denied', code: 'KZA_BLOCKED' }, 403, scoreHeaders(totalScore))
+    const blockPayload: Record<string, unknown> = { error: 'Access denied', code: 'KZA_BLOCKED' }
+    if (geoAction) {
+      blockPayload.country = country
+      blockPayload.reason = geoReason || 'Region not supported'
+    }
+    return jsonResponseEx(blockPayload, 403, scoreHeaders(totalScore))
   }
 
   return jsonResponseEx({ ok: true, score: totalScore, tier }, 200, scoreHeaders(totalScore))
   })
+  } catch (err: any) {
+    console.error('[KZA-SENTINEL-CRASH]', err?.message ?? err)
+    return new Response(JSON.stringify({
+      error: 'Internal error',
+      code: 'KZA_SENTINEL_CRASH',
+      message: String(err?.message ?? err ?? 'unknown'),
+      stack: String(err?.stack ?? '').substring(0, 500),
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    })
+  }
 })

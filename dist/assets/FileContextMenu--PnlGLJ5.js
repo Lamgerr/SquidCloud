@@ -1,1 +1,0 @@
-import{j as o}from"./index-tm_wbFe3.js";import r from"./UniversalContextMenu-ZheNhGUe.js";import"./use-bookmarks-Dahd3g9_.js";import"./share-2-CqCEFsoO.js";import"./info-CgbuBG0N.js";import"./folder-open-Bh3ejJr5.js";import"./trash-2-CMcOncCW.js";const u=t=>o.jsx(r,{...t,item:t.file});export{u as default};

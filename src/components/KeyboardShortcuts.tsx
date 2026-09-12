@@ -175,7 +175,7 @@ export function KeyboardShortcutsOverlay() {
 
   return (
     <Dialog open={overlayOpen} onOpenChange={setOverlayOpen}>
-      <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden">
+      <DialogContent showCloseButton={false} className="max-w-lg p-0 gap-0 overflow-hidden">
         <ShortcutsContent onClose={() => setOverlayOpen(false)} />
       </DialogContent>
     </Dialog>

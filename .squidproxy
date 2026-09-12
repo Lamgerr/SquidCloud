@@ -1,0 +1,6 @@
+# .squidproxy
+# [[secret]]
+# name = "MY_SECRET"
+# type = "http_auth"
+# inject_header = "Authorization"
+# inject_format = "Bearer {secret}"

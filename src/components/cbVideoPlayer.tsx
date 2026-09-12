@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { 
   Play, Pause, Maximize, Minimize, Loader, Volume2, VolumeX, 
   RotateCcw, RotateCw, Settings, PictureInPicture, AlertCircle, RefreshCw, Cpu, FileVideo,
-  Wifi, WifiOff
+  Wifi, WifiOff, Subtitles, Languages, Gauge, Film
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -51,13 +51,25 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   const [muted, setMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
+  const [showSubtitlesMenu, setShowSubtitlesMenu] = useState(false);
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
+  const [activeAudioTrack, setActiveAudioTrack] = useState<number>(-1);
+  const [activeTextTrack, setActiveTextTrack] = useState<number>(-1);
+  const [audioTracks, setAudioTracks] = useState<{ index: number; language: string; label: string }[]>([]);
+  const [textTracks, setTextTracks] = useState<{ index: number; language: string; label: string }[]>([]);
+  const [chapters, setChapters] = useState<{ time: number; label: string }[]>([]);
+  const [currentChapter, setCurrentChapter] = useState(-1);
+  const [stats, setStats] = useState({ fps: 0, resolution: '', codec: '', bitrate: '' });
+  const lastFrameTimeRef = useRef(performance.now());
   
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPosition, setHoverPosition] = useState(0);
   const [seekAnimation, setSeekAnimation] = useState<'left' | 'right' | null>(null);
 
   const isUnsupportedContainer = useMemo(() => {
-    return /\.(avi|mkv|wmv|flv|mov)$/i.test(file.name);
+    return /\.(avi|wmv|flv)$/i.test(file.name);
   }, [file.name]);
 
   const isLargeFile = useMemo(() => file.size > 50 * 1024 * 1024, [file.size]);
@@ -474,6 +486,26 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
               setBuffering(false);
               setLoadPhase('ready');
             }
+            const v = videoRef.current;
+            if (v) {
+              const at: { index: number; language: string; label: string }[] = [];
+              for (let i = 0; i < (v.audioTracks?.length || 0); i++) {
+                const t = v.audioTracks![i];
+                at.push({ index: i, language: t.language || 'und', label: t.label || t.language || `Track ${i + 1}` });
+              }
+              setAudioTracks(at);
+
+              const tt: { index: number; language: string; label: string }[] = [];
+              for (let i = 0; i < (v.textTracks?.length || 0); i++) {
+                const t = v.textTracks![i];
+                tt.push({ index: i, language: t.language || 'und', label: t.label || t.language || `Sub ${i + 1}` });
+              }
+              setTextTracks(tt);
+
+              const w = v.videoWidth;
+              const h = v.videoHeight;
+              setStats(s => ({ ...s, resolution: w && h ? `${w}×${h}` : 'N/A' }));
+            }
           }}
           onLoadedData={() => {
             setBuffering(false);
@@ -500,6 +532,20 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
             if (current > 0 && buffering) {
               setBuffering(false);
               setLoadPhase('ready');
+            }
+            const now = performance.now();
+            const delta = now - lastFrameTimeRef.current;
+            if (delta > 0) {
+              setStats(s => ({ ...s, fps: Math.round(1000 / delta) }));
+            }
+            lastFrameTimeRef.current = now;
+            if (chapters.length > 0) {
+              for (let i = chapters.length - 1; i >= 0; i--) {
+                if (current >= chapters[i].time) {
+                  if (currentChapter !== i) setCurrentChapter(i);
+                  break;
+                }
+              }
             }
           }}
           onProgress={() => {
@@ -584,6 +630,31 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
         </div>
       )}
 
+      {/* Netflix-style Subtitle Overlay */}
+      {subtitlesEnabled && (() => {
+        const tracks = videoRef.current?.textTracks;
+        if (!tracks) return null;
+        const active = Array.from(tracks).find((t: any) => t.mode === 'showing' && t.activeCues && t.activeCues.length > 0);
+        if (!active || !active.activeCues) return null;
+        const cue = active.activeCues[0] as VTTCue;
+        return (
+          <div className="absolute bottom-24 inset-x-0 flex justify-center z-15 pointer-events-none px-4">
+            <span className="bg-black/80 text-white text-lg md:text-2xl font-semibold px-4 py-2 rounded-md max-w-[80%] text-center leading-snug" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
+              {cue.text}
+            </span>
+          </div>
+        );
+      })()}
+
+      {/* Chapter Indicator */}
+      {chapters.length > 1 && currentChapter >= 0 && playing && (
+        <div className="absolute top-3 left-3 z-10 pointer-events-none">
+          <div className="bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-1 rounded-md">
+            {chapters[currentChapter]?.label}
+          </div>
+        </div>
+      )}
+
       {/* Control Bar Overlay */}
       <div 
         onClick={(e) => e.stopPropagation()}
@@ -606,6 +677,16 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
               style={{ width: `${(loadProgress / 100) * 100}%` }}
             />
           )}
+          {chapters.length > 1 && chapters.map((ch, i) => (
+            i > 0 && (
+              <div
+                key={i}
+                className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3 bg-white/50 rounded-full pointer-events-none"
+                style={{ left: `${(ch.time / (duration || 1)) * 100}%` }}
+                title={ch.label}
+              />
+            )
+          ))}
           {hoverTime !== null && (
             <div 
               className="absolute -top-9 bg-neutral-900 border border-neutral-700 px-2 py-1 rounded text-xs font-mono text-white shadow-lg pointer-events-none -translate-x-1/2"
@@ -651,12 +732,33 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-4 relative">
+          <div className="flex items-center gap-3 relative">
+            {/* Subtitles toggle */}
+            {textTracks.length > 0 && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); setSubtitlesEnabled(!subtitlesEnabled); }}
+                className={cn("hover:text-red-500 transition-colors", subtitlesEnabled && "text-red-500")}
+                title="Subtitles"
+              >
+                <Subtitles className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Stats for nerds */}
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowStats(!showStats); }}
+              className={cn("hover:text-red-500 transition-colors", showStats && "text-red-500")}
+              title="Stats for Nerds"
+            >
+              <Gauge className="w-5 h-5" />
+            </button>
+
             <button onClick={togglePiP} className="hover:text-red-500 transition-colors" title="Picture-in-Picture">
               <PictureInPicture className="w-5 h-5" />
             </button>
 
-            <div className="relative">
+            {/* Settings panel */}
+            <div className="relative flex items-center">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} 
                 className={cn("hover:text-red-500 transition-colors", showSettings && "text-red-500")}
@@ -665,20 +767,104 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
               </button>
 
               {showSettings && (
-                <div className="absolute bottom-9 right-0 bg-neutral-900 border border-neutral-800 rounded-xl py-2 px-3 shadow-2xl flex flex-col gap-1.5 min-w-[120px] z-30">
-                  <span className="text-[10px] uppercase font-bold text-neutral-400 px-2">Speed</span>
-                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((spd) => (
-                    <button
-                      key={spd}
-                      onClick={() => changeSpeed(spd)}
-                      className={cn(
-                        "text-left text-xs px-2 py-1 rounded hover:bg-neutral-800 transition-colors",
-                        playbackSpeed === spd ? "text-red-500 font-bold" : "text-neutral-200"
-                      )}
-                    >
-                      {spd === 1 ? 'Normal' : `${spd}x`}
-                    </button>
-                  ))}
+                <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-neutral-900/95 backdrop-blur-md border border-neutral-800 rounded-xl py-3 px-3 shadow-2xl flex flex-col gap-3 min-w-[180px] z-30 max-h-[60vh] overflow-y-auto">
+                  {/* Speed */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 px-1 block mb-1">Speed</span>
+                    <div className="flex gap-1 flex-wrap">
+                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((spd) => (
+                        <button
+                          key={spd}
+                          onClick={() => changeSpeed(spd)}
+                          className={cn(
+                            "text-[11px] px-2 py-1 rounded transition-colors",
+                            playbackSpeed === spd ? "bg-red-600 text-white font-bold" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                          )}
+                        >
+                          {spd === 1 ? '1×' : `${spd}x`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Audio Language */}
+                  {audioTracks.length > 1 && (
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 px-1 flex items-center gap-1 mb-1">
+                        <Languages className="w-3 h-3" /> Audio
+                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        {audioTracks.map((track) => (
+                          <button
+                            key={track.index}
+                            onClick={() => {
+                              if (videoRef.current) {
+                                for (let i = 0; i < (videoRef.current?.audioTracks?.length || 0); i++) {
+                                  videoRef.current!.audioTracks![i].enabled = i === track.index;
+                                }
+                                setActiveAudioTrack(track.index);
+                              }
+                            }}
+                            className={cn(
+                              "text-left text-[11px] px-2 py-1 rounded transition-colors",
+                              activeAudioTrack === track.index ? "text-red-500 font-bold bg-neutral-800" : "text-neutral-300 hover:bg-neutral-800"
+                            )}
+                          >
+                            {track.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subtitles */}
+                  {textTracks.length > 0 && (
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 px-1 flex items-center gap-1 mb-1">
+                        <Subtitles className="w-3 h-3" /> Subtitles
+                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => { setSubtitlesEnabled(false); }}
+                          className={cn(
+                            "text-left text-[11px] px-2 py-1 rounded transition-colors",
+                            !subtitlesEnabled ? "text-red-500 font-bold bg-neutral-800" : "text-neutral-300 hover:bg-neutral-800"
+                          )}
+                        >
+                          Off
+                        </button>
+                        {textTracks.map((track) => (
+                          <button
+                            key={track.index}
+                            onClick={() => {
+                              setSubtitlesEnabled(true);
+                              setActiveTextTrack(track.index);
+                              if (videoRef.current) {
+                                for (let i = 0; i < (videoRef.current?.textTracks?.length || 0); i++) {
+                                  videoRef.current!.textTracks![i].mode = i === track.index ? 'showing' : 'hidden';
+                                }
+                              }
+                            }}
+                            className={cn(
+                              "text-left text-[11px] px-2 py-1 rounded transition-colors",
+                              subtitlesEnabled && activeTextTrack === track.index ? "text-red-500 font-bold bg-neutral-800" : "text-neutral-300 hover:bg-neutral-800"
+                            )}
+                          >
+                            {track.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Format info */}
+                  <div className="border-t border-neutral-800 pt-2">
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 px-1 flex items-center gap-1 mb-1">
+                      <Film className="w-3 h-3" /> Format
+                    </span>
+                    <p className="text-[11px] text-neutral-300 px-1 font-mono truncate">{file.name}</p>
+                    <p className="text-[10px] text-neutral-500 px-1">{formatFileSize(file.size)} — {file.type || 'unknown'}</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -689,6 +875,21 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Stats for Nerds Overlay */}
+      {showStats && (
+        <div className="absolute top-3 right-3 z-30 bg-black/80 backdrop-blur-sm border border-neutral-700 rounded-lg p-3 min-w-[200px] text-[11px] font-mono text-neutral-300 space-y-1">
+          <div className="flex justify-between"><span className="text-neutral-500">Resolution</span><span className="text-white">{stats.resolution || 'N/A'}</span></div>
+          <div className="flex justify-between"><span className="text-neutral-500">FPS</span><span className="text-white">{stats.fps || '—'}</span></div>
+          <div className="flex justify-between"><span className="text-neutral-500">Buffer</span><span className={cn(bufferHealth > 30 ? "text-green-400" : bufferHealth > 10 ? "text-yellow-400" : "text-red-400")}>{bufferHealth.toFixed(1)}s</span></div>
+          <div className="flex justify-between"><span className="text-neutral-500">Time</span><span className="text-white">{formatTime(currentTime)} / {formatTime(duration)}</span></div>
+          <div className="flex justify-between"><span className="text-neutral-500">Speed</span><span className="text-white">{playbackSpeed}×</span></div>
+          <div className="flex justify-between"><span className="text-neutral-500">Audio</span><span className="text-white">{audioTracks.find(t => t.index === activeAudioTrack)?.label || 'Default'}</span></div>
+          <div className="flex justify-between"><span className="text-neutral-500">Subtitles</span><span className="text-white">{subtitlesEnabled ? (textTracks.find(t => t.index === activeTextTrack)?.label || 'On') : 'Off'}</span></div>
+          {isLargeFile && <div className="flex justify-between"><span className="text-neutral-500">Load</span><span className="text-white">{loadProgress}%</span></div>}
+          <div className="flex justify-between"><span className="text-neutral-500">Retry</span><span className="text-white">{retryCount}</span></div>
+        </div>
+      )}
     </div>
   );
 };
