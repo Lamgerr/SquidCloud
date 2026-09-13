@@ -6,8 +6,8 @@
 -- 1. discount_codes: drop the dangerous public ALL policy, add service-role-only
 DROP POLICY IF EXISTS "service_role_all_discount_codes" ON public.discount_codes;
 
--- Revoke direct access from anon and authenticated roles
-REVOKE ALL ON public.discount_codes FROM anon, authenticated;
+-- Revoke direct access from anon, authenticated, and public roles
+REVOKE ALL ON public.discount_codes FROM public, anon, authenticated;
 
 -- Service role bypasses RLS, so no policy needed — the REVOKE above blocks
 -- all client-side access. Edge functions using SERVICE_ROLE_KEY still work.
@@ -16,10 +16,11 @@ REVOKE ALL ON public.discount_codes FROM anon, authenticated;
 DROP POLICY IF EXISTS "Anyone can read partner codes" ON public.partner_codes;
 DROP POLICY IF EXISTS "Authenticated users can create partner codes" ON public.partner_codes;
 
-REVOKE ALL ON public.partner_codes FROM anon, authenticated;
+REVOKE ALL ON public.partner_codes FROM public, anon, authenticated;
 
 -- 3. passkey_challenges: already secure (RLS on, zero policies = deny-all)
--- No changes needed. Documentation was stale.
+-- Belt-and-suspenders: revoke grants from public/anon/authenticated too
+REVOKE ALL ON public.passkey_challenges FROM public, anon, authenticated;
 
 -- ============================================================
 -- SPIKE HARDENING: Cleanup cron jobs for unbounded tables
