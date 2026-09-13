@@ -64,6 +64,7 @@ const FAQS = [
   { q: 'What happens when a free site archives?', a: 'Free plan published sites are automatically archived after 50 days of inactivity. Archiving means the site is taken offline but all files are preserved. You can 1-click unarchive it anytime from your dashboard — it comes back exactly as it was.' },
   { q: 'What does priority queue mean in practice?', a: 'The processing queue affects uploads, downloads, publishing, and pipelines. Standard queue (Free) processes requests in order behind all paying users. Priority (Supporter) skips ahead of Free. Top priority (Supporter+) processes before all other tiers. In practice this means faster uploads and publishing during peak usage.' },
   { q: 'What counts as an API token?', a: 'Every API request consumes one token, regardless of the endpoint or method. Tokens reset daily and are shared across your account — not per API key. Free: 1,000/day. Supporter: 10,000/day. Supporter+: Unlimited.' },
+  { q: 'How does the daily upload limit work?', a: 'Each completed file upload counts toward your daily quota — Free: 20 files/day, Supporter: 50 files/day, Supporter+: 100 files/day. The counter resets at midnight UTC alongside your API tokens. File size limits still apply separately (1 GB Free, 12 GB Supporter, unlimited Supporter+).' },
   { q: 'Can I switch plans?', a: 'Yes, anytime. Upgrade or downgrade between Free, Supporter, and Supporter+. When upgrading you get immediate access to the new limits. When downgrading, changes apply at the end of your current billing period. No lock-in, no penalties.' },
   { q: 'How does billing work with weekly/monthly/annual?', a: 'You pick the cadence that works for you. Weekly bills every 7 days at the weekly rate (~18% less than monthly). Monthly bills every 30 days. Annual bills once per year and gives you the best value — 4 months effectively free compared to monthly. All payments are processed through MaxelPay with cryptocurrency.' },
 ];
@@ -73,6 +74,7 @@ const COMPARISON_ROWS = [
   { feature: 'Concurrent uploads', free: '2', supp: '10', suppPlus: 'Unlimited' },
   { feature: 'Concurrent downloads', free: '2', supp: '10', suppPlus: 'Unlimited' },
   { feature: 'Max upload file size', free: '1 GB', supp: '12 GB', suppPlus: 'Unlimited' },
+  { feature: 'Daily file uploads', free: '20', supp: '50', suppPlus: '100' },
   { feature: 'API tokens per day', free: '1,000', supp: '10,000', suppPlus: 'Unlimited' },
   { feature: 'Published sites', free: 'Auto-archive 50 days', supp: 'Always active', suppPlus: 'Always active' },
   { feature: 'Processing queue', free: 'Standard', supp: 'Priority', suppPlus: 'Top priority' },
@@ -86,6 +88,7 @@ const FREE_FEATURES = [
   ['2', 'concurrent uploads'],
   ['2', 'concurrent downloads'],
   ['1 GB', 'max file size'],
+  ['20', 'file uploads / day'],
   ['1,000', 'API tokens / day'],
 ] as const;
 
@@ -93,6 +96,7 @@ const SUPP_FEATURES = [
   ['10', 'concurrent uploads'],
   ['10', 'concurrent downloads'],
   ['12 GB', 'max file size'],
+  ['50', 'file uploads / day'],
   ['10,000', 'API tokens / day'],
   ['Priority', 'processing queue'],
   ['Included', 'custom domains'],
@@ -101,6 +105,7 @@ const SUPP_FEATURES = [
 
 const PLUS_FEATURES = [
   ['Unlimited', 'concurrency, file size & tokens'],
+  ['100', 'file uploads / day'],
   ['Top priority', 'processing queue'],
   ['Always active', 'published sites'],
   ['Before Supporter', 'early access'],

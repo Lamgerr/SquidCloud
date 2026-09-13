@@ -365,6 +365,11 @@ class SmartTransferQueue {
           }. Upgrade to upload larger files.`
         );
       }
+      if (limits?.daily_upload_limit && limits.daily_upload_limit > 0 && (limits.uploads_used_today ?? 0) >= limits.daily_upload_limit) {
+        throw new Error(
+          `You have reached your daily upload limit of ${limits.daily_upload_limit} files on the ${limits.tier} plan. Resets at midnight UTC.`
+        );
+      }
       if (limits?.concurrent_uploads && limits.concurrent_uploads > 0) {
         const activeCount = Array.from(this.transfers.values())
           .filter(t => t.type === 'upload' && (t.status === 'transferring' || t.status === 'queued')).length;
