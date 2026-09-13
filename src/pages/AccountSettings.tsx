@@ -18,11 +18,12 @@ import ApiKeyManagement from '@/components/ApiKeyManagement';
 import CliDevicesSection from '@/components/settings/CliDevicesSection';
 import { WebhookManager } from '@/components/WebhookManager';
 import {
-  User, Mail, Key, Shield, Fingerprint, CheckCircle2, AlertCircle,
+  User, Mail, Key, Shield, ShieldAlert, Fingerprint, CheckCircle2, AlertCircle,
   Loader2, Plus, ArrowLeft, Lock, Settings, Trash2, HardDrive, Calendar, Code, Zap,
   FolderOpen, FileArchive, RefreshCw, Crown, Sparkles, Briefcase, TrendingUp,
   Repeat, Book, LogOut, Smartphone,
 } from '@/lib/icon-map';
+import { swkFetchNotices, swkAppealCase, SwkNotice } from '@/lib/swk-manifest';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -139,6 +140,41 @@ const AccountSettings = () => {
   const [redeemCodeInput, setRedeemCodeInput] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false);
+  const [swkNotices, setSwkNotices] = useState<SwkNotice[]>([]);
+  const [swkLoading, setSwkLoading] = useState(false);
+  const [swkAppealingId, setSwkAppealingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeCategory !== 'security') return;
+    let cancelled = false;
+    setSwkLoading(true);
+    swkFetchNotices(true)
+      .then((notices) => { if (!cancelled) setSwkNotices(notices); })
+      .catch(() => null)
+      .finally(() => { if (!cancelled) setSwkLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeCategory]);
+
+  const handleSwkAppeal = async (notice: SwkNotice) => {
+    if (!notice.case_id || swkAppealingId) return;
+    setSwkAppealingId(notice.id);
+    try {
+      const ok = await swkAppealCase(notice.case_id);
+      toast({
+        title: ok ? 'Appeal submitted' : 'Appeal failed',
+        description: ok
+          ? 'A human reviewer will look at your case. The file stays blocked until then.'
+          : 'Could not submit the appeal. Try again shortly.',
+        variant: ok ? 'default' : 'destructive',
+      });
+      if (ok) {
+        const refreshed = await swkFetchNotices(false).catch(() => [] as SwkNotice[]);
+        setSwkNotices(refreshed);
+      }
+    } finally {
+      setSwkAppealingId(null);
+    }
+  };
   const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
   const [paymentLogsLoading, setPaymentLogsLoading] = useState(false);
   const [banDialogOpen, setBanDialogOpen] = useState(false);
@@ -1207,6 +1243,64 @@ const AccountSettings = () => {
                     Update Password
                   </Button>
                 </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-semibold text-foreground">Upload Appeals (S-Hawk)</h4>
+                  <p className="text-xs text-muted-foreground truncate">Why a file was refused — and appeal for human review</p>
+                </div>
+              </div>
+              {swkNotices.filter((n) => !n.is_read).length > 0 && (
+                <Badge className="shrink-0 bg-destructive/10 text-destructive border-destructive/20">
+                  {swkNotices.filter((n) => !n.is_read).length} new
+                </Badge>
+              )}
+            </div>
+            {swkLoading ? (
+              <div className="flex items-center gap-2 p-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Loading screening decisions…</p>
+              </div>
+            ) : swkNotices.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No screening decisions on your account. Every refused upload will appear here with its exact reasons.</p>
+            ) : (
+              <div className="space-y-3">
+                {swkNotices.map((notice) => (
+                  <div key={notice.id} className="p-3 rounded-lg border border-border/40 bg-muted/30 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-foreground">{notice.title}</p>
+                      <span className="text-[11px] text-muted-foreground shrink-0">{new Date(notice.created_at).toLocaleString()}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">{notice.body}</p>
+                    {notice.reason_codes.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {notice.reason_codes.map((code) => (
+                          <Badge key={code} variant="outline" className="text-[10px] font-mono">{code}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    {notice.case_id && (
+                      <Button
+                        variant="outline"
+                        size={btnSize}
+                        disabled={swkAppealingId === notice.id}
+                        onClick={() => handleSwkAppeal(notice)}
+                        className="rounded-xl"
+                      >
+                        {swkAppealingId === notice.id ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : null}
+                        Appeal for human review
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
