@@ -14,6 +14,9 @@ export interface SecureFileRecordInput {
   externalObjectKey?: string | null;
   processor?: string | null;
   encryptionKey?: string | null;
+  swkManifestHash?: string | null;
+  swkManifest?: Record<string, unknown> | null;
+  swkDecision?: string | null;
 }
 
 const getAccessToken = async (): Promise<string> => {

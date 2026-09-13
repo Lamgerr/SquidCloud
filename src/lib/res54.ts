@@ -535,10 +535,18 @@ export const uploadFileWithRes54 = async (
   if (!accessToken) throw new Error('Authentication required');
   const supabaseUrl = SUPABASE_URL;
 
+  // S-Hawk metadata screening (plaintext-side, before encryption).
+  // Rejections throw SwkRejection carrying the exact reasons for the UI.
+  const { buildSwkManifest, swkScanManifest } = await import('./swk-manifest');
+  progressCallback?.(0, 'screening', { message: 'S-Hawk safety screening' });
+  const swkManifest = await buildSwkManifest(file);
+  const swkVerdict = await swkScanManifest(swkManifest);
+  progressCallback?.(0, 'screening-done');
+
   const getUploadUrls = async (chunks: { path: string; index: number }[], totalSize?: number) => {
     if (providerId) {
       const { data, error } = await supabase.functions.invoke('s3-storage', {
-        body: { action: 'get-upload-urls', providerId, chunks }
+        body: { action: 'get-upload-urls', providerId, chunks, totalSize, swkToken: swkVerdict.token, swkManifestHash: swkVerdict.manifestHash }
       });
       if (error || !data?.success) throw new Error(`Storage Error: ${error?.message || data?.error || 'Failed to get upload URLs'}`);
       const urls = data.urls.map((u: any) => ({ ...u, providerId }));
@@ -547,7 +555,7 @@ export const uploadFileWithRes54 = async (
     const urlResponse = await fetch(`${supabaseUrl}/functions/v1/squidcloud-cluster`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, totalSize, chunks })
+      body: JSON.stringify({ action: 'get-upload-urls', userId: user.id, totalSize, chunks, swkToken: swkVerdict.token, swkManifestHash: swkVerdict.manifestHash })
     });
     const responseData = await urlResponse.json();
     if (!urlResponse.ok || responseData.error) {
@@ -725,6 +733,10 @@ export const uploadFileWithRes54 = async (
     encryption_key: dbEncryptionKey,
     tags: [metadataString] as string[],
     processor: "res54",
+    swk_manifest_hash: swkVerdict.manifestHash,
+    swk_manifest: swkManifest,
+    swk_decision: swkVerdict.decision,
+    swk_scanned_at: new Date().toISOString(),
     ...(activeWorkspaceId ? { workspace_id: activeWorkspaceId } : {}),
     ...(providerId ? { storage_provider_id: providerId } : {})
   };

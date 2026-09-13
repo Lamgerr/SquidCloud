@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { securityService, SecurityEvent, ThreatAlert, AuditLog, EncryptionSettings, AccessPolicy } from '@/services/security-service';
+import { swkFetchNotices, swkAppealCase, SwkNotice } from '@/lib/swk-manifest';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -89,6 +90,8 @@ const SecurityCenter = () => {
   const [encryptionSettings, setEncryptionSettings] = useState<EncryptionSettings | null>(null);
   const [accessPolicies, setAccessPolicies] = useState<AccessPolicy[]>([]);
   const [securityReport, setSecurityReport] = useState<any>(null);
+  const [swkNotices, setSwkNotices] = useState<SwkNotice[]>([]);
+  const [appealingId, setAppealingId] = useState<string | null>(null);
   const [newPolicyDialog, setNewPolicyDialog] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<AccessPolicy | null>(null);
   const { toast } = useToast();
@@ -100,17 +103,19 @@ const SecurityCenter = () => {
   const loadSecurityData = async () => {
     setLoading(true);
     try {
-      const [events, alerts, encryption, policies] = await Promise.all([
+      const [events, alerts, encryption, policies, notices] = await Promise.all([
         securityService.getSecurityEvents(),
         securityService.getThreatAlerts(),
         securityService.getEncryptionSettings(),
-        securityService.getAccessPolicies()
+        securityService.getAccessPolicies(),
+        swkFetchNotices(false).catch(() => [] as SwkNotice[]),
       ]);
 
       setSecurityEvents(events);
       setThreatAlerts(alerts);
       setEncryptionSettings(encryption);
       setAccessPolicies(policies);
+      setSwkNotices(notices);
 
       // Generate security report for last 30 days
       const endDate = new Date();
@@ -198,6 +203,27 @@ const SecurityCenter = () => {
         description: "There was an error updating the access policy",
         variant: "destructive"
       });
+    }
+  };
+
+  const appealSwkCase = async (notice: SwkNotice) => {
+    if (!notice.case_id || appealingId) return;
+    setAppealingId(notice.id);
+    try {
+      const ok = await swkAppealCase(notice.case_id);
+      toast({
+        title: ok ? 'Appeal submitted' : 'Appeal failed',
+        description: ok
+          ? 'A human reviewer will look at your case. The file stays blocked until then.'
+          : 'Could not submit the appeal. Try again shortly.',
+        variant: ok ? 'default' : 'destructive',
+      });
+      if (ok) {
+        const refreshed = await swkFetchNotices(false).catch(() => [] as SwkNotice[]);
+        setSwkNotices(refreshed);
+      }
+    } finally {
+      setAppealingId(null);
     }
   };
 
@@ -311,10 +337,21 @@ const SecurityCenter = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs
+        defaultValue="overview"
+        className="space-y-6"
+        onValueChange={(value) => {
+          if (value === 'shawk') {
+            swkFetchNotices(true)
+              .then((refreshed) => setSwkNotices(refreshed))
+              .catch(() => null);
+          }
+        }}
+      >
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="threats">Threat Detection</TabsTrigger>
+          <TabsTrigger value="shawk">S-Hawk</TabsTrigger>
           <TabsTrigger value="encryption">Encryption</TabsTrigger>
           <TabsTrigger value="access">Access Control</TabsTrigger>
           <TabsTrigger value="audit">Audit & Compliance</TabsTrigger>
@@ -456,6 +493,54 @@ const SecurityCenter = () => {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="shawk" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>S-Hawk Upload Screening</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Every upload is screened against file-metadata safety signals before it is accepted.
+                When a file is refused, the exact reasons are listed here and you can appeal for human review.
+              </p>
+              {swkNotices.length === 0 && (
+                <p className="text-sm text-muted-foreground">No S-Hawk decisions on your account. Clean record.</p>
+              )}
+              {swkNotices.map((notice) => (
+                <div key={notice.id} className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium">{notice.title}</h4>
+                    <Badge variant={notice.is_read ? 'default' : 'destructive'}>
+                      {notice.is_read ? 'read' : 'new'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2 whitespace-pre-wrap">{notice.body}</p>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {notice.reason_codes.map((code) => (
+                      <Badge key={code} variant="outline" className="text-xs">
+                        {code}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {new Date(notice.created_at).toLocaleString()}
+                  </p>
+                  {notice.case_id && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={appealingId === notice.id}
+                      onClick={() => appealSwkCase(notice)}
+                    >
+                      {appealingId === notice.id ? 'Submitting…' : 'Appeal for human review'}
+                    </Button>
+                  )}
+                </div>
+              ))}
             </CardContent>
           </Card>
         </TabsContent>

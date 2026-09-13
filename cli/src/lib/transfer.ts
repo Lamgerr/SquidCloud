@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { apiRaw, apiGet, apiPost } from './api/client.js'
@@ -126,6 +127,65 @@ export class TransferProgress {
   }
 }
 
+function extOf(name: string): string {
+  const base = name.split(/[/\\]/).pop() || ''
+  const parts = base.split('.')
+  return parts.length > 1 ? (parts.pop() || '').toLowerCase() : ''
+}
+
+// S-Hawk metadata manifest (plaintext-side, pre-encryption). The server
+// screens this and rejects policy violations with reasons; the CLI sends
+// the raw manifest and the platform screens it server-to-server.
+async function sha256FileCapped(filePath: string, size: number): Promise<string | null> {
+  if (size > 256 * 1024 * 1024) return null
+  return new Promise((resolve) => {
+    try {
+      const hash = createHash('sha256')
+      const stream = fs.createReadStream(filePath, { highWaterMark: 8 * 1024 * 1024 })
+      stream.on('data', (chunk) => hash.update(chunk as Buffer))
+      stream.on('end', () => {
+        try { resolve(hash.digest('hex')) } catch { resolve(null) }
+      })
+      stream.on('error', () => resolve(null))
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+async function buildSwkManifest(filePath: string, name: string, type: string, size: number): Promise<Record<string, unknown>> {
+  let magic: string | null = null
+  try {
+    const fd = fs.openSync(filePath, 'r')
+    try {
+      const head = Buffer.alloc(Math.min(16, size))
+      fs.readSync(fd, head, 0, head.length, 0)
+      magic = head.toString('hex')
+    } finally {
+      fs.closeSync(fd)
+    }
+  } catch {
+    magic = null
+  }
+  const sha = await sha256FileCapped(filePath, size)
+  const extension = extOf(name)
+  return {
+    manifest_version: 'swk_manifest_v1',
+    filename: name.slice(0, 255),
+    size_bytes: size,
+    declared_mime: type,
+    extension,
+    magic_bytes: magic,
+    sniffed_mime: null,
+    width: null, height: null, duration_sec: null, codec: null,
+    exif_software: null, id3_artist: null, id3_title: null,
+    sha256_plaintext: sha,
+    phash: null, audio_fingerprint: null,
+    archive_entries: null, doc_author: null, doc_producer: null,
+    macro_enabled: /^(docm|xlsm|pptm)$/i.test(extension) ? true : null,
+  }
+}
+
 export async function uploadFile(
   filePath: string,
   opts: { folderId?: string | null; onProgress?: (info: ProgressInfo) => void; quiet?: boolean } = {},
@@ -138,10 +198,14 @@ export async function uploadFile(
   const type = guessMime(name)
   const progress = new TransferProgress('upload', stat.size, process.stdout.isTTY && !opts.quiet)
 
+  // S-Hawk screening manifest (rejections surface the server's reasons).
+  const swkManifest = await buildSwkManifest(filePath, name, type, stat.size)
+
   const init = await apiPost<InitUploadResponse>('/upload', {
     name,
     type,
     size: stat.size,
+    swkManifest,
     ...(opts.folderId ? { folder_id: opts.folderId } : {}),
   })
   if (!init?.success || !Array.isArray(init.urls)) throw new Error('Server refused the upload session')
@@ -201,7 +265,7 @@ export async function uploadFile(
   // the stored record's id.
   const complete = await apiPost<{ success?: boolean; id?: string; file_id?: string; file?: { id?: string } }>(
     '/upload/complete',
-    { upload_id: init.upload_id, chunk_size: chunkSize },
+    { upload_id: init.upload_id, chunk_size: chunkSize, swkManifest },
   )
   const realId = complete?.file?.id || complete?.id || complete?.file_id
   if (!realId) throw new Error('Upload complete did not return a file id')

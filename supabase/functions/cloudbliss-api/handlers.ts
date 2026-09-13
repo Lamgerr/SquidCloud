@@ -7,6 +7,7 @@ import {
   deriveAESKeyFromApiKey, logAudit, API_VERSION,
   verifyStreamToken, StreamToken,
   invokeCluster, getClusterDownloadUrls, getClusterUploadUrls,
+  swkRescoreManifest, swkEnsureToken,
 } from './lib.ts'
 
 // ============================================================
@@ -221,7 +222,24 @@ export async function handleFilesAPI(
     for (let i = 0; i < totalChunks; i++) {
       chunkPaths.push({ path: `${userId}/uploads/${uploadId}/${i}.bin`, index: i });
     }
-    const { urls, bucketAssignments } = await getClusterUploadUrls(userId, chunkPaths, size);
+    // S-Hawk: client verdict passes through; raw manifests from API/CLI
+    // clients are screened here server-to-server.
+    const swkInit = await swkEnsureToken(supabase, userId, body, size);
+    if (!swkInit.ok) {
+      return jsonResponse({ error: swkInit.error || 'S-Hawk screening required', success: false }, swkInit.status);
+    }
+    let urls: Array<{ index: number; path: string; uploadUrl: string; bucket: string; clusterId: string; kind: string }>;
+    let bucketAssignments: Record<string, string>;
+    try {
+      ({ urls, bucketAssignments } = await getClusterUploadUrls(userId, chunkPaths, size, undefined, {
+        swkToken: swkInit.swkToken,
+        swkManifestHash: swkInit.swkManifestHash,
+      }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const m = msg.match(/squidcloud-cluster (\d+): (.*)/);
+      return jsonResponse({ error: m?.[2] || msg, success: false }, m?.[1] ? Number(m[1]) : 500);
+    }
     if (!urls.length) {
       return jsonResponse({ error: 'No storage buckets available', success: false }, 503);
     }
@@ -244,6 +262,11 @@ export async function handleFilesAPI(
       folder_id: folderId,
       file_type: type,
       chunk_buckets: bucketAssignments,
+      // S-Hawk provenance for the complete step (manifest already screened).
+      ...(swkInit.manifest && swkInit.swkManifestHash ? {
+        swk_manifest: swkInit.manifest,
+        swk_manifest_hash: swkInit.swkManifestHash,
+      } : {}),
     });
 
     return jsonResponse({
@@ -334,6 +357,13 @@ export async function handleFilesAPI(
         encryption_key: '',
         tags: [JSON.stringify(metadata)],
         is_deleted: false,
+        // S-Hawk provenance carried from the screened init step.
+        ...((session as any).swk_manifest_hash && (session as any).swk_manifest ? {
+          swk_manifest_hash: (session as any).swk_manifest_hash,
+          swk_manifest: (session as any).swk_manifest,
+          swk_decision: 'allow',
+          swk_scanned_at: new Date().toISOString(),
+        } : {}),
       })
       .select()
       .single();
@@ -571,10 +601,12 @@ export async function handleFilesAPI(
         const encrypted = await encryptChunkV2(plaintext, encryptionKey);
 
         // Generate B2 path for the encrypted chunk
+        // Internal platform mint: these bytes were already S-Hawk screened
+        // at the POST /upload entry point.
         const encPath = `${userId}/encrypted/${fileId}/${chunk.index}.bin`;
         const [upload] = await getClusterUploadUrls(userId, [
           { path: encPath, index: chunk.index },
-        ], encrypted.byteLength);
+        ], encrypted.byteLength, undefined, { internalMint: true });
         if (!upload?.uploadUrl) throw new Error(`B2 upload URL failed for chunk ${chunk.index}`);
 
         // Upload encrypted data to B2
@@ -603,6 +635,8 @@ export async function handleFilesAPI(
       previewAvailable: false,
     };
 
+    // S-Hawk provenance (entry was screened at POST /upload; keep the manifest for share-time re-screening).
+    const encSwkManifest = body.swkManifest as Record<string, unknown> | undefined;
     const { data: fileRecord, error: fileError } = await supabase
       .from('files')
       .insert({
@@ -618,6 +652,12 @@ export async function handleFilesAPI(
         encryption_key: encryptionKey,
         tags: [JSON.stringify(metadata)],
         is_deleted: false,
+        ...(encSwkManifest && body.swkManifestHash ? {
+          swk_manifest_hash: String(body.swkManifestHash),
+          swk_manifest: encSwkManifest,
+          swk_decision: 'allow',
+          swk_scanned_at: new Date().toISOString(),
+        } : {}),
       })
       .select()
       .single();
@@ -682,7 +722,24 @@ export async function handleFilesAPI(
     for (let i = 0; i < totalChunks; i++) {
       chunkPaths.push({ path: `${userId}/uploads/${uploadId}/${i}.bin`, index: i });
     }
-    const { urls, bucketAssignments } = await getClusterUploadUrls(userId, chunkPaths, size);
+    // S-Hawk: client verdict passes through; raw manifests from API/CLI
+    // clients are screened here server-to-server.
+    const swkLegacy = await swkEnsureToken(supabase, userId, body, size);
+    if (!swkLegacy.ok) {
+      return jsonResponse({ error: swkLegacy.error || 'S-Hawk screening required', success: false }, swkLegacy.status);
+    }
+    let urls: Array<{ index: number; path: string; uploadUrl: string; bucket: string; clusterId: string; kind: string }>;
+    let bucketAssignments: Record<string, string>;
+    try {
+      ({ urls, bucketAssignments } = await getClusterUploadUrls(userId, chunkPaths, size, undefined, {
+        swkToken: swkLegacy.swkToken,
+        swkManifestHash: swkLegacy.swkManifestHash,
+      }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const m = msg.match(/squidcloud-cluster (\d+): (.*)/);
+      return jsonResponse({ error: m?.[2] || msg, success: false }, m?.[1] ? Number(m[1]) : 500);
+    }
     if (!urls.length) {
       return jsonResponse({ error: 'No storage buckets available', success: false }, 503);
     }
@@ -742,6 +799,19 @@ export async function handleFilesAPI(
 
     if (!uploadId || !fileId || !chunks.length) {
       return jsonResponse({ error: 'upload_id, file_id, and chunks are required', success: false }, 400);
+    }
+
+    // S-Hawk: re-verify the screening verdict at registration and keep the
+    // manifest as provenance for share-time re-screening. Raw manifests
+    // from API/CLI clients are screened here server-to-server.
+    const swkGate = await swkEnsureToken(supabase, userId, body, 0);
+    if (!swkGate.ok) {
+      return jsonResponse({ error: swkGate.error || 'S-Hawk verification failed', success: false }, swkGate.status);
+    }
+    const swkManifest = (swkGate.manifest || body.swkManifest) as Record<string, unknown> | undefined;
+    const swkManifestHash = swkGate.swkManifestHash || String(body.swkManifestHash || '');
+    if (!swkManifest || !swkManifestHash) {
+      return jsonResponse({ error: 'S-Hawk screening required: submit the file manifest with the upload.', success: false }, 403);
     }
 
     const url = new URL(req.url);
@@ -815,6 +885,10 @@ export async function handleFilesAPI(
         encryption_key: encryptionKey,
         tags: [JSON.stringify(metadata)],
         is_deleted: false,
+        swk_manifest_hash: swkManifestHash,
+        swk_manifest: swkManifest,
+        swk_decision: 'allow',
+        swk_scanned_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -904,6 +978,24 @@ export async function handleFilesAPI(
     if (body.expires_at) row.expires_at = String(body.expires_at);
     if (body.max_downloads !== undefined) row.download_limit = Number(body.max_downloads);
     if (body.view_only) row.view_only = true;
+
+    // S-Hawk: re-screen the stored manifest before the file can be distributed.
+    // Manifests evolve (new denylist entries); a file cleared at upload time
+    // may be flaggable now. Files without provenance are grandfathered.
+    if (fileId) {
+      const { data: sharedFile } = await supabase
+        .from('files')
+        .select('swk_manifest')
+        .eq('id', fileId)
+        .maybeSingle();
+      const manifest = (sharedFile as any)?.swk_manifest;
+      if (manifest) {
+        const rescore = await swkRescoreManifest(userId, manifest);
+        if (!rescore.ok) {
+          return jsonResponse({ error: rescore.error || 'Share blocked by S-Hawk', success: false }, rescore.status);
+        }
+      }
+    }
 
     const { error: insertError } = await supabase.from('shares').insert(row).select().maybeSingle();
 
@@ -2426,9 +2518,10 @@ export async function handleSecretsAPI(
         created_at: new Date().toISOString(),
       };
 
+      // Internal platform mint: system-generated secret envelope, not a user file.
       const [upload] = await getClusterUploadUrls(userId, [
         { path: storagePath, index: 0 },
-      ], chunkData.length);
+      ], chunkData.length, undefined, { internalMint: true });
       if (!upload?.uploadUrl) {
         return jsonResponse({ error: 'No storage buckets available for secret', success: false }, 503);
       }

@@ -3,6 +3,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, PutBucketCorsCommand } fr
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
+import { swkCheckUploadBan, swkVerifyToken } from '../_shared/swk-verify.ts';
 
 const MAX_PROXY_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -46,9 +47,22 @@ serve(async (req) => {
   }
   return withPrelGateway(req, { functionId: 'api-file-upload-tebi', operation: 'default' }, async (ctx: PrelContext) => {
     try {
-      const { action, fileName, fileType, path, fileBase64, providerId } = await req.json();
+      const { action, fileName, fileType, path, fileBase64, providerId, swkToken, swkManifestHash, totalSize } = await req.json();
       if (!providerId) {
         return jsonResponse({ success: false, error: "Provider ID is required" }, 400);
+      }
+
+      // S-Hawk gate for upload-shaped actions (user-owned bucket path included).
+      if (action === "upload" || action === "upload-proxy") {
+        const ban = await swkCheckUploadBan(supabase, ctx.userId);
+        if (!ban.ok) return jsonResponse({ success: false, error: ban.error }, ban.status);
+        const gate = await swkVerifyToken(supabase, {
+          userId: ctx.userId,
+          token: String(swkToken || ""),
+          manifestHash: String(swkManifestHash || ""),
+          sizeBytes: typeof totalSize === "number" ? totalSize : 0,
+        });
+        if (!gate.ok) return jsonResponse({ success: false, error: gate.error }, gate.status);
       }
 
       const supabaseUrl = Deno.env.get("SUPABASE_URL");

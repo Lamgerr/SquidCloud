@@ -460,11 +460,108 @@ export async function getClusterDownloadUrls(
   return data?.urls || [];
 }
 
+export interface SwkPass {
+  swkToken?: string;
+  swkManifestHash?: string;
+  internalMint?: boolean;
+}
+
+async function loadSwk(): Promise<any> {
+  return await import('../_shared/swk-verify.ts');
+}
+
+// Verify a kza-swk verdict token for an upload shaped body
+// ({ swkToken, swkManifestHash }).
+export async function swkVerifyUploadToken(
+  supabase: any,
+  userId: string,
+  body: Record<string, unknown>,
+  sizeBytes: number,
+): Promise<{ ok: boolean; status: number; error?: string; decision?: string }> {
+  const { swkVerifyToken } = await loadSwk();
+  return swkVerifyToken(supabase, {
+    userId,
+    token: String(body.swkToken || ''),
+    manifestHash: String(body.swkManifestHash || ''),
+    sizeBytes,
+  });
+}
+
+// Scan-assist for API/CLI clients: accepts either a client-minted verdict
+// ({ swkToken, swkManifestHash }) or a raw manifest ({ swkManifest }),
+// which is screened server-to-server with the caller as subject.
+// Returns the token + hash (+ echoed manifest) to forward downstream.
+export async function swkEnsureToken(
+  supabase: any,
+  userId: string,
+  body: Record<string, unknown>,
+  sizeBytes: number,
+): Promise<{ ok: boolean; status: number; error?: string; swkToken?: string; swkManifestHash?: string; manifest?: unknown }> {
+  if (body.swkToken && body.swkManifestHash) {
+    const gate = await swkVerifyUploadToken(supabase, userId, body, sizeBytes);
+    if (!gate.ok) return gate;
+    return { ok: true, status: 200, swkToken: String(body.swkToken), swkManifestHash: String(body.swkManifestHash), manifest: body.swkManifest };
+  }
+  if (body.swkManifest && typeof body.swkManifest === 'object') {
+    try {
+      const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/kza-swk`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'scan', user_id: userId, manifest: body.swkManifest }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { ok: false, status: 503, error: 'S-Hawk screening unavailable. Try again shortly.' };
+      }
+      if (data.decision === 'reject' || !data.token) {
+        const first = (data.reasons && data.reasons[0]?.message) || 'blocked by S-Hawk safety screening';
+        return { ok: false, status: 403, error: `Upload blocked: ${first}` };
+      }
+      return { ok: true, status: 200, swkToken: data.token, swkManifestHash: data.manifest_hash || '', manifest: body.swkManifest };
+    } catch (e) {
+      return { ok: false, status: 503, error: `S-Hawk screening failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
+  }
+  return { ok: false, status: 403, error: 'S-Hawk screening required: submit swkManifest or a prior swkToken + swkManifestHash.' };
+}
+
+// Re-screen a stored manifest at share/publish time (server-to-server).
+export async function swkRescoreManifest(
+  userId: string,
+  manifest: unknown,
+): Promise<{ ok: boolean; status: number; error?: string; decision?: string }> {
+  try {
+    const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/kza-swk`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'rescore', user_id: userId, manifest }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      return { ok: false, status: 503, error: 'S-Hawk re-screening unavailable. Try again shortly.' };
+    }
+    if (data.decision === 'reject') {
+      const first = (data.reasons && data.reasons[0]?.message) || 'blocked by S-Hawk safety screening';
+      return { ok: false, status: 403, error: `Share blocked: ${first}`, decision: data.decision };
+    }
+    return { ok: true, status: 200, decision: data.decision };
+  } catch (e) {
+    return { ok: false, status: 503, error: `S-Hawk re-screening failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 export async function getClusterUploadUrls(
   userId: string,
   chunks: Array<{ path: string; index: number }>,
   totalSize?: number,
   preferBucket?: string,
+  swk?: SwkPass,
 ): Promise<{
   urls: Array<{ index: number; path: string; uploadUrl: string; bucket: string; clusterId: string; kind: string }>;
   bucketAssignments: Record<string, string>;
@@ -475,6 +572,9 @@ export async function getClusterUploadUrls(
     chunks,
     totalSize,
     preferBucket,
+    ...(swk?.swkToken ? { swkToken: swk.swkToken } : {}),
+    ...(swk?.swkManifestHash ? { swkManifestHash: swk.swkManifestHash } : {}),
+    ...(swk?.internalMint === true ? { internalMint: true } : {}),
   });
   return {
     urls: data?.urls || [],

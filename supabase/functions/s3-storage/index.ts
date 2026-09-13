@@ -2,8 +2,9 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, ListObjectsV2Command, DeleteObjectCommand, PutBucketCorsCommand } from "https://esm.sh/@aws-sdk/client-s3";
 import { getSignedUrl } from "https://esm.sh/@aws-sdk/s3-request-presigner";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from './_shared/kza-prel.ts';
-import { getProviderCredentials } from './_shared/provider-vault.ts';
+import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
+import { getProviderCredentials } from '../_shared/provider-vault.ts';
+import { swkCheckUploadBan, swkVerifyToken } from '../_shared/swk-verify.ts';
 
 function getEndpointForProvider(providerType: string, accountId?: string, customEndpoint?: string): string {
   if (customEndpoint) return customEndpoint;
@@ -43,7 +44,7 @@ serve(async (req) => {
   }
   return withPrelGateway(req, { functionId: 's3-storage', operation: 'default' }, async (ctx: PrelContext) => {
     try {
-      const { action, providerId, chunks, path, fileName, fileType, fileBase64 } = await req.json();
+      const { action, providerId, chunks, path, fileName, fileType, fileBase64, swkToken, swkManifestHash, totalSize } = await req.json();
 
       if (!providerId) {
         return jsonResponse({ success: false, error: "Provider ID is required" }, 400);
@@ -149,6 +150,20 @@ serve(async (req) => {
 
         if (!chunks || !Array.isArray(chunks)) {
           return jsonResponse({ success: false, error: "chunks array required" }, 400);
+        }
+
+        // ===== S-HAWK GATE (same screening as the cluster path) =====
+        {
+          const gateUser = (ctx.userId && ctx.userId !== 'anonymous') ? ctx.userId : String(providerRow.user_id || '');
+          const ban = await swkCheckUploadBan(supabase, gateUser);
+          if (!ban.ok) return jsonResponse({ success: false, error: ban.error }, ban.status);
+          const gate = await swkVerifyToken(supabase, {
+            userId: gateUser,
+            token: String(swkToken || ""),
+            manifestHash: String(swkManifestHash || ""),
+            sizeBytes: typeof totalSize === "number" ? totalSize : 0,
+          });
+          if (!gate.ok) return jsonResponse({ success: false, error: gate.error }, gate.status);
         }
 
         const signedUrls = await Promise.all(

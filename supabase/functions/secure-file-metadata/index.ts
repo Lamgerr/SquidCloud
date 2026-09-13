@@ -153,6 +153,13 @@ serve(async (req) => {
     if (payload.processor) {
       insertPayload.processor = payload.processor;
     }
+    // S-Hawk provenance (stored when the uploader screened the manifest).
+    if (payload.swkManifestHash && payload.swkManifest) {
+      insertPayload.swk_manifest_hash = payload.swkManifestHash;
+      insertPayload.swk_manifest = payload.swkManifest;
+      insertPayload.swk_decision = payload.swkDecision || 'allow';
+      insertPayload.swk_scanned_at = new Date().toISOString();
+    }
 
     const { data: fileData, error: insertError } = await supabase
       .from("files")

@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "npm:aws4fetch";
 import { withPrelGateway } from "../_shared/kza-prel.ts";
 import { getProviderCredentials } from "../_shared/provider-vault.ts";
+import { swkCheckUploadBan, swkVerifyToken } from "../_shared/swk-verify.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -203,6 +204,16 @@ async function resolveClusterByBucket(
 // - Internal function-to-function calls present the service-role bearer and
 //   may delegate for an explicit userId.
 // - Everyone else gets the shared pool only (no private buckets).
+function isServiceCall(req: Request): boolean {
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const serviceRole = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+  if (!serviceRole || !token || token.length !== serviceRole.length) return false;
+  for (let i = 0; i < token.length; i++) {
+    if (token.charCodeAt(i) !== serviceRole.charCodeAt(i)) return false;
+  }
+  return true;
+}
 function resolveActingUserId(
   req: Request,
   ctx: { userId: string },
@@ -308,6 +319,30 @@ serve(async (req) => {
       }
 
       const fileSize = typeof totalSize === "number" ? totalSize : 0;
+
+      // ===== S-HAWK UPLOAD SUSPENSION (hard stop for suspended users) =====
+      {
+        const ban = await swkCheckUploadBan(supabase, userId);
+        if (!ban.ok) return createErrorResponse(ban.error || "Uploads suspended", ban.status);
+      }
+
+      // ===== S-HAWK VERDICT TOKEN (metadata screening gate) =====
+      // Direct client mints must present a kza-swk verdict token. Internal
+      // platform mints (service-role bearer + internalMint flag) move bytes
+      // the platform already accepted at entry — the entry point enforced
+      // the token. Only service-key holders can set internalMint.
+      {
+        const internal = isServiceCall(req) && (body as any).internalMint === true;
+        if (!internal) {
+          const gate = await swkVerifyToken(supabase, {
+            userId,
+            token: String((body as any).swkToken || ""),
+            manifestHash: String((body as any).swkManifestHash || ""),
+            sizeBytes: fileSize,
+          });
+          if (!gate.ok) return createErrorResponse(gate.error || "S-Hawk screening required", gate.status);
+        }
+      }
 
       // ===== PLAN FILE-SIZE ENFORCEMENT (server-side; client checks are bypassable) =====
       if (fileSize > 0) {

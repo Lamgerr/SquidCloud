@@ -92,11 +92,18 @@ function textToBase64Data(value: string): string {
   return btoa(unescape(encodeURIComponent(value)));
 }
 
+export interface SwkPass {
+  token: string;
+  manifestHash: string;
+  totalSize: number;
+}
+
 async function signTebiObjectUpload(
   providerId: string,
   fileName: string,
   path: string,
-  fileType: string
+  fileType: string,
+  swk?: SwkPass
 ): Promise<string> {
   const { data: presignData, error: presignError } = await supabase.functions.invoke('api-file-upload-tebi', {
     body: {
@@ -105,6 +112,7 @@ async function signTebiObjectUpload(
       fileType,
       path,
       providerId,
+      ...(swk ? { swkToken: swk.token, swkManifestHash: swk.manifestHash, totalSize: swk.totalSize } : {}),
     },
   });
 
@@ -122,8 +130,9 @@ async function uploadTebiPayloadWithFallback(
   fileType: string,
   payload: string,
   onProgress?: (progress: number, stage?: string, details?: any) => void,
+  swk?: SwkPass
 ): Promise<void> {
-  const uploadUrl = await signTebiObjectUpload(providerId, fileName, objectPath, fileType);
+  const uploadUrl = await signTebiObjectUpload(providerId, fileName, objectPath, fileType, swk);
 
   try {
     const putResponse = await fetch(uploadUrl, {
@@ -153,6 +162,7 @@ async function uploadTebiPayloadWithFallback(
         path: objectPath,
         fileBase64: textToBase64Data(payload),
         providerId,
+        ...(swk ? { swkToken: swk.token, swkManifestHash: swk.manifestHash, totalSize: swk.totalSize } : {}),
       },
     });
 
@@ -175,6 +185,13 @@ async function uploadFileToTebi(
 ): Promise<FileItem> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Authentication required');
+
+  // S-Hawk metadata screening (plaintext-side, before encryption).
+  onProgress?.(2, 'screening', { provider: 'tebi' });
+  const { buildSwkManifest, swkScanManifest } = await import('./swk-manifest');
+  const swkManifest = await buildSwkManifest(file);
+  const swkVerdict = await swkScanManifest(swkManifest);
+  const swk: SwkPass = { token: swkVerdict.token as string, manifestHash: swkVerdict.manifestHash, totalSize: file.size };
 
   onProgress?.(5, 'preparing', { provider: 'tebi' });
   const objectKey = buildExternalObjectKey(user.id, workspaceId, folderPath, file.name);
@@ -203,6 +220,7 @@ async function uploadFileToTebi(
       'text/plain',
       encryptedChunk,
       onProgress,
+      swk,
     );
 
     chunkMetadata.push({
@@ -238,6 +256,9 @@ async function uploadFileToTebi(
     storageProviderId: providerId,
     externalObjectKey: objectKey,
     encryptionKey,
+    swkManifestHash: swkVerdict.manifestHash,
+    swkManifest: swkManifest as unknown as Record<string, unknown>,
+    swkDecision: swkVerdict.decision,
   });
 
   onProgress?.(100, 'complete');
