@@ -74,6 +74,22 @@ function showFatalOverlay(message: string) {
   document.body.appendChild(overlay);
 }
 
+// Browser extensions inject scripts into the page and can throw their own errors
+// (e.g. `chrome-extension://.../executors/*.js`). Those must never be reported as
+// app startup failures — ignore them unless the app's own code is also implicated.
+const EXTENSION_URL = /(chrome-extension|moz-extension|safari-extension|edge-extension):\/\//i;
+
+function isExtensionNoise(detail: string, filename?: string): boolean {
+  if (filename && EXTENSION_URL.test(filename)) return true;
+  if (!EXTENSION_URL.test(detail)) return false;
+  try {
+    // Genuine app errors reference the app's own origin in the stack.
+    return !detail.includes(window.location.origin);
+  } catch {
+    return true;
+  }
+}
+
 window.addEventListener('error', (event) => {
   if (!event.message) return;
   // Firefox false-positive: dynamic import failures can fire on the main script tag.
@@ -81,6 +97,7 @@ window.addEventListener('error', (event) => {
   // likely false-positives from Firefox's buggy event attribution.
   if (!event.error && /Failed to (load|fetch) resource/i.test(event.message)) return;
   const detail = (event.error && (event.error.stack || event.error.message)) || event.message;
+  if (isExtensionNoise(String(detail), event.filename)) return;
   console.error('[fatal]', detail);
   if (tryRecoverModuleLoad(String(detail))) return;
   showFatalOverlay(String(detail));
@@ -89,14 +106,7 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason;
   const detail = (reason && (reason.stack || reason.message)) || String(reason);
-  console.error('[fatal]', detail);
-  if (tryRecoverModuleLoad(String(detail))) return;
-  showFatalOverlay(String(detail));
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-  const reason = event.reason;
-  const detail = (reason && (reason.stack || reason.message)) || String(reason);
+  if (isExtensionNoise(String(detail))) return;
   console.error('[fatal]', detail);
   if (tryRecoverModuleLoad(String(detail))) return; // stale-deploy recovery: reload once
   showFatalOverlay(String(detail));
