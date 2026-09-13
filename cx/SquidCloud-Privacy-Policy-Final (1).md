@@ -1,236 +1,186 @@
 # SquidCloud Privacy Policy
 
-**Version:** Universal  
-**Effective Date:** 05 April 2026  
-**Last Updated:** 05 April 2026
+**Version:** 2.0  
+**Effective Date:** 13 September 2026
+**Last Updated:** 13 September 2026
 **Applies To:** All SquidCloud services, platforms, APIs, CLI tools, and web interfaces  
 **Operated By:** SquidCloud, an independent project  
 **Platform:** https://squidcloud.vercel.app  
+
+**Plain-language summary:** we cannot read your files — they are encrypted on your device before they reach us. We do collect account data, file metadata, security telemetry, and (since v2.0) safety-screening manifests. This policy lists exactly what, why, and for how long. Summaries in boxes explain; the numbered clauses bind.
 
 ---
 
 ## 1. Introduction
 
-SquidCloud ("we", "us", "our") is committed to protecting your privacy. This Privacy Policy explains what information we collect, how we use it, how we protect it, and what rights you have over it.
+SquidCloud ("we", "us", "our") is committed to protecting your privacy. This policy applies to all SquidCloud services, platforms, APIs, CLI tools, and web interfaces.
 
-By accessing or using any SquidCloud service, you acknowledge that you have read, understood, and agree to this Privacy Policy. If you do not agree, please discontinue use of our services immediately.
+By accessing or using SquidCloud, you acknowledge that you have read and understood this Privacy Policy. If you do not agree, please discontinue use immediately.
 
-This policy is written to be clear and honest. We do not use legal language to obscure what we actually do.
+Material changes are announced by dashboard notice and, where you provided an email, by email at least 7 days before taking effect.
 
 ---
 
 ## 2. Information We Collect
 
-### 2.1 Account Information
-- Name and username
-- Email address
-- Profile photo (optional, only if you choose to upload one)
-- Account creation date and last login timestamp
+### 2.1 Account and identity
+Username, email address, profile fields you set, account timestamps, authentication events, session tokens, MFA/passkey enrollment facts (never private keys or secrets), and linked OAuth provider identifiers.
 
-### 2.2 File and Storage Metadata
-- File names, sizes, types, and timestamps
-- Folder structure and organization data
-- Encryption status and storage usage statistics
+### 2.2 File and storage metadata
+Filenames, sizes, MIME types, folder structure, timestamps, share settings, storage locations, chunk maps, and encryption parameters needed to reassemble your files. This is coordination metadata — it describes your files without revealing their content.
 
-We collect **metadata only**. We do not access, read, analyze, or process the content of your files in any way.
+### 2.3 Safety-screening manifests (S-Hawk)
+Before encryption, your own device assembles a metadata manifest for each upload or share, which our S-Hawk screening unit evaluates. A manifest contains only the following, and nothing else:
 
-### 2.3 Storage Provider Information
-SquidCloud supports multiple storage backends:
+- Filename, byte size, declared file type, file extension
+- First-bytes file signature ("magic bytes") and detected type
+- Media attributes where applicable: image dimensions, audio/video duration, codec label
+- Document/archive structure descriptors: archive entry names and sizes, macro presence flag, document producer/author strings where present
+- Cryptographic hashes: SHA-256 of the plaintext (files up to 256 MB), perceptual hash (images), audio fingerprint (reserved for future use)
 
-- **Native GitHub Storage** — SquidCloud uses GitHub repositories as a native storage backend. Your files are split into encrypted chunks and stored as JSON blob files within a GitHub repository. These chunks are fully encrypted before leaving your session — the resulting stored data is opaque and unidentifiable. Neither GitHub, SquidCloud, nor any third party can determine the nature or contents of your files from the stored chunks. GitHub's own privacy policy applies to the repository infrastructure used. You can review it at https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement.
-- **Bring Your Own Storage (BYOS)** — You may connect your own external storage provider, including but not limited to Tebi.io, Cloudflare R2, or Amazon S3. When you use BYOS, your files are stored directly on your chosen provider's infrastructure. SquidCloud stores only your encrypted connection credentials and file metadata. The privacy practices of your chosen provider apply to data stored there.
-- **Bring Your Own Key (BYOK)** — You may supply your own encryption keys. In this case, SquidCloud never holds or has access to your encryption key. Only you can decrypt your data.
+Manifests of cleared files are stored alongside file metadata so shares can be re-screened later. Manifests of refused files are kept in the case file described in Section 4. **Manifests never contain file content, and screening never decrypts your files.**
 
-### 2.4 API and Developer Data
-- API key prefixes (we store only the first few characters — never the full key)
-- API keys are stored in hashed form only
-- CLI and API usage logs including endpoint accessed, timestamp, and response status
-- These logs are retained for **90 days** and used solely for abuse prevention and diagnostics
+### 2.4 Security and abuse telemetry
+IP address, approximate geolocation (country level), device and session identifiers, request rates, authentication failures, screening decisions and scores, suspension and ban records, appeal records, and audit trails of administrative actions. This telemetry exists to keep the platform and its users safe.
 
-### 2.5 Technical and Diagnostic Data
-- IP address (used for security and rate limiting, not tracking)
-- Browser type and version
-- Operating system
-- Session activity logs for diagnostic purposes
-- Error logs
+### 2.5 API and CLI diagnostics
+Per-key usage counters, operation logs, error traces, and performance timings, retained for abuse prevention and reliability.
 
-### 2.6 Session and Authentication Data
-- Authentication tokens for maintaining your session
-- OAuth tokens if you sign in via a third-party provider (Google, GitHub, etc.)
-- These are stored securely and never shared
+### 2.6 Billing metadata
+Plan tier, billing cadence, payment timestamps, transaction references, and payment status from our processor (MaxelPay). We do not receive or store card numbers, wallet seeds, or private keys.
+
+### 2.7 Communications
+Support emails, appeal texts, and abuse reports you send us.
+
+> **Metadata-only principle.** We collect metadata only. We do not read, decrypt, analyze, or derive insights from the content of your files — including for safety screening, which operates exclusively on the manifests described in Section 2.3.
 
 ---
 
 ## 3. How We Use Your Information
 
-We use the information we collect strictly for the following purposes:
+- **Service delivery:** account access, authentication, storage operations, subscription enforcement.
+- **Safety screening:** evaluating upload/share manifests, refusing violating material, notifying you with reasons, and maintaining case files and appeals.
+- **Security:** abuse prevention, intrusion detection, rate limiting, suspensions, and bans.
+- **Diagnostics:** error tracking, performance analysis, reliability improvements.
+- **Billing:** provisioning paid tiers, handling renewals, downgrades, and disputes.
+- **Communications:** policy notices, security alerts, screening decisions, and support replies.
+- **Compliance:** meeting applicable legal obligations, including responding to lawful authority requests per Section 8.
 
-- **Providing the service** — account creation, authentication, file storage management
-- **Security** — detecting abuse, unauthorized access, and enforcing rate limits
-- **Diagnostics** — identifying and fixing errors and performance issues
-- **Communication** — sending service-related notifications, security alerts, and policy updates via email
-- **Legal compliance** — meeting obligations under applicable law
-
-We do not use your information for advertising. We do not build user profiles for commercial purposes. We do not use your data to train any artificial intelligence or machine learning model.
-
----
-
-## 4. What We Never Do
-
-- We do not sell your data to any third party, ever
-- We do not share your personal information with external companies, advertisers, or data brokers
-- We do not access or read the content of your uploaded files
-- We do not use your files or data to train AI models
-- We do not retain your data beyond what is necessary for providing the service
+Our legal bases include your consent (account creation and use), performance of the contract (the Terms), our legitimate interests (security, abuse prevention, platform integrity), and legal obligation.
 
 ---
 
-## 5. How Your Data Is Stored and Protected
+## 4. Screening Case Files: What Happens on a Refusal
 
-### 5.1 Native Storage — GitHub Encrypted Chunks
-When using native storage, your files are processed as follows before leaving your session:
-
-- Files are split into chunks
-- Each chunk is fully encrypted using the Res54 engine (AES-256-GCM)
-- Encrypted chunks are serialized as JSON blob files
-- These JSON blobs are stored in a GitHub repository managed by SquidCloud on your behalf
-
-The stored JSON blobs contain no identifiable information about your files. No filename, file type, or content can be inferred from the stored chunks by any party — including GitHub and SquidCloud. Only your account, with the correct decryption credentials, can reassemble and decrypt the original files.
-
-GitHub's infrastructure and privacy practices govern the storage of these encrypted blobs. GitHub API rate limits may occasionally affect upload or retrieval performance.
-
-### 5.2 Bring Your Own Storage (BYOS)
-When you attach an external storage provider such as Tebi.io, Cloudflare R2, or Amazon S3, your file content is stored entirely on that provider's infrastructure. SquidCloud stores only:
-- Your provider credentials, encrypted at rest
-- File metadata (names, sizes, timestamps) in our Supabase database
-
-The privacy and security of your file content under BYOS is governed by your chosen provider's terms and privacy policy.
-
-### 5.3 Bring Your Own Key (BYOK)
-If you use BYOK, your encryption key is never transmitted to or stored by SquidCloud. All encryption and decryption happens on your end. We have no ability to access your data in this configuration.
-
-### 5.4 Metadata Storage
-File metadata for all storage configurations is stored in a Supabase database. This metadata includes file names, sizes, types, and timestamps — never file content.
-
-### 5.5 Encryption
-Where SquidCloud manages encryption, we use the Res54 encryption engine implementing:
-- **AES-256-GCM** encryption standard
-- Block-split architecture for enhanced security
-- Optional entropy layer
-- HTTPS enforced on all connections — no plaintext transmission anywhere
-
-### 5.6 Platform Hosting
-The SquidCloud web platform is hosted on Vercel. Vercel may process request and performance data as part of hosting. You can review Vercel's Privacy Policy at https://vercel.com/legal/privacy-policy.
+When S-Hawk refuses an upload or share, we open a case file containing: your account identifier, the manifest (Section 2.3), the triggered signals with their scores, the decision, and any suspension applied. Case files are forwarded to our KZA adjudication pipeline for human review where required, and you receive a notice stating the exact reasons plus an appeal path (Settings → Security → Upload Appeals). Filing an appeal adds your appeal text to the case file. Case files contain no file content — refused material is never stored.
 
 ---
 
-## 6. Cookies and Session Technology
+## 5. What We Never Do
 
-SquidCloud uses minimal cookies and session storage strictly for operational purposes:
-
-- **Authentication cookies** — to keep you logged in during your session
-- **Session tokens** — to maintain your active session securely
-- **Preference storage** — to remember your display or settings preferences (stored locally in your browser)
-
-We do not use tracking cookies, advertising cookies, or third-party analytics cookies. You can clear cookies at any time through your browser settings. Clearing authentication cookies will log you out of your account.
+- We do not sell your personal data.
+- We do not share your information with advertisers or data brokers.
+- We do not read, decrypt, or analyze your uploaded file contents — for any purpose, including screening and law-enforcement cooperation (we can only ever produce the ciphertext and metadata we hold).
+- We do not use your files to train AI models.
+- We do not retain data beyond operational necessity and the retention schedule in Section 9.
+- We do not access your BYOK encryption keys (we never receive them).
 
 ---
 
-## 7. Third-Party Services We Use
+## 6. Storage and Protection
+
+- Native and cluster storage holds only client-side encrypted chunks (AES-256-GCM via the Res54 engine); chunks are opaque blobs.
+- BYOS stores content on your provider; SquidCloud stores encrypted credentials and metadata only.
+- BYOK keeps key management entirely with you.
+- Data in transit is protected with HTTPS; secrets at rest are vault-encrypted.
+- Access to production data is limited to what is strictly necessary to operate the service, and administrative access is logged.
+
+Third-party infrastructure references:
+
+- GitHub Privacy Statement: https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement
+- Vercel Privacy Policy: https://vercel.com/legal/privacy-policy
+
+---
+
+## 7. Cookies and Session Technology
+
+- Authentication cookies and session tokens for secure sign-in continuity.
+- Local preference storage for display and settings preferences.
+- No advertising or third-party tracking cookies.
+
+---
+
+## 8. Third-Party Services and Disclosures
 
 | Service | Purpose | Data Involved |
 |---|---|---|
-| Supabase | Authentication and metadata database | Account info and file metadata only |
-| GitHub | Native file storage backend | Encrypted chunked JSON blobs only |
+| Supabase | Authentication and metadata database | Account information and file metadata |
+| GitHub | Native storage backend | Encrypted chunked JSON blobs only |
 | Vercel | Platform hosting and delivery | Request and performance data |
-| OAuth Providers (Google, GitHub) | Optional sign-in | Only the token and profile info you authorize |
-| Tebi.io / Cloudflare R2 / Amazon S3 | Optional BYOS providers | File content only if you choose to connect them |
+| OAuth providers (Google, GitHub) | Optional sign-in | Authorized token and profile data |
+| Tebi.io / Cloudflare R2 / Amazon S3 | Optional BYOS providers | File content, only if connected by you |
+| MaxelPay | Payment processing for paid tiers | Billing metadata only (Section 2.6); no card/wallet secrets touch our systems |
 
-No readable file content is sent to any service. GitHub receives only encrypted, unidentifiable JSON blobs.
+We disclose personal data to authorities only where required by applicable law (for example, a valid court order), limited to the data we actually hold — account metadata, manifests, and ciphertext — and we will notify you unless legally prohibited. CSAM and other illegal content coming to our attention through screening reports is reported to the relevant authorities as the law requires.
 
 ---
 
-## 8. Data Retention
+## 9. Data Retention
 
 | Data Type | Retention Period |
 |---|---|
 | Account information | Until account deletion |
-| File metadata | Until file or account deletion |
-| API and CLI usage logs | 90 days from creation |
+| File metadata and manifests of stored files | Until file or account deletion |
+| Screening case files and findings | 12 months after case closure, then deleted |
+| Threat and abuse telemetry | 12 months |
+| Active ban records | Duration of the ban plus 12 months |
+| Screening notices and appeals | Until account deletion; appeals 12 months after decision |
+| API and CLI usage logs | 90 days |
+| Daily quota counters | Until the next UTC-midnight reset |
+| Billing metadata | 7 years for tax and accounting compliance, or as the law requires |
 | Session and authentication tokens | Until session expiry or logout |
 | Error and diagnostic logs | 30 days |
-| Deleted account data | Processed within a reasonable timeframe following confirmed deletion via email |
+| Support and grievance correspondence | 24 months |
+
+Backups, if any, age out on the same schedule as the source data. Aggregated, de-identified statistics (counts with no identifiers) may be kept indefinitely.
 
 ---
 
-## 9. Account Deletion and Data Removal
+## 10. Account Deletion and Your Rights
 
-SquidCloud does not currently offer self-service account deletion through the dashboard. To request deletion of your account and all associated data, contact us by email:
+Deletion requests are handled via email (hellosquidcloud@gmail.com, subject "Account Deletion Request — [Your Username or Registered Email]") and verified for account security. On confirmed deletion, account data and metadata are permanently removed per Section 9. External BYOS data must be deleted on your provider platform separately.
+
+Under India's Digital Personal Data Protection Act, 2023, and as a matter of policy wherever you live, you may:
+
+- **Access** a copy of the personal data we hold about you, including your screening case files.
+- **Correct** inaccurate or incomplete personal data.
+- **Delete** your personal data, subject to Section 9 retention required by law (billing, security).
+- **Nominate** another person to exercise your rights in case of death or incapacity.
+- **Grievance redressal:** write to hellosquidcloud@gmail.com with subject "Privacy Grievance — [brief topic]". We acknowledge within 48 hours on business days and resolve within 30 days. If unsatisfied, you may approach the Data Protection Board of India once constituted and operational.
+
+---
+
+## 11. Children
+
+Services are not intended for children under 13, and we do not knowingly collect their data. Accounts found to belong to under-13 users are terminated and their data deleted. Users 13–18 must have parent or guardian awareness and consent.
+
+---
+
+## 12. Changes to This Policy
+
+Material changes are announced by dashboard notice and email at least 7 days before taking effect. Continued use after the effective date constitutes acceptance. Archived versions are available on request.
+
+---
+
+## 13. Contact
 
 **Email:** hellosquidcloud@gmail.com  
-**Subject Line:** Account Deletion Request — [Your Username or Registered Email]
+**Platform:** https://squidcloud.vercel.app  
 
-Upon receiving your request, we will verify your identity and process the deletion. All associated data — account information, file metadata, and logs held by us — will be permanently removed. Encrypted chunks stored in GitHub repositories will also be removed. Files stored on external BYOS providers must be deleted separately through those platforms, as we do not control that infrastructure.
+We aim to respond within 48 hours on business days; privacy grievances per Section 10.
 
-If you wish to suspend your account temporarily rather than delete it, contact us at the same email address with your request.
-
----
-
-## 10. Your Rights and Controls
-
-- **Access** — you may request a summary of data we hold about you by contacting us
-- **Correction** — you may update or correct your account information through the dashboard or by contacting us
-- **Deletion** — you may request full account and data deletion by emailing us (see Section 9)
-- **API key revocation** — you may revoke any API key instantly from your dashboard
-- **Storage provider disconnection** — you may disconnect any external storage provider from your dashboard at any time
+> **Zero-tolerance policy.** CSAM and other illegal content are strictly prohibited and may result in immediate account termination and reporting to relevant authorities. Screening reports contain metadata only — we cannot and do not inspect file content.
 
 ---
 
-## 11. Children's Privacy
-
-SquidCloud services are not intended for individuals under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that a user under 13 has created an account, we will delete that account and all associated data promptly.
-
-If you are between 13 and 18 years of age, you may use SquidCloud with the awareness and consent of a parent or legal guardian.
-
----
-
-## 12. Compliance with Indian Law — DPDP Act 2023
-
-SquidCloud operates in compliance with the **Digital Personal Data Protection Act, 2023 (DPDP Act)** of India.
-
-Under this Act, you have the right to:
-- Know what personal data is being processed and for what purpose
-- Correct inaccurate or outdated personal data
-- Erase your personal data where it is no longer necessary
-- Nominate a representative to exercise these rights on your behalf
-
-**Grievance Redressal**
-
-**Email:** hellosquidcloud@gmail.com  
-**Subject Line:** DPDP Grievance — [Your Username]  
-**Response Time:** We will acknowledge your grievance within 72 hours and aim to resolve it within 15 days.
-
----
-
-## 13. Security Incident Notification
-
-In the unlikely event of a data breach that affects your personal information, we will notify affected users within a reasonable timeframe once the breach is confirmed and post a disclosure on our platform.
-
----
-
-## 14. Changes to This Policy
-
-We may update this Privacy Policy when new features are introduced, storage or encryption systems change, or legal requirements change. When we make material changes, we will notify you via a dashboard notice or email. Continued use of SquidCloud after a policy update constitutes acceptance of the updated policy.
-
----
-
-## 15. Contact
-
-**Email:** hellosquidcloud@gmail.com  
-**Website:** https://squidcloud.vercel.app  
-
-We aim to respond to all inquiries within 48 hours on business days.
-
----
-
-*SquidCloud is an independent project. This Privacy Policy is effective as of the date listed above and supersedes all previous versions.*
+*SquidCloud is an independent project. This Privacy Policy v2.0 is effective as of the date listed above and supersedes all previous versions, including v1.0 (05 April 2026). Nothing in this policy is legal advice; if you need it, consult a lawyer in your jurisdiction.*
