@@ -72,7 +72,7 @@ const COMPARISON_ROWS = [
   { feature: 'Storage', free: 'Unlimited', supp: 'Unlimited', suppPlus: 'Unlimited' },
   { feature: 'Concurrent uploads', free: '2', supp: '10', suppPlus: 'Unlimited' },
   { feature: 'Concurrent downloads', free: '2', supp: '10', suppPlus: 'Unlimited' },
-  { feature: 'Max upload file size', free: '1 GB', supp: '25 GB', suppPlus: 'Unlimited' },
+  { feature: 'Max upload file size', free: '1 GB', supp: '12 GB', suppPlus: 'Unlimited' },
   { feature: 'API tokens per day', free: '1,000', supp: '10,000', suppPlus: 'Unlimited' },
   { feature: 'Published sites', free: 'Auto-archive 50 days', supp: 'Always active', suppPlus: 'Always active' },
   { feature: 'Processing queue', free: 'Standard', supp: 'Priority', suppPlus: 'Top priority' },
@@ -92,7 +92,7 @@ const FREE_FEATURES = [
 const SUPP_FEATURES = [
   ['10', 'concurrent uploads'],
   ['10', 'concurrent downloads'],
-  ['25 GB', 'max file size'],
+  ['12 GB', 'max file size'],
   ['10,000', 'API tokens / day'],
   ['Priority', 'processing queue'],
   ['Included', 'custom domains'],

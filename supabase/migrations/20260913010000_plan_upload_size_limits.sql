@@ -1,6 +1,6 @@
 -- ============================================================
 -- PLAN UPLOAD SIZE LIMITS (matches advertised pricing)
--- free = 1 GB, supporter = 25 GB, supporter-plus = unlimited (-1)
+-- free = 1 GB, supporter = 12 GB, supporter-plus = unlimited (-1)
 -- ============================================================
 
 UPDATE public.plan_limits
@@ -8,7 +8,7 @@ SET max_file_size_bytes = 1073741824    -- 1 GB
 WHERE tier = 'free';
 
 UPDATE public.plan_limits
-SET max_file_size_bytes = 26843545600   -- 25 GB
+SET max_file_size_bytes = 12884901888   -- 12 GB
 WHERE tier = 'supporter';
 
 UPDATE public.plan_limits

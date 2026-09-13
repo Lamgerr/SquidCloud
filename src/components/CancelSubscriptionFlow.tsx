@@ -125,7 +125,7 @@ const CancelSubscriptionFlow: React.FC<CancelSubscriptionFlowProps> = ({
           <p className="text-xs font-semibold text-destructive">Cancel {planName}?</p>
         </div>
         <p className="text-xs text-muted-foreground">
-          You'll lose: priority queue, always-active sites, 25GB uploads, 10,000 API tokens/day, and your Supporter badge.
+          You'll lose: priority queue, always-active sites, 12GB uploads, 10,000 API tokens/day, and your Supporter badge.
         </p>
         <div className="flex gap-2 pt-1">
           <Button size="sm" variant="outline" className="flex-1 rounded-xl h-9 text-xs" onClick={() => setStep('pause')}>
