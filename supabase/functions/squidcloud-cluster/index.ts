@@ -308,6 +308,23 @@ serve(async (req) => {
       }
 
       const fileSize = typeof totalSize === "number" ? totalSize : 0;
+
+      // ===== PLAN FILE-SIZE ENFORCEMENT (server-side; client checks are bypassable) =====
+      if (fileSize > 0) {
+        const { data: sizeCheck, error: sizeErr } = await supabase.rpc("check_upload_file_size", {
+          user_id: userId,
+          file_size_bytes: fileSize,
+        });
+        if (sizeErr) {
+          console.error("[cluster] check_upload_file_size error:", sizeErr.message);
+        } else if (sizeCheck && (sizeCheck as any).allowed === false) {
+          return createErrorResponse(
+            (sizeCheck as any).reason || "File size exceeds your plan limit",
+            413
+          );
+        }
+      }
+
       let clusters = await loadAllBuckets(supabase, userId);
       // Prefer the caller's own buckets first (stable — shared pool order unchanged).
       if (userId) {
