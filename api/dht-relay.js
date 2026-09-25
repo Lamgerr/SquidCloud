@@ -2,7 +2,6 @@ import DHT from "bittorrent-dht";
 
 let _dht = null;
 let _ready = false;
-
 function getDHT() {
   if (_dht && _ready) return _dht;
   _dht = new DHT({ bootstrap: true });
