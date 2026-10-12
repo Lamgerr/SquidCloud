@@ -9,28 +9,36 @@ interface LazyFileGridProps {
   loading?: boolean;
   emptyState?: React.ReactNode;
   batchSize?: number;
+  /**
+   * Optional. When given, the window of rendered rows only resets when this
+   * value changes (folder or search changed) — not whenever the file count does.
+   * Without it, uploading or deleting a file while scrolled deep in a long
+   * folder snaps the list back to the first batch.
+   */
+  resetKey?: string;
 }
 
 const INCREMENT = 48;
 
 const GridSkeleton = () => (
-  <div className="rounded-lg border border-border/40 bg-muted/20 p-4 overflow-hidden animate-pulse">
+  <div className="overflow-hidden rounded-md border border-border bg-card p-4">
     <div className="flex flex-col items-center gap-3">
-      <div className="w-14 h-16 rounded-xl bg-muted/40 flex-shrink-0" />
+      <div className="sq-skeleton h-16 w-14 flex-shrink-0 rounded-md" />
       <div className="w-full space-y-2 pt-1 text-center">
-        <div className="h-3 bg-muted/60 rounded w-3/4 mx-auto" />
-        <div className="h-2 bg-muted/30 rounded w-1/2 mx-auto" />
+        <div className="sq-skeleton mx-auto h-3 w-3/4 rounded" />
+        <div className="sq-skeleton mx-auto h-2 w-1/2 rounded" />
       </div>
     </div>
   </div>
 );
 
+/* Same column templates as the list header below — rows must line up. */
 const ListSkeleton = () => (
-  <div className="flex items-center gap-3 px-4 h-11 rounded-md border border-border/40 bg-muted/20 animate-pulse">
-    <div className="w-7 h-7 rounded-lg bg-muted/50 flex-shrink-0" />
-    <div className="flex-1 h-3 bg-muted/50 rounded max-w-[220px]" />
-    <div className="w-20 h-2.5 bg-muted/30 rounded hidden md:block" />
-    <div className="w-24 h-2.5 bg-muted/30 rounded hidden lg:block" />
+  <div className="flex h-10 items-center gap-3 rounded-md border border-transparent px-3">
+    <div className="sq-skeleton h-6 w-6 flex-shrink-0 rounded" />
+    <div className="sq-skeleton h-3 max-w-[220px] flex-1 rounded" />
+    <div className="sq-skeleton hidden h-2.5 w-20 rounded md:block" />
+    <div className="sq-skeleton hidden h-2.5 w-24 rounded lg:block" />
   </div>
 );
 
@@ -41,6 +49,7 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
   loading = false,
   emptyState,
   batchSize = INCREMENT,
+  resetKey,
 }) => {
   const [visibleCount, setVisibleCount] = useState(batchSize);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -53,12 +62,23 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
 
   useEffect(() => { visibleRef.current = visibleCount; }, [visibleCount]);
   useEffect(() => { filesLenRef.current = files.length; }, [files.length]);
-  useEffect(() => { setVisibleCount(batchSize); }, [files.length, batchSize]);
+
+  // Original behaviour (no resetKey): reset whenever the count changes.
+  // With resetKey: reset only when the folder/search changes.
+  useEffect(() => {
+    if (resetKey === undefined) setVisibleCount(batchSize);
+  }, [files.length, batchSize, resetKey]);
+  useEffect(() => {
+    if (resetKey !== undefined) setVisibleCount(batchSize);
+  }, [resetKey, batchSize]);
 
   const loadMore = useCallback(() => {
     setVisibleCount(prev => Math.min(prev + batchSize, filesLenRef.current));
   }, [batchSize]);
 
+  // A fresh observer after every batch fires immediately if the sentinel is still
+  // in range, so tall screens keep filling instead of stalling after one batch.
+  // `loading` is a dependency because the sentinel only exists once loading ends.
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -72,7 +92,7 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [loadMore]);
+  }, [loadMore, loading, visibleCount, files.length]);
 
   const getGridClass = () => {
     if (isCompact) return 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2';
@@ -83,7 +103,8 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
   if (loading) {
     const n = Math.min(batchSize, 14);
     return (
-      <div className={getGridClass()}>
+      <div className={getGridClass()} role="status" aria-busy="true" aria-live="polite">
+        <span className="sr-only">Loading files…</span>
         {Array.from({ length: n }).map((_, i) => (
           isList ? <ListSkeleton key={i} /> : <GridSkeleton key={i} />
         ))}
@@ -96,12 +117,16 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
   }
 
   const visibleFiles = files.slice(0, visibleCount);
+  const remaining = files.length - visibleFiles.length;
 
   return (
     <div className="w-full select-none">
-      {/* macOS Finder Table Headers (List Mode Only) */}
+      {/* Column header (list mode only). Templates match the list rows exactly. */}
       {isList && (
-        <div className="grid grid-cols-[1fr_100px_140px_36px] md:grid-cols-[1fr_110px_150px_100px_36px] items-center px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border/50 mb-1">
+        <div
+          aria-hidden="true"
+          className="mb-1 grid grid-cols-[1fr_100px_140px_36px] items-center border-b border-border px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground md:grid-cols-[1fr_110px_150px_100px_36px]"
+        >
           <span>Name</span>
           <span className="hidden md:block">Kind</span>
           <span>Date Modified</span>
@@ -119,6 +144,21 @@ const LazyFileGrid: React.FC<LazyFileGridProps> = ({
       </div>
 
       <div ref={sentinelRef} aria-hidden="true" className="h-1 w-full" />
+
+      {remaining > 0 && (
+        <div className="flex items-center justify-center gap-3 py-4 font-mono text-[11px] tabular-nums text-muted-foreground" role="status">
+          <span>
+            Showing {visibleFiles.length.toLocaleString()} of {files.length.toLocaleString()}
+          </span>
+          <button
+            type="button"
+            onClick={loadMore}
+            className="rounded border border-border px-2 py-0.5 text-foreground transition-colors hover:bg-accent"
+          >
+            Show more
+          </button>
+        </div>
+      )}
     </div>
   );
 };

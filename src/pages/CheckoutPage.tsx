@@ -1,19 +1,68 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { Crown, Sparkles, ArrowLeft, Loader2, CheckCircle, XCircle, ExternalLink, ShieldCheck, Tag, Zap, FlaskConical } from '@/lib/icon-map';
+import { Crown, Sparkles, CheckCircle, XCircle, ExternalLink, ShieldCheck, Tag, Zap, FlaskConical } from '@/lib/icon-map';
 import { createPaymentSession } from '@/lib/maxelpay';
+import {
+  AppShell, TopBar, Wrap, Panel, Pill, Note, Spinner, Ico, btn, useDocTitle,
+} from '@/components/custom/squid-app';
 
-const PLAN_META: Record<string, { name: string; icon: typeof Crown; color: string; gradient: string }> = {
-  supporter: { name: 'Supporter', icon: Crown, color: 'text-amber-400', gradient: 'from-amber-500/20 to-amber-500/5' },
-  'supporter-plus': { name: 'Supporter+', icon: Sparkles, color: 'text-purple-400', gradient: 'from-purple-500/20 to-purple-500/5' },
+/* ═══════════════════════════════════════════════════════════════
+   CHECKOUT
+   Plan on the left, a sticky order summary on the right: you can
+   see what you are buying while you pay. No animation, no
+   gradients; the total is the loudest thing on the page.
+   Payment / discount / activation logic is unchanged.
+   Place at: src/pages/CheckoutPage.tsx
+   ═══════════════════════════════════════════════════════════════ */
+
+const CO_CSS = `
+.co { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 40px; align-items: start; }
+.co-side { position: sticky; top: 72px; }
+@media (max-width: 920px) { .co { grid-template-columns: 1fr; gap: 24px; } .co-side { position: static; order: -1; } }
+.co-plan { display: flex; align-items: center; gap: 16px; }
+.co-mark { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--sa-line-2); border-radius: 5px; color: var(--sa-text); flex: none; }
+.co-price { display: flex; align-items: baseline; gap: 6px; margin-top: 22px; }
+.co-price b { font: 300 60px/1 var(--sa-f); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) { .co-price b { font-size: 44px; } }
+.co-price span { font: 400 13px/1 var(--sa-mono); letter-spacing: 0.04em; color: var(--sa-mute); }
+.co-list { list-style: none; margin: 0; padding: 0; }
+.co-list li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; font-size: 13.5px; line-height: 1.5; color: var(--sa-text-2); }
+.co-list li + li { border-top: 1px solid var(--sa-line); }
+.co-list svg { flex: none; margin-top: 3px; color: var(--sa-text); }
+.co-sum { display: grid; gap: 10px; padding: 16px; font-size: 13px; }
+.co-sum > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.co-sum dt, .co-sum .k { color: var(--sa-mute); }
+.co-sum .v { color: var(--sa-text); font-variant-numeric: tabular-nums; }
+.co-sum .total { padding-top: 12px; margin-top: 2px; border-top: 1px solid var(--sa-line); }
+.co-sum .total .k { color: var(--sa-text); font-weight: 500; }
+.co-sum .total .v { font: 400 20px/1 var(--sa-f); letter-spacing: -0.02em; }
+.co-sum .total .v.good, .co-sum .v.good { color: var(--sa-ok); }
+.co-code { padding: 16px; border-top: 1px solid var(--sa-line); }
+.co-applied { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--sa-ok) 40%, var(--sa-line)); border-radius: 4px; background: color-mix(in srgb, var(--sa-ok) 7%, transparent); }
+.co-applied code { font: 500 12.5px/1 var(--sa-mono); color: var(--sa-ok); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.co-pay { padding: 16px; border-top: 1px solid var(--sa-line); }
+.co-fine { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; font-size: 12px; color: var(--sa-mute); text-align: center; }
+.co-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 44px 24px; }
+.co-state h2 { margin: 16px 0 0; font: 400 20px/1.2 var(--sa-f); letter-spacing: -0.02em; }
+.co-state p { margin: 8px 0 0; max-width: 40ch; font-size: 13.5px; line-height: 1.55; color: var(--sa-text-2); }
+.co-state .sa-btn { margin-top: 22px; }
+.co-ok { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--sa-ok) 50%, var(--sa-line)); color: var(--sa-ok); }
+.co-bad { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--sa-err) 50%, var(--sa-line)); color: var(--sa-err); }
+.co-test { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--sa-line); font-size: 12.5px; color: var(--sa-text-2); }
+.co-test span { flex: 1; }
+`;
+
+function DocTitle({ t }: { t: string }) {
+  useDocTitle(t);
+  return null;
+}
+
+const PLAN_META: Record<string, { name: string; icon: typeof Crown; color: string }> = {
+  supporter: { name: 'Supporter', icon: Crown, color: 'text-amber-400' },
+  'supporter-plus': { name: 'Supporter+', icon: Sparkles, color: 'text-primary' },
 };
 
 const PLAN_AMOUNTS: Record<string, Record<string, number>> = {
@@ -208,362 +257,239 @@ export default function CheckoutPage() {
   const Icon = meta.icon;
   const features = FEATURES[planId] || [];
 
+  const summaryRows: Array<[string, string]> = [
+    ['Plan', meta.name],
+    ['Billing', BILLING_LABELS[billing]],
+    ...((discountResult && discountResult.price > 0
+      ? [
+          ['Original', `$${discountResult.original_amount}`],
+          ['Discount', `-${discountResult.discount_percent}%`],
+        ]
+      : []) as Array<[string, string]>),
+  ];
+  const totalLabel = finalAmount === 0 ? 'Price' : 'Total';
+  const totalValue = finalAmount === 0 ? 'Free' : `$${finalAmount} ${BILLING_SUFFIX[billing]}`;
+
+  const footNote = (
+    <p className="sa-hint" style={{ textAlign: 'center', marginTop: 20 }}>
+      Your subscription will start immediately after payment. Cancel anytime.
+    </p>
+  );
+
+  if (status === 'success') {
+    return (
+      <AppShell>
+        <style>{CO_CSS}</style>
+        <DocTitle t="Payment successful" />
+        <TopBar home="/dashboard" crumbs={[{ label: 'Checkout' }, { label: 'Done' }]} />
+        <Wrap width="narrow">
+          <Panel>
+            <div className="co-state" role="status" aria-live="polite">
+              <div className="co-ok"><CheckCircle className="h-5 w-5" /></div>
+              <h2>Payment successful!</h2>
+              <p>Your {meta.name} plan is now active. Welcome to the club.</p>
+              <button type="button" className={btn('primary', 'lg')} onClick={() => navigate('/dashboard')} autoFocus>
+                Go to dashboard
+              </button>
+            </div>
+          </Panel>
+        </Wrap>
+      </AppShell>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background orbs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
-        <div className="absolute -bottom-40 -right-40 w-[400px] h-[400px] rounded-full bg-purple-500/5 blur-[100px]" />
-      </div>
+    <AppShell>
+      <style>{CO_CSS}</style>
+      <DocTitle t="Checkout" />
+      <TopBar home="/dashboard" crumbs={[{ label: 'Pricing', to: '/pricing' }, { label: 'Checkout' }]}>
+        <button type="button" className={btn('ghost', 'sm')} onClick={() => navigate('/pricing')}>
+          <Ico.ArrowLeft size={13} /> Back to pricing
+        </button>
+      </TopBar>
 
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-lg relative z-10"
-      >
-        {/* Back button */}
-        <motion.button
-          initial={{ opacity: 0, x: -12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          onClick={() => navigate('/pricing')}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-5 transition-colors group"
-        >
-          <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" /> Back to pricing
-        </motion.button>
-
-        <div className="rounded-2xl border border-border/20 bg-card/80 backdrop-blur-xl p-5 md:p-7 shadow-lg">
-          {/* Animated gradient orb inside card */}
-          <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-gradient-to-br from-primary/[0.03] to-transparent blur-3xl pointer-events-none" />
-
-          {/* Plan header */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="flex items-center gap-3 mb-6 relative"
-          >
-            <div className={cn(
-              'h-12 w-12 rounded-xl bg-gradient-to-br border flex items-center justify-center',
-              meta.gradient,
-              planId === 'supporter' ? 'border-amber-500/20' : 'border-purple-500/20',
-            )}>
-              <Icon className={cn('h-6 w-6', meta.color)} />
+      <Wrap>
+        <div className="co">
+          {/* ───────── Plan ───────── */}
+          <div>
+            <div className="co-plan">
+              <div className="co-mark"><Icon className="h-5 w-5" /></div>
+              <div>
+                <div className="sa-eyebrow" style={{ margin: 0 }}>Checkout</div>
+                <h1 className="sa-title" style={{ marginTop: 8 }}>{meta.name}</h1>
+              </div>
             </div>
-            <div className="flex-1">
-              <h1 className="text-lg font-bold text-foreground">{meta.name}</h1>
-              <p className="text-xs text-muted-foreground">{BILLING_LABELS[billing]} billing</p>
+
+            <div className="co-price">
+              <b>{finalAmount === 0 ? 'Free' : `$${finalAmount}`}</b>
+              {finalAmount > 0 && <span>{BILLING_SUFFIX[billing]}</span>}
             </div>
-            <Badge
-              variant="secondary"
-              className={cn(
-                'text-xs px-3 py-1',
-                finalAmount === 0 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : '',
-              )}
-            >
-              {finalAmount === 0 ? 'Free' : `$${finalAmount}`}
-              {finalAmount > 0 && (
-                <span className="text-muted-foreground ml-0.5 font-normal">{BILLING_SUFFIX[billing]}</span>
-              )}
-            </Badge>
-          </motion.div>
+            <p className="sa-desc">{BILLING_LABELS[billing]} billing</p>
 
-          {/* Test mode toggle */}
-          {isAdmin && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mb-4 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/20 px-3 py-2"
-            >
-              <FlaskConical className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground flex-1">Test Mode</span>
-              <Switch checked={testMode} onCheckedChange={setTestMode} />
-            </motion.div>
-          )}
-
-          {/* Admin free indicator */}
-          {adminFree && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 mb-5 flex items-center gap-2.5"
-            >
-              <Zap className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-              <p className="text-xs text-emerald-500 font-medium">Admin: Supporter+ Weekly is FREE</p>
-            </motion.div>
-          )}
-
-          {/* Status states */}
-          <AnimatePresence mode="wait">
-            {status === 'success' && (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ type: 'spring', damping: 18, stiffness: 200 }}
-                className="text-center py-8"
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', damping: 12, stiffness: 200, delay: 0.1 }}
-                >
-                  <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle className="h-8 w-8 text-emerald-500" />
-                  </div>
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2, duration: 0.3 }}
-                >
-                  <h2 className="text-lg font-bold text-foreground mb-1">Payment successful!</h2>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Your {meta.name} plan is now active. Welcome to the club.
-                  </p>
-                  <Button onClick={() => navigate('/dashboard')} className="rounded-xl h-10 shadow-md">
-                    Go to Dashboard
-                  </Button>
-                </motion.div>
-              </motion.div>
-            )}
-
-            {status === 'error' && (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ type: 'spring', damping: 18, stiffness: 200 }}
-                className="text-center py-8"
-              >
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/5 border border-destructive/20 flex items-center justify-center mx-auto mb-4">
-                  <XCircle className="h-8 w-8 text-destructive" />
-                </div>
-                <h2 className="text-lg font-bold text-foreground mb-1">Something went wrong</h2>
-                <p className="text-sm text-muted-foreground mb-5">{error}</p>
-                <Button variant="outline" onClick={() => setStatus('idle')} className="rounded-xl h-10">
-                  Try Again
-                </Button>
-              </motion.div>
-            )}
-
-            {status === 'idle' && (
-              <motion.div
-                key="idle"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-4"
-              >
-                {/* Summary */}
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2, duration: 0.3 }}
-                  className="rounded-xl bg-muted/20 border border-border/10 p-4 space-y-2"
-                >
-                  {[
-                    ['Plan', meta.name],
-                    ['Billing', BILLING_LABELS[billing]],
-                    ...(discountResult && discountResult.price > 0 ? [
-                      ['Original', `$${discountResult.original_amount}`],
-                      ['Discount', `-${discountResult.discount_percent}%`],
-                    ] : []),
-                    [finalAmount === 0 ? 'Price' : 'Total', finalAmount === 0 ? 'Free' : `$${finalAmount} ${BILLING_SUFFIX[billing]}`],
-                  ].map(([label, value], i) => (
-                    <div key={label as string} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{label as string}</span>
-                      <span className={cn(
-                        'font-medium',
-                        i === (discountResult && discountResult.price > 0 ? 3 : 1) && discountResult ? 'text-emerald-500' : 'text-foreground',
-                      )}>
-                        {value as string}
-                      </span>
-                    </div>
+            <div style={{ marginTop: 28 }}>
+              <Panel title="What's included" flush>
+                <ul className="co-list">
+                  {features.map((f, i) => (
+                    <li key={i}>
+                      <Ico.Check size={14} />
+                      <span>{f.text}</span>
+                    </li>
                   ))}
-                </motion.div>
+                </ul>
+              </Panel>
+            </div>
+            <div className="sa-hint" style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ShieldCheck className="h-3.5 w-3.5" /> Secured by MaxelPay — no KYC, crypto only
+            </div>
+          </div>
 
-                {/* Features */}
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25, duration: 0.3 }}
-                  className="rounded-xl bg-muted/20 border border-border/10 p-4"
-                >
-                  <p className="text-xs font-semibold text-foreground mb-3 flex items-center gap-1.5">
-                    <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                    What's included
-                  </p>
-                  <div className="space-y-2">
-                    {features.map((f, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3 + i * 0.05, duration: 0.2 }}
-                        className="flex items-center gap-2.5"
-                      >
-                        <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                        <span className="text-xs text-foreground/80">{f.text}</span>
-                      </motion.div>
+          {/* ───────── Order summary ───────── */}
+          <aside className="co-side" aria-label="Order summary">
+            <Panel title="Order summary" actions={<Pill>{BILLING_LABELS[billing]}</Pill>} flush>
+              {status === 'idle' && (
+                <>
+                  {isAdmin && (
+                    <div className="co-test">
+                      <FlaskConical className="h-3.5 w-3.5" />
+                      <span id="co-test-l">Test mode</span>
+                      <Switch checked={testMode} onCheckedChange={setTestMode} aria-labelledby="co-test-l" />
+                    </div>
+                  )}
+
+                  {adminFree && (
+                    <div style={{ padding: '16px 16px 0' }}>
+                      <Note tone="ok" icon={false}>
+                        <Zap className="h-3.5 w-3.5" style={{ display: 'inline', marginRight: 6, verticalAlign: '-2px' }} />
+                        Admin: Supporter+ Weekly is FREE
+                      </Note>
+                    </div>
+                  )}
+
+                  <div className="co-sum">
+                    {summaryRows.map(([k, v]) => (
+                      <div key={k}>
+                        <span className="k">{k}</span>
+                        <span className="v">{v}</span>
+                      </div>
                     ))}
+                    <div className="total">
+                      <span className="k">{totalLabel}</span>
+                      <span className={`v${discountResult ? ' good' : ''}`}>{totalValue}</span>
+                    </div>
                   </div>
-                </motion.div>
 
-                {/* Discount code */}
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.3 }}
-                  className="rounded-xl border border-border/10 p-3 space-y-2"
-                >
-                  <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                    <Tag className="h-3 w-3" /> Discount code
-                  </p>
-                  {!discountResult ? (
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
-                        <Input
+                  <div className="co-code">
+                    <label className="sa-label" htmlFor="co-code" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Tag className="h-3 w-3" /> Discount code
+                    </label>
+
+                    {!discountResult ? (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          id="co-code"
+                          className="sa-input"
                           placeholder="Enter code"
                           value={discountCode}
                           onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                          className="h-9 text-xs pl-8"
                           onKeyDown={(e) => e.key === 'Enter' && applyDiscountCode()}
+                          autoComplete="off"
+                          spellCheck={false}
+                          style={{ fontFamily: 'var(--sa-mono)', letterSpacing: '0.04em' }}
                         />
+                        <button
+                          type="button"
+                          className={btn()}
+                          onClick={applyDiscountCode}
+                          disabled={discountLoading || !discountCode.trim()}
+                        >
+                          {discountLoading ? <Spinner size={12} /> : 'Apply'}
+                        </button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={applyDiscountCode}
-                        disabled={discountLoading || !discountCode.trim()}
-                        className="h-9 text-xs px-3"
-                      >
-                        {discountLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Apply'}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-3 py-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                        <span className="text-xs font-mono text-emerald-500 font-medium truncate">{discountResult.code}</span>
-                        {discountResult.discount_percent > 0 && (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                            -{discountResult.discount_percent}%
-                          </Badge>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => { setDiscountResult(null); setDiscountCode(''); setDiscountError(''); }}
-                        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors flex-shrink-0 ml-2"
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                  {discountError && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-[10px] text-destructive flex items-center gap-1"
-                    >
-                      <XCircle className="h-3 w-3" /> {discountError}
-                    </motion.p>
-                  )}
-                  {discountResult && discountResult.original_amount > 0 && discountResult.price > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="flex items-center justify-between text-xs pt-1"
-                    >
-                      <span className="text-muted-foreground line-through">${discountResult.original_amount}{BILLING_SUFFIX[discountResult.billing_period as string] || ''}</span>
-                      <span className="text-emerald-500 font-semibold">${discountResult.price}{BILLING_SUFFIX[discountResult.billing_period as string] || ''}</span>
-                    </motion.div>
-                  )}
-                </motion.div>
-
-                {/* Pay button */}
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.35, duration: 0.3 }}
-                >
-                  <Button
-                    onClick={handlePay}
-                    disabled={applyingDiscount}
-                    className={cn(
-                      'w-full rounded-xl h-11 text-sm font-semibold transition-all',
-                      finalAmount === 0
-                        ? ''
-                        : 'bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 shadow-md shadow-primary/20',
-                    )}
-                    size="lg"
-                  >
-                    {applyingDiscount ? (
-                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Activating...</>
-                    ) : finalAmount === 0 ? (
-                      <span className="flex items-center gap-2">
-                        <Zap className="h-4 w-4" /> Activate Free
-                      </span>
                     ) : (
-                      `Pay $${finalAmount}${BILLING_SUFFIX[billing]} with Crypto`
+                      <div className="co-applied">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          <CheckCircle className="h-3.5 w-3.5" style={{ color: 'var(--sa-ok)', flex: 'none' }} />
+                          <code>{discountResult.code}</code>
+                          {discountResult.discount_percent > 0 && <Pill tone="ok">-{discountResult.discount_percent}%</Pill>}
+                        </div>
+                        <button
+                          type="button"
+                          className={btn('ghost', 'icon-sm')}
+                          onClick={() => { setDiscountResult(null); setDiscountCode(''); setDiscountError(''); }}
+                          aria-label="Remove discount code"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     )}
-                  </Button>
 
-                  <p className="text-[10px] text-muted-foreground/50 text-center flex items-center justify-center gap-1 mt-3">
-                    <ShieldCheck className="h-3 w-3" /> Secured by MaxelPay — no KYC, crypto only
-                  </p>
-                </motion.div>
-              </motion.div>
-            )}
+                    {discountError && (
+                      <div className="sa-err" role="alert" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <XCircle className="h-3 w-3" /> {discountError}
+                      </div>
+                    )}
 
-            {status === 'creating' && (
-              <motion.div
-                key="creating"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-center py-10"
-              >
-                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">Creating payment session...</p>
-              </motion.div>
-            )}
+                    {discountResult && discountResult.original_amount > 0 && discountResult.price > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5 }} className="sa-num">
+                        <span className="sa-mute" style={{ textDecoration: 'line-through' }}>
+                          ${discountResult.original_amount}{BILLING_SUFFIX[discountResult.billing_period as string] || ''}
+                        </span>
+                        <span style={{ color: 'var(--sa-ok)' }}>
+                          ${discountResult.price}{BILLING_SUFFIX[discountResult.billing_period as string] || ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-            {status === 'redirecting' && (
-              <motion.div
-                key="redirecting"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-center py-10"
-              >
-                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground mb-2">Redirecting to MaxelPay checkout...</p>
-                <motion.div
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <ExternalLink className="h-4 w-4 text-muted-foreground/50 mx-auto" />
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  <div className="co-pay">
+                    <button
+                      type="button"
+                      className={btn('primary', 'lg') + ' block'}
+                      onClick={handlePay}
+                      disabled={applyingDiscount}
+                    >
+                      {applyingDiscount ? (
+                        <><Spinner /> Activating...</>
+                      ) : finalAmount === 0 ? (
+                        <><Zap className="h-4 w-4" /> Activate Free</>
+                      ) : (
+                        `Pay $${finalAmount}${BILLING_SUFFIX[billing]} with Crypto`
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {status === 'creating' && (
+                <div className="co-state" role="status" aria-live="polite">
+                  <Spinner size={22} />
+                  <p>Creating payment session...</p>
+                </div>
+              )}
+
+              {status === 'redirecting' && (
+                <div className="co-state" role="status" aria-live="polite">
+                  <Spinner size={22} />
+                  <p>Redirecting to MaxelPay checkout...</p>
+                  <ExternalLink className="h-4 w-4" style={{ marginTop: 12, color: 'var(--sa-mute)' }} />
+                </div>
+              )}
+
+              {status === 'error' && (
+                <div className="co-state" role="alert">
+                  <div className="co-bad"><XCircle className="h-5 w-5" /></div>
+                  <h2>Something went wrong</h2>
+                  <p style={{ wordBreak: 'break-word' }}>{error}</p>
+                  <button type="button" className={btn('default', 'lg')} onClick={() => setStatus('idle')} autoFocus>
+                    Try again
+                  </button>
+                </div>
+              )}
+            </Panel>
+            {footNote}
+          </aside>
         </div>
-
-        {/* Footer note */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
-          className="text-[10px] text-muted-foreground/30 text-center mt-4"
-        >
-          Your subscription will start immediately after payment. Cancel anytime.
-        </motion.p>
-      </motion.div>
-    </div>
+      </Wrap>
+    </AppShell>
   );
 }

@@ -455,7 +455,7 @@ const EnhancedShareDialogDesktop: React.FC<EnhancedShareDialogProps> = ({ open, 
                 {/* Watermark delivery */}
                 <div className="flex items-center justify-between p-2 rounded-lg border border-border/50">
                   <div className="flex items-center gap-2">
-                    <Droplets className="w-4 h-4 text-blue-400" />
+                    <Droplets className="w-4 h-4 text-primary" />
                     <div>
                       <span className="text-xs font-medium">Watermark with email</span>
                       <p className="text-[10px] text-muted-foreground">Stamps recipient email on PDFs & images</p>

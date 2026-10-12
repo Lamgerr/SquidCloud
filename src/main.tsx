@@ -90,8 +90,19 @@ function isExtensionNoise(detail: string, filename?: string): boolean {
   }
 }
 
+// When a ResizeObserver callback writes layout during delivery, Chromium re-enters it on the
+// next frame and, if that would starve the loop, reports it as a window `error` with this
+// message. It is a notification, not an exception: no code threw, the app keeps running, and
+// the page behind it renders normally. Escalating it to the fatal overlay would blank a
+// working app, so it is dropped like the extension noise above. The observer that caused it
+// is fixed at its source — see useFitWidth in components/custom/squid-ui.tsx, which writes
+// font-size inside its own ResizeObserver callback.
+const RESIZE_OBSERVER_NOTICE =
+  /ResizeObserver loop (?:completed with undelivered notifications|limit exceeded)/i;
+
 window.addEventListener('error', (event) => {
   if (!event.message) return;
+  if (RESIZE_OBSERVER_NOTICE.test(event.message)) return;
   // Firefox false-positive: dynamic import failures can fire on the main script tag.
   // If the app is already running, resource errors without a real script error are
   // likely false-positives from Firefox's buggy event attribution.
@@ -107,6 +118,7 @@ window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason;
   const detail = (reason && (reason.stack || reason.message)) || String(reason);
   if (isExtensionNoise(String(detail))) return;
+  if (RESIZE_OBSERVER_NOTICE.test(String(detail))) return;
   console.error('[fatal]', detail);
   if (tryRecoverModuleLoad(String(detail))) return; // stale-deploy recovery: reload once
   showFatalOverlay(String(detail));

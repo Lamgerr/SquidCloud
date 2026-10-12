@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import MainHeader from '@/components/MainHeader';
 import MobileNavHeader from '@/components/MobileNavHeader';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
@@ -388,13 +387,13 @@ const Settings = () => {
               <div className="space-y-3">
                 <div className="p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
                   <div className="flex items-center gap-3">
-                    <Fingerprint className="h-5 w-5 text-blue-400" />
+                    <Fingerprint className="h-5 w-5 text-primary" />
                     <p className="text-sm text-foreground/70">Enable biometric for faster sign-in</p>
                   </div>
                 </div>
 
                 <Button
-                  className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl"
+                  className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
                   onClick={handleRegisterPasskey}
                   disabled={isLoading}
                 >
@@ -458,7 +457,7 @@ const Settings = () => {
   
   return (
     <div className="min-h-screen bg-background">
-      {isMobile ? <MobileNavHeader onSearchClick={() => {}} onMenuClick={() => {}} /> : <MainHeader />}
+      {isMobile && <MobileNavHeader onSearchClick={() => {}} onMenuClick={() => {}} />}
       
       <div className="container mx-auto max-w-5xl px-4 py-6">
         <div className="mb-6 overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-r from-card via-card to-muted/30 p-6">

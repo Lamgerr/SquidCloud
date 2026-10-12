@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withPrelGateway, jsonResponse, PrelContext } from "../_shared/kza-prel.ts";
+import { readJsonLimited, isBodyTooLarge } from "../_shared/body-limit.ts";
 
 // ============================================================
 // KZA-SWK "S-HAWK" — post-investigation unit for upload/material
@@ -406,7 +407,12 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
     let body: Record<string, unknown>;
-    try { body = await req.json(); } catch { return jsonResponse({ error: "Invalid JSON body" }, 400); }
+    try {
+      body = await readJsonLimited(req, 512 * 1024);
+    } catch (parseErr) {
+      if (isBodyTooLarge(parseErr)) return jsonResponse({ error: "Request body too large" }, 413);
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
     const action = String(body.action || "scan");
 
     // ----- user notices feed -----

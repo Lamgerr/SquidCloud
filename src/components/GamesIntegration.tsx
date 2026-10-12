@@ -30,8 +30,8 @@ const GamesIntegration: React.FC<GamesIntegrationProps> = ({
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-purple-600 flex items-center justify-center">
-                <Gamepad2 className="h-4 w-4 text-white" />
+<div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+                <Gamepad2 className="h-4 w-4 text-primary" />
               </div>
               {(isUploading || isDecoding) && (
                 <div className="absolute inset-0 rounded-full border-2 border-teal-500 animate-spin border-t-transparent" />
@@ -49,7 +49,7 @@ const GamesIntegration: React.FC<GamesIntegrationProps> = ({
           <Button
             size="sm"
             onClick={onOpenGames}
-            className="bg-gradient-to-r from-teal-500 to-purple-600 hover:from-teal-600 hover:to-purple-700 text-white ml-3"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all ml-3"
           >
             <Play className="h-3 w-3 mr-1" />
             Play
@@ -102,8 +102,8 @@ const GamesIntegration: React.FC<GamesIntegrationProps> = ({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-purple-600 flex items-center justify-center">
-                  <Gamepad2 className="h-4 w-4 text-white" />
+<div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+                  <Gamepad2 className="h-4 w-4 text-primary" />
                 </div>
                 <div className="absolute inset-0 rounded-full border-2 border-teal-500 animate-spin border-t-transparent" />
               </div>
@@ -131,7 +131,7 @@ const GamesIntegration: React.FC<GamesIntegrationProps> = ({
             <div className="mb-3">
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
-                  className="bg-gradient-to-r from-teal-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -141,7 +141,7 @@ const GamesIntegration: React.FC<GamesIntegrationProps> = ({
           
           <Button
             onClick={onOpenGames}
-            className="w-full bg-gradient-to-r from-teal-500 to-purple-600 hover:from-teal-600 hover:to-purple-700 text-white"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
             size="sm"
           >
             <Play className="h-4 w-4 mr-2" />
@@ -204,8 +204,8 @@ export const showGameToast = (onOpenGames: () => void) => {
       "animate-in slide-in-from-top-2 duration-300"
     )}>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-purple-600 flex items-center justify-center">
-          <Gamepad2 className="h-5 w-5 text-white" />
+        <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+          <Gamepad2 className="h-5 w-5 text-primary" />
         </div>
         <div className="flex-1">
           <p className="font-medium text-gray-900">Take a break!</p>
@@ -215,7 +215,7 @@ export const showGameToast = (onOpenGames: () => void) => {
           <Button
             size="sm"
             onClick={onOpenGames}
-            className="bg-gradient-to-r from-teal-500 to-purple-600 hover:from-teal-600 hover:to-purple-700 text-white"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
           >
             <Play className="h-3 w-3 mr-1" />
             Play

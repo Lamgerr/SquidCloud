@@ -9,12 +9,37 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
-import { AlertTriangle, Info } from "@/lib/icon-map"
+import { AlertCircle, AlertTriangle, CheckCircle, Info } from "@/lib/icon-map"
 import { cn } from "@/lib/utils"
+
+type ToastVariant = "default" | "destructive" | "success" | "warning" | "info"
+
+const VARIANT_ICON = {
+  default: Info,
+  destructive: AlertTriangle,
+  success: CheckCircle,
+  warning: AlertCircle,
+  info: Info,
+} as const
+
+/**
+ * Measures the rendered toast height so the exit animation can collapse the
+ * element back to zero — the remaining toasts glide up instead of snapping.
+ */
+function useToastHeight() {
+  return React.useCallback((node: HTMLLIElement | null) => {
+    if (!node) return
+    const apply = () =>
+      node.style.setProperty("--sq-toast-h", `${node.offsetHeight}px`)
+    apply()
+    requestAnimationFrame(apply)
+  }, [])
+}
 
 export function Toaster() {
   const { toasts } = useToast()
   const [isMobile, setIsMobile] = React.useState(false)
+  const measureHeight = useToastHeight()
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -37,37 +62,35 @@ export function Toaster() {
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         const { className, duration, variant, ...toastProps } = props
+        const resolvedVariant: ToastVariant =
+          (variant as ToastVariant) ?? "default"
         const resolvedDuration = duration ?? (isMobile ? 3600 : 5600)
         const resolvedClassName = cn(
           "touch-pan-y",
-          isMobile
-            ? "w-full max-w-[min(92vw,380px)]"
-            : "w-full max-w-[380px]",
+          isMobile ? "w-full max-w-[min(92vw,380px)]" : "w-full max-w-[380px]",
           className
         )
 
-        const Icon =
-          variant === "destructive"
-            ? AlertTriangle
-            : Info
+        const Icon = VARIANT_ICON[resolvedVariant] ?? Info
 
         return (
           <Toast
             key={id}
             {...toastProps}
-            variant={variant}
+            ref={measureHeight}
+            variant={resolvedVariant}
             duration={resolvedDuration}
             className={resolvedClassName}
+            style={
+              {
+                "--sq-toast-duration": `${resolvedDuration}ms`,
+              } as React.CSSProperties
+            }
           >
-            <Icon
-              className={cn(
-                "mt-0.5 h-5 w-5 shrink-0",
-                variant === "destructive"
-                  ? "text-zinc-100"
-                  : "text-zinc-400"
-              )}
-            />
-            <div className="grid gap-1">
+            <span className="sq-toast-chip" aria-hidden="true">
+              <Icon />
+            </span>
+            <div className="sq-toast-body">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
                 <ToastDescription>{description}</ToastDescription>
@@ -75,6 +98,7 @@ export function Toaster() {
             </div>
             {action}
             <ToastClose />
+            <span className="sq-toast-progress" aria-hidden="true" />
           </Toast>
         )
       })}

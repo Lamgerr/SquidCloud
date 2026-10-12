@@ -290,7 +290,7 @@ export const ShareManagementDialog: React.FC<ShareManagementDialogProps> = ({ op
                         </span>
                       )}
                       {share.access_code && <Lock className="h-2.5 w-2.5 text-yellow-500" />}
-                      {share.allowed_countries?.length ? <Globe className="h-2.5 w-2.5 text-blue-400" /> : null}
+                      {share.allowed_countries?.length ? <Globe className="h-2.5 w-2.5 text-primary" /> : null}
                       {share.device_fingerprint && <Smartphone className="h-2.5 w-2.5 text-purple-400" />}
                     </div>
                   </div>

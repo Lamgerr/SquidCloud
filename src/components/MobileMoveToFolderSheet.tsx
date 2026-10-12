@@ -182,7 +182,7 @@ const MobileMoveToFolderSheet: React.FC<MobileMoveToFolderSheetProps> = ({
           <button
             onClick={handleMove}
             disabled={moving || loading}
-            className="h-8 px-3.5 rounded-lg text-xs font-medium bg-[#4A90D9] text-white hover:bg-[#4A90D9]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="h-8 px-3.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {moving ? 'Moving...' : <><Check className="w-3.5 h-3.5" /> Move</>}
           </button>

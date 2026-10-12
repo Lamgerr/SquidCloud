@@ -43,6 +43,38 @@ export async function loadReadingProgress(
   return null;
 }
 
+export interface RemoteProgress {
+  progress: number;
+  current_page: number;
+  total_pages: number;
+  last_read_at: string;
+}
+
+export async function saveRemoteProgress(
+  bookKey: string,
+  progress: number,
+  currentPage: number,
+  totalPages: number,
+  meta?: { title?: string; author?: string; coverUrl?: string | null; subjects?: string[] },
+): Promise<void> {
+  await supabase.rpc('save_remote_progress', {
+    p_book_key: bookKey,
+    p_progress: Math.max(0, Math.min(100, Math.round(progress))),
+    p_current_page: currentPage,
+    p_total_pages: totalPages,
+    p_title: meta?.title ?? null,
+    p_author: meta?.author ?? null,
+    p_cover_url: meta?.coverUrl ?? null,
+    p_subjects: meta?.subjects ?? null,
+  });
+}
+
+export async function loadRemoteProgress(bookKey: string): Promise<RemoteProgress | null> {
+  const { data } = await supabase.rpc('get_remote_progress', { p_book_key: bookKey });
+  if (data && data.length > 0) return data[0] as RemoteProgress;
+  return null;
+}
+
 export interface BookMetadata {
   id: string;
   file_id: string;

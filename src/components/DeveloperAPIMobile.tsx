@@ -157,7 +157,7 @@ const DeveloperAPIMobile = () => {
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 h-8 text-[12px] font-medium rounded-lg whitespace-nowrap transition-colors flex-shrink-0",
+                  "flex items-center gap-1.5 px-3.5 h-8 text-[12px] font-medium rounded-full whitespace-nowrap transition-colors flex-shrink-0",
                   activeTab === tab.id
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground/70 hover:text-foreground hover:bg-accent/40"

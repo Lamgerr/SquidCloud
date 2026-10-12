@@ -408,7 +408,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
   if (isUnsupportedContainer && transcodeState !== 'ready') {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full bg-[#0a0a0f] p-8 text-center border border-neutral-800 rounded-2xl space-y-6 select-none">
-        <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-center text-primary">
           <Cpu className="w-8 h-8 animate-pulse" />
         </div>
         
@@ -425,7 +425,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({
         {transcodeState === 'idle' ? (
           <Button 
             onClick={startLocalTranscoding}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 h-11 rounded-xl shadow-lg shadow-blue-600/20 gap-2"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 h-11 rounded-xl shadow-lg shadow-primary/20 gap-2 active:scale-[0.99] transition-all"
           >
             <Cpu className="w-4 h-4" /> Transcode & Stream Locally
           </Button>

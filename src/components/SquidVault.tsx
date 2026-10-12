@@ -415,7 +415,7 @@ const SquidVault: React.FC<SquidVaultProps> = ({ userId, onVaultOpen, onClose })
             <div 
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-0"
               style={{
-                background: 'radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(255, 255, 255, 0.16) 0%, transparent 70%)',
                 animation: 'orbPulse 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards',
                 filter: 'blur(40px)',
                 willChange: 'transform, opacity',
@@ -425,7 +425,7 @@ const SquidVault: React.FC<SquidVaultProps> = ({ userId, onVaultOpen, onClose })
             <div 
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-0"
               style={{
-                background: 'radial-gradient(circle, rgba(168, 85, 247, 0.4) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 70%)',
                 animation: 'orbPulse 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards',
                 filter: 'blur(60px)',
                 willChange: 'transform, opacity',
@@ -435,7 +435,7 @@ const SquidVault: React.FC<SquidVaultProps> = ({ userId, onVaultOpen, onClose })
             <div 
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full opacity-0"
               style={{
-                background: 'radial-gradient(circle, rgba(59, 130, 246, 0.5) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, transparent 70%)',
                 animation: 'orbPulse 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards',
                 filter: 'blur(50px)',
                 willChange: 'transform, opacity',
@@ -656,7 +656,7 @@ const SquidVault: React.FC<SquidVaultProps> = ({ userId, onVaultOpen, onClose })
                         <Button
                           onClick={handleFingerprintAuth}
                           disabled={isLoading}
-                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
                           size="lg"
                         >
                           {isLoading ? (

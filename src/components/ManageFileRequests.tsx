@@ -8,6 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import {
   getMyFileRequests, toggleFileRequest, deleteFileRequest, getFileRequestSubmissions, downloadFile,
 } from '@/lib/api';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Inbox, Copy, ExternalLink, Trash2, Eye, Download, Move, Loader2, Calendar } from '@/lib/icon-map';
 import { formatDistanceToNow } from 'date-fns';
 import { formatBytes } from '@/lib/api';
@@ -43,6 +47,7 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
   const [previewFile, setPreviewFile] = useState<any>(null);
   const [readingEpubFile, setReadingEpubFile] = useState<any>(null);
   const [moveFileIds, setMoveFileIds] = useState<string[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const { toast } = useToast();
 
   const fetchRequests = async () => {
@@ -75,14 +80,17 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!window.confirm(`Delete "${title}" and all submissions?`)) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const { id, title } = deleteTarget;
     try {
       await deleteFileRequest(id);
       setRequests(prev => prev.filter(r => r.id !== id));
       toast({ title: 'Deleted', description: `"${title}" removed` });
     } catch (err: any) {
       toast({ title: 'Failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -174,7 +182,7 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
                         <Button variant="ghost" size="sm" className={btnClass} onClick={() => window.open(`/r/${req.slug}`, '_blank')} title="Open link">
                           <ExternalLink className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className={`${btnClass} text-destructive`} onClick={() => handleDelete(req.id, req.title)} title="Delete">
+                        <Button variant="ghost" size="sm" className={`${btnClass} text-destructive`} onClick={() => setDeleteTarget({ id: req.id, title: req.title })} title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -213,7 +221,7 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
                           <ExternalLink className="h-4 w-4" />
                         </Button>
                         <Switch checked={req.is_active} onCheckedChange={(v) => handleToggle(req.id, v)} />
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => handleDelete(req.id, req.title)} title="Delete">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => setDeleteTarget({ id: req.id, title: req.title })} title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -221,7 +229,7 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
                   )}
 
                   {expandedId === req.id && (
-                    <div className="border-t bg-muted/20 px-4 py-3">
+                    <div className="border-t bg-muted/20 px-4 py-3 animate-fade-in">
                       {submissionsLoading ? (
                         <div className="flex items-center justify-center py-4">
                           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -233,8 +241,8 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
                           {submissions.map((sub: any) => (
                             <div key={sub.id} className="flex items-center justify-between rounded-lg bg-card px-3 py-2 text-sm border">
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className="w-6 h-6 rounded-md bg-green-500/10 flex items-center justify-center shrink-0">
-                                  <Download className="w-3.5 h-3.5 text-green-500" />
+                                <span className="w-6 h-6 rounded-md bg-emerald-500/10 flex items-center justify-center shrink-0">
+                                  <Download className="w-3.5 h-3.5 text-emerald-500" />
                                 </span>
                                 <span className="truncate font-medium">{sub.file_name}</span>
                                 <span className="text-xs text-muted-foreground shrink-0">{formatBytes(sub.file_size)}</span>
@@ -325,6 +333,20 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
         fileIds={moveFileIds}
         onMoved={() => setMoveFileIds([])}
       />
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete file request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleteTarget?.title}” and all of its submissions will be permanently removed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

@@ -14,10 +14,12 @@ interface MoveToFolderDialogProps {
   onClose: () => void;
   fileIds: string[];
   onMoved: () => void;
+  /** Moving a folder instead of files: blocks moving into itself or its descendants. */
+  folderId?: string | null;
 }
 
 export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({
-  open, onClose, fileIds, onMoved,
+  open, onClose, fileIds, onMoved, folderId = null,
 }) => {
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [currentPath, setCurrentPath] = useState('');
@@ -33,6 +35,31 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({
     setPathHistory([]);
   }, [open]);
 
+  // Build the set of paths that belong to the folder being moved (itself +
+  // every descendant) so they can never be offered as a destination.
+  const loadDescendantPaths = async (): Promise<Set<string>> => {
+    if (!folderId) return new Set();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return new Set();
+    const { data, error } = await supabase
+      .from('folders')
+      .select('id, path, parent_folder')
+      .eq('user_id', user.id);
+    if (error || !data) return new Set();
+    const rows = data as any[];
+    const pathById = new Map<string, string>(rows.map(r => [r.id, r.path]));
+    const isDescendant = (id: string): boolean => {
+      let cur: any = rows.find(r => r.id === id);
+      let guard = 0;
+      while (cur && guard++ < 1000) {
+        if (cur.id === folderId) return true;
+        cur = cur.parent_folder ? rows.find(r => r.id === cur.parent_folder) : null;
+      }
+      return false;
+    };
+    return new Set(rows.filter(r => isDescendant(r.id)).map(r => r.path));
+  };
+
   const loadFolders = async (parentPath: string) => {
     setLoading(true);
     try {
@@ -44,10 +71,11 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({
         .eq('user_id', user.id)
         .order('name');
       if (error) throw error;
+      const blocked = await loadDescendantPaths();
       const filtered = (data || []).filter((f: any) => {
         if (!parentPath) return !f.parent_folder || f.parent_folder === '';
         return f.parent_folder === parentPath;
-      });
+      }).filter((f: any) => !blocked.has(f.path));
       setFolders(filtered.map((f: any) => ({
         id: f.id, name: f.name, path: f.path,
         created_at: f.created_at, is_folder: true,
@@ -85,6 +113,7 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      if (!fileIds.length && !folderId) throw new Error('Nothing to move');
       const targetPath = currentPath || null;
       for (const fileId of fileIds) {
         const { error } = await supabase
@@ -93,6 +122,28 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({
           .eq('id', fileId)
           .eq('user_id', user.id);
         if (error) throw error;
+      }
+      if (folderId) {
+        // Re-point the folder row and its children so the whole subtree travels.
+        const folderName = (await supabase
+          .from('folders').select('name').eq('id', folderId).single()).data?.name as string;
+        const oldPath = (await supabase
+          .from('folders').select('path').eq('id', folderId).single()).data?.path as string;
+        const newPath = targetPath ? `${targetPath}/${folderName}` : folderName;
+        const { error: folderErr } = await supabase
+          .from('folders')
+          .update({ parent_folder: targetPath || null, path: newPath })
+          .eq('id', folderId);
+        if (folderErr) throw folderErr;
+        if (oldPath) {
+          const { data: children } = await supabase
+            .from('folders').select('id, path').eq('user_id', user.id);
+          const toUpdate = (children || []).filter((c: any) => c.path.startsWith(`${oldPath}/`));
+          for (const c of toUpdate) {
+            const rel = c.path.slice(oldPath.length);
+            await supabase.from('folders').update({ path: `${newPath}${rel}` }).eq('id', c.id);
+          }
+        }
       }
       for (const fileId of fileIds) {
         void emitWebhookEvent('file.moved', {
@@ -121,7 +172,7 @@ export const MoveToFolderDialog: React.FC<MoveToFolderDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Move to folder</DialogTitle>
           <DialogDescription>
-            Select a destination folder for {fileIds.length} file{fileIds.length > 1 ? 's' : ''}.
+            Select a destination folder for {fileIds.length ? `${fileIds.length} file${fileIds.length > 1 ? 's' : ''}` : 'this folder'}.
           </DialogDescription>
         </DialogHeader>
 

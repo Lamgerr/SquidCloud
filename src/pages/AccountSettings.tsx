@@ -1,15 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { isPasskeyAvailable, registerPasskey, authenticateWithPasskey } from '@/lib/webauthn';
 import BiometricSetupDialog from '@/components/BiometricSetupDialog';
 import { biometricAuthService } from '@/services/biometricAuthService';
@@ -18,9 +13,9 @@ import ApiKeyManagement from '@/components/ApiKeyManagement';
 import CliDevicesSection from '@/components/settings/CliDevicesSection';
 import { WebhookManager } from '@/components/WebhookManager';
 import {
-  User, Mail, Key, Shield, ShieldAlert, Fingerprint, CheckCircle2, AlertCircle,
-  Loader2, Plus, ArrowLeft, Lock, Settings, Trash2, HardDrive, Calendar, Code, Zap,
-  FolderOpen, FileArchive, RefreshCw, Crown, Sparkles, Briefcase, TrendingUp,
+  User, Key, Shield, ShieldAlert, Fingerprint,
+  Plus, Lock, Settings, Trash2, HardDrive, Calendar, Code, Zap,
+  FolderOpen, FileArchive, RefreshCw, Crown, Briefcase, TrendingUp,
   Repeat, Book, LogOut, Smartphone,
 } from '@/lib/icon-map';
 import { swkFetchNotices, swkAppealCase, SwkNotice } from '@/lib/swk-manifest';
@@ -28,14 +23,72 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader } from '@/components/ui/Loader';
-import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import MigrationWizard from '@/components/MigrationWizard';
 import CancelSubscriptionFlow from '@/components/CancelSubscriptionFlow';
-import { cn } from '@/lib/utils';
 import { emitSignal } from '@/lib/api';
 import { mfaService, MfaFactor } from '@/services/mfa-service';
+import {
+  AppShell, TopBar, Wrap, PageHead, Panel, Row, Pill, Dot, Meter, Note, Stat, Stats, KV,
+  Empty, Skel, SkelRows, Spinner, Ico, Field, UnderlineTabs, btn, useHashState, useDocTitle,
+} from '@/components/custom/squid-app';
+import type { Tone } from '@/components/custom/squid-app';
+
+/* ═══════════════════════════════════════════════════════════════
+   ACCOUNT SETTINGS
+   One grammar for the whole page: a Panel is a topic, a Row is one
+   setting (what it is on the left, how to change it on the right).
+   Left rail groups the nine sections and the open one lives in the
+   URL (#section=security), so refresh and back-links land where you
+   were. ⌘/Ctrl+S saves the profile form. Every handler is unchanged.
+   Place at: src/pages/AccountSettings.tsx
+   ═══════════════════════════════════════════════════════════════ */
+
+const ST_CSS = `
+.st { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 48px; align-items: start; }
+.st-nav { position: sticky; top: 72px; }
+.st-main { min-width: 0; max-width: 780px; }
+.st-main > .sa-panel + .sa-panel, .st-main > .sa-panel + div, .st-main > div + .sa-panel { margin-top: 16px; }
+.st-bar { display: none; }
+@media (max-width: 860px) {
+  .st { grid-template-columns: 1fr; gap: 0; }
+  .st-nav { display: none; }
+  .st-bar { display: block; position: sticky; top: 48px; z-index: 30; padding: 0 var(--sa-gut); border-bottom: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg) 92%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .st-bar .sa-tabs { border-bottom: 0; }
+}
+.st-foot { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 16px; border-top: 1px solid var(--sa-line); }
+.st-p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--sa-text-2); }
+.st-form { display: grid; gap: 16px; }
+.st-form > *, .st-g2 > * { min-width: 0; }
+.st-g2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 640px) { .st-g2 { grid-template-columns: minmax(0, 1fr); } }
+.st-mfa { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 20px; padding: 16px; }
+@media (max-width: 640px) { .st-mfa { grid-template-columns: 1fr; } }
+.st-qr { width: 176px; height: 176px; padding: 8px; border-radius: 4px; background: #fff; }
+.st-qr svg, .st-qr img { display: block; width: 100%; height: 100%; }
+.st-select { height: 30px; padding: 0 8px; border: 1px solid var(--sa-line-2); border-radius: 4px; background: var(--sa-bg); color: var(--sa-text); font: 400 12.5px/1 var(--sa-f); }
+.st-select:focus-visible { outline: 1px solid var(--sa-text); outline-offset: 1px; }
+.st-notice { padding: 14px 16px; }
+.st-notice + .st-notice { border-top: 1px solid var(--sa-line); }
+.st-notice h4 { margin: 0; font: 500 13.5px/1.35 var(--sa-f); }
+.st-notice .when { font: 400 11px/1.4 var(--sa-mono); color: var(--sa-mute); }
+.st-notice p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--sa-text-2); white-space: pre-wrap; }
+.st-codes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.st-df { padding: 12px 14px; border: 1px solid var(--sa-line); border-radius: 4px; background: var(--sa-bg-2); min-width: 0; }
+.st-df.full { grid-column: 1 / -1; }
+.st-df small { display: block; font: 400 10.5px/1 var(--sa-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--sa-mute); }
+.st-df b { display: block; margin-top: 7px; font: 500 13.5px/1.35 var(--sa-f); color: var(--sa-text); word-break: break-word; }
+.st-df b.mono { font: 400 12px/1.5 var(--sa-mono); }
+.st-df b.cap { text-transform: capitalize; }
+.st-df b.good { color: var(--sa-ok); }
+.st-pay { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; transition: background 0.12s; }
+.st-pay + .st-pay { border-top: 1px solid var(--sa-line); }
+.st-pay:hover { background: var(--sa-bg-3); }
+.st-pay .l { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.st-pay b { display: block; font: 500 13.5px/1.35 var(--sa-f); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-pay small { display: block; margin-top: 2px; font-size: 12px; color: var(--sa-mute); }
+.st-pay .amt { font: 500 13.5px/1 var(--sa-mono); flex: none; }
+`;
 
 const ACCOUNT_PREFS_STORAGE_KEY = 'squid_account_settings_v3';
 
@@ -110,13 +163,34 @@ const SETTINGS_CATEGORIES = [
 
 type SettingsCategory = typeof SETTINGS_CATEGORIES[number]['id'];
 
+const SECTION_IDS: SettingsCategory[] = SETTINGS_CATEGORIES.map((c) => c.id);
+
+const NAV_GROUPS: Array<{ label: string; ids: SettingsCategory[] }> = [
+  { label: 'Account', ids: ['profile', 'security', 'plans'] },
+  { label: 'Developer', ids: ['developer', 'webhooks', 'devices'] },
+  { label: 'Data', ids: ['migration', 'byok'] },
+  { label: 'System', ids: ['preferences'] },
+];
+
+const SECTION_DESC: Record<SettingsCategory, string> = {
+  profile: 'Your personal information',
+  security: 'Protect your account',
+  devices: 'Command-line devices linked to your account',
+  developer: 'Manage your API keys and integrations',
+  webhooks: 'Configure event-driven webhook notifications',
+  plans: 'Manage your plan and billing',
+  migration: 'Track your ZIP imports and cloud migrations',
+  byok: 'Encryption keys and data protection',
+  preferences: 'Fine-tune your SquidCloud experience',
+};
+
 const AccountSettings = () => {
-  const { user, profile, session, signOut } = useAuth();
+  const { user, profile, session, signOut, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('profile');
+  const [activeCategory, setActiveCategory] = useHashState<SettingsCategory>('section', 'profile', SECTION_IDS);
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [loading, setLoading] = useState(false);
@@ -204,29 +278,6 @@ const AccountSettings = () => {
   const paymentLogsFetchedRef = useRef(false);
   const notifPrefsFetchedRef = useRef(false);
 
-  const mc = (extra = '') => cn('lg-card', isMobile ? 'p-4' : 'p-5', extra);
-
-  const cardHeader = (icon: React.ReactNode, title: string, desc: string) => (
-    <div className={cn('flex items-center gap-3 mb-5', isMobile ? 'mb-4' : 'mb-5')}>
-      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <h3 className={cn('font-semibold text-foreground', isMobile ? 'text-[15px]' : 'text-sm')}>{title}</h3>
-        <p className="text-xs text-muted-foreground truncate">{desc}</p>
-      </div>
-    </div>
-  );
-
-  const switchCategory = (cat: SettingsCategory) => {
-    if (cat === activeCategory) return;
-    setAnimating(true);
-    setTimeout(() => {
-      setActiveCategory(cat);
-      setAnimating(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 150);
-  };
 
   const preferenceCategories = useMemo<AccountPreferenceCategory[]>(() => [
     {
@@ -732,678 +783,537 @@ const AccountSettings = () => {
     }
   };
 
+  /* ───────── presentation helpers (UI only) ───────── */
+  const migTone = (s: string): Exclude<Tone, 'solid'> =>
+    s === 'completed' ? 'ok' : s === 'failed' ? 'err' : s === 'cancelled' ? 'neutral' : s === 'scheduled' ? 'warn' : 'info';
+  const payTone = (s: string): Exclude<Tone, 'solid'> =>
+    s === 'completed' ? 'ok' : s === 'pending' || s === 'expired' ? 'warn' : s === 'failed' ? 'err' : s === 'refunded' ? 'info' : 'neutral';
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const sv = (v: React.ReactNode) => <span style={{ fontSize: 20 }}>{v}</span>;
+  const iconTitle = (icon: React.ReactNode, text: string) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{icon}{text}</span>
+  );
+
   const DetailField = ({ label, value, capitalize, mono, fullWidth, highlight }: { label: string; value: string; capitalize?: boolean; mono?: boolean; fullWidth?: boolean; highlight?: boolean }) => (
-    <div className={cn('p-3 rounded-xl bg-muted/20 border border-border/20', fullWidth && isMobile ? '' : fullWidth ? 'col-span-2' : '')}>
-      <p className="text-[10px] text-muted-foreground/70 mb-0.5">{label}</p>
-      <p className={cn('text-sm font-semibold', highlight ? 'text-green-400' : 'text-foreground', mono ? 'font-mono text-xs break-all' : '', capitalize ? 'capitalize' : '')}>{value}</p>
+    <div className={`st-df${fullWidth ? ' full' : ''}`}>
+      <small>{label}</small>
+      <b className={[mono ? 'mono' : '', capitalize ? 'cap' : '', highlight ? 'good' : ''].filter(Boolean).join(' ')}>{value}</b>
     </div>
   );
 
   function renderPlansSection() {
+    const purchaseDate = profile?.subscription_starts_at
+      ? new Date(profile.subscription_starts_at).toLocaleDateString()
+      : latestPayment?.created_at
+        ? new Date(latestPayment.created_at).toLocaleDateString()
+        : '-';
+    const detailItems: Array<[React.ReactNode, React.ReactNode]> = [
+      ['Plan', userTier],
+      ['Billing Period', <span style={{ textTransform: 'capitalize' }}>{latestPayment?.billing_period || '-'}</span>],
+      ['Purchase Date', purchaseDate],
+      ['Expires On', profile?.subscription_expires_at ? new Date(profile.subscription_expires_at).toLocaleDateString() : '-'],
+      ['Amount Paid', latestPayment ? formatPaymentAmount(latestPayment) : '-'],
+      ['Payment Mode', <span style={{ textTransform: 'capitalize' }}>{latestPayment?.tx_hash ? 'Crypto' : latestPayment?.discount_code ? 'Discount Code' : latestPayment?.metadata?.source === 'redeem_code' ? 'Redeem Code' : '-'}</span>],
+    ];
+    if (latestPayment?.discount_percent) {
+      detailItems.push(['Discount', <span style={{ color: 'var(--sa-ok)' }}>{latestPayment.discount_percent}%{latestPayment.discount_code ? ` (${latestPayment.discount_code})` : ''}</span>]);
+    } else if (latestPayment?.metadata?.code) {
+      detailItems.push(['Redeem Code', <span className="sa-mono" style={{ color: 'var(--sa-ok)' }}>{latestPayment.metadata.code}</span>]);
+    }
+
     return (
       <>
-      <div className={mc()}>
-        {cardHeader(
-          isPremium ? <Crown className="h-5 w-5 text-amber-400" /> : <Zap className="h-5 w-5 text-muted-foreground" />,
-          'Plans & Subscription',
-          'Manage your plan and billing'
+        <Panel
+          title={`Current Plan — ${userTier}`}
+          desc={isPremium
+            ? 'Priority queue, unlimited file requests, always-active sites & more'
+            : 'Unlimited storage with standard queue priority'}
+          actions={<Pill tone={isPremium ? 'solid' : 'neutral'}>{userTier}</Pill>}
+          flush
+        >
+          <Stats>
+            <Stat label="Storage" value={sv(formatBytes(storageUsed))} />
+            <Stat label="Total Files" value={sv(`${totalFiles} files`)} />
+            <Stat label="Member Since" value={sv(profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : '-')} />
+            <Stat label="Account Type" value={sv(userTier)} />
+          </Stats>
+          <div className="st-foot">
+            {isPremium ? (
+              <button type="button" className={btn()} onClick={() => navigate('/pricing')}>
+                <Crown className="h-3.5 w-3.5" />Change Plan
+              </button>
+            ) : (
+              <button type="button" className={btn('primary')} onClick={() => navigate('/pricing')}>
+                <Crown className="h-3.5 w-3.5" />Upgrade Now
+              </button>
+            )}
+            <button type="button" className={btn()} onClick={() => { fetchPaymentLogs(); setPaymentHistoryOpen(true); }}>
+              <Calendar className="h-3.5 w-3.5" />History
+            </button>
+          </div>
+        </Panel>
+
+        {isPremium && (
+          <Panel title="Subscription Details">
+            <KV items={detailItems} />
+          </Panel>
         )}
 
-        <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className={cn(
-                'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
-                isPremium ? 'bg-amber-500/15' : 'bg-muted/30',
-              )}>
-                {isPremium ? <Crown className="h-4 w-4 text-amber-400" /> : <Zap className="h-4 w-4 text-muted-foreground" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-semibold text-foreground truncate">Current Plan — {userTier}</h4>
-                <p className="text-xs text-muted-foreground">
-                  {isPremium
-                    ? 'Priority queue, unlimited file requests, always-active sites & more'
-                    : 'Unlimited storage with standard queue priority'}
-                </p>
-              </div>
-            </div>
-            <Badge className={cn('shrink-0', isPremium ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-muted/50 text-muted-foreground border-border/30')}>
-              {userTier}
-            </Badge>
+        <Panel title="Redeem a Code" desc="Enter a redeem code to unlock premium features">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="sa-input sa-mono"
+              style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}
+              placeholder="Enter redeem code"
+              value={redeemCodeInput}
+              onChange={(e) => setRedeemCodeInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && handleRedeemCode()}
+              aria-label="Redeem code"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button type="button" className={btn('primary')} onClick={handleRedeemCode} disabled={!redeemCodeInput.trim() || redeeming}>
+              {redeeming && <Spinner size={12} />}Redeem
+            </button>
           </div>
+        </Panel>
 
-          <div className="grid grid-cols-2 gap-px bg-border/20 rounded-xl overflow-hidden border border-border/20">
-            {[
-              { icon: HardDrive, label: 'Storage', value: formatBytes(storageUsed) },
-              { icon: Briefcase, label: 'Total Files', value: `${totalFiles} files` },
-              { icon: Calendar, label: 'Member Since', value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : '-' },
-              { icon: TrendingUp, label: 'Account Type', value: userTier },
-            ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="bg-muted/20 p-3">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <Icon className="h-3 w-3 text-primary" />
-                  <p className="text-[10px] text-muted-foreground/70">{label}</p>
-                </div>
-                <p className="text-sm font-medium text-foreground">{value}</p>
-              </div>
-            ))}
-          </div>
+        {isPremium && (
+          <Panel danger title="Cancel Subscription" desc="Your plan will remain active until the end of the billing period">
+            <CancelSubscriptionFlow
+              userId={user?.id || ''}
+              planType={profile?.tier}
+              billingPeriod={latestPayment?.billing_period || 'monthly'}
+              onCancelled={() => { refreshProfile(); fetchPaymentLogs(); }}
+            />
+          </Panel>
+        )}
 
-          {isPremium && (
-            <div className="rounded-xl border border-border/20 bg-muted/20 overflow-hidden">
-              <div className="px-3 py-2 border-b border-border/20">
-                <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Subscription Details</p>
-              </div>
-              <div className={cn('grid', isMobile ? '' : 'grid-cols-2')}>
-                <div className="p-3 border-r border-b border-border/20">
-                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Plan</p>
-                  <p className="text-sm font-medium text-foreground">{userTier}</p>
-                </div>
-                <div className="p-3 border-b border-border/20">
-                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Billing Period</p>
-                  <p className="text-sm font-medium text-foreground capitalize">{latestPayment?.billing_period || '-'}</p>
-                </div>
-                <div className="p-3 border-r border-border/20">
-                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Purchase Date</p>
-                  <p className="text-sm font-medium text-foreground">{profile?.subscription_starts_at ? new Date(profile.subscription_starts_at).toLocaleDateString() : latestPayment?.created_at ? new Date(latestPayment.created_at).toLocaleDateString() : '-'}</p>
-                </div>
-                <div className="p-3 border-border/20">
-                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Expires On</p>
-                  <p className="text-sm font-medium text-foreground">{profile?.subscription_expires_at ? new Date(profile.subscription_expires_at).toLocaleDateString() : '-'}</p>
-                </div>
-                <div className="p-3 border-r border-t border-border/20">
-                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Amount Paid</p>
-                  <p className="text-sm font-medium text-foreground">{latestPayment ? formatPaymentAmount(latestPayment) : '-'}</p>
-                </div>
-                <div className="p-3 border-t border-border/20">
-                  <p className="text-[10px] text-muted-foreground/70 mb-0.5">Payment Mode</p>
-                  <p className="text-sm font-medium text-foreground capitalize">{latestPayment?.tx_hash ? 'Crypto' : latestPayment?.discount_code ? 'Discount Code' : latestPayment?.metadata?.source === 'redeem_code' ? 'Redeem Code' : '-'}</p>
-                </div>
-                {latestPayment?.discount_percent ? (
-                  <div className="p-3 border-r border-t border-border/20 col-span-2">
-                    <p className="text-[10px] text-muted-foreground/70 mb-0.5">Discount</p>
-                    <p className="text-sm font-medium text-green-400">{latestPayment.discount_percent}%{latestPayment.discount_code ? ` (${latestPayment.discount_code})` : ''}</p>
-                  </div>
-                ) : latestPayment?.metadata?.code ? (
-                  <div className="p-3 border-r border-t border-border/20 col-span-2">
-                    <p className="text-[10px] text-muted-foreground/70 mb-0.5">Redeem Code</p>
-                    <p className="text-sm font-medium text-emerald-400">{latestPayment.metadata.code}</p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          )}
+        <Dialog open={paymentHistoryOpen} onOpenChange={(open) => { setPaymentHistoryOpen(open); if (!open) setSelectedPayment(null); }}>
+          <DialogContent className={isMobile ? 'max-h-[85vh] overflow-y-auto max-w-full p-0' : 'max-h-[85vh] overflow-y-auto max-w-2xl p-0'}>
+            <div style={{ padding: isMobile ? '8px 16px 24px' : 20 }}>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-base">
+                  {selectedPayment ? (
+                    <>
+                      <button type="button" className={btn('ghost', 'icon-sm')} onClick={() => setSelectedPayment(null)} aria-label="Back to payment history">
+                        <Ico.ArrowLeft size={14} />
+                      </button>
+                      <span>Payment Details</span>
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="h-4 w-4" />
+                      <span>Payment History</span>
+                    </>
+                  )}
+                </DialogTitle>
+              </DialogHeader>
 
-          <div className={cn('flex gap-2 pt-1', isMobile ? 'flex-col' : 'flex-wrap')}>
-            {isPremium ? (
-              <>
-                <Button onClick={() => navigate('/pricing')} variant="outline" size={isMobile ? 'default' : 'sm'} className="rounded-xl">
-                  <Crown className="h-3.5 w-3.5 mr-1.5" />Change Plan
-                </Button>
-                <Button onClick={() => { fetchPaymentLogs(); setPaymentHistoryOpen(true); }} variant="outline" size={isMobile ? 'default' : 'sm'} className="rounded-xl">
-                  <Calendar className="h-3.5 w-3.5 mr-1.5" />History
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button onClick={() => navigate('/pricing')} size={isMobile ? 'default' : 'sm'} className="rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/25 hover:bg-amber-500/25">
-                  <Crown className="h-3.5 w-3.5 mr-1.5" />Upgrade Now
-                </Button>
-                <Button onClick={() => { fetchPaymentLogs(); setPaymentHistoryOpen(true); }} variant="outline" size={isMobile ? 'default' : 'sm'} className="rounded-xl">
-                  <Calendar className="h-3.5 w-3.5 mr-1.5" />History
-                </Button>
-              </>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                <Key className="h-4 w-4 text-emerald-400" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-semibold text-foreground">Redeem a Code</h4>
-                <p className="text-xs text-muted-foreground">Enter a redeem code to unlock premium features</p>
-              </div>
-            </div>
-            <div className={cn('flex gap-2', isMobile ? 'flex-col' : '')}>
-              <Input placeholder="Enter redeem code" value={redeemCodeInput} onChange={(e) => setRedeemCodeInput(e.target.value.toUpperCase())} className={cn('rounded-xl bg-muted/20 border-border/40 font-mono text-sm uppercase', isMobile ? 'h-11' : 'flex-1 h-10')} onKeyDown={(e) => e.key === 'Enter' && handleRedeemCode()} />
-              <Button onClick={handleRedeemCode} disabled={!redeemCodeInput.trim() || redeeming} size={isMobile ? 'default' : 'sm'} className="rounded-xl" loading={redeeming}>Redeem</Button>
-            </div>
-          </div>
-
-          {isPremium && (
-            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
-                  <Trash2 className="h-4 w-4 text-red-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-foreground">Cancel Subscription</h4>
-                  <p className="text-xs text-muted-foreground">Your plan will remain active until the end of the billing period</p>
-                </div>
-              </div>
-              <CancelSubscriptionFlow
-                userId={user?.id || ''}
-                planType={profile?.tier}
-                billingPeriod={latestPayment?.billing_period || 'monthly'}
-                onCancelled={() => { refreshProfile(); fetchPaymentLogs(); }}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <Dialog open={paymentHistoryOpen} onOpenChange={(open) => { setPaymentHistoryOpen(open); if (!open) setSelectedPayment(null); }}>
-        <DialogContent className={cn('max-h-[85vh] overflow-y-auto p-0', isMobile ? 'max-w-full' : 'max-w-2xl')}>
-          <div className={cn(isMobile ? 'px-4 pt-2 pb-6' : 'p-5')}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              {selectedPayment ? (
-                <>
-                  <button onClick={() => setSelectedPayment(null)} className="h-8 w-8 rounded-lg bg-accent/50 hover:bg-accent/80 flex items-center justify-center transition-colors shrink-0">
-                    <ArrowLeft className="h-4 w-4" />
-                  </button>
-                  <span>Payment Details</span>
-                </>
-              ) : (
-                <>
-                  <Calendar className="h-4 w-4" />
-                  <span>Payment History</span>
-                </>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-
-          {paymentLogsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : selectedPayment ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/20 border border-border/30">
-                <Badge className={getPaymentStatusColor(selectedPayment.status)}>
-                  {selectedPayment.status.charAt(0).toUpperCase() + selectedPayment.status.slice(1)}
-                </Badge>
-                <div>
-                  <p className="font-semibold text-foreground">{selectedPayment.plan_type ? (selectedPayment.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : selectedPayment.plan || 'Subscription'}</p>
-                  <p className="text-xs text-muted-foreground">{formatPaymentDate(selectedPayment.created_at)}</p>
-                </div>
-              </div>
-
-              <div className={cn('grid gap-3', isMobile ? '' : 'grid-cols-2')}>
-                <DetailField label="Amount" value={formatPaymentAmount(selectedPayment)} />
-                <DetailField label="Status" value={selectedPayment.status} capitalize />
-                <DetailField label="Plan" value={selectedPayment.plan_type ? (selectedPayment.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : selectedPayment.plan || '—'} />
-                <DetailField label="Billing Period" value={selectedPayment.billing_period || '—'} capitalize />
-                {selectedPayment.discount_percent ? (
-                  <DetailField label="Discount" value={`${selectedPayment.discount_percent}%${selectedPayment.discount_code ? ` (${selectedPayment.discount_code})` : ''}`} highlight />
-                ) : null}
-                {selectedPayment.network ? <DetailField label="Network" value={selectedPayment.network} /> : null}
-                {selectedPayment.token ? <DetailField label="Token" value={selectedPayment.token} /> : null}
-                {selectedPayment.tx_hash ? <DetailField label="Transaction Hash" value={selectedPayment.tx_hash} mono fullWidth /> : null}
-                {selectedPayment.session_id ? <DetailField label="Session ID" value={selectedPayment.session_id} mono fullWidth /> : null}
-                {selectedPayment.description ? <DetailField label="Description" value={selectedPayment.description} fullWidth /> : null}
-                <DetailField label="Created" value={formatPaymentDate(selectedPayment.created_at)} />
-                {selectedPayment.paid_at ? <DetailField label="Paid At" value={formatPaymentDate(selectedPayment.paid_at)} /> : null}
-                {selectedPayment.timezone ? <DetailField label="Timezone" value={selectedPayment.timezone} /> : null}
-              </div>
-            </div>
-          ) : paymentLogs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Calendar className="h-10 w-10 text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">No payment history yet</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Your completed payments will appear here.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {paymentLogs.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedPayment(p)}
-                  className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/20 hover:bg-accent/30 hover:border-border/40 transition-all text-left"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Badge className={getPaymentStatusColor(p.status) + ' shrink-0'}>
-                      {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
-                    </Badge>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {p.plan_type ? (p.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : p.plan || 'Subscription'}
-                        {p.billing_period ? ` — ${p.billing_period}` : ''}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">{formatPaymentDate(p.created_at)}</p>
+              {paymentLogsLoading ? (
+                <div style={{ paddingTop: 16 }}><SkelRows rows={4} /></div>
+              ) : selectedPayment ? (
+                <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, border: '1px solid var(--sa-line)', borderRadius: 5, background: 'var(--sa-bg-2)' }}>
+                    <Pill tone={payTone(selectedPayment.status)}>{cap(selectedPayment.status)}</Pill>
+                    <div>
+                      <div style={{ fontWeight: 500 }}>{selectedPayment.plan_type ? (selectedPayment.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : selectedPayment.plan || 'Subscription'}</div>
+                      <div className="sa-mute" style={{ fontSize: 12 }}>{formatPaymentDate(selectedPayment.created_at)}</div>
                     </div>
                   </div>
-                  <div className="text-sm font-semibold text-foreground shrink-0 ml-3">
-                    {formatPaymentAmount(p)}
+
+                  <div style={{ display: 'grid', gap: 10, gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr' }}>
+                    <DetailField label="Amount" value={formatPaymentAmount(selectedPayment)} />
+                    <DetailField label="Status" value={selectedPayment.status} capitalize />
+                    <DetailField label="Plan" value={selectedPayment.plan_type ? (selectedPayment.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : selectedPayment.plan || '—'} />
+                    <DetailField label="Billing Period" value={selectedPayment.billing_period || '—'} capitalize />
+                    {selectedPayment.discount_percent ? (
+                      <DetailField label="Discount" value={`${selectedPayment.discount_percent}%${selectedPayment.discount_code ? ` (${selectedPayment.discount_code})` : ''}`} highlight />
+                    ) : null}
+                    {selectedPayment.network ? <DetailField label="Network" value={selectedPayment.network} /> : null}
+                    {selectedPayment.token ? <DetailField label="Token" value={selectedPayment.token} /> : null}
+                    {selectedPayment.tx_hash ? <DetailField label="Transaction Hash" value={selectedPayment.tx_hash} mono fullWidth /> : null}
+                    {selectedPayment.session_id ? <DetailField label="Session ID" value={selectedPayment.session_id} mono fullWidth /> : null}
+                    {selectedPayment.description ? <DetailField label="Description" value={selectedPayment.description} fullWidth /> : null}
+                    <DetailField label="Created" value={formatPaymentDate(selectedPayment.created_at)} />
+                    {selectedPayment.paid_at ? <DetailField label="Paid At" value={formatPaymentDate(selectedPayment.paid_at)} /> : null}
+                    {selectedPayment.timezone ? <DetailField label="Timezone" value={selectedPayment.timezone} /> : null}
                   </div>
-                </button>
-              ))}
+                </div>
+              ) : paymentLogs.length === 0 ? (
+                <Empty icon={<Calendar className="h-4 w-4" />} title="No payment history yet" body="Your completed payments will appear here." />
+              ) : (
+                <div className="sa-panel" style={{ marginTop: 16, overflow: 'hidden' }}>
+                  {paymentLogs.map((p) => (
+                    <button key={p.id} type="button" className="st-pay" onClick={() => setSelectedPayment(p)}>
+                      <span className="l">
+                        <Pill tone={payTone(p.status)}>{cap(p.status)}</Pill>
+                        <span style={{ minWidth: 0 }}>
+                          <b>
+                            {p.plan_type ? (p.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : p.plan || 'Subscription'}
+                            {p.billing_period ? ` — ${p.billing_period}` : ''}
+                          </b>
+                          <small>{formatPaymentDate(p.created_at)}</small>
+                        </span>
+                      </span>
+                      <span className="amt">{formatPaymentAmount(p)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>);
+          </DialogContent>
+        </Dialog>
+      </>
+    );
   }
 
   function renderProfileSection() {
+    const dirty = fullName.trim() !== (profile?.full_name || '') || displayName.trim() !== (profile?.display_name || '');
     return (
-      <div className={mc()}>
-        {cardHeader(<User className="h-5 w-5 text-primary" />, 'Profile', 'Your personal information')}
-        <div className="space-y-4">
-          <div className={cn('grid gap-4', isMobile ? '' : 'sm:grid-cols-2')}>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Full Name</Label>
-              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Enter your name" className="h-11 rounded-xl bg-muted/20 border-border/40" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Display Name</Label>
-              <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Enter display name" className="h-11 rounded-xl bg-muted/20 border-border/40" />
-            </div>
+      <Panel
+        title="Personal information"
+        actions={dirty ? <Pill tone="warn">Unsaved</Pill> : undefined}
+      >
+        <form
+          className="st-form"
+          onSubmit={(e) => { e.preventDefault(); handleSaveProfile(); }}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); handleSaveProfile(); }
+          }}
+        >
+          <div className="st-g2">
+            <Field label="Full name" htmlFor="st-full">
+              <input id="st-full" className="sa-input" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Enter your name" autoComplete="name" />
+            </Field>
+            <Field label="Display name" htmlFor="st-display">
+              <input id="st-display" className="sa-input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Enter display name" autoComplete="nickname" />
+            </Field>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Email</Label>
-            <Input value={user?.email || ''} disabled className="h-11 rounded-xl bg-muted/30 border-border/40 text-muted-foreground" />
-            <p className="text-[11px] text-muted-foreground/60">Email cannot be changed.</p>
+          <Field label="Email" htmlFor="st-email" hint="Email cannot be changed.">
+            <input id="st-email" className="sa-input" value={user?.email || ''} disabled />
+          </Field>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button type="submit" className={btn('primary')} disabled={loading}>
+              {loading && <Spinner size={12} />}Save changes
+            </button>
+            <span className="sa-hint hide-sm" style={{ margin: 0 }}>or press ⌘ / Ctrl + S</span>
           </div>
-          <Button onClick={handleSaveProfile} loading={loading} size={isMobile ? 'default' : 'sm'} className="rounded-xl w-full sm:w-auto">Save Changes</Button>
-        </div>
-      </div>
+        </form>
+      </Panel>
     );
   }
 
   function renderSecuritySection() {
-    const btnSize = isMobile ? 'default' : 'sm';
+    const unread = swkNotices.filter((n) => !n.is_read).length;
     return (
-      <div className={mc()}>
-        {cardHeader(<Shield className="h-5 w-5 text-primary" />, 'Security', 'Protect your account')}
+      <>
+        {/* Two-factor */}
+        <Panel
+          title={iconTitle(<Smartphone className="h-3.5 w-3.5" />, 'Two-Factor Authentication')}
+          desc="Add an extra layer of security with TOTP authenticator"
+          actions={aalLevel ? <Pill tone={aalLevel.currentLevel === 'aal2' ? 'ok' : 'neutral'}>{aalLevel.currentLevel === 'aal2' ? 'Active' : 'Disabled'}</Pill> : undefined}
+          flush
+        >
+          {!mfaSetupMode && mfaFactors.length === 0 && (
+            <Row label="Authenticator app" desc="Protect your account by requiring a verification code from your authenticator app when signing in.">
+              <button type="button" className={btn()} onClick={handleEnrollMfa} disabled={mfaLoading}>
+                {mfaLoading ? <Spinner size={12} /> : <Plus className="h-3 w-3" />}Enable TOTP
+              </button>
+            </Row>
+          )}
 
-        <div className="space-y-4">
-          {/* MFA/TOTP Card */}
-          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Smartphone className="h-4 w-4 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-foreground">Two-Factor Authentication</h4>
-                  <p className="text-xs text-muted-foreground truncate">Add an extra layer of security with TOTP authenticator</p>
-                </div>
+          {mfaSetupMode && (
+            <div className="st-mfa">
+              <div>
+                <div className="st-qr" dangerouslySetInnerHTML={{ __html: mfaQrCode }} />
               </div>
-              {aalLevel && (
-                <Badge className={cn('shrink-0', aalLevel.currentLevel === 'aal2' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-muted/50 text-muted-foreground border-border/30')}>
-                  {aalLevel.currentLevel === 'aal2' ? 'Active' : 'Disabled'}
-                </Badge>
-              )}
-            </div>
-
-            {!mfaSetupMode && mfaFactors.length === 0 && (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Protect your account by requiring a verification code from your authenticator app when signing in.
-                </p>
-                <Button variant="outline" size={btnSize} onClick={handleEnrollMfa} disabled={mfaLoading} className="rounded-xl">
-                  {mfaLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Plus className="h-3 w-3 mr-1.5" />}
-                  Enable TOTP
-                </Button>
-              </div>
-            )}
-
-            {mfaSetupMode && (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-border/40 bg-muted/30 p-4 space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
-                  </p>
-                  <div className="flex justify-center">
-                    <div
-                      className="bg-white p-2 rounded-lg"
-                      dangerouslySetInnerHTML={{ __html: mfaQrCode }}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] text-muted-foreground">Manual entry key:</p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 text-xs font-mono bg-muted/50 p-2 rounded break-all text-foreground">{mfaSecret}</code>
-                      <button
-                        type="button"
-                        onClick={handleCopySecret}
-                        className="shrink-0 h-8 w-8 rounded-lg bg-muted/50 hover:bg-muted/80 flex items-center justify-center transition-colors"
-                        title="Copy secret"
-                      >
-                        {secretCopied ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                        ) : (
-                          <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
+              <div style={{ display: 'grid', gap: 14, alignContent: 'start', minWidth: 0 }}>
+                <p className="st-p">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                <div>
+                  <div className="sa-label">Manual entry key</div>
+                  <div className="sa-code inline" style={{ maxWidth: '100%' }}>
+                    <code title={mfaSecret} style={{ userSelect: 'all' }}>{mfaSecret}</code>
+                    <button type="button" className={btn('ghost', 'icon-sm')} onClick={handleCopySecret} aria-label="Copy secret">
+                      {secretCopied ? <Ico.Check size={13} /> : <Ico.Copy size={13} />}
+                    </button>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs">Enter 6-digit code from authenticator</Label>
-                  <Input
+                <Field label="Enter 6-digit code from authenticator" htmlFor="st-mfa-code">
+                  <input
+                    id="st-mfa-code"
+                    className="sa-input sa-mono"
+                    style={{ height: 44, fontSize: 18, textAlign: 'center', letterSpacing: '0.4em' }}
                     type="text"
                     inputMode="numeric"
+                    autoComplete="one-time-code"
                     maxLength={6}
                     value={mfaVerifyCode}
                     onChange={(e) => setMfaVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && mfaVerifyCode.length === 6 && !mfaVerifying) handleVerifyMfa(); }}
                     placeholder="000000"
-                    className="h-11 rounded-xl bg-muted/20 border-border/40 font-mono text-center text-lg tracking-widest"
+                    autoFocus
                   />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="ghost" size={btnSize} onClick={() => { setMfaSetupMode(false); setMfaVerifyCode(''); setMfaQrCode(''); setMfaSecret(''); setMfaEnrollmentId(''); }} className="rounded-xl">Cancel</Button>
-                  <Button size={btnSize} onClick={handleVerifyMfa} disabled={mfaVerifying || mfaVerifyCode.length !== 6} className="rounded-xl flex-1">
-                    {mfaVerifying ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : null}
-                    Verify & Enable
-                  </Button>
+                </Field>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className={btn('ghost')} onClick={() => { setMfaSetupMode(false); setMfaVerifyCode(''); setMfaQrCode(''); setMfaSecret(''); setMfaEnrollmentId(''); }}>Cancel</button>
+                  <button type="button" className={btn('primary')} onClick={handleVerifyMfa} disabled={mfaVerifying || mfaVerifyCode.length !== 6}>
+                    {mfaVerifying && <Spinner size={12} />}Verify &amp; Enable
+                  </button>
                 </div>
               </div>
-            )}
-
-            {!mfaSetupMode && mfaFactors.length > 0 && (
-              <div className="space-y-3">
-                {mfaFactors.map(factor => (
-                  <div key={factor.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border/40 bg-muted/30">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                        <Smartphone className="h-4 w-4 text-emerald-500" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground">{factor.friendly_name || 'Authenticator App'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Added {new Date(factor.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size={btnSize}
-                      onClick={() => { setUnenrollFactorId(factor.id); setShowUnenrollDialog(true); }}
-                      disabled={mfaLoading}
-                      className="rounded-xl shrink-0"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1.5" />Remove
-                    </Button>
-                  </div>
-                ))}
-                <Button variant="outline" size={btnSize} onClick={handleEnrollMfa} disabled={mfaLoading} className="rounded-xl">
-                  <Plus className="h-3 w-3 mr-1.5" /> Add Another
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Fingerprint className="h-4 w-4 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-foreground">Passkey Authentication</h4>
-                  <p className="text-xs text-muted-foreground truncate">Use fingerprint, Face ID, or security key to sign in</p>
-                </div>
-              </div>
-              {!isCheckingPasskey && passkeyAvailable && (
-                <Badge className={cn('shrink-0', hasPasskey ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-muted/50 text-muted-foreground border-border/30')}>
-                  {hasPasskey ? 'Active' : 'Disabled'}
-                </Badge>
-              )}
             </div>
-            {!passkeyAvailable && (
-              <div className="flex items-start gap-3 p-3 rounded-lg border border-border/40 bg-muted/30">
-                <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                <p className="text-sm text-muted-foreground">Your device doesn't support passkey authentication.</p>
-              </div>
-            )}
-            {isCheckingPasskey && passkeyAvailable && (
-              <div className="flex items-center gap-2 p-2">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Checking passkey...</p>
-              </div>
-            )}
-            {!isCheckingPasskey && passkeyAvailable && hasPasskey && (
-              <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'flex-wrap')}>
-                <Button variant="outline" size={btnSize} onClick={handleTestPasskey} disabled={loading} className="rounded-xl">
-                  {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Fingerprint className="h-3 w-3 mr-1.5" />}
-                  Test
-                </Button>
-                <Button variant="outline" size={btnSize} onClick={handleUpdatePasskey} disabled={loading} className="rounded-xl">Update</Button>
-                <Button variant="destructive" size={btnSize} onClick={() => setShowDeleteDialog(true)} disabled={loading} className="rounded-xl">
-                  <Trash2 className="h-3 w-3 mr-1.5" />Remove
-                </Button>
-              </div>
-            )}
-            {!isCheckingPasskey && passkeyAvailable && !hasPasskey && (
-              <Button onClick={handleRegisterPasskey} disabled={loading} size={btnSize} className="rounded-xl w-full sm:w-auto">
-                {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Plus className="h-3 w-3 mr-1.5" />}
-                Setup Passkey
-              </Button>
-            )}
-          </div>
+          )}
 
-          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Fingerprint className="h-4 w-4 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-foreground">Biometric Security</h4>
-                  <p className="text-xs text-muted-foreground truncate">Use device biometrics to protect sensitive actions</p>
-                </div>
-              </div>
-              <Badge className={cn('shrink-0', hasBiometric ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-muted/50 text-muted-foreground border-border/30')}>
-                {hasBiometric ? 'Active' : 'Disabled'}
-              </Badge>
-            </div>
-            <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'flex-wrap')}>
-              {!hasBiometric ? (
-                <Button variant="outline" size={btnSize} onClick={handleSetupBiometric} className="rounded-xl">
-                  <Plus className="h-3 w-3 mr-1.5" /> Enable Biometric
-                </Button>
-              ) : (
-                <Button variant="destructive" size={btnSize} onClick={handleDisableBiometric} className="rounded-xl">Disable Biometric</Button>
-              )}
-            </div>
-          </div>
+          {!mfaSetupMode && mfaFactors.length > 0 && (
+            <>
+              {mfaFactors.map((factor) => (
+                <Row
+                  key={factor.id}
+                  label={<span title={factor.friendly_name || 'Authenticator App'} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{factor.friendly_name || 'Authenticator App'}</span>}
+                  desc={`Added ${new Date(factor.created_at).toLocaleDateString()}`}
+                >
+                  <button
+                    type="button"
+                    className={btn('danger', 'sm')}
+                    onClick={() => { setUnenrollFactorId(factor.id); setShowUnenrollDialog(true); }}
+                    disabled={mfaLoading}
+                  >
+                    <Trash2 className="h-3 w-3" />Remove
+                  </button>
+                </Row>
+              ))}
+              <Row label="Add another authenticator" desc="Register a second device so you are never locked out.">
+                <button type="button" className={btn('default', 'sm')} onClick={handleEnrollMfa} disabled={mfaLoading}>
+                  <Plus className="h-3 w-3" /> Add Another
+                </button>
+              </Row>
+            </>
+          )}
+        </Panel>
 
-          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Key className="h-4 w-4 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-foreground">Change Password</h4>
-                  <p className="text-xs text-muted-foreground truncate">Update your account password</p>
-                </div>
-              </div>
-              {!changingPassword && (
-                <Button variant="outline" size={btnSize} onClick={() => setChangingPassword(true)} className="rounded-xl shrink-0">Change</Button>
-              )}
+        {/* Passkey */}
+        <Panel
+          title={iconTitle(<Fingerprint className="h-3.5 w-3.5" />, 'Passkey Authentication')}
+          desc="Use fingerprint, Face ID, or security key to sign in"
+          actions={!isCheckingPasskey && passkeyAvailable ? <Pill tone={hasPasskey ? 'ok' : 'neutral'}>{hasPasskey ? 'Active' : 'Disabled'}</Pill> : undefined}
+          flush
+        >
+          {!passkeyAvailable && (
+            <div style={{ padding: 16 }}>
+              <Note>Your device doesn't support passkey authentication.</Note>
             </div>
-            {changingPassword && (
-              <div className="space-y-3 pt-2">
-                <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" className="h-11 rounded-xl bg-muted/20 border-border/40" />
-                <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" className="h-11 rounded-xl bg-muted/20 border-border/40" />
-                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" className="h-11 rounded-xl bg-muted/20 border-border/40" />
-                <div className="flex gap-2 pt-1">
-                  <Button variant="ghost" size={btnSize} onClick={() => { setChangingPassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }} className="rounded-xl">Cancel</Button>
-                  <Button size={btnSize} onClick={handleChangePassword} disabled={!currentPassword || !newPassword || !confirmPassword || loading} className="rounded-xl flex-1 sm:flex-none" loading={loading}>
-                    Update Password
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+          )}
+          {isCheckingPasskey && passkeyAvailable && (
+            <Row label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 400 }}><Spinner size={12} />Checking passkey...</span>} />
+          )}
+          {!isCheckingPasskey && passkeyAvailable && hasPasskey && (
+            <Row label="Passkey registered" desc="Test it, replace it, or remove it.">
+              <button type="button" className={btn('default', 'sm')} onClick={handleTestPasskey} disabled={loading}>
+                {loading ? <Spinner size={12} /> : <Fingerprint className="h-3 w-3" />}Test
+              </button>
+              <button type="button" className={btn('default', 'sm')} onClick={handleUpdatePasskey} disabled={loading}>Update</button>
+              <button type="button" className={btn('danger', 'sm')} onClick={() => setShowDeleteDialog(true)} disabled={loading}>
+                <Trash2 className="h-3 w-3" />Remove
+              </button>
+            </Row>
+          )}
+          {!isCheckingPasskey && passkeyAvailable && !hasPasskey && (
+            <Row label="No passkey yet" desc="Sign in with a touch or a look instead of a password.">
+              <button type="button" className={btn('primary', 'sm')} onClick={handleRegisterPasskey} disabled={loading}>
+                {loading ? <Spinner size={12} /> : <Plus className="h-3 w-3" />}Setup Passkey
+              </button>
+            </Row>
+          )}
+        </Panel>
 
-          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <ShieldAlert className="h-4 w-4 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-foreground">Upload Appeals (S-Hawk)</h4>
-                  <p className="text-xs text-muted-foreground truncate">Why a file was refused — and appeal for human review</p>
-                </div>
-              </div>
-              {swkNotices.filter((n) => !n.is_read).length > 0 && (
-                <Badge className="shrink-0 bg-destructive/10 text-destructive border-destructive/20">
-                  {swkNotices.filter((n) => !n.is_read).length} new
-                </Badge>
-              )}
-            </div>
-            {swkLoading ? (
-              <div className="flex items-center gap-2 p-2">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">Loading screening decisions…</p>
-              </div>
-            ) : swkNotices.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No screening decisions on your account. Every refused upload will appear here with its exact reasons.</p>
+        {/* Biometric */}
+        <Panel
+          title={iconTitle(<Fingerprint className="h-3.5 w-3.5" />, 'Biometric Security')}
+          desc="Use device biometrics to protect sensitive actions"
+          actions={<Pill tone={hasBiometric ? 'ok' : 'neutral'}>{hasBiometric ? 'Active' : 'Disabled'}</Pill>}
+          flush
+        >
+          <Row label={hasBiometric ? 'Biometric protection is on' : 'Biometric protection is off'}>
+            {!hasBiometric ? (
+              <button type="button" className={btn('default', 'sm')} onClick={handleSetupBiometric}>
+                <Plus className="h-3 w-3" /> Enable Biometric
+              </button>
             ) : (
-              <div className="space-y-3">
-                {swkNotices.map((notice) => (
-                  <div key={notice.id} className="p-3 rounded-lg border border-border/40 bg-muted/30 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-foreground">{notice.title}</p>
-                      <span className="text-[11px] text-muted-foreground shrink-0">{new Date(notice.created_at).toLocaleString()}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">{notice.body}</p>
-                    {notice.reason_codes.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {notice.reason_codes.map((code) => (
-                          <Badge key={code} variant="outline" className="text-[10px] font-mono">{code}</Badge>
-                        ))}
-                      </div>
-                    )}
-                    {notice.case_id && (
-                      <Button
-                        variant="outline"
-                        size={btnSize}
-                        disabled={swkAppealingId === notice.id}
-                        onClick={() => handleSwkAppeal(notice)}
-                        className="rounded-xl"
-                      >
-                        {swkAppealingId === notice.id ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : null}
-                        Appeal for human review
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <button type="button" className={btn('danger', 'sm')} onClick={handleDisableBiometric}>Disable Biometric</button>
             )}
-          </div>
-        </div>
-      </div>
+          </Row>
+        </Panel>
+
+        {/* Password */}
+        <Panel
+          title={iconTitle(<Key className="h-3.5 w-3.5" />, 'Change Password')}
+          desc="Update your account password"
+          flush={!changingPassword}
+          actions={!changingPassword ? <button type="button" className={btn('default', 'sm')} onClick={() => setChangingPassword(true)}>Change</button> : undefined}
+        >
+          {changingPassword && (
+            <form
+              className="st-form"
+              onSubmit={(e) => { e.preventDefault(); if (currentPassword && newPassword && confirmPassword && !loading) handleChangePassword(); }}
+            >
+              <input type="password" className="sa-input" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" autoComplete="current-password" aria-label="Current password" autoFocus />
+              <input type="password" className="sa-input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" autoComplete="new-password" aria-label="New password" />
+              <input type="password" className="sa-input" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" autoComplete="new-password" aria-label="Confirm new password" />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className={btn('ghost')} onClick={() => { setChangingPassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}>Cancel</button>
+                <button type="submit" className={btn('primary')} disabled={!currentPassword || !newPassword || !confirmPassword || loading}>
+                  {loading && <Spinner size={12} />}Update Password
+                </button>
+              </div>
+            </form>
+          )}
+        </Panel>
+
+        {/* S-Hawk */}
+        <Panel
+          title={iconTitle(<ShieldAlert className="h-3.5 w-3.5" />, 'Upload Appeals (S-Hawk)')}
+          desc="Why a file was refused — and appeal for human review"
+          actions={unread > 0 ? <Pill tone="err">{unread} new</Pill> : undefined}
+          flush
+        >
+          {swkLoading ? (
+            <div style={{ padding: 16, display: 'grid', gap: 8 }}>
+              <Skel w="40%" h={11} /><Skel w="70%" h={9} />
+              <span className="sa-sr">Loading screening decisions…</span>
+            </div>
+          ) : swkNotices.length === 0 ? (
+            <div style={{ padding: 16 }}>
+              <p className="st-p sa-mute">No screening decisions on your account. Every refused upload will appear here with its exact reasons.</p>
+            </div>
+          ) : (
+            swkNotices.map((notice) => (
+              <div key={notice.id} className="st-notice">
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+                  <h4>{notice.title}</h4>
+                  <span className="when">{new Date(notice.created_at).toLocaleString()}</span>
+                </div>
+                <p>{notice.body}</p>
+                {notice.reason_codes.length > 0 && (
+                  <div className="st-codes">
+                    {notice.reason_codes.map((code) => (
+                      <Pill key={code}>{code}</Pill>
+                    ))}
+                  </div>
+                )}
+                {notice.case_id && (
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      type="button"
+                      className={btn('default', 'sm')}
+                      disabled={swkAppealingId === notice.id}
+                      onClick={() => handleSwkAppeal(notice)}
+                    >
+                      {swkAppealingId === notice.id ? <Spinner size={12} /> : null}
+                      Appeal for human review
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </Panel>
+      </>
     );
   }
 
   function renderMigrationSection() {
-    const btnSize = isMobile ? 'default' : 'sm';
+    if (!migrationJob) {
+      return (
+        <Panel title="Migration Progress" desc="Track your ZIP imports and cloud migrations">
+          <Empty
+            icon={<FileArchive className="h-4 w-4" />}
+            title="No active imports"
+            body="Import files from other platforms or ZIP archives."
+            action={
+              <button type="button" className={btn()} onClick={() => setShowImportDialog(true)}>
+                <Plus className="h-3.5 w-3.5" /> Import Files
+              </button>
+            }
+          />
+        </Panel>
+      );
+    }
+    const running = ['scheduled', 'extracting', 'uploading', 'in_progress'].includes(migrationJob.status);
     return (
-      <div className={mc()}>
-        {cardHeader(<FileArchive className="h-5 w-5 text-primary" />, 'Migration Progress', 'Track your ZIP imports and cloud migrations')}
-        {migrationJob ? (
-          <div className="rounded-xl border border-border/30 bg-muted/20 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-medium capitalize truncate">{migrationJob.source_platform?.replace('-', ' ')}</span>
-              </div>
-              <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full shrink-0', getStatusColor(migrationJob.status), 'bg-current/10')}>
-                {getStatusLabel(migrationJob.status)}
-              </span>
+      <Panel
+        title={
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textTransform: 'capitalize' }}>
+            <FolderOpen className="h-3.5 w-3.5" />{migrationJob.source_platform?.replace('-', ' ')}
+          </span>
+        }
+        desc="Track your ZIP imports and cloud migrations"
+        actions={<Pill tone={migTone(migrationJob.status)}>{getStatusLabel(migrationJob.status)}</Pill>}
+        flush
+      >
+        {migrationJob.total_files > 0 && (
+          <>
+            <div style={{ padding: '16px 16px 0' }}>
+              <Meter plain value={migrationJob.processed_files} max={migrationJob.total_files} label="Files processed" />
             </div>
-            {migrationJob.total_files > 0 && (
-              <>
-                <Progress value={migrationJob.total_files > 0 ? (migrationJob.processed_files / migrationJob.total_files) * 100 : 0} className="w-full" />
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div><span className="font-medium">{migrationJob.total_files}</span> <span className="text-muted-foreground">total</span></div>
-                  <div><span className="font-medium text-green-600">{migrationJob.processed_files}</span> <span className="text-muted-foreground">done</span></div>
-                  <div><span className="font-medium text-red-600">{migrationJob.failed_files}</span> <span className="text-muted-foreground">failed</span></div>
-                </div>
-              </>
-            )}
-            {migrationJob.settings?.totalSize && (
-              <div className="text-[11px] text-muted-foreground text-center">
-                Total: {formatSpeed(migrationJob.settings.totalSize)}
-                {migrationJob.settings.processedSize ? ` · Uploaded: ${formatSpeed(migrationJob.settings.processedSize)}` : ''}
-              </div>
-            )}
-            {migrationJob.error_message && (
-              <div className="text-xs text-red-500 bg-red-500/10 p-2 rounded-lg">{migrationJob.error_message}</div>
-            )}
-            {['scheduled', 'extracting', 'uploading', 'in_progress'].includes(migrationJob.status) && (
-              <div className="space-y-2">
-                <Button variant="outline" size={btnSize} className="w-full rounded-xl" onClick={() => setShowImportDialog(true)}>
-                  <RefreshCw className="h-3.5 w-3.5 mr-2" /> View Details
-                </Button>
-                <Button variant="destructive" size={btnSize} className="w-full rounded-xl" onClick={handleCancelMigration} disabled={cancelling}>
-                  {cancelling ? <Loader size="sm" className="mr-2" /> : null}Cancel Import
-                </Button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <FileArchive className="mx-auto h-10 w-10 text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground mb-1">No active imports</p>
-            <p className="text-xs text-muted-foreground/60 mb-4">Import files from other platforms or ZIP archives.</p>
-            <Button variant="outline" size={btnSize} className="rounded-xl" onClick={() => setShowImportDialog(true)}>
-              <Plus className="h-3.5 w-3.5 mr-2" /> Import Files
-            </Button>
+            <Stats>
+              <Stat label="Total" value={sv(migrationJob.total_files)} />
+              <Stat label="Done" value={<span style={{ fontSize: 20, color: 'var(--sa-ok)' }}>{migrationJob.processed_files}</span>} />
+              <Stat label="Failed" value={<span style={{ fontSize: 20, color: migrationJob.failed_files ? 'var(--sa-err)' : undefined }}>{migrationJob.failed_files}</span>} />
+            </Stats>
+          </>
+        )}
+        {migrationJob.settings?.totalSize && (
+          <div className="sa-hint" style={{ margin: 0, padding: '12px 16px' }}>
+            Total: {formatSpeed(migrationJob.settings.totalSize)}
+            {migrationJob.settings.processedSize ? ` · Uploaded: ${formatSpeed(migrationJob.settings.processedSize)}` : ''}
           </div>
         )}
-      </div>
+        {migrationJob.error_message && (
+          <div style={{ padding: 16 }}><Note tone="err">{migrationJob.error_message}</Note></div>
+        )}
+        {running && (
+          <div className="st-foot">
+            <button type="button" className={btn()} onClick={() => setShowImportDialog(true)}>
+              <RefreshCw className="h-3.5 w-3.5" /> View Details
+            </button>
+            <button type="button" className={btn('danger')} onClick={handleCancelMigration} disabled={cancelling}>
+              {cancelling ? <Spinner size={12} /> : null}Cancel Import
+            </button>
+          </div>
+        )}
+        {!running && (
+          <div className="st-foot">
+            <button type="button" className={btn()} onClick={() => setShowImportDialog(true)}>
+              <Plus className="h-3.5 w-3.5" /> Import Files
+            </button>
+          </div>
+        )}
+      </Panel>
     );
   }
 
   function renderDeveloperSection() {
-    const btnSize = isMobile ? 'default' : 'sm';
     return (
-      <div className={mc()}>
-        {cardHeader(<Code className="h-5 w-5 text-primary" />, 'Developer API', 'Manage your API keys and integrations')}
+      <>
         <ApiKeyManagement />
-        <Button
-          variant="outline"
-          size={btnSize}
-          onClick={() => navigate('/developer-api')}
-          className="w-full rounded-xl mt-4"
-        >
-          <Book className="h-4 w-4 mr-2" />
+        <button type="button" className={btn() + ' block'} onClick={() => navigate('/developer-api')}>
+          <Book className="h-4 w-4" />
           API Documentation
-        </Button>
-      </div>
+        </button>
+      </>
     );
   }
 
   function renderWebhooksSection() {
-    const btnSize = isMobile ? 'default' : 'sm';
     return (
-      <div className={mc()}>
-        {cardHeader(<Repeat className="h-5 w-5 text-primary" />, 'Webhooks', 'Configure event-driven webhook notifications')}
+      <>
         <WebhookManager open={false} onClose={() => {}} standalone />
-        <Button
-          variant="outline"
-          size={btnSize}
-          onClick={() => navigate('/webhooks')}
-          className="w-full rounded-xl mt-4"
-        >
-          <Book className="h-4 w-4 mr-2" />
+        <button type="button" className={btn() + ' block'} onClick={() => navigate('/webhooks')}>
+          <Book className="h-4 w-4" />
           Webhook Documentation
-        </Button>
-      </div>
+        </button>
+      </>
     );
   }
 
@@ -1413,83 +1323,54 @@ const AccountSettings = () => {
 
   function renderPreferencesSection() {
     return (
-      <div className={mc()}>
-        {cardHeader(<Settings className="h-5 w-5 text-primary" />, 'Advanced Preferences', 'Fine-tune your SquidCloud experience')}
-        <div className="space-y-5">
-          {preferenceCategories.map((category) => (
-            <div key={category.id}>
-              <h4 className="text-xs font-semibold text-foreground mb-1">{category.title}</h4>
-              <p className="text-[11px] text-muted-foreground/60 mb-3">{category.subtitle}</p>
-              <div className="space-y-2">
-                {category.items.map((item) => (
-                  <div key={item.key} className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground">{item.label}</p>
-                      <p className="text-xs text-muted-foreground/70 mt-0.5">{item.description}</p>
-                    </div>
-                    <Switch checked={accountPreferences[item.key]} onCheckedChange={(checked) => updatePreference(item.key, checked)} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+      <>
+        {preferenceCategories.map((category) => (
+          <Panel key={category.id} title={category.title} desc={category.subtitle} flush>
+            {category.items.map((item) => (
+              <Row key={item.key} label={item.label} desc={item.description}>
+                <Switch
+                  checked={accountPreferences[item.key]}
+                  onCheckedChange={(checked) => updatePreference(item.key, checked)}
+                  aria-label={item.label}
+                />
+              </Row>
+            ))}
+          </Panel>
+        ))}
 
-        <div className="mt-6 pt-6 border-t border-border/20 space-y-4">
-          <h4 className="text-xs font-semibold text-foreground">Subscription Notifications</h4>
-          <p className="text-[11px] text-muted-foreground/60 -mt-3">Control how and when we remind you about subscription expiry.</p>
-
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">Email notifications</p>
-              <p className="text-xs text-muted-foreground/70 mt-0.5">Receive expiry reminders via email</p>
-            </div>
-            <Switch checked={notifPrefs.email_enabled} onCheckedChange={(v) => updateNotifPref('email_enabled', v)} />
-          </div>
-
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">In-app popups</p>
-              <p className="text-xs text-muted-foreground/70 mt-0.5">Show expiry warnings inside the app</p>
-            </div>
-            <Switch checked={notifPrefs.popup_enabled} onCheckedChange={(v) => updateNotifPref('popup_enabled', v)} />
-          </div>
-
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">Warning lead time</p>
-              <p className="text-xs text-muted-foreground/70 mt-0.5">How many days before expiry to start warning you</p>
-            </div>
+        <Panel title="Subscription Notifications" desc="Control how and when we remind you about subscription expiry." flush>
+          <Row label="Email notifications" desc="Receive expiry reminders via email">
+            <Switch checked={notifPrefs.email_enabled} onCheckedChange={(v) => updateNotifPref('email_enabled', v)} aria-label="Email notifications" />
+          </Row>
+          <Row label="In-app popups" desc="Show expiry warnings inside the app">
+            <Switch checked={notifPrefs.popup_enabled} onCheckedChange={(v) => updateNotifPref('popup_enabled', v)} aria-label="In-app popups" />
+          </Row>
+          <Row label="Warning lead time" desc="How many days before expiry to start warning you">
             <select
+              className="st-select"
               value={notifPrefs.warning_lead_days}
               onChange={(e) => updateNotifPref('warning_lead_days', parseInt(e.target.value))}
-              className="h-8 rounded-lg bg-muted/50 border border-border/30 text-xs px-2 text-foreground"
+              aria-label="Warning lead time"
             >
               <option value={1}>1 day</option>
               <option value={3}>3 days</option>
               <option value={7}>7 days</option>
             </select>
-          </div>
+          </Row>
+          <Row label="Do not contact" desc="Stop all win-back emails after cancellation or expiry">
+            <Switch checked={notifPrefs.do_not_contact} onCheckedChange={(v) => updateNotifPref('do_not_contact', v)} aria-label="Do not contact" />
+          </Row>
+        </Panel>
 
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/30 hover:border-border/40">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">Do not contact</p>
-              <p className="text-xs text-muted-foreground/70 mt-0.5">Stop all win-back emails after cancellation or expiry</p>
-            </div>
-            <Switch checked={notifPrefs.do_not_contact} onCheckedChange={(v) => updateNotifPref('do_not_contact', v)} />
-          </div>
-        </div>
-
-        <div className="mt-6 pt-6 border-t border-border/20">
-          <button
-            onClick={signOut}
-            className="flex w-full items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-[13px] font-medium text-red-400 transition-all duration-150 hover:bg-red-500/10 hover:border-red-500/30 active:scale-[0.98]"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </button>
-        </div>
-      </div>
+        <Panel danger title="Session" flush>
+          <Row label="Sign out" desc="End this session on this device.">
+            <button type="button" className={btn('danger', 'sm')} onClick={signOut}>
+              <LogOut className="h-3.5 w-3.5" />
+              Sign Out
+            </button>
+          </Row>
+        </Panel>
+      </>
     );
   }
 
@@ -1501,7 +1382,7 @@ const AccountSettings = () => {
     migration: renderMigrationSection,
     plans: renderPlansSection,
     byok: () => (
-      <div className="space-y-6">
+      <div style={{ display: 'grid', gap: 16 }}>
         <BYOKSettingsCard className="rounded-xl" />
         <SDESettingsCard className="rounded-xl" />
       </div>
@@ -1510,86 +1391,64 @@ const AccountSettings = () => {
     devices: renderDevicesSection,
   };
 
+  const current = SETTINGS_CATEGORIES.find((c) => c.id === activeCategory) ?? SETTINGS_CATEGORIES[0];
+  useDocTitle(`${current.label} · Account settings`);
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="sticky top-0 z-50 backdrop-blur-xl border-b border-border/10 bg-background/80">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="h-9 w-9 rounded-xl bg-accent/50 hover:bg-accent/80 flex items-center justify-center lg-press-subtle transition-colors">
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-semibold text-foreground truncate">Account Settings</h1>
-            <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
-          </div>
-        </div>
-      </div>
+    <AppShell>
+      <style>{ST_CSS}</style>
 
-      {isMobile ? (
-        <>
-          <div className="sticky top-14 z-40 bg-background/80 backdrop-blur-xl border-b border-border/10">
-            <div className="flex gap-1.5 px-3 py-2.5 overflow-x-auto scrollbar-none snap-x snap-mandatory">
-              {SETTINGS_CATEGORIES.map((cat) => {
-                const Icon = cat.icon;
-                const isActive = activeCategory === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => switchCategory(cat.id)}
-                    className={cn(
-                      'flex items-center gap-2 px-3.5 h-9 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-200 snap-start shrink-0',
-                      isActive
-                        ? 'bg-primary/15 text-primary shadow-sm shadow-primary/5 border border-primary/20'
-                        : 'bg-muted/30 text-muted-foreground/70 hover:text-foreground hover:bg-accent/40 border border-transparent',
-                    )}
-                  >
-                    <Icon className={cn('h-3.5 w-3.5', isActive ? 'text-primary' : 'text-muted-foreground/50')} />
-                    {cat.label}
-                  </button>
-                );
-              })}
-            </div>
+      <TopBar
+        crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Account settings' }, { label: current.label }]}
+        below={
+          <div className="st-bar">
+            <UnderlineTabs<SettingsCategory>
+              label="Settings sections"
+              idPrefix="st-m"
+              value={activeCategory}
+              onChange={setActiveCategory}
+              tabs={SETTINGS_CATEGORIES.map((c) => ({ id: c.id, label: c.label }))}
+            />
           </div>
+        }
+      >
+        <span className="hide-sm sa-mono sa-mute" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }} title={user?.email || ''}>{user?.email}</span>
+      </TopBar>
 
-          <div ref={contentRef} className="px-3 pt-4 pb-8 space-y-5 overflow-y-auto">
-            <div className={cn(
-              'transition-all duration-200 ease-out',
-              animating ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
-            )}>
+      <Wrap>
+        <div className="st">
+          <nav className="st-nav sa-nav" aria-label="Settings sections">
+            {NAV_GROUPS.map((g) => (
+              <React.Fragment key={g.label}>
+                <div className="sa-nav-h">{g.label}</div>
+                {g.ids.map((id) => {
+                  const cat = SETTINGS_CATEGORIES.find((c) => c.id === id)!;
+                  const Icon = cat.icon;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`sa-nav-i${activeCategory === id ? ' on' : ''}`}
+                      aria-current={activeCategory === id ? 'page' : undefined}
+                      onClick={() => { setActiveCategory(id); window.scrollTo({ top: 0 }); }}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {cat.label}
+                    </button>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </nav>
+
+          <div className="st-main sa-in" key={activeCategory}>
+            <PageHead eyebrow="Account settings" title={current.label} desc={SECTION_DESC[activeCategory]} />
+            <div style={{ display: 'grid', gap: 16 }}>
               {sectionRenderers[activeCategory]()}
             </div>
           </div>
-        </>
-      ) : (
-        <div className="max-w-5xl mx-auto px-4 py-8 flex gap-6">
-          <aside className="w-52 flex-shrink-0">
-            <nav className="sticky top-20 space-y-1">
-              {SETTINGS_CATEGORIES.map((cat) => {
-                const Icon = cat.icon;
-                const isActive = activeCategory === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => setActiveCategory(cat.id)}
-                    className={cn(
-                      'flex items-center gap-2.5 w-full px-3.5 h-9 rounded-xl text-sm font-medium transition-all text-left',
-                      isActive
-                        ? 'bg-primary/10 text-primary border border-primary/15'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/30',
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {cat.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </aside>
-
-          <div className="flex-1 min-w-0 space-y-6">
-            {sectionRenderers[activeCategory]()}
-          </div>
         </div>
-      )}
+      </Wrap>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
@@ -1600,7 +1459,7 @@ const AccountSettings = () => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeletePasskey} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Removing...</> : 'Remove Passkey'}
+              {loading ? <><Spinner size={14} /><span style={{ marginLeft: 8 }}>Removing...</span></> : 'Remove Passkey'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1631,12 +1490,12 @@ const AccountSettings = () => {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={mfaLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleUnenrollMfa} disabled={mfaLoading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {mfaLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Disabling...</> : 'Disable MFA'}
+              {mfaLoading ? <><Spinner size={14} /><span style={{ marginLeft: 8 }}>Disabling...</span></> : 'Disable MFA'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppShell>
   );
 };
 

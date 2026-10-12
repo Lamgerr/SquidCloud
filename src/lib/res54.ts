@@ -543,13 +543,22 @@ export const uploadFileWithRes54 = async (
   const swkVerdict = await swkScanManifest(swkManifest);
   progressCallback?.(0, 'screening-done');
 
+  // Effective provider: the server may transparently fail over to a
+  // sibling bucket with free space (BUCKET_FULL gate). Metadata must point
+  // at the bucket that actually holds the chunks.
+  let effectiveProviderId = providerId;
+
   const getUploadUrls = async (chunks: { path: string; index: number }[], totalSize?: number) => {
     if (providerId) {
       const { data, error } = await supabase.functions.invoke('s3-storage', {
         body: { action: 'get-upload-urls', providerId, chunks, totalSize, swkToken: swkVerdict.token, swkManifestHash: swkVerdict.manifestHash }
       });
       if (error || !data?.success) throw new Error(`Storage Error: ${error?.message || data?.error || 'Failed to get upload URLs'}`);
-      const urls = data.urls.map((u: any) => ({ ...u, providerId }));
+      if (data.providerId && data.providerId !== providerId) {
+        effectiveProviderId = data.providerId;
+        progressCallback?.(0, 'failover', { message: 'Primary bucket full — using a bucket with free space', providerId: data.providerId });
+      }
+      const urls = data.urls.map((u: any) => ({ ...u, providerId: u.providerId || effectiveProviderId }));
       return { urls, clusterCount: 1 };
     }
     const urlResponse = await fetch(`${supabaseUrl}/functions/v1/squidcloud-cluster`, {
@@ -738,7 +747,7 @@ export const uploadFileWithRes54 = async (
     swk_decision: swkVerdict.decision,
     swk_scanned_at: new Date().toISOString(),
     ...(activeWorkspaceId ? { workspace_id: activeWorkspaceId } : {}),
-    ...(providerId ? { storage_provider_id: providerId } : {})
+    ...(effectiveProviderId ? { storage_provider_id: effectiveProviderId } : {})
   };
 
   const { data: dbFile, error: dbError } = await supabase.from('files').insert(fileRecord).select().single();

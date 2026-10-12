@@ -326,8 +326,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
       return (
         <div ref={previewRef} className="p-8 bg-slate-100 dark:bg-slate-800 rounded-md">
           <div className="flex flex-col items-center">
-            <div className="w-64 h-64 flex items-center justify-center bg-gradient-to-r from-blue-400 to-blue-600 rounded-full mb-4">
-              <Music className="h-24 w-24 text-white" />
+            <div className="w-64 h-64 flex items-center justify-center bg-primary/10 rounded-full mb-4">
+              <Music className="h-24 w-24 text-primary" />
             </div>
             <p className="text-lg font-medium text-center mb-4">{file.name}</p>
             <audio controls className="w-full" controlsList="nodownload">
@@ -366,7 +366,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
             <Button 
               onClick={handleSaveTextFile}
               disabled={loading}
-              className="bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
             >
               Save Changes
             </Button>
@@ -395,7 +395,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
           <Button 
             onClick={handleDownload}
             disabled={loading}
-            className="bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
           >
             <Download className="h-4 w-4 mr-2" />
             Download
@@ -487,7 +487,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ file, onClose }) => {
             <Button 
               onClick={handleDownload}
               disabled={loading}
-              className="bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
             >
               <Download className="h-4 w-4 mr-2" />
               Download

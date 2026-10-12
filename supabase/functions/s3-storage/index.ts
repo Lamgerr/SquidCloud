@@ -116,7 +116,7 @@ serve(async (req) => {
         return jsonResponse({ success: false, error: "Missing provider credentials" }, 400);
       }
 
-      const s3Client = new S3Client({
+      let s3Client = new S3Client({
         region: credentials.region || "auto",
         endpoint: credentials.endpoint || undefined,
         credentials: {
@@ -126,7 +126,7 @@ serve(async (req) => {
         requestHandler: undefined,
       });
 
-      const bucketName = credentials.bucketName;
+      let bucketName = credentials.bucketName;
 
       // Permission checks for user-managed providers (not squidcloud admin buckets)
       const checkRead = () => {
@@ -166,6 +166,89 @@ serve(async (req) => {
           if (!gate.ok) return jsonResponse({ success: false, error: gate.error }, gate.status);
         }
 
+        // ===== CAPACITY GATE + SIBLING FAILOVER =====
+        // Never hand out upload URLs for a bucket that is already at quota.
+        // storage_used_bytes / storage_limit_bytes are maintained by the
+        // usage tracker; a NULL limit means unlimited. When the requested
+        // bucket is full, transparently fail over to a sibling provider of
+        // the same owner with room, and report the effective provider id so
+        // the client records metadata against the bucket that holds the data.
+        // (Failover stays within user-owned providers; admin sc-buckets are
+        // gated but never silently swapped, since file rows FK to
+        // storage_providers.)
+        let failoverFrom: string | null = null;
+        let failoverTo: string | null = null;
+        {
+          const needBytes = typeof totalSize === "number" && totalSize > 0 ? totalSize : 0;
+          const hasRoom = (row: any, need: number) => {
+            if (row.storage_limit_bytes == null) return true;
+            const used = Number(row.storage_used_bytes) || 0;
+            return need > 0 ? used + need <= row.storage_limit_bytes : used < row.storage_limit_bytes;
+          };
+          const freeBytes = (row: any) =>
+            row.storage_limit_bytes == null ? Number.MAX_SAFE_INTEGER : Math.max(0, row.storage_limit_bytes - (Number(row.storage_used_bytes) || 0));
+
+          if (!isSquidcloudBucket && !hasRoom(providerRow, needBytes)) {
+            const { data: siblings } = await supabase
+              .from("storage_providers")
+              .select("id, bucket_name, storage_used_bytes, storage_limit_bytes, write_enabled")
+              .eq("user_id", ctx.userId)
+              .neq("id", providerRow.id);
+            const candidate = (siblings || [])
+              .filter((s: any) => s.write_enabled !== false && hasRoom(s, needBytes))
+              .sort((a: any, b: any) => freeBytes(b) - freeBytes(a))[0];
+            if (!candidate) {
+              return jsonResponse({
+                success: false,
+                error: "Storage bucket is full and no other bucket with free space was found. Free up space or add another provider.",
+                code: "BUCKET_FULL",
+              }, 409);
+            }
+            // Swap the active row + client to the sibling bucket.
+            const { data: fullRow } = await supabase
+              .from("storage_providers")
+              .select("*")
+              .eq("id", candidate.id)
+              .eq("user_id", ctx.userId)
+              .single();
+            if (!fullRow) {
+              return jsonResponse({ success: false, error: "Storage bucket is full and failover failed. Try again." }, 409);
+            }
+            providerRow = fullRow;
+            failoverFrom = providerId;
+            failoverTo = fullRow.id;
+            try {
+              credentials = await getProviderCredentials(supabase, supabaseServiceKey, providerRow);
+            } catch {
+              return jsonResponse({ success: false, error: "Provider credentials are invalid. Please reconfigure provider." }, 400);
+            }
+            credentials.bucketName = providerRow.bucket_name || credentials.bucketName;
+            credentials.region = providerRow.bucket_region || credentials.region || 'auto';
+            credentials.endpoint = providerRow.bucket_endpoint || getEndpointForProvider(
+              providerRow.provider_type, credentials.accountId
+            );
+            if (!credentials.accessKeyId || !credentials.secretAccessKey || !credentials.bucketName) {
+              return jsonResponse({ success: false, error: "Missing provider credentials" }, 400);
+            }
+            s3Client = new S3Client({
+              region: credentials.region || "auto",
+              endpoint: credentials.endpoint || undefined,
+              credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey,
+              },
+              requestHandler: undefined,
+            });
+            bucketName = credentials.bucketName;
+          } else if (isSquidcloudBucket && !hasRoom(providerRow, needBytes)) {
+            return jsonResponse({
+              success: false,
+              error: "Storage bucket is full. Free up space and try again.",
+              code: "BUCKET_FULL",
+            }, 409);
+          }
+        }
+
         const signedUrls = await Promise.all(
           chunks.map(async (chunk: { path: string; index: number }) => {
             const command = new PutObjectCommand({
@@ -178,7 +261,13 @@ serve(async (req) => {
           })
         );
 
-        return jsonResponse({ success: true, urls: signedUrls });
+        return jsonResponse({
+          success: true,
+          urls: signedUrls,
+          providerId: failoverTo || providerId,
+          failover: failoverTo !== null,
+          ...(failoverTo ? { failoverFrom } : {}),
+        });
       }
 
       if (action === "get-download-url") {

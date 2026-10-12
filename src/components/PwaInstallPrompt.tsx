@@ -129,7 +129,7 @@ const PwaInstallPrompt: React.FC = () => {
       </p>
       <Button 
         onClick={handleInstall} 
-        className="w-full bg-gradient-to-r from-blue-500 to-blue-600"
+        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
       >
         <Download className="h-4 w-4 mr-2" />
         Install App

@@ -152,8 +152,8 @@ export default function SquidVaultView({ userId, onClose }: SquidVaultViewProps)
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-              <Shield className="w-6 h-6 text-white" />
+<div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center">
+              <Shield className="w-6 h-6 text-primary" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">SquidVault</h1>
@@ -171,7 +171,7 @@ export default function SquidVaultView({ userId, onClose }: SquidVaultViewProps)
             />
             <Button
               onClick={() => document.getElementById('vault-upload')?.click()}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
             >
               <Upload className="w-4 h-4 mr-2" />
               Upload to Vault

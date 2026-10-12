@@ -106,7 +106,7 @@ function InfoBox({ children, variant = 'info' }: { children: React.ReactNode; va
   );
 }
 
-const BASE_URL = 'https://veil.example.com';
+const BASE_URL = 'https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/squidveil-api';
 
 const sections: Section[] = [
   {
@@ -480,7 +480,7 @@ const sections: Section[] = [
               ['SQUIDVEIL_TOKEN', 'An sv_ access token'],
             ]}
           />
-          <CodeBlock code={`export SQUIDVEIL_URL="https://veil.example.com"
+          <CodeBlock code={`export SQUIDVEIL_URL="https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/squidveil-api"
 export SQUIDVEIL_TOKEN="sv_..."`} lang="bash" />
         </div>
       </div>
@@ -598,10 +598,10 @@ curl -X DELETE $SQUIDVEIL_URL/v1/policies/<id> \\
         <div>
           <h2 className="text-xl font-bold text-white mb-4">API Reference</h2>
           <p className="text-white/70 leading-relaxed mb-2">
-            Base URL: <InlineCode>https://veil.example.com</InlineCode> — replace with your SquidVeil endpoint
+            Base URL: <InlineCode>https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/squidveil-api</InlineCode> — replace with your SquidVeil endpoint
             (the SDKs read it from <InlineCode>SQUIDVEIL_URL</InlineCode>).
           </p>
-          <CodeBlock code={`export SQUIDVEIL_URL="https://veil.example.com"
+          <CodeBlock code={`export SQUIDVEIL_URL="https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/squidveil-api"
 export SQUIDVEIL_TOKEN="sv_..."`} lang="bash" />
           <p className="text-white/70 text-sm leading-relaxed mb-2">
             Authenticate with the <InlineCode>X-SquidVeil-Token: sv_&hellip;</InlineCode> header or{' '}
@@ -1360,7 +1360,7 @@ func main() {
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">CI/CD Integration</h3>
           <CodeBlock code={`# One-shot CI job: fetch at the moment of use, never persist
-export SQUIDVEIL_URL="https://veil.example.com"
+export SQUIDVEIL_URL="https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/squidveil-api"
 export SQUIDVEIL_TOKEN="\${SQUIDVEIL_CI_TOKEN}"
 pip install squidveil
 python -c "from squidveil import SquidVeilClient; print(SquidVeilClient.from_env().get_secret('prod/api-key').value)" > .key.tmp

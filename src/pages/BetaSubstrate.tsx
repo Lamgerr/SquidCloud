@@ -55,7 +55,7 @@ export default function BetaSubstrate() {
           <span className="inline-flex items-center gap-2 rounded-full border border-[#30363d] bg-[#161b22] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#7d8590]">
             <span className="h-2 w-2 rounded-full bg-[#58a6ff] animate-pulse" /> Private Beta — Limited Seats
           </span>
-          <h1 className="mt-6 text-balance text-[clamp(2.4rem,6vw,4.2rem)] font-semibold leading-[1.02] tracking-tight">
+          <h1 className="mt-6 text-balance text-[4.2rem] font-semibold leading-[1.02] tracking-tight">
             Storage that
             <br /><span className="text-[#58a6ff]">lives everywhere.</span>
           </h1>

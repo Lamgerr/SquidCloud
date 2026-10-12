@@ -152,9 +152,15 @@ Deno.serve(async (req: Request) => {
     if (userErr || !userData?.user) return errorResponse('Invalid Supabase session', 401, 'UNAUTHORIZED')
     const ownerId = userData.user.id
 
-    const { data: existingTokens } = await supabase.from('access_tokens').select('id').eq('owner_id', ownerId).limit(1)
-    if (existingTokens && existingTokens.length > 0) {
-      return errorResponse('Already bootstrapped — create additional tokens with token_admin', 409, 'ALREADY_BOOTSTRAPPED')
+    // Recovery-aware guard: only block when at least one token is still
+    // usable. Expired or revoked rows must not lock the owner out — a user
+    // whose local copy is gone and whose tokens all lapsed needs a fresh
+    // bootstrap to regain access (their Supabase session is the root of trust).
+    const { data: existingTokens } = await supabase.from('access_tokens').select('id, expires_at, revoked_at').eq('owner_id', ownerId).limit(50)
+    const now = Date.now()
+    const hasActive = (existingTokens || []).some((t: any) => !t.revoked_at && (!t.expires_at || new Date(t.expires_at).getTime() > now))
+    if (hasActive) {
+      return errorResponse('An active token already exists — use its saved value, or rotate it from the Tokens tab', 409, 'ALREADY_BOOTSTRAPPED')
     }
 
     const masterKey = await getMasterKey()

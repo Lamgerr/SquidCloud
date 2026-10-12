@@ -137,15 +137,15 @@ export const SquidAISpotlight: React.FC<SquidAISpotlightProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0 bg-slate-900/98 backdrop-blur-2xl border-slate-700/50 shadow-2xl">
+      <DialogContent className="sm:max-w-[600px] p-0 gap-0 bg-popover/95 backdrop-blur-2xl border-border/50 shadow-2xl">
         {/* Spotlight Search Bar */}
         <div className="relative">
           <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
             {isLoading ? (
-              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
+<div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-primary" />
               </div>
             )}
           </div>
@@ -156,7 +156,7 @@ export const SquidAISpotlight: React.FC<SquidAISpotlightProps> = ({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask Squid AI anything..."
-              className="h-16 pl-16 pr-4 text-lg bg-transparent border-0 border-b border-slate-700/50 rounded-none focus-visible:ring-0 text-white placeholder:text-slate-500"
+              className="h-16 pl-16 pr-4 text-lg bg-transparent border-0 border-b border-border/50 rounded-none focus-visible:ring-0 text-foreground placeholder:text-muted-foreground/60"
               autoComplete="off"
             />
           </form>
@@ -168,21 +168,21 @@ export const SquidAISpotlight: React.FC<SquidAISpotlightProps> = ({
             // AI Response
             <div className="p-6 space-y-4">
               <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Sparkles className="w-4 h-4 text-white" />
+<div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Sparkles className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+                  <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
                     {result}
                   </p>
                 </div>
               </div>
               
-              <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
-                <p className="text-xs text-slate-500">Press Esc to close</p>
+              <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground/70">Press Esc to close</p>
                 <button
                   onClick={onClose}
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  className="text-xs text-primary hover:text-primary/80 transition-colors"
                 >
                   Done
                 </button>
@@ -191,7 +191,7 @@ export const SquidAISpotlight: React.FC<SquidAISpotlightProps> = ({
           ) : (
             // Suggestions
             <div className="p-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider px-3 py-2">
+              <p className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider px-3 py-2">
                 Suggestions
               </p>
               <div className="space-y-1">
@@ -199,19 +199,19 @@ export const SquidAISpotlight: React.FC<SquidAISpotlightProps> = ({
                   <button
                     key={idx}
                     onClick={() => handleSuggestionClick(suggestion)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-800/60 transition-all duration-150 text-left group"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/60 active:scale-[0.99] transition-all duration-150 text-left group"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-slate-800/60 flex items-center justify-center flex-shrink-0 group-hover:bg-slate-700/60 transition-colors">
-                      {idx === 0 && <FolderPlus className="w-4 h-4 text-blue-400" />}
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-muted/80 transition-colors">
+                      {idx === 0 && <FolderPlus className="w-4 h-4 text-primary" />}
                       {idx === 1 && <FolderPlus className="w-4 h-4 text-purple-400" />}
                       {idx === 2 && <MoveHorizontal className="w-4 h-4 text-green-400" />}
                       {idx === 3 && <FileText className="w-4 h-4 text-orange-400" />}
                       {idx === 4 && <Sparkles className="w-4 h-4 text-pink-400" />}
                     </div>
-                    <span className="flex-1 text-sm text-slate-300 group-hover:text-white transition-colors">
+                    <span className="flex-1 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                       {suggestion}
                     </span>
-                    <ArrowRight className="w-4 h-4 text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ArrowRight className="w-4 h-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 ))}
               </div>
@@ -221,21 +221,21 @@ export const SquidAISpotlight: React.FC<SquidAISpotlightProps> = ({
 
         {/* Footer Hint */}
         {!result && (
-          <div className="px-4 py-3 border-t border-slate-700/50 bg-slate-800/30">
-            <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="px-4 py-3 border-t border-border/50 bg-muted/20">
+            <div className="flex items-center justify-between text-xs text-muted-foreground/70">
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-slate-700/50 rounded text-[10px]">↵</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">↵</kbd>
                   Submit
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-slate-700/50 rounded text-[10px]">Esc</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">Esc</kbd>
                   Close
                 </span>
               </div>
               <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-slate-700/50 rounded text-[10px]">⌘</kbd>
-                <kbd className="px-1.5 py-0.5 bg-slate-700/50 rounded text-[10px]">K</kbd>
+                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">⌘</kbd>
+                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">K</kbd>
                 Reopen
               </span>
             </div>

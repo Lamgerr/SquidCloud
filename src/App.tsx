@@ -70,6 +70,7 @@ const CLIDocs = lazy(() => import("./pages/CLIDocs"));
 const CliDevice = lazy(() => import("./pages/CliDevice"));
 const CliAuthorize = lazy(() => import("./pages/CliAuthorize"));
 const BetaSubstrate = lazy(() => import("./pages/BetaSubstrate"));
+const SupportPage = lazy(() => import("./pages/SupportPage"));
 const SquidVeilDocs = lazy(() => import("./pages/SquidVeilDocs"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const SquidFSPage = lazy(() => import("./pages/SquidFSPage"));
@@ -198,8 +199,26 @@ const NativeMobileBridge = () => {
 
 const AppContent = () => {
   const location = useLocation();
-  const showHeader = !['/', '/auth', '/dashboard', '/onboarding', '/pricing', '/cb/pdf/viewer', '/scripts'].some(path =>
-    path === location.pathname || location.pathname.startsWith('/cb/pdf/viewer') || location.pathname.startsWith('/scripts')
+  // First path segment allow-list: anything else falls through to the
+  // catch-all 404 route, which renders chromeless (no global header).
+  const KNOWN_FIRST_SEGMENTS = new Set([
+    '', 'auth', 'oauth', 'github', 'dashboard', 'notes', 'manage', 'profile',
+    'settings', 'analytics', 'security', 'signals', 'storage', 'scripts',
+    'developer-api', 'webhooks', 'extensions', 'cc', 'cbcode', 'cb', 's',
+    'share', 'file', 'r', 'workspace', 'onboarding', 'repo', 'terms',
+    'privacy', 'legal', 'support', 'pricing', 'beta', 'checkout', 'cli',
+    'help', 'squidfs', 'embed', 'ad',
+  ]);
+  const firstSeg = location.pathname.split('/')[1] ?? '';
+  const isNotFound = !KNOWN_FIRST_SEGMENTS.has(firstSeg);
+  // Pages with their own in-page TopBar (squid-app workbench layer) render
+  // their own nav — the global MainHeader is deprecated there to avoid
+  // double stacked navbars.
+  const noHeaderExact = ['/', '/auth', '/dashboard', '/onboarding', '/pricing', '/developer-api', '/settings/account', '/checkout'];
+  const noHeaderPrefix = ['/cb/pdf/viewer', '/scripts', '/help/docs'];
+  const showHeader = !isNotFound && !(
+    noHeaderExact.some(path => path === location.pathname) ||
+    noHeaderPrefix.some(prefix => location.pathname === prefix || location.pathname.startsWith(prefix + '/'))
   );
   const showMaintenanceBanner = !location.pathname.startsWith('/ad/');
 
@@ -446,6 +465,9 @@ const AppContent = () => {
           <Route path="/privacy" element={<AnimatedRoute><RouteSuspense><PrivacyPolicy /></RouteSuspense></AnimatedRoute>} />
           <Route path="/legal/tos" element={<AnimatedRoute><RouteSuspense><TermsOfService /></RouteSuspense></AnimatedRoute>} />
           <Route path="/legal/privacy" element={<AnimatedRoute><RouteSuspense><PrivacyPolicy /></RouteSuspense></AnimatedRoute>} />
+
+          {/* Support */}
+          <Route path="/support" element={<AnimatedRoute><RouteSuspense><SupportPage /></RouteSuspense></AnimatedRoute>} />
 
           {/* Pricing & Checkout */}
           <Route path="/pricing" element={<AnimatedRoute><RouteSuspense><PricingPage /></RouteSuspense></AnimatedRoute>} />

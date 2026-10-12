@@ -231,11 +231,11 @@ export const INKModal: React.FC<INKModalProps> = ({ isOpen, onClose, fileContext
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10 dark:border-white/5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-2xl bg-primary/15 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <h2 className="text-xl font-semibold text-foreground">
                 INK AI
               </h2>
               <p className="text-xs text-muted-foreground">Your intelligent file assistant</p>
@@ -262,7 +262,7 @@ export const INKModal: React.FC<INKModalProps> = ({ isOpen, onClose, fileContext
               <div
                 className={`max-w-[80%] px-4 py-2 rounded-2xl ${
                   msg.role === 'user'
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm'
                 }`}
               >
@@ -295,7 +295,7 @@ export const INKModal: React.FC<INKModalProps> = ({ isOpen, onClose, fileContext
             <Button
               onClick={handleSend}
               disabled={loading || !input.trim()}
-              className="rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
             >
               Send
             </Button>

@@ -25,6 +25,11 @@ interface FileItemProps {
   onOpenInCbCode?: (file: FileItemType) => void;
   onShareRevoked?: (id: string) => void;
   onShareChange?: (id: string) => void;
+  // Passed by the dashboard. selectionMode keeps the checkboxes visible;
+  // the other two are accepted and not consumed here.
+  selectionMode?: boolean;
+  onNotes?: (file: FileItemType) => void;
+  onEmbed?: (file: FileItemType) => void;
 }
 
 const getFileConfig = (name: string, type: string) => {
@@ -47,8 +52,51 @@ const getFileConfig = (name: string, type: string) => {
   return { label: ext, icon: FileText };
 };
 
+/* Relative time for the row, exact time on hover. A malformed created_at
+   renders nothing instead of throwing and taking the whole grid down. */
+const whenOf = (file: FileItemType) => {
+  const d = new Date(file.created_at || Date.now());
+  if (Number.isNaN(d.getTime())) return { rel: '', exact: '', iso: undefined as string | undefined };
+  return {
+    rel: formatDistanceToNow(d, { addSuffix: true }).replace('about ', ''),
+    exact: d.toLocaleString(),
+    iso: d.toISOString(),
+  };
+};
+
+/* Selection box. Shown on hover / focus, always while something is selected or
+   the dashboard is in selection mode. Not a tab stop: files are reached with
+   the arrow keys and toggled with Space. */
+const SelectBox: React.FC<{ checked: boolean; label: string; visible: boolean; onToggle: () => void; className?: string }> = ({
+  checked, label, visible, onToggle, className,
+}) => (
+  <button
+    type="button"
+    role="checkbox"
+    aria-checked={checked}
+    aria-label={label}
+    tabIndex={-1}
+    onClick={(e) => { e.stopPropagation(); onToggle(); }}
+    onDoubleClick={(e) => e.stopPropagation()}
+    className={cn(
+      'flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border transition-[opacity,background-color,border-color] duration-100',
+      checked
+        ? 'border-foreground bg-foreground text-background'
+        : 'border-input bg-background/90 text-transparent hover:border-foreground',
+      visible || checked
+        ? 'opacity-100'
+        : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+      className,
+    )}
+  >
+    <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="2.5 6.5 5 9 9.5 3.5" />
+    </svg>
+  </button>
+);
+
 const FileItem: React.FC<FileItemProps> = ({
-  file, viewMode, isSelected = false, onToggleSelect, onClick, onPreview, onDelete, onShare, onDownload, onMoveToFolder
+  file, viewMode, isSelected = false, selectionMode = false, onToggleSelect, onClick, onPreview, onDelete, onShare, onDownload, onMoveToFolder
 }) => {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -56,6 +104,7 @@ const FileItem: React.FC<FileItemProps> = ({
   const isMobile = useIsMobile();
   const cfg = getFileConfig(file.name, file.type);
   const IconComponent = cfg.icon;
+  const when = whenOf(file);
 
   const handleTouchStart = useCallback(() => {
     longPressRef.current = setTimeout(() => setMobileSheetOpen(true), 500);
@@ -85,19 +134,37 @@ const FileItem: React.FC<FileItemProps> = ({
     }
   };
 
+  /* Space on a focused file toggles its selection (the keyboard twin of ⌘/Ctrl-click).
+     Only when the item itself has focus, so buttons inside it keep their own Space. */
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || !onToggleSelect) return;
+    if (e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleSelect(file.id);
+    }
+  };
+
   const isGrid = viewMode === 'grid' || viewMode === 'compact';
+  const isCompact = viewMode === 'compact';
+  const boxLabel = `Select ${file.name}`;
+  const menuLabel = `Actions for ${file.name}`;
 
   if (isGrid) {
     return (
       <>
         <div
           data-kbd-item
+          data-selected={isSelected ? 'true' : undefined}
+          tabIndex={-1}
           className={cn(
-            'group relative flex flex-col p-2.5 rounded-[10px] cursor-pointer transition-colors duration-150 select-none border',
-            'bg-card/50 border-border/60 hover:bg-accent/40 hover:border-border',
-            isSelected && 'bg-accent ring-1 ring-foreground/50 border-transparent'
+            'group relative flex flex-col rounded-[var(--radius-file)] cursor-pointer transition-colors duration-100 select-none border',
+            isCompact ? 'p-2' : 'p-2.5',
+            'bg-card border-border hover:bg-accent/50 hover:border-input',
+            isSelected && 'bg-accent border-foreground/60 hover:border-foreground/60'
           )}
           onClick={handleClick}
+          onKeyDown={handleKeyDown}
           onDoubleClick={() => setViewerOpen(true)}
           onTouchStart={isMobile ? handleTouchStart : undefined}
           onTouchEnd={isMobile ? handleTouchEnd : undefined}
@@ -105,19 +172,30 @@ const FileItem: React.FC<FileItemProps> = ({
           onContextMenu={isMobile ? (e) => { e.preventDefault(); setMobileSheetOpen(true); } : undefined}
         >
           {/* Preview canvas */}
-          <div className="relative w-full aspect-[4/3] rounded-md bg-muted/30 border border-border/40 flex flex-col items-center justify-center mb-3 overflow-hidden">
-            <IconComponent className="w-8 h-8 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors duration-150" />
+          <div className="relative w-full aspect-[4/3] rounded-[calc(var(--radius-file)-2px)] bg-muted/40 border border-border/70 flex flex-col items-center justify-center mb-2.5 overflow-hidden">
+            <IconComponent className="w-8 h-8 text-muted-foreground group-hover:text-foreground transition-colors duration-150" />
 
             {cfg.label !== 'FILE' && (
-              <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-muted/80 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+              <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-background/80 border border-border/60 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 {cfg.label}
               </span>
             )}
 
             {file.shared && (
-              <div className="absolute top-2 left-2 p-1 rounded bg-muted/70 text-muted-foreground">
+              <div className="absolute bottom-1.5 left-1.5 p-1 rounded bg-background/80 border border-border/60 text-muted-foreground" title="Shared">
                 <Share2 className="w-3 h-3" />
+                <span className="sr-only">Shared</span>
               </div>
+            )}
+
+            {onToggleSelect && (
+              <SelectBox
+                checked={isSelected}
+                label={boxLabel}
+                visible={selectionMode}
+                onToggle={() => onToggleSelect(file.id)}
+                className="absolute top-1.5 left-1.5"
+              />
             )}
           </div>
 
@@ -126,25 +204,29 @@ const FileItem: React.FC<FileItemProps> = ({
             <span className="text-[13px] font-medium text-foreground truncate leading-snug tracking-tight" title={file.name}>
               {file.name}
             </span>
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-1 tabular-nums">
+            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mt-1 tabular-nums">
               <span>{formatBytes(file.size)}</span>
-              <span>
-                {formatDistanceToNow(new Date(file.created_at || Date.now()), { addSuffix: true }).replace('about ', '')}
-              </span>
+              {!isCompact && (
+                <time dateTime={when.iso} title={when.exact} className="truncate">
+                  {when.rel}
+                </time>
+              )}
             </div>
           </div>
 
-          {/* Grid hover action menu trigger */}
-          <div className="absolute top-2.5 right-2.5 z-10" onClick={e => e.stopPropagation()}>
+          {/* Grid action menu trigger: hover, keyboard focus, or while the menu is open */}
+          <div className="absolute top-2 right-2 z-10" onClick={e => e.stopPropagation()}>
             {isMobile ? (
               <button
+                type="button"
+                aria-label={menuLabel}
                 onClick={handleMobileMenuClick}
-                className="w-7 h-7 rounded-md bg-background/90 border border-border hover:bg-accent flex items-center justify-center text-foreground transition-colors"
+                className="w-9 h-9 rounded-md bg-background/90 border border-border hover:bg-accent flex items-center justify-center text-foreground transition-colors"
               >
-                <MoreVertical className="w-3.5 h-3.5" />
+                <MoreVertical className="w-4 h-4" />
               </button>
             ) : (
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 transition-opacity duration-100">
                 <FileActionMenu
                   file={file}
                   onView={() => setViewerOpen(true)}
@@ -153,7 +235,7 @@ const FileItem: React.FC<FileItemProps> = ({
                   onDelete={() => onDelete?.(file)}
                   onMoveToFolder={() => onMoveToFolder?.(file)}
                   trigger={
-                    <button className="w-7 h-7 rounded-md bg-background/90 border border-border hover:bg-accent flex items-center justify-center text-foreground transition-colors">
+                    <button type="button" aria-label={menuLabel} className="w-7 h-7 rounded-md bg-background/90 border border-border hover:bg-accent flex items-center justify-center text-foreground transition-colors">
                       <MoreVertical className="w-3.5 h-3.5" />
                     </button>
                   }
@@ -178,17 +260,20 @@ const FileItem: React.FC<FileItemProps> = ({
     );
   }
 
-  // macOS Finder List Table Row
+  // List row. Column templates match LazyFileGrid's header exactly.
   return (
     <>
       <div
         data-kbd-item
+        data-selected={isSelected ? 'true' : undefined}
+        tabIndex={-1}
         className={cn(
-          'group grid grid-cols-[1fr_100px_140px_36px] md:grid-cols-[1fr_110px_150px_100px_36px] items-center px-3 h-10 rounded-md cursor-pointer transition-colors duration-150 select-none border border-transparent',
-          'hover:bg-accent/40',
-          isSelected && 'bg-accent ring-1 ring-foreground/40'
+          'group grid grid-cols-[1fr_100px_140px_36px] md:grid-cols-[1fr_110px_150px_100px_36px] items-center px-3 h-10 rounded-[var(--radius-file)] cursor-pointer transition-colors duration-100 select-none border border-transparent',
+          'hover:bg-accent/50',
+          isSelected && 'bg-accent border-foreground/40 hover:bg-accent'
         )}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         onDoubleClick={() => setViewerOpen(true)}
         onTouchStart={isMobile ? handleTouchStart : undefined}
         onTouchEnd={isMobile ? handleTouchEnd : undefined}
@@ -196,21 +281,42 @@ const FileItem: React.FC<FileItemProps> = ({
         onContextMenu={isMobile ? (e) => { e.preventDefault(); setMobileSheetOpen(true); } : undefined}
       >
         <div className="flex items-center gap-3 min-w-0 pr-3">
-          <div className="w-7 h-7 rounded-md bg-muted/50 border border-border/60 flex items-center justify-center shrink-0">
-            <IconComponent className="w-3.5 h-3.5 text-muted-foreground" />
+          {/* Icon swaps for the selection box on hover / in selection mode */}
+          <div className="relative w-7 h-7 shrink-0">
+            <div
+              className={cn(
+                'absolute inset-0 rounded-md bg-muted/50 border border-border/70 flex items-center justify-center transition-opacity duration-100',
+                onToggleSelect && (selectionMode || isSelected)
+                  ? 'opacity-0'
+                  : onToggleSelect ? 'group-hover:opacity-0 group-focus-within:opacity-0' : ''
+              )}
+            >
+              <IconComponent className="w-3.5 h-3.5 text-muted-foreground" />
+            </div>
+            {onToggleSelect && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <SelectBox checked={isSelected} label={boxLabel} visible={selectionMode} onToggle={() => onToggleSelect(file.id)} />
+              </div>
+            )}
           </div>
           <span className="text-[13px] font-medium text-foreground truncate" title={file.name}>
             {file.name}
           </span>
+          {file.shared && (
+            <span className="shrink-0 text-muted-foreground" title="Shared">
+              <Share2 className="w-3 h-3" />
+              <span className="sr-only">Shared</span>
+            </span>
+          )}
         </div>
 
         <span className="text-[11px] text-muted-foreground hidden md:block uppercase tracking-wider font-mono">
           {cfg.label}
         </span>
 
-        <span className="text-xs text-muted-foreground truncate tabular-nums">
-          {formatDistanceToNow(new Date(file.created_at || Date.now()), { addSuffix: true })}
-        </span>
+        <time dateTime={when.iso} title={when.exact} className="text-xs text-muted-foreground truncate tabular-nums">
+          {when.rel}
+        </time>
 
         <span className="text-xs text-muted-foreground font-mono tabular-nums">
           {formatBytes(file.size)}
@@ -219,13 +325,15 @@ const FileItem: React.FC<FileItemProps> = ({
         <div className="flex justify-end shrink-0" onClick={e => e.stopPropagation()}>
           {isMobile ? (
             <button
+              type="button"
+              aria-label={menuLabel}
               onClick={handleMobileMenuClick}
-              className="w-7 h-7 rounded-md hover:bg-accent flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-md hover:bg-accent flex items-center justify-center transition-colors"
             >
               <MoreVertical className="w-4 h-4 text-muted-foreground" />
             </button>
           ) : (
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+            <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 transition-opacity duration-100">
               <FileActionMenu
                 file={file}
                 onView={() => setViewerOpen(true)}
@@ -234,7 +342,7 @@ const FileItem: React.FC<FileItemProps> = ({
                 onDelete={() => onDelete?.(file)}
                 onMoveToFolder={() => onMoveToFolder?.(file)}
                 trigger={
-                  <button className="w-7 h-7 rounded-md hover:bg-accent flex items-center justify-center">
+                  <button type="button" aria-label={menuLabel} className="w-7 h-7 rounded-md hover:bg-accent flex items-center justify-center">
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                   </button>
                 }

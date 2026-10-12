@@ -1,6 +1,6 @@
 {
   "name": "squidcloudctl",
-  "version": "3.1.9",
+  "version": "3.2.0",
   "description": "SquidCloud CLI (squidcloudctl) — encrypted storage, shares and secrets from your terminal",
   "main": "dist/bin/squidcloud.js",
   "bin": {
@@ -26,9 +26,10 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "sucrase": "^3.35.1",
     "tsup": "^8.5.1",
-    "typescript": "^7.0.2"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@noble/ciphers": "^2.3.0",

@@ -139,7 +139,7 @@ const SquidVeilSecretsMobile = () => {
       fetchTokens();
     } catch (e: any) {
       if (e.code === 'ALREADY_BOOTSTRAPPED') {
-        setBootstrapError('A token already exists for this account. It can only be created once — if you lost its value, you can rotate or revoke tokens from the Developer API page, then reconnect here.');
+        setBootstrapError('An active token already exists. Reconnect with its saved value — or, if none of your tokens work anymore, tap Create again to be issued a fresh one.');
       } else if (e.message && e.message.toLowerCase().includes('unauthenticated')) {
         setBootstrapError('Your session has expired. Sign out and back in, then try again.');
       } else {

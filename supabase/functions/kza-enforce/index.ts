@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { readJsonLimited, isBodyTooLarge } from '../_shared/body-limit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,23 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { ip, country } = await req.json()
+    let country: string | undefined;
+    try {
+      const parsed = await readJsonLimited(req, 16 * 1024);
+      country = parsed.country;
+    } catch (parseErr) {
+      if (isBodyTooLarge(parseErr)) {
+        return new Response(JSON.stringify({
+          blocked: true,
+          type: 'body',
+          reason: 'Request body too large',
+        }), {
+          status: 413,
+          headers: { ...corsHeaders, 'content-type': 'application/json' },
+        })
+      }
+      throw parseErr;
+    }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,

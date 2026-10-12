@@ -162,11 +162,11 @@ const MobileFileActionSheet: React.FC<MobileFileActionSheetProps> = ({
         }
       }}
       className={cn(
-        'flex items-center gap-3 w-full px-3 py-3 rounded-xl text-[15px] font-normal transition-colors duration-80 text-left active:bg-[#2D333B]',
-        destructive ? 'text-[#F85149]' : 'text-[#E6EDF3] hover:bg-[#2D333B]'
+        'flex items-center gap-3 w-full px-3 py-3 rounded-xl text-[15px] font-normal transition-colors duration-80 text-left active:bg-accent',
+        destructive ? 'text-destructive' : 'text-foreground hover:bg-accent'
       )}
     >
-      <Icon className={cn('w-[18px] h-[18px] shrink-0', destructive ? 'text-[#F85149]' : 'text-[#8B949E]')} />
+      <Icon className={cn('w-[18px] h-[18px] shrink-0', destructive ? 'text-destructive' : 'text-muted-foreground')} />
       <span className="flex-1 truncate">{label}</span>
     </button>
   );
@@ -176,14 +176,14 @@ const MobileFileActionSheet: React.FC<MobileFileActionSheetProps> = ({
     <MobileSheet open={isOpen} onOpenChange={onClose}
       title={
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-[10px] bg-[#2D333B] border border-[#373E47] flex items-center justify-center shrink-0">
-            <FileIconComponent className="w-5 h-5 text-[#8B949E]" />
+          <div className="w-12 h-12 rounded-[10px] bg-muted/60 border border-border flex items-center justify-center shrink-0">
+            <FileIconComponent className="w-5 h-5 text-muted-foreground" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-[15px] font-medium text-[#E6EDF3] truncate">{file.name}</h3>
+            <h3 className="text-[15px] font-medium text-foreground truncate">{file.name}</h3>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[12px] text-[#768390]">{formatFileSize(file.size || 0)}</span>
-              {isEncrypted && <span className="text-[12px] text-[#58A6FF]">· Encrypted</span>}
+              <span className="text-[12px] text-muted-foreground">{formatFileSize(file.size || 0)}</span>
+              {isEncrypted && <span className="text-[12px] text-primary">· Encrypted</span>}
             </div>
           </div>
         </div>
@@ -218,7 +218,7 @@ const MobileFileActionSheet: React.FC<MobileFileActionSheetProps> = ({
         )}
         {onDelete && (
           <>
-            <div className="h-px bg-[#2D333B] my-1.5" />
+            <div className="h-px bg-border my-1.5" />
             <Row icon={Trash2} label="Delete" onClick={onDelete} destructive />
           </>
         )}

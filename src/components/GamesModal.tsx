@@ -246,8 +246,8 @@ const GamesModal: React.FC<GamesModalProps> = ({ open, onClose }) => {
           {selectedGame === 'menu' && (
             <div className="space-y-4">
               <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-teal-500 to-purple-600 rounded-full flex items-center justify-center mb-3">
-                  <Star className="h-8 w-8 text-white" />
+                <div className="w-16 h-16 mx-auto bg-primary/15 rounded-full flex items-center justify-center mb-3">
+                  <Star className="h-8 w-8 text-primary" />
                 </div>
                 <p className="text-gray-600">Take a break and play some games!</p>
               </div>
@@ -255,7 +255,7 @@ const GamesModal: React.FC<GamesModalProps> = ({ open, onClose }) => {
               <div className="grid gap-3">
                 <Button
                   onClick={() => setSelectedGame('tictactoe')}
-                  className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                  className="w-full p-4 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
                 >
                   <div className="text-center">
                     <div className="font-medium">Tic Tac Toe</div>
@@ -265,7 +265,7 @@ const GamesModal: React.FC<GamesModalProps> = ({ open, onClose }) => {
 
                 <Button
                   onClick={() => setSelectedGame('memory')}
-                  className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                  className="w-full p-4 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
                 >
                   <div className="text-center">
                     <div className="font-medium">Number Memory</div>

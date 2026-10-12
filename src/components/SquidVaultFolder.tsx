@@ -32,9 +32,9 @@ const SquidVaultFolder: React.FC<SquidVaultFolderProps> = ({
         <Card 
           className={cn(
             "group cursor-pointer transition-all duration-300",
-            "bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-blue-600/10",
-            "border-2 border-blue-500/30 hover:border-blue-500/60",
-            "hover:shadow-[0_0_30px_rgba(59,130,246,0.3)]",
+            "bg-primary/[0.07]",
+            "border-2 border-primary/25 hover:border-primary/50",
+            "hover:shadow-[0_0_30px_rgba(0,0,0,0.35)]",
             "p-3"
           )}
           onClick={handleClick}
@@ -44,9 +44,9 @@ const SquidVaultFolder: React.FC<SquidVaultFolderProps> = ({
               {/* Vault Icon */}
               <div className="relative">
                 <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full" />
-                <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <Shield className="w-7 h-7 text-white" />
-                  <Lock className="absolute bottom-1 right-1 w-3 h-3 text-white/90" />
+<div className="relative w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center">
+                  <Shield className="w-7 h-7 text-primary" />
+                  <Lock className="absolute bottom-1 right-1 w-3 h-3 text-primary/70" />
                 </div>
               </div>
               
@@ -84,9 +84,9 @@ const SquidVaultFolder: React.FC<SquidVaultFolderProps> = ({
       <Card 
         className={cn(
           "group cursor-pointer transition-all duration-300 overflow-hidden",
-          "bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-blue-600/10",
-          "border-2 border-blue-500/30 hover:border-blue-500/60",
-          "hover:shadow-[0_0_30px_rgba(59,130,246,0.3)]",
+          "bg-primary/[0.07]",
+          "border-2 border-primary/25 hover:border-primary/50",
+          "hover:shadow-[0_0_30px_rgba(0,0,0,0.35)]",
           "hover:scale-105"
         )}
         onClick={handleClick}
@@ -96,9 +96,9 @@ const SquidVaultFolder: React.FC<SquidVaultFolderProps> = ({
             {/* Vault Icon with Glow Effect */}
             <div className="relative">
               <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full animate-pulse" />
-              <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                <Shield className="w-12 h-12 text-white" />
-                <Lock className="absolute bottom-2 right-2 w-5 h-5 text-white/90" />
+<div className="relative w-20 h-20 rounded-2xl bg-primary/15 flex items-center justify-center shadow-lg">
+                <Shield className="w-12 h-12 text-primary" />
+                <Lock className="absolute bottom-2 right-2 w-5 h-5 text-primary/70" />
               </div>
             </div>
             

@@ -15,28 +15,19 @@ export interface ActivityMetrics {
   downloads: number;
   shares: number;
   views: number;
+  filesGrowth: number;
   dailyActivity: { date: string; uploads: number; downloads: number; views: number }[];
   popularFiles: { name: string; views: number; downloads: number }[];
   accessPatterns: { hour: number; activity: number }[];
 }
 
-export interface UserMetrics {
-  totalUsers: number;
-  activeUsers: number;
-  newUsers: number;
-  userGrowth: number;
-  loginPatterns: { date: string; logins: number }[];
-  featureUsage: { feature: string; usage: number }[];
-}
-
 export interface PerformanceMetrics {
-  avgUploadSpeed: number;
-  avgDownloadSpeed: number;
-  errorRate: number;
-  uptime: number;
-  responseTime: number;
+  apiResponseMs: number;
+  uploadBytes30d: number;
+  shareDownloads: number;
+  activeShares: number;
   systemHealth: 'excellent' | 'good' | 'fair' | 'poor';
-  bandwidthUsage: { date: string; upload: number; download: number }[];
+  bandwidthUsage: { date: string; uploadMB: number }[];
 }
 
 class AnalyticsService {
@@ -98,7 +89,7 @@ class AnalyticsService {
       // Get real storage data from existing files table
       const { data: files } = await supabase
         .from('files')
-        .select('size, type')
+        .select('size, type, created_at')
         .eq('user_id', this.userId)
         .eq('is_deleted', false);
 
@@ -128,11 +119,28 @@ class AnalyticsService {
         storageByType[category] = (storageByType[category] || 0) + (file.size || 0);
       });
 
+      // Real 7-day growth: bytes added in the last 7 days vs the 7 before
+      const now = Date.now();
+      const d7 = 7 * 24 * 60 * 60 * 1000;
+      const recentBytes = files
+        .filter(f => f.created_at && now - new Date(f.created_at).getTime() < d7)
+        .reduce((acc, f) => acc + (f.size || 0), 0);
+      const priorBytes = files
+        .filter(f => {
+          if (!f.created_at) return false;
+          const age = now - new Date(f.created_at).getTime();
+          return age >= d7 && age < 2 * d7;
+        })
+        .reduce((acc, f) => acc + (f.size || 0), 0);
+      const storageGrowth =
+        priorBytes > 0 ? Math.round(((recentBytes - priorBytes) / priorBytes) * 100)
+        : recentBytes > 0 ? 100 : 0;
+
       return {
         totalStorage,
         usedStorage,
         availableStorage,
-        storageGrowth: Math.floor(Math.random() * 20) + 5, // Mock growth percentage
+        storageGrowth,
         fileCount,
         fileTypes,
         storageByType
@@ -164,77 +172,82 @@ class AnalyticsService {
 
   async getActivityMetrics(): Promise<ActivityMetrics> {
     try {
-      // Get real events from localStorage
-      const events = JSON.parse(localStorage.getItem('analytics_events') || '[]');
-      const userEvents = events.filter((e: any) => e.user_id === this.userId);
-      
-      // Count different event types
-      const uploads = userEvents.filter((e: any) => e.event_type === 'file_upload').length;
-      const downloads = userEvents.filter((e: any) => e.event_type === 'file_download').length;
-      const shares = userEvents.filter((e: any) => e.event_type === 'file_share').length;
-      const views = userEvents.filter((e: any) => e.event_type === 'file_view').length;
+      await this.ensureUserInitialized();
+      if (!this.userId) throw new Error('No user');
 
-      // Generate daily activity for the last 7 days
+      // Real uploads: every non-deleted file, with creation timestamps
+      const { data: files } = await supabase
+        .from('files')
+        .select('id, name, size, created_at')
+        .eq('user_id', this.userId)
+        .eq('is_deleted', false);
+
+      // Real shares + engagement: the shares table counts every view/download
+      const { data: shares } = await supabase
+        .from('shares')
+        .select('file_id, share_views, download_count, created_at')
+        .eq('user_id', this.userId);
+
+      const fileList = files || [];
+      const shareList = (shares || []) as any[];
+      const uploads = fileList.length;
+      const shareCount = shareList.length;
+      const views = shareList.reduce((a, s) => a + (s.share_views || 0), 0);
+      const downloads = shareList.reduce((a, s) => a + (s.download_count || 0), 0);
+
+      // Real file-count momentum: this week vs last week
+      const nowMs = Date.now();
+      const weekMs = 7 * 24 * 60 * 60 * 1000;
+      const thisWeek = fileList.filter(f => f.created_at && nowMs - new Date(f.created_at).getTime() < weekMs).length;
+      const lastWeek = fileList.filter(f => {
+        if (!f.created_at) return false;
+        const age = nowMs - new Date(f.created_at).getTime();
+        return age >= weekMs && age < 2 * weekMs;
+      }).length;
+      const filesGrowth = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : thisWeek > 0 ? 100 : 0;
+
+      // Daily activity for the last 14 days, from real creation timestamps
       const dailyActivity = [];
-      for (let i = 6; i >= 0; i--) {
+      for (let i = 13; i >= 0; i--) {
         const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
         const dateString = date.toISOString().split('T')[0];
-        const dayEvents = userEvents.filter((e: any) => 
-          e.created_at && e.created_at.startsWith(dateString)
-        );
-        
+        const dayFiles = fileList.filter(f => f.created_at && f.created_at.startsWith(dateString));
+        const dayShares = shareList.filter(s => s.created_at && String(s.created_at).startsWith(dateString));
         dailyActivity.push({
           date: dateString,
-          uploads: dayEvents.filter((e: any) => e.event_type === 'file_upload').length,
-          downloads: dayEvents.filter((e: any) => e.event_type === 'file_download').length,
-          views: dayEvents.filter((e: any) => e.event_type === 'file_view').length
+          uploads: dayFiles.length,
+          downloads: 0,
+          views: dayShares.reduce((a, s) => a + (s.share_views || 0), 0),
         });
       }
 
-      // Get popular files from file access events
-      const fileEvents = userEvents.filter((e: any) => 
-        e.event_type === 'file_view' || e.event_type === 'file_download'
-      );
-      
-      const fileStats: { [key: string]: { views: number; downloads: number } } = {};
-      fileEvents.forEach((event: any) => {
-        try {
-          const metadata = JSON.parse(event.metadata || '{}');
-          const fileName = metadata.fileName || 'Unknown File';
-          if (!fileStats[fileName]) {
-            fileStats[fileName] = { views: 0, downloads: 0 };
-          }
-          if (event.event_type === 'file_view') fileStats[fileName].views++;
-          if (event.event_type === 'file_download') fileStats[fileName].downloads++;
-        } catch (e) {
-          // Skip invalid metadata
-        }
-      });
-
-      const popularFiles = Object.entries(fileStats)
-        .map(([name, stats]) => ({ name, ...stats }))
-        .sort((a, b) => (b.views + b.downloads) - (a.views + a.downloads))
+      // Popular files: most-viewed shared files, resolved to real names
+      const topShares = [...shareList]
+        .sort((a, b) => ((b.share_views || 0) + (b.download_count || 0)) - ((a.share_views || 0) + (a.download_count || 0)))
         .slice(0, 5);
+      const topIds = topShares.map(s => s.file_id).filter(Boolean);
+      let nameById: Record<string, string> = {};
+      if (topIds.length > 0) {
+        const { data: named } = await supabase.from('files').select('id, name').in('id', topIds);
+        (named || []).forEach((f: any) => { nameById[f.id] = f.name; });
+      }
+      const popularFiles = topShares
+        .filter(s => (s.share_views || 0) + (s.download_count || 0) > 0)
+        .map(s => ({
+          name: nameById[s.file_id] || 'Shared file',
+          views: s.share_views || 0,
+          downloads: s.download_count || 0,
+        }));
 
-      // Generate access patterns (hourly activity)
-      const accessPatterns = Array.from({ length: 24 }, (_, hour) => {
-        const hourEvents = userEvents.filter((e: any) => {
-          if (!e.created_at) return false;
-          const eventHour = new Date(e.created_at).getHours();
-          return eventHour === hour;
-        });
-        return { hour, activity: hourEvents.length };
-      }).filter(p => p.activity > 0);
+      // Access patterns: the hours this account actually adds files
+      const hourBuckets = Array.from({ length: 24 }, (_, hour) => ({ hour, activity: 0 }));
+      fileList.forEach(f => {
+        if (!f.created_at) return;
+        hourBuckets[new Date(f.created_at).getHours()].activity++;
+      });
+      const accessPatterns = hourBuckets.filter(p => p.activity > 0);
 
-      return {
-        uploads,
-        downloads,
-        shares,
-        views,
-        dailyActivity,
-        popularFiles,
-        accessPatterns
-      };
+      return { uploads, downloads, shares: shareCount, views, filesGrowth, dailyActivity, popularFiles, accessPatterns };
     } catch (error) {
       console.error('Error getting activity metrics:', error);
       return {
@@ -242,6 +255,7 @@ class AnalyticsService {
         downloads: 0,
         shares: 0,
         views: 0,
+        filesGrowth: 0,
         dailyActivity: [],
         popularFiles: [],
         accessPatterns: []
@@ -249,173 +263,67 @@ class AnalyticsService {
     }
   }
 
-  async getUserMetrics(): Promise<UserMetrics> {
-    try {
-      // Mock user metrics for now
-      return {
-        totalUsers: Math.floor(Math.random() * 200) + 100,
-        activeUsers: Math.floor(Math.random() * 100) + 50,
-        newUsers: Math.floor(Math.random() * 20) + 5,
-        userGrowth: Math.floor(Math.random() * 30) + 10, // Growth percentage
-        loginPatterns: [
-          { date: '2024-01-01', logins: 50 },
-          { date: '2024-01-02', logins: 55 },
-          { date: '2024-01-03', logins: 60 },
-          { date: '2024-01-04', logins: 58 },
-          { date: '2024-01-05', logins: 65 },
-          { date: '2024-01-06', logins: 70 },
-          { date: '2024-01-07', logins: 75 }
-        ],
-        featureUsage: [
-          { feature: 'File Upload', usage: 85 },
-          { feature: 'File Sharing', usage: 72 },
-          { feature: 'File Preview', usage: 90 },
-          { feature: 'Mobile Access', usage: 65 }
-        ]
-      };
-    } catch (error) {
-      console.error('Error getting user metrics:', error);
-      return {
-        totalUsers: 0,
-        activeUsers: 0,
-        newUsers: 0,
-        userGrowth: 0,
-        loginPatterns: [],
-        featureUsage: []
-      };
-    }
-  }
-
   async getPerformanceMetrics(): Promise<PerformanceMetrics> {
     try {
-      // Mock performance metrics for now
-      return {
-        avgUploadSpeed: Math.floor(Math.random() * 10) + 5, // MB/s
-        avgDownloadSpeed: Math.floor(Math.random() * 20) + 15, // MB/s
-        errorRate: Math.round((Math.random() * 2 + 0.5) * 100) / 100, // Percentage
-        uptime: Math.round((Math.random() * 2 + 98) * 100) / 100, // Percentage
-        responseTime: Math.floor(Math.random() * 200) + 100, // ms
-        systemHealth: 'excellent' as const,
-        bandwidthUsage: [
-          { date: '2024-01-01', upload: 120, download: 450 },
-          { date: '2024-01-02', upload: 110, download: 380 },
-          { date: '2024-01-03', upload: 130, download: 520 },
-          { date: '2024-01-04', upload: 100, download: 400 },
-          { date: '2024-01-05', upload: 115, download: 475 },
-          { date: '2024-01-06', upload: 125, download: 495 },
-          { date: '2024-01-07', upload: 105, download: 425 }
-        ]
-      };
+      await this.ensureUserInitialized();
+
+      // Real API response: timed round-trip against the database
+      const pingStart = performance.now();
+      let apiResponseMs = -1;
+      try {
+        await supabase.from('files').select('id', { head: true, count: 'exact' }).limit(1);
+        apiResponseMs = Math.max(1, Math.round(performance.now() - pingStart));
+      } catch {
+        apiResponseMs = -1;
+      }
+
+      // Real volumes from the files + shares tables
+      const { data: files } = await supabase
+        .from('files')
+        .select('size, created_at')
+        .eq('user_id', this.userId || '')
+        .eq('is_deleted', false);
+      const { data: shares } = await supabase
+        .from('shares')
+        .select('download_count')
+        .eq('user_id', this.userId || '');
+
+      const fileList = files || [];
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const uploadBytes30d = fileList
+        .filter(f => f.created_at && new Date(f.created_at).getTime() >= cutoff)
+        .reduce((a, f) => a + (f.size || 0), 0);
+      const shareDownloads = ((shares || []) as any[]).reduce((a, s) => a + (s.download_count || 0), 0);
+      const activeShares = (shares || []).length;
+
+      // Daily upload volume (MB) for the last 14 days
+      const bandwidthUsage = [];
+      for (let i = 13; i >= 0; i--) {
+        const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+        const dateString = date.toISOString().split('T')[0];
+        const dayBytes = fileList
+          .filter(f => f.created_at && f.created_at.startsWith(dateString))
+          .reduce((a, f) => a + (f.size || 0), 0);
+        bandwidthUsage.push({ date: dateString, uploadMB: Math.round((dayBytes / (1024 * 1024)) * 10) / 10 });
+      }
+
+      const systemHealth: PerformanceMetrics['systemHealth'] =
+        apiResponseMs < 0 ? 'poor' :
+        apiResponseMs < 300 ? 'excellent' :
+        apiResponseMs < 800 ? 'good' : 'fair';
+
+      return { apiResponseMs, uploadBytes30d, shareDownloads, activeShares, systemHealth, bandwidthUsage };
     } catch (error) {
       console.error('Error getting performance metrics:', error);
       return {
-        avgUploadSpeed: 0,
-        avgDownloadSpeed: 0,
-        errorRate: 0,
-        uptime: 0,
-        responseTime: 0,
+        apiResponseMs: -1,
+        uploadBytes30d: 0,
+        shareDownloads: 0,
+        activeShares: 0,
         systemHealth: 'poor',
         bandwidthUsage: []
       };
     }
-  }
-
-  private generateDailyActivity(events: any[]): { date: string; uploads: number; downloads: number; views: number }[] {
-    const last30Days = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      return date.toISOString().split('T')[0];
-    }).reverse();
-
-    return last30Days.map(date => {
-      const dayEvents = events.filter(e => e.timestamp.startsWith(date));
-      return {
-        date,
-        uploads: dayEvents.filter(e => e.event_type === 'file_upload').length,
-        downloads: dayEvents.filter(e => e.event_type === 'file_download').length,
-        views: dayEvents.filter(e => e.event_type === 'file_view').length
-      };
-    });
-  }
-
-  private getPopularFiles(events: any[]): { name: string; views: number; downloads: number }[] {
-    const fileStats: { [key: string]: { views: number; downloads: number } } = {};
-
-    events.forEach(event => {
-      const fileName = event.metadata?.fileName || 'Unknown File';
-      if (!fileStats[fileName]) {
-        fileStats[fileName] = { views: 0, downloads: 0 };
-      }
-
-      if (event.event_type === 'file_view') {
-        fileStats[fileName].views++;
-      } else if (event.event_type === 'file_download') {
-        fileStats[fileName].downloads++;
-      }
-    });
-
-    return Object.entries(fileStats)
-      .map(([name, stats]) => ({ name, ...stats }))
-      .sort((a, b) => (b.views + b.downloads) - (a.views + a.downloads))
-      .slice(0, 10);
-  }
-
-  private getAccessPatterns(events: any[]): { hour: number; activity: number }[] {
-    const hourlyActivity = Array.from({ length: 24 }, (_, i) => ({ hour: i, activity: 0 }));
-
-    events.forEach(event => {
-      const hour = new Date(event.timestamp).getHours();
-      hourlyActivity[hour].activity++;
-    });
-
-    return hourlyActivity;
-  }
-
-  private generateBandwidthData(): { date: string; upload: number; download: number }[] {
-    const last30Days = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      return {
-        date: date.toISOString().split('T')[0],
-        upload: Math.random() * 1000 + 500,
-        download: Math.random() * 2000 + 1000
-      };
-    }).reverse();
-
-    return last30Days;
-  }
-
-  private getSessionId(): string {
-    let sessionId = sessionStorage.getItem('analytics_session_id');
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      sessionStorage.setItem('analytics_session_id', sessionId);
-    }
-    return sessionId;
-  }
-
-  private getDefaultStorageMetrics(): StorageMetrics {
-    return {
-      totalStorage: 100 * 1024 * 1024 * 1024,
-      usedStorage: 0,
-      availableStorage: 100 * 1024 * 1024 * 1024,
-      storageGrowth: 0,
-      fileCount: 0,
-      fileTypes: {},
-      storageByType: {}
-    };
-  }
-
-  private getDefaultActivityMetrics(): ActivityMetrics {
-    return {
-      uploads: 0,
-      downloads: 0,
-      shares: 0,
-      views: 0,
-      dailyActivity: [],
-      popularFiles: [],
-      accessPatterns: Array.from({ length: 24 }, (_, i) => ({ hour: i, activity: 0 }))
-    };
   }
 
   // Event tracking methods

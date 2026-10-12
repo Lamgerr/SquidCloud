@@ -93,7 +93,7 @@ const MobileTopNavbar: React.FC<MobileTopNavbarProps> = ({
               className={cn(
                 "flex items-center gap-1.5",
                 "h-7 px-2.5 rounded-full",
-                "bg-gradient-to-r from-amber-500/15 to-amber-600/10",
+                "bg-amber-500/10",
                 "border border-amber-500/20",
                 "text-amber-500 text-[10px] font-semibold",
                 "transition-all duration-150 active:scale-95"

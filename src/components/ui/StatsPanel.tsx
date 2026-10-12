@@ -56,7 +56,8 @@ const Stat: React.FC<{ label: string; value: string; muted?: boolean; active?: b
   <button
     onClick={onClick}
     className={cn(
-      'flex flex-col gap-0.5 flex-shrink-0 text-left transition-all duration-100',
+      'flex flex-col gap-0.5 flex-shrink-0 text-left rounded-md transition-all duration-150 outline-none',
+      'focus-visible:ring-2 focus-visible:ring-ring/40 active:scale-[0.97]',
       muted && 'opacity-50',
       active && 'opacity-100',
       onClick && 'hover:opacity-80 cursor-pointer'

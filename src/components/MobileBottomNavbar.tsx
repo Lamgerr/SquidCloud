@@ -37,7 +37,7 @@ interface MobileBottomNavbarProps {
 const navItems = [
   { id: 'files', label: 'Files', icon: FileStack },
   { id: 'shared', label: 'Shared', icon: Users },
-  { id: 'analytics', label: 'Activity', icon: BarChart3 },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'account', label: 'Account', icon: User },
 ];
 
@@ -181,13 +181,13 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
             'pointer-events-auto flex items-center justify-center p-1.5 overflow-hidden',
             'rounded-full bg-background/85 backdrop-blur-2xl border border-border/40',
             'shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)]',
-            'transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)]',
+            'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
             mounted ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-12 opacity-0 scale-95',
             isMorphed ? 'w-full max-w-[340px] gap-2' : 'w-full max-w-md gap-1'
           )}
         >
           {/* ═══ STANDARD NAV (Left Side) OR MORPHED HOME ═══ */}
-          <div className={cn("flex items-center transition-all duration-400", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
+          <div className={cn("flex items-center transition-all duration-300", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
             {navItems.slice(0, navMid).map((item) => (
               <button
                 key={item.id}
@@ -207,7 +207,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
           <button 
             onClick={() => activate('home', () => { haptic(10); if (window.location.pathname !== '/') window.location.href = '/'; })}
             className={cn(
-              "flex items-center justify-center rounded-full shrink-0 transition-all duration-400",
+              "flex items-center justify-center rounded-full shrink-0 transition-all duration-300",
               isMorphed ? "w-11 h-11 bg-muted/40 text-foreground hover:bg-muted/60 opacity-100" : "hidden"
             )}
           >
@@ -215,7 +215,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
           </button>
 
           {/* ═══ STANDARD CREATE BUTTON ═══ */}
-          <div className={cn("px-1 transition-all duration-400", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
+          <div className={cn("px-1 transition-all duration-300", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
             <button
               onClick={() => { 
                 if (createDisabled) { 
@@ -237,7 +237,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
           {/* ═══ MORPHED PROGRESS PILL ═══ */}
           <div 
             className={cn(
-              "flex items-center justify-between rounded-full bg-muted/30 transition-all duration-400 overflow-hidden",
+              "flex items-center justify-between rounded-full bg-muted/30 transition-all duration-300 overflow-hidden",
               isMorphed ? "flex-1 h-11 px-3 opacity-100" : "hidden"
             )}
           >
@@ -266,7 +266,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
           </div>
 
           {/* ═══ STANDARD NAV (Right Side) ═══ */}
-          <div className={cn("flex items-center transition-all duration-400", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
+          <div className={cn("flex items-center transition-all duration-300", isMorphed ? "w-0 opacity-0 hidden" : "opacity-100")}>
             {navItems.slice(navMid).map((item) => (
               <button
                 key={item.id}
@@ -286,7 +286,7 @@ const MobileBottomNavbar: React.FC<MobileBottomNavbarProps> = ({
           <button 
             onClick={() => handleTabClick('account')}
             className={cn(
-              "flex items-center justify-center rounded-full shrink-0 transition-all duration-400",
+              "flex items-center justify-center rounded-full shrink-0 transition-all duration-300",
               isMorphed ? "w-11 h-11 bg-muted/40 text-foreground hover:bg-muted/60 opacity-100" : "hidden"
             )}
           >

@@ -157,8 +157,8 @@ export default function ExtensionLab() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-              <Package className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center">
+              <Package className="w-6 h-6 text-primary" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white">Extension Lab</h1>
@@ -205,8 +205,8 @@ export default function ExtensionLab() {
                               {extension.icon_url ? (
                                 <img src={extension.icon_url} alt={extension.name} className="w-10 h-10 rounded-lg" />
                               ) : (
-                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                                  <Code className="w-5 h-5 text-white" />
+                                <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center">
+                                  <Code className="w-5 h-5 text-primary" />
                                 </div>
                               )}
                               <div>
@@ -255,7 +255,7 @@ export default function ExtensionLab() {
                           ) : (
                             <Button 
                               onClick={() => installExtension(extension.id)}
-                              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
                               size="sm"
                             >
                               <Plus className="w-4 h-4 mr-2" />

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBYOK } from '@/hooks/use-byok';
 import { useToast } from '@/hooks/use-toast';
 import { registerPasskey, isPasskeyAvailable } from '@/lib/webauthn';
+import SquidLogo from '@/components/ui/SquidLogo';
 import {
   User, Mail, Key, Shield, Check, ChevronRight, Upload,
   Fingerprint, Lock,
@@ -81,6 +83,58 @@ function base64ToBlob(b64: string, mime: string): Blob {
   return new Blob([arr], { type: mime });
 }
 
+/* ── Page-scoped motion details (logic-free) ── */
+
+const OB_CSS = `
+@keyframes obKenburns { from { transform: scale(1.1); } to { transform: scale(1.18); } }
+.ob-kenburns { animation: obKenburns 46s ease-in-out infinite alternate; will-change: transform; }
+@keyframes obPop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+.ob-pop { animation: obPop 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes obDrawCheck { to { stroke-dashoffset: 0; } }
+.ob-draw-check { stroke-dasharray: 24; stroke-dashoffset: 24; animation: obDrawCheck 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards; }
+@keyframes obBreathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.ob-breathe { animation: obBreathe 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ob-kenburns, .ob-pop, .ob-breathe { animation: none !important; }
+  .ob-draw-check { stroke-dashoffset: 0; animation: none; }
+}
+`;
+
+const STEP_NAMES = ['Profile', 'Workspace', 'Security'];
+
+const LOADING_LINES = ['Preparing your vault…', 'Checking security…', 'Almost there…'];
+
+function LoadingScreen() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setI(v => (v + 1) % LOADING_LINES.length), 1400);
+    return () => window.clearInterval(t);
+  }, []);
+  return (
+    <MotionConfig reducedMotion="user">
+    <div className="fixed inset-0 bg-[#0a0a0f] flex flex-col items-center justify-center gap-5">
+      <style>{OB_CSS}</style>
+      <div className="ob-breathe">
+        <SquidLogo size={40} />
+      </div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.p
+          key={i}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          className="text-sm text-white/40"
+          aria-live="polite"
+        >
+          {LOADING_LINES[i]}
+        </motion.p>
+      </AnimatePresence>
+    </div>
+    </MotionConfig>
+  );
+}
+
 /* ── Step 1: Profile ─────────────────────────────────── */
 
 function ProfileStep({ form, onChange, onPhotoChange }: {
@@ -101,17 +155,19 @@ function ProfileStep({ form, onChange, onPhotoChange }: {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <p className="text-sm text-white/40">Step 1 of 3</p>
-        <h2 className="text-xl font-semibold text-white mt-1">Your Profile</h2>
+        <p className="text-sm text-white/40">Step 1 of 3 · Profile</p>
+        <h2 className="text-xl font-semibold text-white mt-1">Welcome to SquidCloud</h2>
+        <p className="text-xs text-white/40 mt-1.5">Three quick steps — about a minute — then your private cloud is ready.</p>
       </div>
 
       <div className="flex flex-col items-center gap-4">
         <button
           onClick={() => fileRef.current?.click()}
-          className="group relative w-20 h-20 rounded-full overflow-hidden border-2 border-white/10 hover:border-primary/50 transition-all duration-300"
+          aria-label="Upload profile photo"
+          className="group relative w-20 h-20 rounded-full overflow-hidden border-2 border-white/10 hover:border-primary/50 active:scale-95 transition-all duration-300"
         >
           {form.photo ? (
-            <img src={form.photo} alt="" className="w-full h-full object-cover" />
+            <img key={form.photo.slice(-24)} src={form.photo} alt="" className="w-full h-full object-cover ob-pop" />
           ) : (
             <div className="w-full h-full bg-white/5 flex items-center justify-center">
               <User className="w-8 h-8 text-white/30" />
@@ -122,7 +178,7 @@ function ProfileStep({ form, onChange, onPhotoChange }: {
           </div>
         </button>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-        <p className="text-xs text-white/30 -mt-1">Upload profile photo</p>
+        <p className="text-xs text-white/30 -mt-1">{form.photo ? 'Looking good — tap to change' : 'Upload profile photo'}</p>
       </div>
 
       <div className="space-y-4">
@@ -191,11 +247,12 @@ function WorkspaceStep({ workspaceName, setWorkspaceName, provider, setProvider 
                 key={sp.id}
                 onClick={() => sp.available && setProvider(sp.id)}
                 disabled={!sp.available}
+                aria-pressed={provider === sp.id}
                 className={cn(
-                  'relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-200',
+                  'relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-200 active:scale-[0.96]',
                   provider === sp.id && sp.available
-                    ? 'border-primary/50 bg-primary/[0.08]'
-                    : 'border-white/10 bg-white/[0.03] hover:border-white/20',
+                    ? 'border-primary/50 bg-primary/[0.08] shadow-[0_0_20px_rgba(0,0,0,0.35)]'
+                    : 'border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.05]',
                   !sp.available && 'opacity-30 cursor-not-allowed'
                 )}
               >
@@ -205,7 +262,7 @@ function WorkspaceStep({ workspaceName, setWorkspaceName, provider, setProvider 
                   <span className="text-[9px] text-white/30 absolute -bottom-[2px]">Coming soon</span>
                 )}
                 {provider === sp.id && sp.available && (
-                  <Check className="absolute top-1.5 right-1.5 w-3 h-3 text-primary" />
+                  <Check className="absolute top-1.5 right-1.5 w-3 h-3 text-primary ob-pop" />
                 )}
               </button>
             );
@@ -429,7 +486,7 @@ function BYOKSetupDialog({ open, onOpenChange, onComplete }: {
 
   return (
     <AlertDialog open={open} onOpenChange={(v) => { if (!v) { reset(); onOpenChange(v); } }}>
-      <AlertDialogContent className="bg-[#1a1a2e] border-white/10 max-w-md">
+        <AlertDialogContent className="bg-card border-border/60 max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-white flex items-center gap-2">
             <Key className="h-5 w-5 text-amber-400" />
@@ -461,22 +518,47 @@ function BYOKSetupDialog({ open, onOpenChange, onComplete }: {
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
+          </div>
+          {password.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1 flex-1" aria-hidden="true">
+                {[1, 2, 3, 4].map(n => {
+                  const s =
+                    (password.length >= 8 ? 1 : 0) +
+                    (password.length >= 12 ? 1 : 0) +
+                    (/[A-Z]/.test(password) && /[a-z]/.test(password) ? 1 : 0) +
+                    (/\d/.test(password) && /[^A-Za-z0-9]/.test(password) ? 1 : 0);
+                  const tone = s <= 1 ? 'bg-red-400' : s === 2 ? 'bg-amber-400' : 'bg-emerald-400';
+                  return <div key={n} className={cn('h-1 flex-1 rounded-full transition-colors duration-200', n <= s ? tone : 'bg-white/10')} />;
+                })}
+              </div>
+              <span className="text-[11px] text-white/40 w-16 text-right">
+                {(() => {
+                  const s =
+                    (password.length >= 8 ? 1 : 0) +
+                    (password.length >= 12 ? 1 : 0) +
+                    (/[A-Z]/.test(password) && /[a-z]/.test(password) ? 1 : 0) +
+                    (/\d/.test(password) && /[^A-Za-z0-9]/.test(password) ? 1 : 0);
+                  return s <= 1 ? 'Weak' : s === 2 ? 'Okay' : s === 3 ? 'Strong' : 'Excellent';
+                })()}
+              </span>
             </div>
-          </div>
+          )}
+        </div>
 
-          <div className="space-y-2">
-            <Label className="text-white/70">Confirm Key</Label>
-            <Input
-              type={showPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your key"
-              className="bg-black/20 border-white/10 text-white"
-            />
-            {confirmPassword && password !== confirmPassword && (
-              <p className="text-xs text-red-400">Keys do not match</p>
-            )}
-          </div>
+        <div className="space-y-2">
+          <Label className="text-white/70">Confirm Key</Label>
+          <Input
+            type={showPassword ? 'text' : 'password'}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm your key"
+            className="bg-black/20 border-white/10 text-white"
+          />
+          {confirmPassword && password !== confirmPassword && (
+            <p className="text-xs text-red-400">Keys do not match</p>
+          )}
+        </div>
 
           {password.length > 0 && password.length < 8 && (
             <p className="text-xs text-amber-400">Key must be at least 8 characters</p>
@@ -515,6 +597,13 @@ export default function OnboardingSetup() {
   const [phase, setPhase] = useState<Phase>('loading');
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [dir, setDir] = useState(1);
+  const [celebrating, setCelebrating] = useState(false);
+
+  const goStep = useCallback((next: number) => {
+    setDir(next > step ? 1 : -1);
+    setStep(next);
+  }, [step]);
 
   const [profileForm, setProfileForm] = useState({ username: '', email: '', photo: null as string | null });
   const [workspaceName, setWorkspaceName] = useState('');
@@ -687,7 +776,9 @@ export default function OnboardingSetup() {
         throw rpcErr;
       }
 
-      navigate('/dashboard', { replace: true });
+      setSaving(false);
+      setCelebrating(true);
+      window.setTimeout(() => navigate('/dashboard', { replace: true }), 1050);
       return;
     } catch (err: any) {
       console.error('Onboarding save failed:', err);
@@ -709,11 +800,7 @@ export default function OnboardingSetup() {
   // ── LOADING ──
   // ═══════════════════════════════════════════════════════
   if (phase === 'loading') {
-    return (
-      <div className="fixed inset-0 bg-[#0a0a0f] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-white/30 animate-spin" />
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   // ═══════════════════════════════════════════════════════
@@ -721,9 +808,11 @@ export default function OnboardingSetup() {
   // ═══════════════════════════════════════════════════════
   if (phase === 'setup') {
     return (
+      <MotionConfig reducedMotion="user">
       <div className="fixed inset-0 overflow-y-auto bg-[#0a0a0f]">
+        <style>{OB_CSS}</style>
         <div
-          className="fixed inset-0 z-0"
+          className="fixed inset-0 z-0 ob-kenburns motion-reduce:animate-none"
           style={{
             backgroundImage: 'url(/artwork.png)',
             backgroundSize: 'cover',
@@ -750,21 +839,45 @@ export default function OnboardingSetup() {
           >
             {/* Step indicator */}
             {!isSummary && (
-              <div className="flex items-center justify-center gap-2 pt-6 pb-2">
-                {[1, 2, 3].map(s => (
-                  <div
-                    key={s}
-                    className={cn(
-                      'h-1 rounded-full transition-all duration-500',
-                      s === step ? 'w-8 bg-gradient-to-r from-[#4A90D9] to-[#7B4FC9]' :
-                      s < step ? 'w-6 bg-white/30' : 'w-6 bg-white/10'
-                    )}
-                  />
-                ))}
+              <div className="flex flex-col items-center gap-2 pt-6 pb-2">
+                <div className="flex items-center justify-center gap-2" aria-hidden="true">
+                  {[1, 2, 3].map(s => (
+                    <div
+                      key={s}
+                      className={cn(
+                        'h-1 rounded-full transition-all duration-500',
+                        s === step ? 'w-8 bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.45)]' :
+                        s < step ? 'w-6 bg-white/30' : 'w-6 bg-white/10'
+                      )}
+                    />
+                  ))}
+                </div>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.p
+                    key={step}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    className="text-[11px] font-medium tracking-wide text-white/40"
+                    aria-live="polite"
+                  >
+                    {STEP_NAMES[step - 1]}
+                  </motion.p>
+                </AnimatePresence>
               </div>
             )}
 
-            <div className="p-6 sm:p-8 animate-[fadeUpSoft_0.4s_cubic-bezier(0.16,1,0.3,1)_forwards]">
+            <div className="p-6 sm:p-8">
+              <AnimatePresence mode="wait" initial={false} custom={dir}>
+                <motion.div
+                  key={isSummary ? 'summary' : step}
+                  custom={dir}
+                  initial={{ opacity: 0, x: 36 * dir }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -28 * dir }}
+                  transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                >
               {step === 1 && (
                 <ProfileStep
                   form={profileForm}
@@ -802,13 +915,15 @@ export default function OnboardingSetup() {
                   provider={provider}
                 />
               )}
+                </motion.div>
+              </AnimatePresence>
 
               {/* Navigation */}
               <div className={cn('flex gap-3', isSummary ? 'mt-6' : 'mt-8')}>
                 {!isSummary && step > 1 && (
                   <Button
                     variant="outline"
-                    onClick={() => setStep(s => s - 1)}
+                    onClick={() => goStep(step - 1)}
                     className="flex-1 h-10 border-white/10 text-white/60 hover:text-white hover:bg-white/5 rounded-xl text-sm"
                   >
                     Back
@@ -816,9 +931,9 @@ export default function OnboardingSetup() {
                 )}
                 {step <= 3 ? (
                   <Button
-                    onClick={() => setStep(s => s + 1)}
+                    onClick={() => goStep(step + 1)}
                     disabled={!canContinueStep()}
-                    className="flex-1 h-10 rounded-xl text-sm font-medium bg-gradient-to-r from-[#4A90D9] to-[#7B4FC9] text-white hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="flex-1 h-10 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     Continue
                     <ChevronRight className="w-4 h-4 ml-1" />
@@ -826,11 +941,18 @@ export default function OnboardingSetup() {
                 ) : (
                   <Button
                     onClick={handleComplete}
-                    disabled={saving}
-                    className="flex-1 h-10 rounded-xl text-sm font-medium bg-gradient-to-r from-[#4A90D9] to-[#7B4FC9] text-white hover:opacity-90 transition-opacity"
+                    disabled={saving || celebrating}
+                    className="flex-1 h-10 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all disabled:opacity-80"
                   >
                     {saving ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Finalizing\u2026</>
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Finalizing…</>
+                    ) : celebrating ? (
+                      <span className="inline-flex items-center">
+                        <svg viewBox="0 0 24 24" className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <polyline points="4 12.5 9.5 18 20 6.5" className="ob-draw-check" />
+                        </svg>
+                        Welcome in
+                      </span>
                     ) : (
                       <><Sparkles className="w-4 h-4 mr-1.5" /> Dive In</>
                     )}
@@ -847,6 +969,7 @@ export default function OnboardingSetup() {
           onComplete={handleBYOKComplete}
         />
       </div>
+      </MotionConfig>
     );
   }
 

@@ -444,11 +444,11 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
 
   const collaboratorsContent = (
     <div className="space-y-6 px-5 pb-4">
-      <section className="rounded-xl border border-[#373E47] bg-[#1C2128] p-4">
+      <section className="rounded-xl border border-border bg-muted/30 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-[#E6EDF3]">Members</p>
-            <p className="text-xs text-[#768390]">
+            <p className="text-sm font-medium text-foreground">Members</p>
+            <p className="text-xs text-muted-foreground">
               {members.length} total · {activeMemberCount} active now
             </p>
           </div>
@@ -469,21 +469,21 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
             return (
               <div
                 key={member.user_id}
-                className="flex items-center justify-between rounded-lg border border-[#373E47] bg-[#161B22] px-3 py-2"
+                className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"
               >
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-9 w-9 shrink-0">
                     <AvatarImage src={profile?.avatar_url || ''} />
                     <AvatarFallback className="text-xs font-semibold">
                       {initials}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="text-sm font-medium text-[#E6EDF3]">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate" title={displayName}>
                       {displayName}
-                      {isSelf && <span className="ml-2 text-[11px] text-[#768390]">You</span>}
+                      {isSelf && <span className="ml-2 text-[11px] text-muted-foreground">You</span>}
                     </p>
-                    <p className="text-xs text-[#768390]">
+                    <p className="text-xs text-muted-foreground">
                       Joined {new Date(member.joined_at).toLocaleDateString()}
                     </p>
                   </div>
@@ -515,7 +515,7 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 text-[#F85149] hover:text-[#F85149]"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors"
                       onClick={() => handleRemoveMember(member.user_id)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -529,14 +529,14 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
       </section>
 
       {canManageMembers && (
-        <section className="rounded-xl border border-[#373E47] bg-[#1C2128] p-4">
+        <section className="rounded-xl border border-border bg-muted/30 p-4">
           <div className="flex items-center gap-2">
-            <UserPlus className="h-4 w-4 text-[#8B949E]" />
-            <p className="text-sm font-medium text-[#E6EDF3]">Invite teammates</p>
+            <UserPlus className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">Invite teammates</p>
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_140px_auto]">
             <div>
-              <Label className="text-xs text-[#E6EDF3]">Email</Label>
+              <Label className="text-xs text-foreground">Email</Label>
               <Input
                 value={inviteEmail}
                 onChange={(event) => setInviteEmail(event.target.value)}
@@ -545,7 +545,7 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
               />
             </div>
             <div>
-              <Label className="text-xs text-[#E6EDF3]">Role</Label>
+              <Label className="text-xs text-foreground">Role</Label>
               <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as WorkspaceRole)}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
@@ -571,11 +571,11 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
           </div>
 
           {inviteLink && (
-            <div className="mt-3 rounded-lg border border-[#373E47] bg-[#161B22] p-3">
-              <p className="text-xs text-[#768390]">Invite link (shown once):</p>
+            <div className="mt-3 rounded-lg border border-border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Invite link (shown once):</p>
               <div className="mt-2 flex items-center gap-2">
-                <Link2 className="h-4 w-4 text-[#768390]" />
-                <span className="text-xs break-all text-[#E6EDF3]">{inviteLink}</span>
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs break-all text-foreground">{inviteLink}</span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -591,15 +591,15 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
 
           {canViewInvites && invites.length > 0 && (
             <div className="mt-4 space-y-2">
-              <p className="text-xs uppercase tracking-[0.1em] text-[#768390]">Pending invites</p>
+              <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground">Pending invites</p>
               {invites.map(invite => (
                 <div
                   key={invite.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#373E47] bg-[#161B22] px-3 py-2"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2"
                 >
                   <div>
-                    <p className="text-sm font-medium text-[#E6EDF3]">{invite.invitee_email}</p>
-                    <p className="text-xs text-[#768390]">
+                    <p className="text-sm font-medium text-foreground">{invite.invitee_email}</p>
+                    <p className="text-xs text-muted-foreground">
                       {ROLE_LABELS[invite.role]} · {invite.status}
                     </p>
                   </div>
@@ -611,7 +611,7 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 px-2 text-[#F85149] hover:text-[#F85149]"
+                        className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors"
                         onClick={() => handleRevokeInvite(invite.id)}
                       >
                         <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -626,15 +626,15 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
         </section>
       )}
 
-      <section className="rounded-xl border border-[#373E47] bg-[#1C2128] p-4">
+      <section className="rounded-xl border border-border bg-muted/30 p-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-[#E6EDF3]">Active now</p>
+          <p className="text-sm font-medium text-foreground">Active now</p>
           <Badge variant="secondary" className="text-xs">
             {activeMemberCount}
           </Badge>
         </div>
         {presence.length === 0 ? (
-          <p className="mt-3 text-xs text-[#768390]">No active members right now.</p>
+          <p className="mt-3 text-xs text-muted-foreground">No active members right now.</p>
         ) : (
           <div className="mt-3 flex flex-wrap gap-2">
             {presence.map(entry => {
@@ -642,7 +642,7 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
               return (
                 <div
                   key={entry.user_id}
-                  className="flex items-center gap-2 rounded-full border border-[#373E47] bg-[#161B22] px-2 py-1"
+                  className="flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1"
                 >
                   <Avatar className="h-6 w-6">
                     <AvatarImage src={entry.profile?.avatar_url || ''} />
@@ -650,7 +650,7 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
                       {getInitials(name)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-xs font-medium text-[#E6EDF3]">{name}</span>
+                  <span className="text-xs font-medium text-foreground">{name}</span>
                 </div>
               );
             })}
@@ -662,7 +662,7 @@ const WorkspaceCollaboratorsModal: React.FC<WorkspaceCollaboratorsModalProps> = 
         <div className="flex justify-end">
           <Button
             variant="outline"
-            className="text-[#F85149] hover:text-[#F85149]"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors"
             onClick={() => void handleLeaveWorkspace()}
           >
             Leave workspace

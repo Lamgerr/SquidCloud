@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendSignal } from "../_shared/signals.ts";
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -85,6 +86,14 @@ serve(async (req) => {
       total_files: entries.length,
     }).eq('id', job.id);
 
+    // All extracted files belong to the user's default workspace so they
+    // appear in the dashboard instead of limbo.
+    let workspaceId: string | null = null;
+    try {
+      const { data: wsId } = await supabase.rpc('get_or_create_default_workspace', { p_user_id: job.user_id });
+      if (typeof wsId === 'string' && wsId) workspaceId = wsId;
+    } catch { /* non-fatal: files still land, workspace-scoped views may hide them */ }
+
     let processed = 0;
     let failed = 0;
     const errors: string[] = [];
@@ -108,6 +117,7 @@ serve(async (req) => {
           user_id: job.user_id,
           encrypted: false,
           parent_folder: entry.parentFolder,
+          ...(workspaceId ? { workspace_id: workspaceId } : {}),
         });
         if (recordError) throw new Error(`Record insert failed: ${recordError.message}`);
 
@@ -128,6 +138,41 @@ serve(async (req) => {
 
     await supabase.storage.from(BUCKET).remove([storagePath]);
 
+    // Create folder rows for every directory in the archive. Without these,
+    // extracted files carry parent_folder paths that don't exist as rows,
+    // leaving the whole tree orphaned and invisible in the dashboard.
+    try {
+      const dirSet = new Set<string>();
+      for (const entry of entries) {
+        const parts = String(entry.parentFolder || '').split('/').filter(Boolean);
+        for (let i = 1; i <= parts.length; i++) dirSet.add(parts.slice(0, i).join('/'));
+      }
+      if (dirSet.size > 0) {
+        const { data: existing } = await supabase
+          .from('folders')
+          .select('path')
+          .eq('user_id', job.user_id);
+        const have = new Set((existing || []).map((f: any) => f.path));
+        const missing = [...dirSet].filter(p => !have.has(p));
+        for (const dirPath of missing) {
+          const segs = dirPath.split('/');
+          const parent = segs.length > 1 ? segs.slice(0, -1).join('/') : null;
+          await supabase.from('folders').insert({
+            user_id: job.user_id,
+            name: segs[segs.length - 1],
+            path: dirPath,
+            parent_folder: parent,
+            ...(workspaceId ? { workspace_id: workspaceId } : {}),
+          });
+        }
+        if (missing.length > 0) {
+          await addLog(supabase, job.id, job.user_id, 'info', `Created ${missing.length} folders for extracted tree`);
+        }
+      }
+    } catch (folderErr: any) {
+      await addLog(supabase, job.id, job.user_id, 'error', `Folder creation failed (files are intact): ${folderErr?.message || folderErr}`);
+    }
+
     const jobFinalStatus = failed === 0 ? 'completed' : failed === entries.length ? 'failed' : 'completed';
     const msg = `Migration ${jobFinalStatus}: ${processed}/${entries.length} files uploaded${failed > 0 ? `, ${failed} failed` : ''}`;
     await supabase.from('migration_jobs').update({
@@ -138,6 +183,56 @@ serve(async (req) => {
       completed_at: new Date().toISOString(),
     }).eq('id', job.id);
     await addLog(supabase, job.id, job.user_id, jobFinalStatus === 'completed' ? 'success' : 'error', msg);
+
+    // Post-verify browsability: every extracted file's parent chain must
+    // exist as folder rows, otherwise the tree is orphaned and invisible
+    // in the dashboard despite a "completed" job. Never stay silent.
+    try {
+      const { data: fileRows } = await supabase
+        .from('files')
+        .select('parent_folder')
+        .eq('user_id', job.user_id)
+        .like('storage_path', `${job.user_id}/migration/${job.id}/%`);
+      const needed = new Set<string>();
+      for (const r of fileRows || []) {
+        const parts = String((r as any).parent_folder || '').split('/').filter(Boolean);
+        for (let i = 1; i <= parts.length; i++) needed.add(parts.slice(0, i).join('/'));
+      }
+      let orphanCount = 0;
+      if (needed.size > 0) {
+        const { data: folderRows } = await supabase
+          .from('folders')
+          .select('path')
+          .eq('user_id', job.user_id);
+        const have = new Set((folderRows || []).map((f: any) => f.path));
+        orphanCount = [...needed].filter(p => !have.has(p)).length;
+      }
+      const label = job.settings?.originalName || 'archive';
+      if (jobFinalStatus === 'failed' || failed > 0 || orphanCount > 0) {
+        await sendSignal({
+          service_id: 'cloudbliss',
+          type: 'import_failed',
+          user_id: job.user_id,
+          severity: 'warning',
+          title: `Import finished with issues (${label})`,
+          body: `${processed}/${entries.length} files imported${failed > 0 ? `, ${failed} failed` : ''}${orphanCount > 0 ? `, ${orphanCount} folders missing — files may be hidden` : ''}. Check the file requests panel for details.`,
+          link: '/dashboard',
+        });
+      } else {
+        await sendSignal({
+          service_id: 'cloudbliss',
+          type: 'import_completed',
+          user_id: job.user_id,
+          severity: 'info',
+          title: `Import complete (${label})`,
+          body: `${processed} files are now browsable in your dashboard.`,
+          link: '/dashboard',
+          idempotency_key: `migration-${job.id}`,
+        });
+      }
+    } catch (signalErr) {
+      await addLog(supabase, job.id, job.user_id, 'error', `Completion signal failed: ${(signalErr as any)?.message || signalErr}`);
+    }
 
     return json(200, { processed: true, jobId: job.id, processed, failed, total: entries.length });
 

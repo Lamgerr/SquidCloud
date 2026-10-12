@@ -398,6 +398,14 @@ export class EpubEngine {
     el.style.overflowWrap = 'break-word';
     el.style.textRendering = 'optimizeLegibility';
     el.style.webkitFontSmoothing = 'antialiased';
+    // Book typography: justified measure with hyphenation, capped line
+    // length so wide screens still read like a page, not a webpage.
+    el.style.textAlign = 'justify';
+    (el.style as any).hyphens = 'auto';
+    (el.style as any).webkitHyphens = 'auto';
+    el.style.maxWidth = '68ch';
+    el.style.marginLeft = 'auto';
+    el.style.marginRight = 'auto';
 
     const allEls = el.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, span, a, em, strong, i, b, div, section, article');
     allEls.forEach((child) => {

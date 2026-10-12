@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SquidCloud - Secure, Unlimited Cloud Storage</title>
+    <meta
+      name="description"
+      content="SquidCloud - Secure, Unlimited Cloud Storage for Your Digital Life with end-to-end encryption"
+    />
+    <meta name="theme-color" content="#000000" />
+    <meta name="robots" content="index, follow" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://db.onlinewebfonts.com" />
+
+    <!-- Inter (UI) -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- BubbledotICG-FinePos (retro dot-matrix display) -->
+    <link
+      href="https://db.onlinewebfonts.com/c/8cb707a9b8a73f8a7403336b861c3074?family=BubbledotICG-FinePos"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <!-- Full-bleed looping background video -->
+    <div class="bg" aria-hidden="true">
+      <video
+        class="bg-video"
+        autoplay
+        muted
+        loop
+        playsinline
+        poster="assets/poster.jpg"
+      >
+        <source
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260809_012548_ef22562c-c0ae-4816-ad9d-f8922af4e6a7.mp4"
+          type="video/mp4"
+        />
+      </video>
+    </div>
+
+    <div class="page">
+      <!-- 1. Header -->
+      <header class="header">
+        <a class="logo" href="/" aria-label="SquidCloud home">
+          <img src="assets/logo.webp" alt="" width="52" height="52" />
+        </a>
+
+        <nav class="nav" aria-label="Primary">
+          <a href="#seal">Seal it</a>
+          <a href="#how">How it works</a>
+          <a href="#capabilities">Capabilities</a>
+          <a href="#cli">CLI</a>
+          <a href="#pricing">Pricing</a>
+        </nav>
+
+        <a class="signin" href="/auth">Sign in</a>
+      </header>
+
+      <!-- 2. Hero -->
+      <main class="hero">
+        <div class="trust anim" style="--d: 0.05s">
+          <span class="avatars" aria-hidden="true">
+            <span class="avatar a1">
+              <span class="avatar-inner"><svg viewBox="0 0 448 512"><path d="M144 144v48H304V144c0-44.2-35.8-80-80-80s-80 35.8-80 80zM80 192V144C80 64.5 144.5 0 224 0s144 64.5 144 144v48h16c35.3 0 64 28.7 64 64V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V256c0-35.3 28.7-64 64-64H80z"/></svg></span>
+            </span>
+            <span class="avatar a2">
+              <span class="avatar-inner"><svg viewBox="0 0 640 512"><path d="M0 241.1C0 161 65 96 145.1 96c38.5 0 75.4 15.3 102.6 42.5L320 210.7l72.2-72.2C419.5 111.3 456.4 96 494.9 96C575 96 640 161 640 241.1v29.7C640 351 575 416 494.9 416c-38.5 0-75.4-15.3-102.6-42.5L320 301.3l-72.2 72.2C220.5 400.7 183.6 416 145.1 416C65 416 0 351 0 270.9V241.1zM274.7 256l-72.2-72.2c-15.2-15.2-35.9-23.8-57.4-23.8C100.3 160 64 196.3 64 241.1v29.7c0 44.8 36.3 81.1 81.1 81.1c21.5 0 42.2-8.5 57.4-23.8L274.7 256zm90.5 0l72.2 72.2c15.2 15.2 35.9 23.8 57.4 23.8c44.8 0 81.1-36.3 81.1-81.1V241.1c0-44.8-36.3-81.1-81.1-81.1c-21.5 0-42.2 8.5-57.4 23.8L365.3 256z"/></svg></span>
+            </span>
+            <span class="avatar a3">
+              <span class="avatar-inner"><svg viewBox="0 0 640 512"><path d="M0 336c0 79.5 64.5 144 144 144H512c70.7 0 128-57.3 128-128c0-61.9-44-113.6-102.4-125.4c4.1-10.7 6.4-22.4 6.4-34.6c0-53-43-96-96-96c-19.7 0-38.1 6-53.3 16.2C367 64.2 315.3 32 256 32C167.6 32 96 103.6 96 192c0 2.7 .1 5.4 .2 8.1C40.2 219.8 0 273.2 0 336z"/></svg></span>
+            </span>
+          </span>
+          <p class="trust-pill">Free. Unlimited space. No card needed</p>
+        </div>
+
+        <h1 class="headline anim">
+          <span class="hl-1">Only you can</span>
+          <span class="hl-2">open your files.</span>
+        </h1>
+
+        <p class="subhead anim" style="--d: 0.28s">
+          We lock each file on your device before it uploads. The copies we keep
+          are unreadable, even to us.
+        </p>
+
+        <span class="cta-wrap anim" style="--d: 0.4s"><a class="cta" href="/auth">Get started</a></span>
+      </main>
+
+      <!-- 3. Stats footer -->
+      <footer class="stats">
+        <div class="stat anim" style="--d: 0.5s">
+          <span class="stat-icon" aria-hidden="true">&lt;</span>
+          <span class="stat-value">unlimited</span>
+          <span class="stat-label">space</span>
+        </div>
+        <div class="stat anim" style="--d: 0.58s">
+          <span class="stat-icon" aria-hidden="true">%</span>
+          <span class="stat-value">none</span>
+          <span class="stat-label">file size limit</span>
+        </div>
+        <div class="stat anim" style="--d: 0.66s">
+          <span class="stat-icon" aria-hidden="true">*</span>
+          <span class="stat-value" data-count="0" data-decimals="0">0</span>
+          <span class="stat-label">your files we can read</span>
+        </div>
+        <div class="stat anim" style="--d: 0.74s">
+          <span class="stat-icon" aria-hidden="true">#</span>
+          <span class="stat-value">never sent</span>
+          <span class="stat-label">your password</span>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Mobile burger (sits above the overlay) -->
+    <button
+      class="burger"
+      type="button"
+      aria-label="Open menu"
+      aria-expanded="false"
+      aria-controls="mobile-menu"
+    >
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <div class="overlay" hidden></div>
+
+    <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile" hidden>
+      <a class="m-link" href="#seal">Seal it</a>
+      <a class="m-link" href="#how">How it works</a>
+      <a class="m-link" href="#capabilities">Capabilities</a>
+      <a class="m-link" href="#cli">CLI</a>
+      <a class="m-link" href="#pricing">Pricing</a>
+      <a class="m-signin" href="/auth">Sign in</a>
+    </nav>
+
+    <script src="main.js" defer></script>
+  </body>
+</html>

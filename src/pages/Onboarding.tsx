@@ -1,10 +1,36 @@
-
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, HardDrive, Shield, Lock, FolderOpen } from '@/lib/icon-map';
+import { HardDrive, Shield, Lock, FolderOpen } from '@/lib/icon-map';
 import MigrationWizard from '@/components/MigrationWizard';
+import {
+  AppShell, TopBar, Wrap, PageHead, Panel, Pill, Spinner, btn, useDocTitle,
+} from '@/components/custom/squid-app';
+
+/* ═══════════════════════════════════════════════════════════════
+   ONBOARDING — first run only
+   Two honest states, nothing decorative: no vault yet → create or
+   import; vault exists → continue. Logic is unchanged.
+   Place at: src/pages/Onboarding.tsx
+   ═══════════════════════════════════════════════════════════════ */
+
+const ONB_CSS = `
+.ob-steps { display: grid; gap: 0; }
+.ob-step { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 14px 16px; }
+.ob-step + .ob-step { border-top: 1px solid var(--sa-line); }
+.ob-step .n { font: 400 11px/1.9 var(--sa-mono); letter-spacing: 0.1em; color: var(--sa-mute); }
+.ob-step p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--sa-text-2); }
+.ob-act { display: flex; gap: 8px; flex-wrap: wrap; padding: 16px; border-top: 1px solid var(--sa-line); }
+.ob-act .sa-btn { flex: 1 1 200px; }
+.ob-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; border: 1px solid var(--sa-line); border-radius: 5px; background: var(--sa-bg-2); overflow: hidden; }
+.ob-fact { padding: 18px 16px; }
+.ob-fact + .ob-fact { border-left: 1px solid var(--sa-line); }
+.ob-fact svg { color: var(--sa-mute); margin-bottom: 14px; }
+.ob-fact h3 { margin: 0; font: 500 13px/1.3 var(--sa-f); }
+.ob-fact p { margin: 5px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--sa-mute); }
+@media (max-width: 720px) { .ob-facts { grid-template-columns: 1fr; } .ob-fact + .ob-fact { border-left: 0; border-top: 1px solid var(--sa-line); } }
+.ob-center { display: grid; place-items: center; min-height: calc(100vh / var(--sa-zoom, 1) - 48px); }
+`;
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -87,115 +113,118 @@ const Onboarding = () => {
     window.location.reload();
   };
 
+  useDocTitle(showMigration ? 'Import files' : 'Welcome');
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <AppShell>
+        <style>{ONB_CSS}</style>
+        <TopBar home="/" crumbs={[{ label: 'Setup' }]} />
+        <div className="ob-center">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--sa-mute)', fontSize: 13 }}>
+            <Spinner size={16} /> Checking your account…
+          </div>
+        </div>
+      </AppShell>
     );
   }
 
   if (showMigration) {
     return (
-      <div className="container mx-auto max-w-4xl p-4">
-        <MigrationWizard 
-          onComplete={handleMigrationComplete}
-          onCancel={() => setShowMigration(false)}
-        />
-      </div>
+      <AppShell>
+        <style>{ONB_CSS}</style>
+        <TopBar home="/" crumbs={[{ label: 'Setup', to: '/onboarding' }, { label: 'Import files' }]} />
+        <Wrap>
+          <MigrationWizard
+            onComplete={handleMigrationComplete}
+            onCancel={() => setShowMigration(false)}
+          />
+        </Wrap>
+      </AppShell>
     );
   }
 
   return (
-    <div className="container mx-auto max-w-2xl p-4">
-      <h1 className="text-2xl font-bold mb-4">Welcome to SquidCloud</h1>
-      
-      <div className="space-y-6">
+    <AppShell>
+      <style>{ONB_CSS}</style>
+      <TopBar home="/" crumbs={[{ label: 'Setup' }]}>
+        <Link to="/help/docs" className={btn('ghost', 'sm')}>Docs</Link>
+      </TopBar>
+
+      <Wrap width="narrow">
+        <PageHead
+          eyebrow={repoCount === 0 ? 'Step 1 of 2' : 'Step 2 of 2'}
+          title="Welcome to SquidCloud"
+          desc={
+            repoCount === 0
+              ? "A vault is where your files live. Create one now, or bring your existing files in."
+              : "Your vault is ready. Head to the dashboard whenever you are."
+          }
+        />
+
         {repoCount === 0 ? (
           <>
-            <div className="bg-card p-4 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-2">Create Your Storage Vault</h2>
-              <p className="text-muted-foreground mb-4">
-                To get started with SquidCloud, you'll need to:
-              </p>
-              <ul className="list-disc pl-5 space-y-2 mb-4">
-                <li>Create a secure storage vault (max 2 vaults per user)</li>
-                <li>Your files will be protected with end-to-end encryption</li>
-                <li>Access dashboard features after vault creation</li>
-              </ul>
-              
-              <div className="flex gap-3">
-                <Button 
-                  onClick={handleCreateVault}
-                  className="flex-1"
-                  size="lg"
-                >
-                  <HardDrive className="mr-2 h-5 w-5" />
-                  Create Storage Vault
-                </Button>
-                
-                <Button 
-                  onClick={() => setShowMigration(true)}
-                  variant="outline"
-                  className="flex-1"
-                  size="lg"
-                >
-                  <FolderOpen className="mr-2 h-5 w-5" />
-                  Import Files
-                </Button>
+            <Panel
+              title="Create your storage vault"
+              desc="To get started with SquidCloud, you'll need to:"
+              actions={<Pill>Required</Pill>}
+              flush
+            >
+              <div className="ob-steps">
+                <div className="ob-step"><span className="n">01</span><p>Create a secure storage vault (max 2 vaults per user)</p></div>
+                <div className="ob-step"><span className="n">02</span><p>Your files will be protected with end-to-end encryption</p></div>
+                <div className="ob-step"><span className="n">03</span><p>Access dashboard features after vault creation</p></div>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg flex flex-col items-center text-center">
-                <Shield className="h-8 w-8 text-blue-500 mb-2" />
-                <h3 className="font-medium">End-to-End Encryption</h3>
-                <p className="text-sm text-muted-foreground">All files are securely encrypted</p>
+              <div className="ob-act">
+                <button type="button" className={btn('primary', 'lg')} onClick={handleCreateVault} autoFocus>
+                  <HardDrive className="h-4 w-4" />
+                  Create storage vault
+                </button>
+                <button type="button" className={btn('default', 'lg')} onClick={() => setShowMigration(true)}>
+                  <FolderOpen className="h-4 w-4" />
+                  Import files
+                </button>
               </div>
-              
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg flex flex-col items-center text-center">
-                <Lock className="h-8 w-8 text-green-500 mb-2" />
-                <h3 className="font-medium">Private Storage</h3>
-                <p className="text-sm text-muted-foreground">Only you can access your files</p>
+            </Panel>
+
+            <div className="ob-facts">
+              <div className="ob-fact">
+                <Shield className="h-5 w-5" />
+                <h3>End-to-End Encryption</h3>
+                <p>All files are securely encrypted</p>
               </div>
-              
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg flex flex-col items-center text-center">
-                <HardDrive className="h-8 w-8 text-purple-500 mb-2" />
-                <h3 className="font-medium">Multiple Vaults</h3>
-                <p className="text-sm text-muted-foreground">Create up to 2 secure vaults</p>
+              <div className="ob-fact">
+                <Lock className="h-5 w-5" />
+                <h3>Private Storage</h3>
+                <p>Only you can access your files</p>
+              </div>
+              <div className="ob-fact">
+                <HardDrive className="h-5 w-5" />
+                <h3>Multiple Vaults</h3>
+                <p>Create up to 2 secure vaults</p>
               </div>
             </div>
           </>
         ) : (
-          <div className="bg-card p-6 rounded-lg shadow text-center">
-            <h2 className="text-xl font-semibold mb-4">All Set! Let's Get Started</h2>
-            <p className="text-muted-foreground mb-6">
-              You've already created {repoCount} storage vault{repoCount > 1 ? 's' : ''}. You're ready to use SquidCloud!
-            </p>
-            
-            <div className="flex gap-3">
-              <Button 
-                onClick={completeOnboarding}
-                className="flex-1"
-                size="lg"
-              >
-                Continue to Dashboard
-              </Button>
-              
-              <Button 
-                onClick={() => setShowMigration(true)}
-                variant="outline"
-                className="flex-1"
-                size="lg"
-              >
-                <FolderOpen className="mr-2 h-5 w-5" />
-                Import Files
-              </Button>
+          <Panel
+            title="All set! Let's get started"
+            desc={`You've already created ${repoCount} storage vault${repoCount > 1 ? 's' : ''}. You're ready to use SquidCloud!`}
+            actions={<Pill tone="ok">Vault ready</Pill>}
+            flush
+          >
+            <div className="ob-act" style={{ borderTop: 0 }}>
+              <button type="button" className={btn('primary', 'lg')} onClick={completeOnboarding} autoFocus>
+                Continue to dashboard
+              </button>
+              <button type="button" className={btn('default', 'lg')} onClick={() => setShowMigration(true)}>
+                <FolderOpen className="h-4 w-4" />
+                Import files
+              </button>
             </div>
-          </div>
+          </Panel>
         )}
-      </div>
-    </div>
+      </Wrap>
+    </AppShell>
   );
 };
 

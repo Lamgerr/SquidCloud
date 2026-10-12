@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SquidCloud Auth Directions</title>
+<style>
+:root {
+  color-scheme: dark;
+  --ink: #f5f7f2;
+  --muted: #969b91;
+  --dim: #6e746a;
+  --lime: #c8f04b;
+  --lime-ink: #101300;
+  --line: rgba(255,255,255,.11);
+  --glass: rgba(19,21,18,.64);
+  --glass-strong: rgba(13,15,13,.82);
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #070807;
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.page { width: min(1680px, 100%); margin: 0 auto; padding: 44px 34px 70px; }
+.intro { display: flex; align-items: end; justify-content: space-between; gap: 30px; margin-bottom: 30px; }
+.eyebrow { color: var(--lime); font-size: 12px; font-weight: 650; letter-spacing: .13em; text-transform: uppercase; }
+h1 { margin: 10px 0 0; font-size: clamp(32px, 4vw, 58px); line-height: .98; letter-spacing: -.045em; font-weight: 680; max-width: 850px; }
+.intro p { color: var(--muted); line-height: 1.55; max-width: 470px; margin: 0; font-size: 15px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.option { border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.025); overflow: hidden; cursor: pointer; transition: border-color .22s ease, transform .35s var(--ease), background .22s ease; }
+.option:hover { transform: translateY(-4px); border-color: rgba(200,240,75,.3); background: rgba(255,255,255,.04); }
+.option.selected { border-color: rgba(200,240,75,.72); box-shadow: 0 0 0 1px rgba(200,240,75,.15), 0 22px 70px rgba(0,0,0,.32); }
+.option-head { padding: 17px 18px 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+.option-head h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: -.015em; }
+.option-head p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.badge { flex: 0 0 auto; border: 1px solid rgba(200,240,75,.28); background: rgba(200,240,75,.1); color: var(--lime); border-radius: 999px; padding: 5px 8px; font-size: 9px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.preview { position: relative; aspect-ratio: 1.14; min-height: 510px; overflow: hidden; background: #080908; }
+.preview::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,.025), transparent 35%, rgba(0,0,0,.25)); pointer-events: none; z-index: 5; }
+.scene { position: absolute; inset: 0; overflow: hidden; }
+.scene::before, .scene::after { content: ""; position: absolute; border-radius: 50%; filter: blur(70px); opacity: .15; }
+.scene::before { width: 260px; height: 260px; left: -80px; top: 40px; background: #8ea53d; }
+.scene::after { width: 240px; height: 240px; right: -80px; bottom: 20px; background: #52665a; }
+.scene-lines { position: absolute; inset: 0; opacity: .42; }
+.scene-lines i { position: absolute; display: block; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent); }
+.scene-lines i:nth-child(1) { top: 20%; left: 8%; width: 84%; }
+.scene-lines i:nth-child(2) { top: 48%; left: -5%; width: 110%; }
+.scene-lines i:nth-child(3) { top: 76%; left: 15%; width: 75%; }
+.scene-panel { position: absolute; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.025); border-radius: 14px; backdrop-filter: blur(14px); }
+.scene-panel.one { width: 120px; height: 76px; left: 8%; top: 13%; transform: rotate(-4deg); }
+.scene-panel.two { width: 148px; height: 88px; right: 5%; top: 24%; transform: rotate(5deg); }
+.scene-panel.three { width: 180px; height: 92px; left: 18%; bottom: 10%; transform: rotate(2deg); }
+.scene-panel::after { content: ""; position: absolute; left: 14px; right: 14px; top: 17px; height: 5px; border-radius: 4px; background: rgba(255,255,255,.11); box-shadow: 0 14px 0 rgba(255,255,255,.06), 0 28px 0 rgba(255,255,255,.04); }
+.topbar { position: absolute; z-index: 6; left: 0; right: 0; top: 0; height: 50px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.075); background: rgba(8,9,8,.42); backdrop-filter: blur(24px) saturate(120%); }
+.brand { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 650; letter-spacing: -.01em; }
+.mark { width: 23px; height: 23px; border-radius: 8px; display: grid; place-items: center; color: var(--lime-ink); background: var(--lime); box-shadow: inset 0 0 0 1px rgba(255,255,255,.32); }
+.mark svg { width: 14px; height: 14px; }
+.top-actions { display: flex; align-items: center; gap: 7px; color: #8a9085; font-size: 9px; }
+.top-actions span { padding: 5px 7px; border: 1px solid rgba(255,255,255,.08); border-radius: 999px; background: rgba(255,255,255,.035); }
+.center-stage { position: absolute; inset: 50px 0 0; z-index: 3; display: grid; place-items: center; padding: 28px 20px; }
+.glass-card { width: min(350px, 90%); border: 1px solid rgba(255,255,255,.13); border-radius: 24px; background: var(--glass); box-shadow: 0 28px 80px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(32px) saturate(135%); padding: 24px; animation: rise .7s var(--ease) both; }
+.card-title { font-size: 25px; font-weight: 650; letter-spacing: -.035em; line-height: 1.1; }
+.card-sub { color: var(--muted); font-size: 11px; line-height: 1.45; margin-top: 6px; }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.075); border-radius: 11px; margin: 18px 0 16px; }
+.segmented span { text-align: center; font-size: 10px; color: var(--muted); padding: 7px 4px; border-radius: 8px; }
+.segmented .active { color: var(--ink); background: rgba(255,255,255,.1); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+.field-stack { display: grid; gap: 9px; }
+.field { height: 42px; border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.22); border-radius: 12px; display: flex; align-items: center; gap: 9px; padding: 0 12px; color: #7f857a; font-size: 10px; }
+.field svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.field .filler { height: 1px; width: 58%; background: rgba(255,255,255,.1); }
+.primary { height: 43px; border: 0; border-radius: 12px; background: var(--lime); color: var(--lime-ink); font-size: 11px; font-weight: 750; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 12px; box-shadow: 0 8px 24px rgba(200,240,75,.12); }
+.passkey { height: 42px; border: 1px solid rgba(255,255,255,.14); border-radius: 12px; background: rgba(255,255,255,.06); color: var(--ink); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.passkey svg { width: 15px; height: 15px; }
+.meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; margin-top: 10px; }
+.meta b { color: var(--lime); font-weight: 600; }
+.legal { text-align: center; color: #71766d; font-size: 8px; margin-top: 15px; line-height: 1.5; }
+.legal b { color: #adb2a8; font-weight: 500; }
+.split-stage { position: absolute; z-index: 3; inset: 50px 0 0; display: grid; grid-template-columns: 1.03fr .97fr; }
+.split-story { padding: 34px 24px; display: flex; flex-direction: column; justify-content: space-between; }
+.story-kicker { color: var(--muted); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+.story-title { font-size: 31px; line-height: 1.02; letter-spacing: -.045em; font-weight: 650; max-width: 260px; margin-top: 13px; }
+.story-copy { color: var(--muted); font-size: 10px; line-height: 1.55; max-width: 240px; margin-top: 12px; }
+.vault-status { border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.2); border-radius: 15px; padding: 12px; backdrop-filter: blur(16px); }
+.vault-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: var(--muted); }
+.vault-row + .vault-row { margin-top: 10px; }
+.vault-row b { color: #c5cac0; font-weight: 550; }
+.seal { display: inline-flex; align-items: center; gap: 5px; color: var(--lime); }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 10px rgba(200,240,75,.5); }
+.split-form { background: rgba(10,12,10,.48); border-left: 1px solid rgba(255,255,255,.09); backdrop-filter: blur(26px) saturate(120%); padding: 35px 28px; display: flex; flex-direction: column; justify-content: center; }
+.form-shell { width: 100%; max-width: 260px; margin: auto; animation: rise .7s .08s var(--ease) both; }
+.form-shell .card-title { font-size: 22px; }
+.oauth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.oauth { height: 38px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; display: grid; place-items: center; color: #d7dbd2; font-size: 9px; background: rgba(255,255,255,.035); }
+.separator { display: flex; align-items: center; gap: 8px; color: #656a62; font-size: 8px; margin: 13px 0; }
+.separator:before, .separator:after { content: ""; height: 1px; flex: 1; background: rgba(255,255,255,.08); }
+.sheet-stage { position: absolute; z-index: 3; inset: 50px 0 0; padding: 34px 22px 22px; display: flex; align-items: end; justify-content: center; }
+.native-sheet { width: 100%; border: 1px solid rgba(255,255,255,.14); border-radius: 25px 25px 17px 17px; background: rgba(18,20,17,.78); box-shadow: 0 -18px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.09); backdrop-filter: blur(36px) saturate(140%); padding: 12px 22px 18px; animation: sheet .75s var(--ease) both; }
+.handle { width: 34px; height: 4px; border-radius: 99px; background: rgba(255,255,255,.22); margin: 0 auto 17px; }
+.sheet-content { display: grid; grid-template-columns: .9fr 1.1fr; gap: 24px; align-items: end; }
+.sheet-intro .card-title { font-size: 26px; }
+.sheet-intro .card-sub { max-width: 150px; }
+.security-note { display: flex; gap: 9px; align-items: flex-start; margin-top: 22px; color: var(--muted); font-size: 8px; line-height: 1.45; }
+.security-note svg { width: 14px; height: 14px; color: var(--lime); flex: 0 0 auto; }
+.sheet-form .field { height: 39px; }
+.sheet-form .primary { height: 40px; }
+.footer-note { color: #6f756b; font-size: 8px; text-align: center; margin-top: 12px; }
+.preview-foot { padding: 15px 18px 18px; display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
+.preview-foot p { margin: 0; color: #858b80; font-size: 11px; line-height: 1.45; }
+.preview-foot strong { color: #c7ccc2; font-weight: 600; }
+.choose { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.045); color: #cdd1c9; border-radius: 10px; font: inherit; font-size: 10px; font-weight: 650; padding: 8px 10px; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes sheet { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: none; } }
+@media (max-width: 1180px) { .grid { grid-template-columns: 1fr; } .preview { min-height: 610px; aspect-ratio: 1.55; } }
+@media (max-width: 680px) {
+  .page { padding: 28px 14px 48px; }
+  .intro { align-items: start; flex-direction: column; }
+  .preview { min-height: 550px; aspect-ratio: auto; }
+  .split-stage { grid-template-columns: 1fr; }
+  .split-story { display: none; }
+  .split-form { border-left: 0; }
+  .sheet-content { grid-template-columns: 1fr; }
+  .security-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="intro">
+    <div>
+      <div class="eyebrow">SquidCloud · Auth Canvas</div>
+      <h1>Three dark-native ways in.</h1>
+    </div>
+    <p>All three keep form work primary, reserve transparency for controls and surfaces, and use motion only to explain arrival or state change. Click the direction that feels most native.</p>
+  </header>
+
+  <section class="grid">
+    <article class="option" data-choice="centered-glass" onclick="toggleSelect(this)">
+      <div class="option-head">
+        <div><h2>A · Centered Glass</h2><p>Focused, calm, universal. The safest foundation.</p></div>
+        <span class="badge">Recommended</span>
+      </div>
+      <div class="preview">
+        <div class="scene"><div class="scene-lines"><i></i><i></i><i></i></div><div class="scene-panel one"></div><div class="scene-panel two"></div><div class="scene-panel three"></div></div>
+        <div class="topbar"><div class="brand"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8c4 0 7 2 7 7 0-5 3-7 7-7"/></svg></span>SquidCloud</div><div class="top-actions"><span>Privacy</span><span>Help</span></div></div>
+        <div class="center-stage">
+          <div class="glass-card">
+            <div class="card-title">Welcome back.</div>
+            <div class="card-sub">Your private workspace is one step away.</div>
+            <div class="segmented"><span class="active">Sign in</span><span>Create account</span></div>
+            <button class="passkey"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 11a2 2 0 0 1 2 2c0 2-1 3-1 5M9 16c0-1.4-.6-2.1-1.5-2.8M7 11.5C7 8.5 9.2 6 12 6s5 2.5 5 5.5c0 1.2-.3 2.2-.8 3M5.5 14.5C5 13.8 4.6 13 4.5 12M12 20v.1"/></svg>Continue with passkey</button>
+            <div class="field-stack" style="margin-top:10px"><div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span class="filler"></span></div><div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span class="filler" style="width:42%"></span></div></div>
+            <div class="meta"><span>Keep me signed in</span><b>Forgot password?</b></div>
+            <div class="primary">Sign in <span>→</span></div>
+            <div class="legal">Protected by device-bound encryption. By continuing, you agree to our <b>Terms</b> and <b>Privacy Policy</b>.</div>
+          </div>
+        </div>
+      </div>
+      <div class="preview-foot"><p><strong>Best for:</strong> fastest universal implementation and the clearest conversion path.</p><button class="choose">Choose A</button></div>
+    </article>
+
+    <article class="option" data-choice="adaptive-split" onclick="toggleSelect(this)">
+      <div class="option-head">
+        <div><h2>B · Adaptive Split</h2><p>More product expression with a native workspace split.</p></div>
+        <span class="badge">Desktop rich</span>
+      </div>
+      <div class="preview">
+        <div class="scene"><div class="scene-lines"><i></i><i></i><i></i></div><div class="scene-panel one"></div><div class="scene-panel two"></div><div class="scene-panel three"></div></div>
+        <div class="topbar"><div class="brand"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8c4 0 7 2 7 7 0-5 3-7 7-7"/></svg></span>SquidCloud</div><div class="top-actions"><span>Secure</span><span>Support</span></div></div>
+        <div class="split-stage">
+          <div class="split-story">
+            <div><div class="story-kicker">Your private cloud</div><div class="story-title">Everything important. Nothing exposed.</div><div class="story-copy">Open a calm, encrypted workspace where files, shares, and tools stay one gesture away.</div></div>
+            <div class="vault-status"><div class="vault-row"><span>Vault state</span><b class="seal"><i class="dot"></i>Sealed</b></div><div class="vault-row"><span>Encryption</span><b>Before upload</b></div><div class="vault-row"><span>Session</span><b>TLS + device key</b></div></div>
+          </div>
+          <div class="split-form">
+            <div class="form-shell">
+              <div class="card-title">Sign in to SquidCloud</div><div class="card-sub">Use the identity you already trust.</div>
+              <button class="passkey" style="margin-top:17px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 11a2 2 0 0 1 2 2c0 2-1 3-1 5M9 16c0-1.4-.6-2.1-1.5-2.8M7 11.5C7 8.5 9.2 6 12 6s5 2.5 5 5.5c0 1.2-.3 2.2-.8 3M5.5 14.5C5 13.8 4.6 13 4.5 12M12 20v.1"/></svg>Use Face ID or Touch ID</button>
+              <div class="separator">or use your account</div>
+              <div class="field-stack"><div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span class="filler"></span></div><div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span class="filler" style="width:42%"></span></div></div>
+              <div class="meta"><span>Keep me signed in</span><b>Forgot password?</b></div>
+              <div class="primary">Continue securely</div>
+              <div class="oauth-row"><div class="oauth">GitHub</div><div class="oauth">Google</div></div>
+              <div class="legal">New to SquidCloud? <b>Create an account</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="preview-foot"><p><strong>Best for:</strong> premium product storytelling and richer desktop sessions.</p><button class="choose">Choose B</button></div>
+    </article>
+
+    <article class="option" data-choice="native-sheet" onclick="toggleSelect(this)">
+      <div class="option-head">
+        <div><h2>C · Native Sheet</h2><p>Content stays visible; authentication arrives as a layer.</p></div>
+        <span class="badge">Most fluid</span>
+      </div>
+      <div class="preview">
+        <div class="scene"><div class="scene-lines"><i></i><i></i><i></i></div><div class="scene-panel one"></div><div class="scene-panel two"></div><div class="scene-panel three"></div></div>
+        <div class="topbar"><div class="brand"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8c4 0 7 2 7 7 0-5 3-7 7-7"/></svg></span>SquidCloud</div><div class="top-actions"><span>Private by design</span></div></div>
+        <div class="sheet-stage">
+          <div class="native-sheet">
+            <div class="handle"></div>
+            <div class="sheet-content">
+              <div class="sheet-intro"><div class="card-title">Your cloud.<br>Your keys.</div><div class="card-sub">Authentication should feel like unlocking—not filling out a form.</div><div class="security-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 5 6v5c0 4.8 2.8 8.4 7 10 4.2-1.6 7-5.2 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg><span>Your private keys never reach SquidCloud. Files are sealed on your device before transfer.</span></div></div>
+              <div class="sheet-form">
+                <button class="passkey"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 11a2 2 0 0 1 2 2c0 2-1 3-1 5M9 16c0-1.4-.6-2.1-1.5-2.8M7 11.5C7 8.5 9.2 6 12 6s5 2.5 5 5.5c0 1.2-.3 2.2-.8 3M5.5 14.5C5 13.8 4.6 13 4.5 12M12 20v.1"/></svg>Unlock with passkey</button>
+                <div class="field-stack" style="margin-top:9px"><div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span class="filler"></span></div><div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span class="filler" style="width:42%"></span></div></div>
+                <div class="primary">Unlock workspace</div>
+                <div class="footer-note">Prefer a password? Continue below · New? <b style="color:#cbd0c6">Create account</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="preview-foot"><p><strong>Best for:</strong> continuity from onboarding, shares, and gated app actions.</p><button class="choose">Choose C</button></div>
+    </article>
+  </section>
+</main>
+</body>
+</html>

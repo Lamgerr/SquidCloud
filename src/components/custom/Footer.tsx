@@ -42,6 +42,7 @@ const footerLinks: { title: string; items: { label: string; href: string }[] }[]
   {
     title: 'Company',
     items: [
+      { label: 'Support', href: '/support' },
       { label: 'Terms of Service', href: '/terms' },
       { label: 'Privacy Policy', href: '/privacy' },
       { label: 'API Status', href: '/cc/api/status' },

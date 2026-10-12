@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SquidCloud Auth — Refined A and B</title>
+<style>
+:root {
+  color-scheme: dark;
+  --black: #000;
+  --canvas: #0b0b0c;
+  --surface: #1c1c1e;
+  --surface-raised: #2c2c2e;
+  --label: #f5f5f7;
+  --secondary: #a1a1a6;
+  --tertiary: #6e6e73;
+  --separator: rgba(255,255,255,.13);
+  --blue: #2997ff;
+  --lime: #c8f04b;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: #080808; color: var(--label); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+.page { max-width: 1540px; margin: 0 auto; padding: 42px 28px 64px; }
+.page-head { display: flex; justify-content: space-between; align-items: end; gap: 32px; margin-bottom: 28px; }
+.page-head h1 { margin: 0; font-size: clamp(32px, 4vw, 54px); line-height: 1; letter-spacing: -.042em; font-weight: 650; }
+.page-head p { margin: 0; max-width: 560px; color: var(--secondary); font-size: 14px; line-height: 1.55; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.direction { overflow: hidden; border: 1px solid var(--separator); border-radius: 18px; background: #0e0e0f; cursor: pointer; transition: transform .35s var(--ease), border-color .2s ease; }
+.direction:hover { transform: translateY(-3px); }
+.direction.selected { border-color: var(--blue); box-shadow: 0 0 0 1px rgba(41,151,255,.25); }
+.direction-head { min-height: 84px; padding: 17px 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--separator); }
+.direction-head h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: -.012em; }
+.direction-head p { margin: 0; font-size: 11px; line-height: 1.45; color: var(--secondary); }
+.tag { flex: 0 0 auto; border: 1px solid rgba(41,151,255,.35); color: var(--blue); border-radius: 99px; padding: 4px 7px; font-size: 9px; }
+.screen { height: 720px; position: relative; overflow: hidden; background: var(--black); }
+.global-nav { height: 48px; position: relative; z-index: 10; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.72); backdrop-filter: blur(24px) saturate(130%); padding: 0 22px; }
+.nav-inner { max-width: 960px; height: 100%; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+.nav-brand { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
+.mark { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; color: #101300; background: var(--lime); }
+.mark svg { width: 15px; height: 15px; }
+.nav-links { display: flex; align-items: center; gap: 18px; color: var(--secondary); font-size: 10px; }
+.auth-main { width: min(352px, calc(100% - 44px)); margin: 0 auto; padding: 74px 0 40px; animation: arrive .5s var(--ease) both; }
+.auth-title { margin: 0; text-align: center; font-size: 28px; line-height: 1.14; letter-spacing: -.032em; font-weight: 600; }
+.auth-subtitle { margin: 8px auto 32px; max-width: 300px; text-align: center; color: var(--secondary); font-size: 13px; line-height: 1.45; }
+.passkey-primary, .continue-primary { width: 100%; height: 46px; border: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 13px; font-weight: 600; transition: transform .12s ease, filter .16s ease; }
+.passkey-primary { background: var(--label); color: #000; }
+.continue-primary { background: var(--blue); color: #fff; }
+.passkey-primary:active, .continue-primary:active { transform: scale(.985); }
+.passkey-primary svg { width: 17px; height: 17px; }
+.separator { display: flex; align-items: center; gap: 11px; color: var(--tertiary); font-size: 10px; margin: 23px 0; }
+.separator:before, .separator:after { content: ""; height: 1px; flex: 1; background: var(--separator); }
+.field { display: block; margin-bottom: 17px; }
+.field > span { display: block; margin: 0 0 7px 2px; color: var(--secondary); font-size: 12px; }
+.input { height: 46px; display: flex; align-items: center; padding: 0 13px; border-radius: 12px; background: var(--surface); border: 1px solid transparent; color: var(--tertiary); font-size: 13px; transition: border-color .16s ease, background .16s ease; }
+.input.focused { border-color: var(--blue); background: #19191b; }
+.input .caret { width: 1px; height: 17px; background: var(--label); margin-left: -2px; }
+.form-meta { min-height: 20px; margin: -3px 2px 15px; display: flex; justify-content: space-between; align-items: center; color: var(--secondary); font-size: 11px; }
+.check { display: flex; align-items: center; gap: 7px; }
+.check i { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #636366; display: block; }
+.link { color: var(--blue); }
+.more-options { width: 100%; height: 44px; margin-top: 17px; padding: 0 2px; border: 0; background: transparent; color: var(--secondary); display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.more-options svg { width: 13px; height: 13px; }
+.account-note { text-align: center; color: var(--secondary); font-size: 12px; margin-top: 24px; }
+.legal { text-align: center; color: var(--tertiary); font-size: 9px; line-height: 1.5; margin-top: 28px; }
+.legal a { color: var(--secondary); text-decoration: none; }
+.app-surface { position: absolute; inset: 48px 0 0; background: #080909; }
+.app-rail { position: absolute; inset: 0 auto 0 0; width: 104px; border-right: 1px solid rgba(255,255,255,.1); padding: 20px 12px; }
+.app-rail .brand-mini { width: 34px; height: 34px; border-radius: 10px; margin: 0 auto 24px; background: var(--lime); display: grid; place-items: center; color: #101300; font-size: 11px; font-weight: 800; }
+.app-rail i { display: block; height: 30px; border-radius: 8px; margin-bottom: 9px; background: rgba(255,255,255,.07); }
+.app-rail i.active { background: rgba(255,255,255,.18); }
+.app-content { position: absolute; left: 104px; right: 0; top: 0; bottom: 0; padding: 34px 38px; opacity: .52; }
+.app-content .crumb { width: 160px; height: 8px; border-radius: 99px; background: rgba(255,255,255,.14); margin-bottom: 30px; }
+.file-layout { display: grid; grid-template-columns: 170px 1fr; gap: 22px; }
+.preview-block { height: 275px; border-radius: 14px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.08); }
+.detail-block { padding-top: 10px; }
+.detail-block b { display: block; font-size: 17px; margin-bottom: 12px; }
+.detail-block i { display: block; height: 8px; border-radius: 99px; background: rgba(255,255,255,.12); margin-bottom: 11px; }
+.detail-block i:nth-child(3) { width: 68%; }
+.detail-block i:nth-child(4) { width: 84%; }
+.detail-block i:nth-child(5) { width: 52%; }
+.app-surface::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.28); }
+.sheet { position: absolute; z-index: 6; left: 50%; bottom: 26px; transform: translateX(-50%); width: min(430px, calc(100% - 32px)); border-radius: 22px; padding: 12px 26px 24px; background: rgba(28,28,30,.84); border: 1px solid rgba(255,255,255,.15); box-shadow: 0 22px 70px rgba(0,0,0,.54); backdrop-filter: blur(36px) saturate(135%); animation: sheet-in .55s var(--ease) both; }
+.sheet-handle { width: 38px; height: 5px; border-radius: 99px; background: #48484a; margin: 0 auto 14px; }
+.sheet-close { position: absolute; left: 18px; top: 19px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgba(255,255,255,.11); color: var(--secondary); display: grid; place-items: center; }
+.sheet-close svg { width: 12px; height: 12px; }
+.sheet-copy { text-align: center; padding: 9px 20px 20px; }
+.sheet-copy h3 { margin: 0; font-size: 23px; line-height: 1.15; letter-spacing: -.027em; font-weight: 600; }
+.sheet-copy p { margin: 7px auto 0; max-width: 310px; color: var(--secondary); font-size: 12px; line-height: 1.45; }
+.recognized { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 10px 12px; border-radius: 13px; background: rgba(255,255,255,.07); margin-bottom: 14px; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #3a3a3c; color: #d1d1d6; font-size: 12px; }
+.recognized div:nth-child(2) { min-width: 0; flex: 1; }
+.recognized b { display: block; font-size: 13px; font-weight: 500; }
+.recognized small { display: block; margin-top: 2px; color: var(--secondary); font-size: 9px; }
+.recognized > span { color: var(--tertiary); font-size: 12px; }
+.sheet-primary { width: 100%; height: 46px; border: 0; border-radius: 12px; background: var(--blue); color: #fff; display: flex; justify-content: center; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; }
+.sheet-primary svg { width: 17px; height: 17px; }
+.sheet-links { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; font-size: 11px; }
+.sheet-legal { text-align: center; color: var(--tertiary); font-size: 8px; line-height: 1.5; margin-top: 19px; }
+.direction-foot { border-top: 1px solid var(--separator); padding: 15px 18px 18px; }
+.direction-foot strong { display: block; font-size: 11px; margin-bottom: 4px; }
+.direction-foot p { margin: 0; color: var(--secondary); font-size: 11px; line-height: 1.45; }
+@keyframes arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes sheet-in { from { opacity: 0; transform: translate(-50%, 26px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (max-width: 1080px) { .grid { grid-template-columns: 1fr; } .screen { height: 760px; } }
+@media (max-width: 620px) {
+  .page { padding: 28px 12px 48px; }
+  .page-head { flex-direction: column; align-items: start; }
+  .nav-links { display: none; }
+  .screen { height: 680px; }
+  .auth-main { padding-top: 50px; }
+  .file-layout { grid-template-columns: 1fr; }
+  .preview-block { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-head">
+    <h1>Quietly native.</h1>
+    <p>Refined around Apple’s actual authentication rules: delay or minimize effort, explain the value of signing in, prefer device authentication, reveal alternatives progressively, and keep one primary action per step.</p>
+  </header>
+  <section class="grid">
+    <article class="direction" data-choice="a-refined" onclick="toggleSelect(this)">
+      <div class="direction-head"><div><h2>A · Apple Account Web</h2><p>Passkey first, password second, other providers hidden until requested.</p></div><span class="tag">Recommended</span></div>
+      <div class="screen">
+        <div class="global-nav"><div class="nav-inner"><div class="nav-brand"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8c4 0 7 2 7 7 0-5 3-7 7-7"/></svg></span>SquidCloud</div><div class="nav-links"><span>Privacy</span><span>Support</span></div></div></div>
+        <div class="auth-main">
+          <h3 class="auth-title">Sign in to SquidCloud</h3>
+          <p class="auth-subtitle">Access your encrypted files and workspace.</p>
+          <button class="passkey-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 11V8a4 4 0 0 1 8 0v3M6 11h12v10H6z"/><path d="M12 15v2"/></svg>Continue with a passkey</button>
+          <div class="separator">or use your password</div>
+          <label class="field"><span>Email or phone</span><div class="input focused"><span style="color:#c7c7cc">name@example.com</span><i class="caret"></i></div></label>
+          <label class="field"><span>Password</span><div class="input"><span style="color:#6e6e73">Enter your password</span></div></label>
+          <div class="form-meta"><span class="check"><i></i>Keep me signed in</span><span class="link">Forgot password?</span></div>
+          <button class="continue-primary">Continue</button>
+          <button class="more-options"><span>Other sign-in options</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/></svg></button>
+          <div class="account-note">New to SquidCloud? <span class="link">Create an account</span></div>
+          <div class="legal">By continuing, you agree to SquidCloud’s <a>Terms</a> and acknowledge the <a>Privacy Policy</a>.</div>
+        </div>
+      </div>
+      <div class="direction-foot"><strong>Cleanest full-page foundation</strong><p>One field of focus, one blue action, and no competing social-auth hierarchy.</p></div>
+    </article>
+
+    <article class="direction" data-choice="b-refined" onclick="toggleSelect(this)">
+      <div class="direction-head"><div><h2>B · Native Access Sheet</h2><p>A contextual, one-step unlock for protected actions.</p></div><span class="tag">Most native</span></div>
+      <div class="screen">
+        <div class="global-nav"><div class="nav-inner"><div class="nav-brand"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8c4 0 7 2 7 7 0-5 3-7 7-7"/></svg></span>SquidCloud</div><div class="nav-links"><span>Search</span><span>Help</span></div></div></div>
+        <div class="app-surface">
+          <div class="app-rail"><div class="brand-mini">S</div><i class="active"></i><i></i><i></i><i></i><i></i></div>
+          <div class="app-content"><div class="crumb"></div><div class="file-layout"><div class="preview-block"></div><div class="detail-block"><b>Launch Plan.pdf</b><i></i><i></i><i></i><i></i></div></div></div>
+        </div>
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <button class="sheet-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+          <div class="sheet-copy"><h3>Sign in to share</h3><p>Create a secure link for “Launch Plan.pdf”.</p></div>
+          <div class="recognized"><div class="avatar">N</div><div><b>Naveen Singh</b><small>naveensingh9016</small></div><span>•••</span></div>
+          <button class="sheet-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 11V8a4 4 0 0 1 8 0v3M6 11h12v10H6z"/><path d="M12 15v2"/></svg>Continue with Face ID</button>
+          <div class="sheet-links"><span class="link">Use password instead</span><span class="link">Use another account</span></div>
+          <div class="sheet-legal">SquidCloud uses your identity only to authorize this action. File contents remain encrypted.</div>
+        </div>
+      </div>
+      <div class="direction-foot"><strong>Best for gated product actions</strong><p>Shares, uploads, billing, invitations, and protected files can reuse this exact access sheet.</p></div>
+    </article>
+  </section>
+</main>
+</body>
+</html>

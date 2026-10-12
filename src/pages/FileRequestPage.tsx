@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFileRequestBySlug, submitFileRequest, uploadFile } from '@/lib/api';
-import { Inbox, Upload, Check, AlertCircle, Loader2, Globe, Clock, FileText, HardDrive } from '@/lib/icon-map';
+import { Inbox, Upload, Check, AlertCircle, Loader2, Globe, Clock, FileText, HardDrive, X } from '@/lib/icon-map';
 import { formatBytes } from '@/lib/api';
 
 interface FileRequestData {
@@ -202,7 +202,7 @@ const FileRequestPage: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4 animate-fade-in-scale">
               <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
             <CardTitle>Files Submitted!</CardTitle>
@@ -234,7 +234,7 @@ const FileRequestPage: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8 space-y-6">
+      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8 space-y-6 animate-fade-in">
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">{request.title}</CardTitle>
@@ -284,7 +284,7 @@ const FileRequestPage: React.FC = () => {
             )}
 
             {/* Uploader info */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Your name (optional)</Label>
                 <Input
@@ -308,7 +308,7 @@ const FileRequestPage: React.FC = () => {
             <div className="space-y-2">
               <Label>Files</Label>
               <div
-                className={`border-2 border-dashed border-border/60 rounded-xl p-6 text-center transition-colors ${canUpload ? 'cursor-pointer hover:border-primary/50' : 'cursor-not-allowed opacity-70'}`}
+                className={`border-2 border-dashed border-border/60 rounded-xl p-6 text-center transition-all duration-150 ${canUpload ? 'cursor-pointer hover:border-primary/50 hover:bg-primary/[0.03] active:scale-[0.99]' : 'cursor-not-allowed opacity-70'}`}
                 onClick={handlePickFiles}
               >
                 <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
@@ -337,9 +337,10 @@ const FileRequestPage: React.FC = () => {
                       </div>
                       <button
                         onClick={() => removeFile(i)}
-                        className="text-muted-foreground hover:text-destructive transition-colors shrink-0 ml-2"
+                        aria-label={`Remove ${file.name}`}
+                        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-90 transition-all shrink-0 ml-2"
                       >
-                        ✕
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}

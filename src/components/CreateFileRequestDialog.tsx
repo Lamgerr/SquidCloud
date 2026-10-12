@@ -312,7 +312,7 @@ export const CreateFileRequestDialog: React.FC<CreateFileRequestDialogProps> = (
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Inbox className="w-5 h-5 text-green-500" />
+              <Inbox className="w-5 h-5 text-emerald-500" />
               File Request Created
             </DialogTitle>
             <DialogDescription>
@@ -320,11 +320,13 @@ export const CreateFileRequestDialog: React.FC<CreateFileRequestDialogProps> = (
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 p-4">
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/25 p-4">
               <Label className="text-sm font-medium">Public upload link</Label>
               <div className="mt-1 flex gap-2">
                 <Input value={result.url} readOnly className="font-mono text-sm" />
-                <Button onClick={copyLink} variant="outline" size="sm">Copy</Button>
+                <Button onClick={copyLink} variant="outline" size="sm" className="shrink-0 active:scale-95 transition-transform">
+                  {copied ? <Check className="w-4 h-4 text-emerald-500" /> : 'Copy'}
+                </Button>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">

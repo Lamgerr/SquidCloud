@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
-  Folder, MoreHorizontal, Trash2, Star, Palette, FolderOpen, Code2, Share2, AlertTriangle, Globe,
+  Folder, MoreHorizontal, Trash2, Star, Palette, FolderOpen, Code2, Share2, AlertTriangle, Globe, Check,
 } from '@/lib/icon-map';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -45,7 +45,7 @@ const MenuDropdown = ({ menuOpen, setMenuOpen, onOpen, onOpenInCbCode, onToggleB
   <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
     <DropdownMenuTrigger asChild>
       <button
-        className="flex items-center justify-center w-7 h-7 rounded-md text-[#8B949E] hover:bg-[#2D333B] transition-colors duration-160"
+        className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-160"
         aria-label="Folder actions"
       >
         <MoreHorizontal className="w-4 h-4" />
@@ -53,50 +53,50 @@ const MenuDropdown = ({ menuOpen, setMenuOpen, onOpen, onOpenInCbCode, onToggleB
     </DropdownMenuTrigger>
     <DropdownMenuContent
       align="end"
-      className="bg-[#1C2128] border border-[#2D333B] rounded-lg shadow-lg p-1 min-w-[160px] data-[side=bottom]:animate-in data-[side=bottom]:fade-in-0 data-[side=bottom]:slide-in-from-top-1"
+      className="bg-popover border border-border rounded-lg shadow-lg p-1 min-w-[160px] data-[side=bottom]:animate-in data-[side=bottom]:fade-in-0 data-[side=bottom]:slide-in-from-top-1"
       style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}
       onClick={e => e.stopPropagation()}
     >
-      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-[#E6EDF3] focus:bg-[#2D333B] focus:text-[#E6EDF3]" onClick={onOpen}>
-        <FolderOpen className="w-4 h-4 text-[#8B949E]" /> Open
+      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-foreground focus:bg-accent focus:text-accent-foreground" onClick={onOpen}>
+        <FolderOpen className="w-4 h-4 text-muted-foreground" /> Open
       </DropdownMenuItem>
       {onOpenInCbCode && (
-        <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-[#E6EDF3] focus:bg-[#2D333B] focus:text-[#E6EDF3]" onClick={onOpenInCbCode}>
-          <Code2 className="w-4 h-4 text-[#8B949E]" /> Open in cbCode
+        <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-foreground focus:bg-accent focus:text-accent-foreground" onClick={onOpenInCbCode}>
+          <Code2 className="w-4 h-4 text-muted-foreground" /> Open in cbCode
         </DropdownMenuItem>
       )}
-      <DropdownMenuSeparator className="bg-[#2D333B]" />
-      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-[#E6EDF3] focus:bg-[#2D333B] focus:text-[#E6EDF3]" onClick={onToggleBookmark}>
-        <Star className={cn('w-4 h-4 text-[#8B949E]', isBookmarked && 'fill-yellow-400 text-yellow-400')} />
+      <DropdownMenuSeparator className="bg-border" />
+      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-foreground focus:bg-accent focus:text-accent-foreground" onClick={onToggleBookmark}>
+        <Star className={cn('w-4 h-4 text-muted-foreground', isBookmarked && 'fill-yellow-400 text-yellow-400')} />
         {isBookmarked ? 'Unfavorite' : 'Favorite'}
       </DropdownMenuItem>
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger className="rounded-md gap-2 cursor-pointer text-sm text-[#E6EDF3] focus:bg-[#2D333B] focus:text-[#E6EDF3]">
-          <Palette className="w-4 h-4 text-[#8B949E]" /> Set color
+        <DropdownMenuSubTrigger className="rounded-md gap-2 cursor-pointer text-sm text-foreground focus:bg-accent focus:text-accent-foreground">
+          <Palette className="w-4 h-4 text-muted-foreground" /> Set color
         </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="bg-[#1C2128] border border-[#2D333B] rounded-lg p-1 shadow-lg">
+        <DropdownMenuSubContent className="bg-popover border border-border rounded-lg p-1 shadow-lg">
           {FOLDER_COLORS.map(c => (
-            <DropdownMenuItem key={c.name} className="rounded-md gap-2.5 cursor-pointer text-sm text-[#E6EDF3] focus:bg-[#2D333B]" onClick={() => onSetColor(c.value)}>
-              <div className={cn('w-3.5 h-3.5 rounded-full', !c.value && 'border border-dashed border-[#484F58]')} style={c.value ? { backgroundColor: c.value } : {}} />
-              {c.name}{color === c.value && <span className="ml-auto text-[#58A6FF] text-xs">✓</span>}
+            <DropdownMenuItem key={c.name} className="rounded-md gap-2.5 cursor-pointer text-sm text-foreground focus:bg-accent" onClick={() => onSetColor(c.value)}>
+              <div className={cn('w-3.5 h-3.5 rounded-full', !c.value && 'border border-dashed border-muted-foreground/50')} style={c.value ? { backgroundColor: c.value } : {}} />
+              {c.name}{color === c.value && <Check className="ml-auto w-3.5 h-3.5 text-primary" />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
-      <DropdownMenuSeparator className="bg-[#2D333B]" />
-      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-[#E6EDF3] focus:bg-[#2D333B] focus:text-[#E6EDF3]" onClick={() => { setMenuOpen(false); onPublish?.(); }}>
-        <Globe className="w-4 h-4 text-[#8B949E]" />
+      <DropdownMenuSeparator className="bg-border" />
+      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-foreground focus:bg-accent focus:text-accent-foreground" onClick={() => { setMenuOpen(false); onPublish?.(); }}>
+        <Globe className="w-4 h-4 text-muted-foreground" />
         {isPublished ? 'Manage Published Site' : 'Publish as Website'}
       </DropdownMenuItem>
-      <DropdownMenuSeparator className="bg-[#2D333B]" />
-      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-[#E6EDF3] focus:bg-[#2D333B] focus:text-[#E6EDF3]" onClick={() => { setMenuOpen(false); setShowEnhancedShareDialog(true); }}>
-        <Share2 className="w-4 h-4 text-[#8B949E]" /> Share
+      <DropdownMenuSeparator className="bg-border" />
+      <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-foreground focus:bg-accent focus:text-accent-foreground" onClick={() => { setMenuOpen(false); setShowEnhancedShareDialog(true); }}>
+        <Share2 className="w-4 h-4 text-muted-foreground" /> Share
       </DropdownMenuItem>
       {onDelete && (
         <>
-          <DropdownMenuSeparator className="bg-[#2D333B]" />
-          <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-[#F85149] focus:bg-[#F85149]/10 focus:text-[#F85149]" onClick={handleDeleteClick}>
-            <Trash2 className="w-4 h-4 text-[#F85149]" /> Delete
+          <DropdownMenuSeparator className="bg-border" />
+          <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-sm text-destructive focus:bg-destructive/10 focus:text-destructive" onClick={handleDeleteClick}>
+            <Trash2 className="w-4 h-4" /> Delete
           </DropdownMenuItem>
         </>
       )}
@@ -129,17 +129,17 @@ export const EnterpriseFolderCard: React.FC<FolderCardProps> = ({
     return (
       <>
         <div
-          className="flex items-center gap-3 px-4 py-3 rounded-[10px] cursor-pointer bg-[#161B22] border border-[#2D333B] transition-all duration-160 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-[#1C2128] hover:border-[#444C56] hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)] hover:-translate-y-px active:bg-[#222930] active:translate-y-0 active:shadow-none active:duration-80"
+          className="group flex items-center gap-3 px-4 py-3 rounded-[10px] cursor-pointer bg-card border border-border/60 transition-all duration-160 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-accent/50 hover:border-border hover:shadow-lg hover:-translate-y-px active:bg-accent active:translate-y-0 active:shadow-none active:duration-80"
           onClick={onOpen}
           onContextMenu={handleContextMenu}
         >
-          <div className="w-9 h-9 rounded-[8px] bg-[#2D333B] border border-[#373E47] flex items-center justify-center shrink-0">
-            <Folder className="w-[18px] h-[18px] text-[#8B949E]" />
+          <div className="w-9 h-9 rounded-[8px] bg-muted/60 border border-border flex items-center justify-center shrink-0">
+            <Folder className="w-[18px] h-[18px] text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-[#E6EDF3] truncate" title={folder.name}>{folder.name}</p>
+            <p className="text-sm font-medium text-foreground truncate" title={folder.name}>{folder.name}</p>
           </div>
-          <span className="text-[12px] text-[#768390] whitespace-nowrap">{formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}</span>
+          <span className="text-[12px] text-muted-foreground whitespace-nowrap">{formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}</span>
           {isBookmarked && <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 shrink-0" />}
           <div className="shrink-0 opacity-0 group-hover:opacity-100" onClick={e => e.stopPropagation()}>
             <MenuDropdown {...sharedMenuProps} />
@@ -177,7 +177,7 @@ export const EnterpriseFolderCard: React.FC<FolderCardProps> = ({
   return (
     <>
       <div
-        className="relative rounded-[10px] cursor-pointer bg-[#161B22] border border-[#2D333B] transition-all duration-160 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-[#1C2128] hover:border-[#444C56] hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)] hover:-translate-y-px active:bg-[#222930] active:translate-y-0 active:shadow-none active:duration-80"
+        className="group relative rounded-[10px] cursor-pointer bg-card border border-border/60 transition-all duration-160 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-accent/50 hover:border-border hover:shadow-lg hover:-translate-y-px active:bg-accent active:translate-y-0 active:shadow-none active:duration-80"
         onClick={onOpen}
         onContextMenu={handleContextMenu}
       >
@@ -188,12 +188,12 @@ export const EnterpriseFolderCard: React.FC<FolderCardProps> = ({
         )}
         <div className="p-[14px_16px]">
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-[10px] bg-[#2D333B] border border-[#373E47] flex items-center justify-center shrink-0">
-              <Folder className="w-[22px] h-[22px] text-[#8B949E]" />
+            <div className="w-12 h-12 rounded-[10px] bg-muted/60 border border-border flex items-center justify-center shrink-0">
+              <Folder className="w-[22px] h-[22px] text-muted-foreground" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-[#E6EDF3] leading-snug line-clamp-2" title={folder.name}>{folder.name}</p>
-              <p className="text-[12px] text-[#768390] mt-[3px]">{formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}</p>
+              <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2" title={folder.name}>{folder.name}</p>
+              <p className="text-[12px] text-muted-foreground mt-[3px]">{formatDistanceToNow(new Date(folder.created_at), { addSuffix: true })}</p>
             </div>
             <div className="shrink-0 opacity-0 group-hover:opacity-100 absolute top-2 right-2" onClick={e => e.stopPropagation()}>
               <MenuDropdown {...sharedMenuProps} />

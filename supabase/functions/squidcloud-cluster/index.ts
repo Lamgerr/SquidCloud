@@ -53,6 +53,26 @@ function getEndpointForProvider(providerType: string, customEndpoint?: string): 
   }
 }
 
+// Sanity-check a bucket before it's used for signing. A dead key, a bucket
+// name/region mismatch, or a broken endpoint 403s on every upload — so it
+// must be skipped instead of rotated into.
+async function isClusterHealthy(cluster: B2Cluster): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${cluster.endpoint.replace(/\/$/, '')}/${cluster.bucket}`, {
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    clearTimeout(t);
+    // 200 = bucket exists and is reachable. 403 can also mean "reachable,
+    // wrong credentials" — those are auth errors, not dead-bucket errors.
+    return res.ok || res.status === 403;
+  } catch {
+    return false; // DNS/timeout/TLS failure — definitely dead
+  }
+}
+
 async function loadAllBuckets(
   supabase: any,
   userId?: string
@@ -66,16 +86,30 @@ async function loadAllBuckets(
   const envAppKey = Deno.env.get("B2_SECRET_ACCESS_KEY");
   if (envKeyId && envAppKey) {
     const bucketName = Deno.env.get("B2_BUCKET_NAME");
+    const envEndpoint = Deno.env.get("B2_ENDPOINT")!;
+    // Region must match the endpoint's region or S3 signatures 403. Derive
+    // it from the endpoint hostname (s3.<region>.backblazeb2.com) instead of
+    // trusting a stale env default.
+    const endpointRegion = (() => {
+      try {
+        const host = new URL(envEndpoint).hostname;
+        const m = host.match(/^s3\.([^.]+)\./);
+        return m ? m[1] : null;
+      } catch {
+        return null;
+      }
+    })();
+    const envRegion = Deno.env.get("B2_REGION") || endpointRegion || "us-east-005";
     if (bucketName && !seen.has(bucketName)) {
       clusters.push({
         id: "env_main",
         client: new AwsClient({
           accessKeyId: envKeyId,
           secretAccessKey: envAppKey,
-          region: Deno.env.get("B2_REGION") ?? "us-west-000",
+          region: envRegion,
           service: "s3",
         }),
-        endpoint: Deno.env.get("B2_ENDPOINT")!,
+        endpoint: envEndpoint,
         bucket: bucketName,
         displayName: bucketName,
         kind: "env",
@@ -371,7 +405,17 @@ serve(async (req) => {
         ? clusters.find(c => c.bucket === preferBucket)
         : undefined;
       if (!preferred) {
-        clusters = clusters.filter(c => c.limitBytes == null || (c.usedBytes ?? 0) + fileSize <= c.limitBytes);
+        const healthy: B2Cluster[] = [];
+        for (const c of clusters) {
+          if (c.limitBytes == null || (c.usedBytes ?? 0) + fileSize <= c.limitBytes) {
+            healthy.push(c);
+          }
+        }
+        if (healthy.length > 0) {
+          const probes = await Promise.all(healthy.map(isClusterHealthy));
+          const live = healthy.filter((_, i) => probes[i]);
+          if (live.length > 0) clusters = live;
+        }
       }
       if (!preferred && clusters.length === 0) {
         return createErrorResponse("No storage buckets available (none configured or all at capacity)", 503);

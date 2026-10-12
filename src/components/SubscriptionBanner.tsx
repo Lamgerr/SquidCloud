@@ -20,10 +20,10 @@ const SubscriptionBanner: React.FC<SubscriptionBannerProps> = ({ notification, o
 
   return (
     <div className={cn(
-      'relative flex items-center gap-3 px-4 py-2.5 border-l-4 border-l-blue-500',
-      'bg-blue-500/5 border-b border-blue-500/10 text-sm',
+      'relative flex items-center gap-3 px-4 py-2.5 border-l-4 border-l-primary',
+      'bg-primary/[0.04] border-b border-primary/10 text-sm',
     )}>
-      <Bell className="h-4 w-4 text-blue-400 flex-shrink-0" />
+      <Bell className="h-4 w-4 text-primary flex-shrink-0" />
       <p className="flex-1 text-foreground/80 text-xs md:text-sm">
         Your <strong className="text-foreground">{planName}</strong> {billing_period} plan{' '}
         {stage <= 3 ? `expires in ${daysLeft} day${stage === 3 ? '' : 's'}` : 'has ended'}
@@ -31,7 +31,7 @@ const SubscriptionBanner: React.FC<SubscriptionBannerProps> = ({ notification, o
       <div className="flex items-center gap-2 flex-shrink-0">
         <Button
           size="sm"
-          className="h-7 text-xs rounded-lg px-3 bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border-0"
+          className="h-7 text-xs rounded-lg px-3 bg-primary/15 text-primary hover:bg-primary/25 border-0"
           onClick={() => navigate('/checkout?plan=' + plan_type + '&billing=' + billing_period)}
         >
           <Crown className="h-3 w-3 mr-1" /> Renew now

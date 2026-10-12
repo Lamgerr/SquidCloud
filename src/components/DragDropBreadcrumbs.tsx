@@ -191,7 +191,7 @@ export const DragDropBreadcrumbs: React.FC<DragDropBreadcrumbsProps> = ({
                         ) : (
                           <Folder className={cn(
                             "w-3.5 h-3.5",
-                            isLast ? "text-primary" : "text-blue-400"
+                            isLast ? "text-primary" : "text-muted-foreground"
                           )} />
                         )}
                         

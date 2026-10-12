@@ -4,6 +4,7 @@ import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
 import { swkCheckUploadBan, swkVerifyToken } from '../_shared/swk-verify.ts';
+import { readJsonLimited, isBodyTooLarge } from '../_shared/body-limit.ts';
 
 const MAX_PROXY_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -47,7 +48,14 @@ serve(async (req) => {
   }
   return withPrelGateway(req, { functionId: 'api-file-upload-tebi', operation: 'default' }, async (ctx: PrelContext) => {
     try {
-      const { action, fileName, fileType, path, fileBase64, providerId, swkToken, swkManifestHash, totalSize } = await req.json();
+      let action: string, fileName: string, fileType: string, path: string, fileBase64: string, providerId: string, swkToken: string, swkManifestHash: string, totalSize: number;
+      try {
+        const parsed = await readJsonLimited(req, 32 * 1024 * 1024);
+        ({ action, fileName, fileType, path, fileBase64, providerId, swkToken, swkManifestHash, totalSize } = parsed);
+      } catch (parseErr) {
+        if (isBodyTooLarge(parseErr)) return jsonResponse({ success: false, error: "Request body too large" }, 413);
+        return jsonResponse({ success: false, error: "Invalid JSON body" }, 400);
+      }
       if (!providerId) {
         return jsonResponse({ success: false, error: "Provider ID is required" }, 400);
       }

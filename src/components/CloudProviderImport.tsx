@@ -175,7 +175,7 @@ export default function CloudProviderImport({ onConnect }: CloudProviderImportPr
                   </div>
                   <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#4A90D9] to-[#7B4FC9] transition-all duration-500"
+                      className="h-full rounded-full bg-primary transition-all duration-500"
                       style={{ width: `${Math.min(100, (provider.storage.used / provider.storage.total) * 100)}%` }}
                     />
                   </div>

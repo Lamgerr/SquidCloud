@@ -247,20 +247,20 @@ const SquidVaultCard: React.FC<SquidVaultCardProps> = ({ onUnlock }) => {
   return (
     <>
       <Card 
-        className="group relative overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20 hover:border-purple-500/40"
+        className="group relative overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-500 bg-primary/[0.06] border-primary/20 hover:border-primary/40"
         onClick={handleClick}
       >
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-xl group-hover:blur-2xl transition-all" />
-                <div className="relative w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                  <Lock className="w-8 h-8 text-white" />
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:blur-2xl transition-all" />
+                <div className="relative w-16 h-16 bg-primary/15 rounded-full flex items-center justify-center">
+                  <Lock className="w-8 h-8 text-primary" />
                 </div>
               </div>
               <div>
-                <h3 className="text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+                <h3 className="text-xl font-bold text-primary">
                   SquidVault
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -308,7 +308,7 @@ const SquidVaultCard: React.FC<SquidVaultCardProps> = ({ onUnlock }) => {
                     type="button"
                     onClick={() => handlePasskeyLogin(vaultName)}
                     disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
                     size="lg"
                   >
                     {isLoading ? (

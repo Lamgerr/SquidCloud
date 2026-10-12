@@ -139,16 +139,16 @@ export const SquidAIChat: React.FC<SquidAIChatProps> = ({
   };
 
   return (
-    <Card className="flex flex-col h-[500px] bg-slate-900/40 border-slate-800/30">
+    <Card className="flex flex-col h-[500px] bg-card/80 border-border/50">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-800/30">
+      <div className="flex items-center justify-between p-4 border-b border-border/50">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <div>
             <h3 className="font-semibold text-white">Squid AI</h3>
-            <p className="text-xs text-slate-400">Your intelligent assistant</p>
+            <p className="text-xs text-muted-foreground">Your intelligent assistant</p>
           </div>
         </div>
         {onClose && (
@@ -161,8 +161,8 @@ export const SquidAIChat: React.FC<SquidAIChatProps> = ({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
-          <div className="text-center text-slate-400 mt-8">
-            <Sparkles className="w-12 h-12 mx-auto mb-4 text-blue-500" />
+          <div className="text-center text-muted-foreground mt-8">
+            <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
             <p className="font-medium">Hey! I'm Squid AI</p>
             <p className="text-sm mt-2">Try asking me to:</p>
             <ul className="text-sm mt-2 space-y-1">
@@ -182,16 +182,16 @@ export const SquidAIChat: React.FC<SquidAIChatProps> = ({
             )}
           >
             {msg.role === 'assistant' && (
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-4 h-4 text-white" />
+              <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-primary" />
               </div>
             )}
             <div
               className={cn(
                 'rounded-lg px-4 py-2 max-w-[80%]',
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800/60 text-slate-100'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/60 text-foreground'
               )}
             >
               <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
@@ -201,11 +201,11 @@ export const SquidAIChat: React.FC<SquidAIChatProps> = ({
         
         {isLoading && (
           <div className="flex gap-3">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="w-4 h-4 text-white" />
+            <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-primary" />
             </div>
-            <div className="bg-slate-800/60 rounded-lg px-4 py-2">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+            <div className="bg-muted/60 rounded-lg px-4 py-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
             </div>
           </div>
         )}
@@ -214,20 +214,20 @@ export const SquidAIChat: React.FC<SquidAIChatProps> = ({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-slate-800/30">
+      <div className="p-4 border-t border-border/50">
         <div className="flex gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Ask Squid AI anything..."
-            className="bg-slate-800/60 border-slate-700/50 text-white placeholder:text-slate-500"
+            className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/60"
             disabled={!isInitialized || isLoading}
           />
           <Button
             onClick={handleSend}
             disabled={!input.trim() || !isInitialized || isLoading}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
           >
             <Send className="w-4 h-4" />
           </Button>

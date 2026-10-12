@@ -147,7 +147,7 @@ export default function WelcomeScreen({ workspaceName, onComplete }: WelcomeScre
           viewBox="0 0 800 160"
           className="w-full max-w-[90vw] h-auto"
           style={{
-            maxHeight: 'clamp(80px, 15vw, 160px)',
+            maxHeight: '160px',
             opacity: stageOpacity,
             transform: `scale(${stageScale}) translateZ(0)`,
             transition: phase === 'finish' ? 'opacity 0.6s ease' : 'none',
@@ -222,7 +222,7 @@ export default function WelcomeScreen({ workspaceName, onComplete }: WelcomeScre
             className="antialiased"
             style={{
               marginTop: 'clamp(24px, 5vh, 48px)',
-              fontSize: 'clamp(11px, 1.1vw, 13px)',
+              fontSize: '13px',
               fontWeight: 400,
               letterSpacing: '0.14em',
               color: 'rgba(255,255,255,0.2)',

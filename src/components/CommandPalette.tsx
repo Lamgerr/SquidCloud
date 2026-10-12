@@ -149,7 +149,7 @@ const getFileIcon = (type: string, name: string) => {
     return <Presentation className="w-4 h-4 text-orange-400" />;
   }
   if (mimeType.includes('javascript') || mimeType.includes('typescript') || mimeType.includes('json') || mimeType.includes('html') || mimeType.includes('css') || ['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'go', 'rs', 'rb', 'php', 'swift', 'kt'].includes(ext)) {
-    return <Code className="w-4 h-4 text-blue-400" />;
+    return <Code className="w-4 h-4 text-primary" />;
   }
   if (mimeType.startsWith('text/') || ['txt', 'md', 'rtf', 'doc', 'docx'].includes(ext)) {
     return <FileText className="w-4 h-4 text-gray-400" />;
@@ -239,7 +239,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         id: 'nav-shared',
         label: 'Go to shared',
         description: 'Open shared files view',
-        icon: <Share2 className="w-4 h-4 text-blue-400" />,
+        icon: <Share2 className="w-4 h-4 text-primary" />,
         category: 'navigation',
         shortcut: '⌘2',
         action: () => {
@@ -255,7 +255,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         id: 'nav-jump',
         label: 'Go to folder...',
         description: 'Jump to any folder quickly',
-        icon: <FolderOpen className="w-4 h-4 text-blue-400" />,
+        icon: <FolderOpen className="w-4 h-4 text-primary" />,
         category: 'navigation',
         shortcut: '⌘G',
         action: () => {
@@ -270,7 +270,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       id: 'nav-home',
       label: 'Go to home',
       description: 'Navigate to root folder',
-      icon: <Folder className="w-4 h-4 text-blue-400" />,
+      icon: <Folder className="w-4 h-4 text-primary" />,
       category: 'navigation',
       action: () => {
         onNavigateToFolder?.('');
@@ -377,7 +377,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           id: 'action-share',
           label: `Share ${selectedFilesCount} file${selectedFilesCount > 1 ? 's' : ''}`,
           description: 'Create share links',
-          icon: <Share2 className="w-4 h-4 text-blue-400" />,
+          icon: <Share2 className="w-4 h-4 text-primary" />,
           category: 'actions',
           action: () => {
             onShareSelected();
@@ -540,7 +540,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         id: 'create-folder',
         label: 'New folder',
         description: 'Create a new folder',
-        icon: <Plus className="w-4 h-4 text-blue-400" />,
+        icon: <Plus className="w-4 h-4 text-primary" />,
         category: 'create',
         action: () => {
           onCreateFolder();
@@ -637,7 +637,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           id: `folder-${folder.id}`,
           label: folder.name,
           description: folder.path ? `📁 ${folder.path}` : '📁 Root folder',
-          icon: <FolderOpen className="w-4 h-4 text-blue-400" />,
+          icon: <FolderOpen className="w-4 h-4 text-primary" />,
           category: 'files',
           action: () => {
             onNavigateToFolder?.(folder.path);

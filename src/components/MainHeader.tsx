@@ -132,8 +132,10 @@ const MainHeader: React.FC = () => {
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Hide on mobile for app-shell routes (they have their own nav)
-  const hiddenMobileRoutes = ['/dashboard', '/auth', '/developer-api', '/webhooks', '/settings'];
+  // Hide on mobile for app-shell routes (they have their own nav).
+  // NOTE: routes with their own in-page TopBar (developer-api, settings,
+  // docs, checkout) never render MainHeader at all — see showHeader in App.tsx.
+  const hiddenMobileRoutes = ['/dashboard', '/auth', '/webhooks', '/settings'];
   if (isMobile && hiddenMobileRoutes.some(route => location.pathname.startsWith(route))) {
     return null;
   }

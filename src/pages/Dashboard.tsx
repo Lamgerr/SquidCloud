@@ -89,6 +89,8 @@ import Overview from '@/components/DashboardOverview';
 import SquidVeilSecrets from '@/components/SquidVeilSecrets';
 import SquidVeilSecretsMobile from '@/components/SquidVeilSecretsMobile';
 import GitHubRepoCloneDialog from '@/components/GitHubRepoCloneDialog';
+import { TabHeader } from '@/components/dashboard/TabHeader';
+import { AppTheme } from '@/components/custom/squid-app';
 // Icons
 import {
   Search, Grid3X3, List, RefreshCw, ChevronLeft, ChevronRight,
@@ -159,10 +161,11 @@ const PathBar = memo(({
   if (!currentFolder) return null;
   const parts = currentFolder.split('/').filter(Boolean);
   return (
-    <div className="flex items-center gap-0.5 text-xs text-muted-foreground select-none mt-1">
+    <nav aria-label="Folder path" className="flex items-center gap-0.5 text-[12px] text-muted-foreground select-none mt-1 min-w-0">
       <button
         onClick={() => onNavigate('')}
-        className="hover:text-foreground/80 transition-colors flex items-center gap-1 px-0.5"
+        aria-label="Root folder"
+        className="hover:text-foreground transition-colors flex items-center gap-1 px-0.5 rounded"
       >
         <Home className="w-3 h-3" />
       </button>
@@ -171,14 +174,15 @@ const PathBar = memo(({
         const isLast = i === parts.length - 1;
         return (
           <React.Fragment key={path}>
-            <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+            <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/50" />
             <button
               onClick={() => !isLast && onNavigate(path)}
+              aria-current={isLast ? 'page' : undefined}
               className={cn(
-                'transition-colors max-w-[120px] truncate rounded px-1 py-0.5',
+                'transition-colors max-w-[180px] truncate rounded px-1 py-0.5',
                 isLast
-                  ? 'text-foreground/80 font-medium cursor-default'
-                  : 'hover:text-foreground/80 hover:bg-accent/50'
+                  ? 'text-foreground font-medium cursor-default'
+                  : 'hover:text-foreground hover:bg-accent'
               )}
             >
               {part}
@@ -186,7 +190,7 @@ const PathBar = memo(({
           </React.Fragment>
         );
       })}
-    </div>
+    </nav>
   );
 });
 PathBar.displayName = 'PathBar';
@@ -204,12 +208,14 @@ const BackCard = memo(({
 }) => (
   <div
     role="button"
+    tabIndex={0}
     aria-label="Go back"
     onClick={onClick}
+    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
     className={cn(
-      'group relative overflow-hidden rounded-xl border border-dashed border-border/60 bg-muted/20 text-muted-foreground',
+      'group relative overflow-hidden rounded-xl border border-dashed border-border bg-muted/20 text-muted-foreground',
       'transition-all duration-150 cursor-pointer select-none',
-      'hover:border-border/80 hover:bg-muted/40 hover:text-foreground'
+      'hover:border-foreground/30 hover:bg-muted/40 hover:text-foreground'
     )}
   >
     {viewMode === 'grid' ? (
@@ -247,11 +253,11 @@ VaultCard.displayName = 'VaultCard';
 // ─────────────────────────────────────────────────────────
 
 const EmptyState = memo(({ searchQuery }: { searchQuery: string }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-center">
-    <div className="w-14 h-14 rounded-[14px] bg-[#c8f04b]/[0.07] border border-[#c8f04b]/20 flex items-center justify-center mb-4 text-[#c8f04b]">
-      <Files className="w-6 h-6" />
+  <div key={searchQuery || 'empty'} className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+    <div className="w-12 h-12 rounded-md bg-card border border-border flex items-center justify-center mb-4 text-muted-foreground">
+      <Files className="w-5 h-5" />
     </div>
-    <h3 className="lg-body font-semibold mb-1">
+    <h3 className="lg-body font-medium mb-1">
       {searchQuery ? 'No files found' : 'No files here yet'}
     </h3>
     <p className="lg-caption max-w-sm">
@@ -259,6 +265,9 @@ const EmptyState = memo(({ searchQuery }: { searchQuery: string }) => (
         ? `Try a different search term or clear the filter.`
         : 'Folders help you organize your files. Use the Create & Upload buttons above to get started.'}
     </p>
+    {!searchQuery && (
+      <p className="lg-caption max-w-sm mt-2">Or drop files anywhere on this page.</p>
+    )}
   </div>
 ));
 EmptyState.displayName = 'EmptyState';
@@ -840,9 +849,11 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
     check();
   }, [user]);
 
-  // Re-fetch after background upload completes
+  // Re-fetch after background upload completes; surface failures loudly
+  // so a blocked upload is never silent.
   useEffect(() => {
     let wasActive = false;
+    const notifiedFailed = new Set<string>();
     const unsub = backgroundUploadService.subscribe(tasks => {
       const hasCompleted = tasks.some(t => t.status === 'completed');
       const hasActive    = tasks.some(t => t.status === 'uploading' || t.status === 'pending');
@@ -852,6 +863,16 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
         const count = tasks.filter(t => t.status === 'completed').length;
         toast({ title: 'Upload complete', description: `${count} file(s) uploaded successfully` });
         setTimeout(fetchFiles, 800);
+      }
+      for (const t of tasks) {
+        if (t.status === 'failed' && !notifiedFailed.has(t.id)) {
+          notifiedFailed.add(t.id);
+          toast({
+            title: `Upload failed: ${t.file?.name || 'file'}`,
+            description: t.error || 'Upload failed. Open the upload panel to retry.',
+            variant: 'destructive',
+          });
+        }
       }
     });
     return unsub;
@@ -1059,6 +1080,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
   }, [activeWorkspaceRole, canModifyItem, toast, verifyOperationNow]);
+
+  const onFolderMove = useCallback((folder: FolderItem) => {
+    setMoveDialogFile({ ids: [folder.id], folderId: folder.id });
+  }, []);
 
   // ── Selection / Bulk ─────────────────────────────────────
   const clearSelection = useCallback(() => {
@@ -1283,6 +1308,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   if (isMobile) {
     return (
       <FileViewInfoContext.Provider value={handleViewInfo}>
+      <AppTheme />
       <AppStartupBiometricCheck>
         <DragDropUpload
           onFilesDropped={handleFilesDropped}
@@ -1376,15 +1402,21 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
 
               {activeTab === 'trash' && (
                 <div className="rounded-lg border border-border/50 bg-card/80 p-3">
+                  <div className="sq-tab-enter">
                   <TrashTab workspaceId={activeWorkspaceId} />
+                  </div>
                 </div>
               )}
 
               {activeTab === 'analytics' && (
+                <div className="sq-tab-enter">
                 <AnalyticsDashboard />
+                </div>
               )}
               {activeTab === 'secrets' && (
+                <div className="sq-tab-enter">
                 <SquidVeilSecretsMobile />
+                </div>
               )}
               {activeTab === 'file-requests' && (
                 profile?.is_premium ? (
@@ -1395,7 +1427,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                           <h2 className="text-sm font-semibold text-foreground">File Requests</h2>
                           <p className="text-xs text-muted-foreground mt-0.5">Public upload links for anyone to submit files.</p>
                         </div>
-                        <Button size="sm" onClick={() => setFileRequestOpen(true)} className="gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 hover:text-amber-200 h-8">
+                        <Button size="sm" onClick={() => setFileRequestOpen(true)} className="gap-1.5 h-8">
                           <Plus className="w-3.5 h-3.5" />
                           New
                         </Button>
@@ -1416,8 +1448,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                 ) : (
                   <div className="pt-8 px-4 text-center">
                     <div className="rounded-lg border border-border/40 bg-card p-6">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
-                        <Crown className="h-5 w-5 text-amber-400" />
+                      <div className="w-10 h-10 rounded-md border border-border bg-muted flex items-center justify-center mx-auto mb-3">
+                        <Crown className="h-5 w-5 text-foreground" />
                       </div>
                       <h3 className="text-sm font-bold text-foreground mb-1">Supporter feature</h3>
                       <p className="text-xs text-muted-foreground mb-4 max-w-xxs mx-auto">
@@ -1432,6 +1464,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
               )}
 
               {activeTab === 'shared' && (
+                <div className="sq-tab-enter">
                 <SharedView
                   files={files}
                   onFileDownload={handleFileDownload}
@@ -1443,12 +1476,15 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                   onViewInfo={handleViewInfo}
                   onFolderShareClick={(shareId) => window.open(`/s/${shareId}`, '_blank')}
                 />
+                </div>
               )}
               {activeTab === 'books' && (
+                <div className="sq-tab-enter">
                 <DeepReadCatalog
                   files={files}
                   onBookOpen={handleBookOpen}
                 />
+                </div>
               )}
 
               {activeTab === 'settings' && (
@@ -1816,6 +1852,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   // ─────────────────────────────────────────────────────────
   return (
     <FileViewInfoContext.Provider value={handleViewInfo}>
+    <AppTheme />
     <AppStartupBiometricCheck>
       <DragDropUpload
         onFilesDropped={handleFilesDropped}
@@ -1825,10 +1862,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
       >
         {/* Drop overlay */}
         {isDragActive && (
-          <div className="fixed inset-0 z-[100] bg-primary/5 flex items-center justify-center pointer-events-none">
-            <div className="bg-card border-2 border-dashed border-primary rounded-[20px] p-10 text-center shadow-2xl">
-              <Upload className="w-8 h-8 text-primary mx-auto mb-3" />
-              <p className="text-base font-semibold">Drop to upload</p>
+          <div className="fixed inset-0 z-[100] bg-background/75 backdrop-blur-sm flex items-center justify-center pointer-events-none" role="status" aria-live="polite">
+            <div className="bg-card border border-dashed border-foreground/40 rounded-md px-12 py-10 text-center shadow-2xl">
+              <Upload className="w-6 h-6 text-foreground mx-auto mb-3" />
+              <p className="text-base font-medium">Drop to upload</p>
               <p className="text-sm text-muted-foreground mt-1">
                 {currentFolder
                   ? `To "${currentFolder.split('/').pop()}"`
@@ -1868,7 +1905,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                     </span>
                     <div className="flex items-center gap-1.5 leading-tight min-w-0">
                       <span className="text-[13px] font-medium text-foreground">Storage</span>
-                      <span className="text-neutral-600">·</span>
+                      <span className="text-muted-foreground/40">·</span>
                       <span className="max-w-[160px] truncate text-[13px] text-muted-foreground">
                         {activeProviderType === 'squidcloud' ? 'SquidCloud' : activeProviderId ? 'Custom Bucket' : 'SquidCloud'}
                       </span>
@@ -1884,7 +1921,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                         </span>
                         <div className="flex items-center gap-1.5 leading-tight min-w-0">
                           <span className="text-[13px] font-medium text-foreground">Workspace</span>
-                          <span className="text-neutral-600">·</span>
+                          <span className="text-muted-foreground/40">·</span>
                         <span className="max-w-[160px] truncate text-[13px] text-muted-foreground">
                           {activeWorkspace?.name || '…'}
                         </span>
@@ -1932,12 +1969,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                   </button>
                   <button
                     onClick={() => setIsSpotlightOpen(true)}
-                    className="sq-press hidden h-8 items-center gap-2 rounded-md border border-border/70 bg-card/60 pl-2.5 pr-1.5 text-muted-foreground hover:border-white/20 hover:text-foreground sm:flex"
+                    className="sq-press hidden h-8 items-center gap-2 rounded-md border border-border/70 bg-card/60 pl-2.5 pr-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground sm:flex"
                     title="Search (⌘K)"
                   >
                     <Search className="h-3.5 w-3.5" />
                     <span className="text-[12.5px]">Search</span>
-                    <kbd className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
+                    <kbd className="sa-kbd">{/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd>
                   </button>
                   <button
                     onClick={() => setIsSpotlightOpen(true)}
@@ -2034,6 +2071,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
               )}
 
               {activeTab === 'shared' && (
+                <div className="sq-tab-enter">
                 <SharedView
                   files={files}
                   onFileDownload={handleFileDownload}
@@ -2045,33 +2083,33 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                   onViewInfo={handleViewInfo}
                   onFolderShareClick={(shareId) => window.open(`/s/${shareId}`, '_blank')}
                 />
+                </div>
               )}
 
-              {activeTab === 'trash'     && <TrashTab workspaceId={activeWorkspaceId} />}
-              {activeTab === 'analytics' && <AnalyticsDashboard />}
-              {activeTab === 'secrets'   && <SquidVeilSecrets />}
-              {activeTab === 'storage'   && <StorageTab />}
-              {activeTab === 'scripts'   && <Scripts />}
+              {activeTab === 'trash'     && <div className="sq-tab-enter"><TrashTab workspaceId={activeWorkspaceId} /></div>}
+              {activeTab === 'analytics' && <div className="sq-tab-enter"><AnalyticsDashboard /></div>}
+              {activeTab === 'secrets'   && <div className="sq-tab-enter"><SquidVeilSecrets /></div>}
+              {activeTab === 'storage'   && <div className="sq-tab-enter"><StorageTab /></div>}
+              {activeTab === 'scripts'   && <div className="sq-tab-enter"><Scripts /></div>}
               {activeTab === 'books' && (
+                <div className="sq-tab-enter">
                 <DeepReadCatalog
                   files={files}
                   onBookOpen={handleBookOpen}
                 />
+                </div>
               )}
 
               {activeTab === 'file-requests' && (
                 profile?.is_premium ? (
-                  <div className="space-y-5">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <h1 className="lg-title">File Requests</h1>
-                        <p className="lg-caption mt-1">Public upload links for anyone to submit files.</p>
-                      </div>
-                      <Button onClick={() => setFileRequestOpen(true)} className="gap-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 hover:text-amber-200">
-                        <Plus className="w-4 h-4" />
-                        New Request
-                      </Button>
-                    </div>
+                  <div className="sq-tab-enter space-y-5">
+                    <TabHeader
+                      title="File Requests"
+                      subtitle="Public upload links for anyone to submit files."
+                      primaryLabel="New Request"
+                      primaryIcon={Plus}
+                      onPrimary={() => setFileRequestOpen(true)}
+                    />
                     <div className="lg-card overflow-hidden">
                       <ManageFileRequests refreshToken={fileRequestsRefreshToken} />
                     </div>
@@ -2089,8 +2127,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                 ) : (
                   <div className="max-w-lg mx-auto pt-16 text-center">
                     <div className="rounded-lg border border-border/40 bg-card p-8">
-                      <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
-                        <Crown className="h-6 w-6 text-amber-400" />
+                      <div className="w-12 h-12 rounded-md border border-border bg-muted flex items-center justify-center mx-auto mb-4">
+                        <Crown className="h-6 w-6 text-foreground" />
                       </div>
                       <h2 className="text-lg font-bold text-foreground mb-2">File Requests are a Supporter feature</h2>
                       <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
@@ -2125,8 +2163,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                     <button onClick={signOut} className="flex w-full items-center gap-3 px-4 h-12 hover:bg-red-500/10 text-left transition-colors group rounded-b-2xl">
                       <LogOut className="w-4 h-4 text-red-400/60 flex-shrink-0" />
                       <span className="text-sm flex-1 font-medium text-red-400">Sign out</span>
-                      <span className="text-xs text-red-400/40">End current session</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-red-400/20 transition-transform group-hover:translate-x-0.5" />
+                      <span className="text-xs text-red-400/70">End current session</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-red-400/50 transition-transform group-hover:translate-x-0.5" />
                     </button>
                   </SettingsCard>
                 </div>
@@ -2256,7 +2294,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
         open={!!moveDialogFile}
         onClose={() => setMoveDialogFile(null)}
         fileIds={moveDialogFile?.ids || []}
-        onMoved={fetchFiles}
+        folderId={moveDialogFile?.folderId ?? null}
+        onMoved={() => { setMoveDialogFile(null); fetchFiles(); }}
       />
       {shareFile && (
         <EnhancedShareDialog
@@ -2449,6 +2488,13 @@ const FilesView: React.FC<FilesViewProps> = ({
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
       if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) return;
+      // Menus, dialogs, lists and sliders own their arrow / Enter keys.
+      if (target.closest?.('[role="menu"], [role="dialog"], [role="alertdialog"], [role="listbox"], [role="tablist"], [role="slider"], [role="combobox"], [role="radiogroup"], select')) return;
+      // Enter on a focused button or link must activate it, not open the first file.
+      if (e.key === 'Enter') {
+        const control = target.closest?.('button, a[href], summary, [role="button"], [role="checkbox"], [role="switch"], [role="menuitem"]');
+        if (control && !control.hasAttribute('data-kbd-item')) return;
+      }
 
       if (Date.now() - lastMouseMove.current < 800) {
         if (kbdIndex >= 0) setKbdIndex(-1);
@@ -2522,7 +2568,7 @@ const FilesView: React.FC<FilesViewProps> = ({
   }, [kbdIndex]);
 
   return (
-    <div className="space-y-5" ref={kbdContainerRef} onMouseMove={handleKbdMouseMove}>
+    <div className="sq-tab-enter space-y-5" ref={kbdContainerRef} onMouseMove={handleKbdMouseMove}>
 
       {/* ── Page header ── */}
       <div className="flex items-start justify-between gap-4">
@@ -2530,7 +2576,7 @@ const FilesView: React.FC<FilesViewProps> = ({
           <div className="flex items-baseline gap-3 min-w-0">
             <h1 className="text-[15px] font-semibold tracking-tight text-foreground truncate">Storage</h1>
             <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-              {folders.length} folders · {files.length} files{sharedFiles.length > 0 ? ` · ${sharedFiles.length} shared` : ''}
+              {folders.length} folders · {files.length} files{sharedFiles.length > 0 ? ` · ${sharedFiles.length} shared` : ''} · {formatBytes(totalSize)}
             </span>
           </div>
           <PathBar currentFolder={currentFolder} onNavigate={onNavigateTo} />
@@ -2566,6 +2612,18 @@ const FilesView: React.FC<FilesViewProps> = ({
               {filteredFiles.length + filteredFolders.length} results for &ldquo;{searchQuery}&rdquo;
             </span>
           )}
+          {selectionMode && (
+            <span className="flex items-center gap-2 text-[12.5px] text-muted-foreground tabular-nums" aria-live="polite">
+              <span className="text-foreground">{selectedFiles.size}</span> selected
+              <button
+                type="button"
+                onClick={() => onSelectAll()}
+                className="text-foreground/80 underline underline-offset-4 decoration-border hover:text-foreground hover:decoration-foreground transition-colors"
+              >
+                Select all
+              </button>
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <Button
@@ -2582,10 +2640,15 @@ const FilesView: React.FC<FilesViewProps> = ({
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 lg-press-subtle">
+              <button
+                type="button"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] font-medium whitespace-nowrap outline-none select-none transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring/40 active:scale-[0.97] lg-press-subtle"
+              >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span className="text-xs hidden sm:inline">Sort</span>
-              </Button>
+                <span className="text-xs hidden sm:inline">
+                  {({ 'date-desc': 'Newest', 'date-asc': 'Oldest', 'name-asc': 'Name A–Z', 'name-desc': 'Name Z–A', 'size-desc': 'Largest', 'size-asc': 'Smallest' } as Record<string, string>)[sortBy] || 'Sort'}
+                </span>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="lg-dropdown w-40 p-1">
               {[
@@ -2611,6 +2674,8 @@ const FilesView: React.FC<FilesViewProps> = ({
             variant="ghost"
             size="sm"
             onClick={onRefresh}
+            aria-label="Refresh"
+            title="Refresh"
             className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent/50 lg-press-subtle"
           >
             <RefreshCw className="w-4 h-4" />
@@ -2623,6 +2688,8 @@ const FilesView: React.FC<FilesViewProps> = ({
                 viewMode === 'grid' && 'lg-tab-active'
               )}
               title="Grid view"
+              aria-label="Grid view"
+              aria-pressed={viewMode === 'grid'}
             >
               <Grid3X3 className="w-3.5 h-3.5" />
             </button>
@@ -2633,6 +2700,8 @@ const FilesView: React.FC<FilesViewProps> = ({
                 viewMode === 'compact' && 'lg-tab-active'
               )}
               title="Compact view"
+              aria-label="Compact view"
+              aria-pressed={viewMode === 'compact'}
             >
               <Grid3X3 className="w-3 h-3" />
             </button>
@@ -2643,6 +2712,8 @@ const FilesView: React.FC<FilesViewProps> = ({
                 viewMode === 'list' && 'lg-tab-active'
               )}
               title="List view"
+              aria-label="List view"
+              aria-pressed={viewMode === 'list'}
             >
               <List className="w-3.5 h-3.5" />
             </button>
@@ -2673,6 +2744,7 @@ const FilesView: React.FC<FilesViewProps> = ({
           onOpen={onOpenFolder}
           onDelete={onFolderDelete}
           onShare={onFolderShare}
+          onMove={onFolderMove}
           onCreateFolder={onCreateFolder}
         />
       )}
@@ -2683,6 +2755,7 @@ const FilesView: React.FC<FilesViewProps> = ({
           {(showFolders || showFiles) && (
             <button
               onClick={() => setFilesCollapsed(!filesCollapsed)}
+              aria-expanded={!filesCollapsed}
               className="flex items-center gap-2 px-1 group"
             >
               <ChevronRight className={cn(
@@ -2699,6 +2772,7 @@ const FilesView: React.FC<FilesViewProps> = ({
               viewMode={viewMode}
               loading={loading}
               batchSize={40}
+              resetKey={`${currentFolder}|${searchQuery}`}
               emptyState={<EmptyState searchQuery={searchQuery} />}
               renderFile={(file) => (
                 <FileItem
@@ -2724,6 +2798,20 @@ const FilesView: React.FC<FilesViewProps> = ({
             />
           )}
         </section>
+      )}
+
+      {/* ── Status line ── */}
+      {!error && !loading && filteredFiles.length + filteredFolders.length > 0 && (
+        <div className="flex items-center justify-between gap-4 border-t border-border/50 pt-3 text-[11.5px] text-muted-foreground tabular-nums">
+          <span>
+            {filteredFolders.length} folders · {filteredFiles.length} files{searchQuery ? ' match' : ''}
+          </span>
+          <span className="hidden md:flex items-center gap-4">
+            <span className="flex items-center gap-1.5"><kbd className="sa-kbd">←</kbd><kbd className="sa-kbd">↑</kbd><kbd className="sa-kbd">↓</kbd><kbd className="sa-kbd">→</kbd> move</span>
+            <span className="flex items-center gap-1.5"><kbd className="sa-kbd">Enter</kbd> open</span>
+            <span className="flex items-center gap-1.5"><kbd className="sa-kbd">{/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd> search</span>
+          </span>
+        </div>
       )}
     </div>
   );
@@ -2866,6 +2954,7 @@ const MobileFilesView: React.FC<any> = ({
             viewMode={viewMode}
             loading={loading}
             batchSize={40}
+            resetKey={`${currentFolder}|${searchQuery}`}
             emptyState={<EmptyState searchQuery={searchQuery} />}
             renderFile={(file) => (
               <RecencyFadeWrapper key={file.id} file={file}>

@@ -39,7 +39,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-blue-500" />
+            <Bell className="h-5 w-5 text-primary" />
             Subscription Notice
           </DialogTitle>
           <DialogDescription>
@@ -60,7 +60,7 @@ const SubscriptionPopup: React.FC<SubscriptionPopupProps> = ({
           </Button>
           <Button
             size="sm"
-            className="bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border-0"
+            className="bg-primary/15 text-primary hover:bg-primary/25 border-0"
             onClick={() => {
               navigate('/checkout?plan=' + plan_type + '&billing=' + billing_period);
               onDismiss(notification.id);

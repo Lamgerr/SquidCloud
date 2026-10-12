@@ -25,7 +25,7 @@ const Navbar: React.FC = () => {
       <nav className="bg-background border-b sticky top-0 z-50">
         <div className="container flex items-center justify-between py-3">
         <Link to="/" className="flex items-center gap-2">
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg w-8 h-8 flex items-center justify-center"><div className="w-4 h-4 bg-white rounded-sm"></div></div>
+          <div className="bg-primary rounded-lg w-8 h-8 flex items-center justify-center"><div className="w-4 h-4 bg-primary-foreground rounded-sm"></div></div>
           <span className="font-semibold md:inline-block">SquidCloud</span>
           <span className="text-xs text-muted-foreground hidden md:inline-block">by </span>
         </Link>

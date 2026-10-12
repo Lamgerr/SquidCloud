@@ -168,51 +168,51 @@ export const SquidSpotlight: React.FC<SquidSpotlightProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl p-0 gap-0 bg-slate-900/92 backdrop-blur-[10px] border border-slate-800/40 shadow-2xl overflow-hidden rounded-2xl">
+      <DialogContent className="max-w-2xl p-0 gap-0 bg-popover/95 backdrop-blur-[10px] border border-border/50 shadow-2xl overflow-hidden rounded-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-800/40 bg-gradient-to-r from-slate-900/60 to-slate-900/40">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-border/50 bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-md">
-              <Sparkles className="w-4 h-4 text-white" />
+<div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center shadow-md">
+              <Sparkles className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-white">Squid AI Spotlight</h3>
-              <p className="text-xs text-slate-400">Quick search & file actions — Press Esc to close</p>
+              <h3 className="font-semibold text-foreground">Squid AI Spotlight</h3>
+              <p className="text-xs text-muted-foreground">Quick search & file actions — Press Esc to close</p>
             </div>
           </div>
-          <div className="text-xs text-slate-500">Tip: <kbd className="px-2 py-1 bg-slate-800/60 rounded text-slate-400">⌘K</kbd></div>
+          <div className="text-xs text-muted-foreground/70">Tip: <kbd className="px-2 py-1 bg-muted rounded text-muted-foreground">⌘K</kbd></div>
         </div>
 
         {/* Input */}
         <div className="px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-slate-800/40 rounded-full px-3 py-2 w-full gap-3">
-              <Sparkles className="w-5 h-5 text-blue-400 flex-shrink-0" />
+            <div className="flex items-center bg-muted/50 rounded-full px-3 py-2 w-full gap-3">
+              <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
               <Input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
                 placeholder={isInitialized ? 'Ask Squid AI anything — e.g. "Organize my files"' : 'Squid AI is unavailable'}
-                className="border-0 bg-transparent text-lg text-white placeholder:text-slate-500 focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
+                className="border-0 bg-transparent text-lg text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
                 disabled={!isInitialized || isLoading}
                 aria-label="Squid AI input"
               />
               <div className="flex items-center gap-2">
                 {input && (
-                  <button onClick={clearInput} className="p-1 rounded-full hover:bg-slate-800/60">
-                    <X className="w-4 h-4 text-slate-300" />
+                  <button onClick={clearInput} className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150">
+                    <X className="w-4 h-4" />
                   </button>
                 )}
                 {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
                 ) : (
                   <button
                     onClick={() => handleSubmit()}
                     disabled={!isInitialized || !input}
                     className={cn(
-                      'px-3 py-1 rounded-full text-sm font-medium transition-all',
-                      !isInitialized || !input ? 'bg-slate-800/30 text-slate-500' : 'bg-blue-500 hover:bg-blue-600 text-white'
+                      'px-3 py-1 rounded-full text-sm font-medium transition-all active:scale-95',
+                      !isInitialized || !input ? 'bg-muted/40 text-muted-foreground/60' : 'bg-primary hover:bg-primary/90 text-primary-foreground'
                     )}
                   >
                     Send
@@ -222,7 +222,7 @@ export const SquidSpotlight: React.FC<SquidSpotlightProps> = ({
             </div>
           </div>
           {!isInitialized && (
-            <div className="mt-3 px-3 py-2 rounded-md bg-red-900/20 border border-red-900/10 text-sm text-red-200">
+            <div className="mt-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/25 text-sm text-destructive">
               Squid AI is not configured. Set <span className="font-mono">GEMINI_API_KEY</span> in Supabase secrets.
             </div>
           )}
@@ -230,16 +230,16 @@ export const SquidSpotlight: React.FC<SquidSpotlightProps> = ({
 
         {/* Response */}
         {response && (
-          <div className="px-6 py-4 bg-slate-800/30 border-t border-slate-800/40">
+          <div className="px-6 py-4 bg-muted/30 border-t border-border/40">
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Sparkles className="w-4 h-4 text-white" />
+<div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Sparkles className="w-4 h-4 text-primary" />
               </div>
               <div className="flex-1">
-                <div className="rounded-lg bg-slate-900/60 p-3">
-                  <p className="text-sm text-slate-200 whitespace-pre-wrap">{response}</p>
+                <div className="rounded-lg bg-muted/40 p-3">
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{response}</p>
                 </div>
-                <div className="mt-2 text-xs text-slate-500">Response generated by Squid AI</div>
+                <div className="mt-2 text-xs text-muted-foreground/70">Response generated by Squid AI</div>
               </div>
             </div>
           </div>
@@ -248,7 +248,7 @@ export const SquidSpotlight: React.FC<SquidSpotlightProps> = ({
         {/* Suggestions */}
         {!response && !isLoading && (
           <div className="px-6 py-4 space-y-2">
-            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-3">
+            <p className="text-xs text-muted-foreground/70 uppercase tracking-wider font-semibold mb-3">
               Quick Actions
             </p>
             <div className="flex flex-wrap gap-2">
@@ -257,12 +257,12 @@ export const SquidSpotlight: React.FC<SquidSpotlightProps> = ({
                   key={idx}
                   onClick={() => handleSuggestionClick(suggestion)}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-full text-sm transition-all',
-                    !isInitialized ? 'bg-slate-800/30 text-slate-500' : 'bg-slate-800/40 text-slate-200 hover:bg-slate-800/60'
+                    'flex items-center gap-2 px-3 py-2 rounded-full text-sm transition-all active:scale-95',
+                    !isInitialized ? 'bg-muted/40 text-muted-foreground/60' : 'bg-muted/40 text-foreground hover:bg-muted/70'
                   )}
                   disabled={!isInitialized}
                 >
-                  <suggestion.icon className="w-4 h-4 text-blue-400" />
+                  <suggestion.icon className="w-4 h-4 text-primary" />
                   <span>{suggestion.text}</span>
                 </button>
               ))}
@@ -271,14 +271,14 @@ export const SquidSpotlight: React.FC<SquidSpotlightProps> = ({
         )}
 
         {/* Keyboard Hint */}
-        <div className="px-6 py-3 border-t border-slate-800/50 bg-slate-900/60">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="px-6 py-3 border-t border-border/40 bg-muted/20">
+          <div className="flex items-center justify-between text-xs text-muted-foreground/70">
             <span>
-              <kbd className="px-2 py-1 bg-slate-800/60 rounded text-slate-400">⌘K</kbd> or{' '}
-              <kbd className="px-2 py-1 bg-slate-800/60 rounded text-slate-400">Ctrl+K</kbd> to open
+              <kbd className="px-2 py-1 bg-muted rounded text-muted-foreground">⌘K</kbd> or{' '}
+              <kbd className="px-2 py-1 bg-muted rounded text-muted-foreground">Ctrl+K</kbd> to open
             </span>
             <span>
-              <kbd className="px-2 py-1 bg-slate-800/60 rounded text-slate-400">Enter</kbd> to send
+              <kbd className="px-2 py-1 bg-muted rounded text-muted-foreground">Enter</kbd> to send
             </span>
           </div>
         </div>

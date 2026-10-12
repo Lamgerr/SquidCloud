@@ -1,63 +1,26 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
-  Check,
-  ShieldCheck,
-  ChevronDown,
-  Crown,
-  Sparkles,
-} from 'lucide-react';
-import SquidLogo from '@/components/ui/SquidLogo';
-import Footer from '@/components/custom/Footer';
-import { useReducedMotion } from '@/hooks/use-reduced-motion';
+  BillingToggle,
+  Closing,
+  Field,
+  Nav,
+  PlanCards,
+  Shell,
+  ease,
+} from '@/components/custom/squid-ui';
+import type { Billing, NavLinkItem } from '@/components/custom/squid-ui';
 
-/* ════════════════════════════════════════════════════════════════
-   PRICING — same system as the landing: near-black canvas,
-   hairline rules, one lime accent, grotesque display type.
-   All plans, prices, limits and copy preserved verbatim.
-   ════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   PRICING — same system as the homepage (squid-ui.tsx).
+   Plans, prices, limits, FAQ and payment copy are unchanged.
+   ═══════════════════════════════════════════════════════════════ */
 
-const C = {
-  canvas: '#060607',
-  panel: '#0b0c0f',
-  hair: 'rgba(255,255,255,0.08)',
-  paper: '#f2f2ed',
-  dim: '#a3a39a',
-  faint: '#63635c',
-  accent: '#c8f04b',
-  accentInk: '#101300',
-};
-
-const DISPLAY = { fontFamily: "'Space Grotesk', system-ui, sans-serif" };
-const SERIF_IT = { fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: 'italic' as const };
-const MONO = { fontFamily: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace" };
-
-function usePressFonts() {
-  useEffect(() => {
-    const ID = 'sq-landing-fonts';
-    if (document.getElementById(ID)) return;
-    const l = document.createElement('link');
-    l.id = ID;
-    l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap';
-    document.head.appendChild(l);
-  }, []);
-}
-
-/* ═══ Data (Preserved from Original) ═══ */
-type Billing = 'weekly' | 'monthly' | 'annual';
-
-const PLAN_PRICES = {
-  supporter: { weekly: { display: '$0.75' }, monthly: 4, annual: 32 },
-  'supporter-plus': { weekly: { display: '$1.89' }, monthly: 10, annual: 80 },
-};
-
-const BILLING_OPTIONS: { value: Billing; label: string; badge?: string }[] = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'annual', label: 'Annual', badge: '4 mos free' },
+const NAV: NavLinkItem[] = [
+  { label: 'Plans', href: '#plans' },
+  { label: 'Compare', href: '#compare' },
+  { label: 'FAQ', href: '#faq' },
+  { label: 'Docs', to: '/docs' },
 ];
 
 const FAQS = [
@@ -82,401 +45,225 @@ const COMPARISON_ROWS = [
   { feature: 'Early feature access', free: '—', supp: 'Before public', suppPlus: 'Before Supporter' },
 ];
 
-/* Progressive feature lists — every value matches COMPARISON_ROWS. */
-const FREE_FEATURES = [
-  ['Unlimited', 'storage, forever'],
-  ['2', 'concurrent uploads'],
-  ['2', 'concurrent downloads'],
-  ['1 GB', 'max file size'],
-  ['20', 'file uploads / day'],
-  ['1,000', 'API tokens / day'],
-] as const;
+const PAGE_CSS = `
+.plans-sec { max-width: 1480px; margin: 0 auto; padding: 0 var(--gutter) 160px; }
+.sec.tight { padding-top: 80px; }
+.sec.rule { border-top: 1px solid var(--line); max-width: none; padding: 0; }
+.rule-in { max-width: 1480px; margin: 0 auto; padding: 0 var(--gutter); }
+.hero-note { font: 400 11px/1.4 var(--f-mono); letter-spacing: 0.06em; color: var(--mute); }
 
-const SUPP_FEATURES = [
-  ['10', 'concurrent uploads'],
-  ['10', 'concurrent downloads'],
-  ['12 GB', 'max file size'],
-  ['50', 'file uploads / day'],
-  ['10,000', 'API tokens / day'],
-  ['Priority', 'processing queue'],
-  ['Included', 'custom domains'],
-  ['Before public', 'early access'],
-] as const;
+/* ── Comparison ── */
+.cmp-wrap { overflow-x: auto; border: 1px solid var(--line-2); border-radius: 6px; background: var(--ink-2); }
+.cmp { width: 100%; min-width: 680px; border-collapse: separate; border-spacing: 0; text-align: left; }
+.cmp th, .cmp td { padding: 20px 26px; border-bottom: 1px solid var(--line); font: 400 0.95rem/1.3 var(--f-display); }
+.cmp thead th { font: 400 11px/1 var(--f-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); }
+.cmp tbody tr:last-child td { border-bottom: 0; }
+.cmp th:first-child, .cmp td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ink-2); color: var(--bone); font-weight: 500; white-space: nowrap; }
+.cmp th:not(:first-child), .cmp td:not(:first-child) { text-align: center; }
+.cmp td { color: var(--mute); transition: background 0.25s; }
+.cmp td.mid { color: var(--bone); }
+.cmp .feat { background: rgba(232, 231, 225, 0.05); color: var(--bone); }
+.cmp thead th.feat { color: var(--bone); }
+.cmp tbody tr:hover td { background: rgba(232, 231, 225, 0.03); }
+.cmp tbody tr:hover td.feat { background: rgba(232, 231, 225, 0.07); }
 
-const PLUS_FEATURES = [
-  ['Unlimited', 'concurrency, file size & tokens'],
-  ['100', 'file uploads / day'],
-  ['Top priority', 'processing queue'],
-  ['Always active', 'published sites'],
-  ['Before Supporter', 'early access'],
-] as const;
+/* ── FAQ ── */
+.faq-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 100px; align-items: start; }
+.faq-head { position: sticky; top: 110px; display: flex; flex-direction: column; gap: 22px; }
+.faq { border-top: 1px solid var(--line); }
+.faq:last-child { border-bottom: 1px solid var(--line); }
+.faq button { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; gap: 24px; width: 100%; padding: 24px 0; cursor: pointer; color: var(--mute); font: 400 1.3rem/1.3 var(--f-display); letter-spacing: -0.015em; transition: color 0.3s; }
+.faq button:hover, .faq.open button { color: var(--bone); }
+.faq button:focus-visible { outline: 1px solid var(--bone); outline-offset: 2px; }
+.plus { position: relative; flex: none; width: 14px; height: 14px; }
+.plus::before, .plus::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: currentColor; transition: transform 0.5s var(--ease); }
+.plus::after { transform: rotate(90deg); }
+.faq.open .plus::after { transform: rotate(0deg); }
+.faq-a { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.55s var(--ease); }
+.faq.open .faq-a { grid-template-rows: 1fr; }
+.faq-a > div { overflow: hidden; min-height: 0; }
+.faq-a p { margin: 0; max-width: 38em; padding: 0 40px 26px 0; color: var(--mute); font: 400 0.98rem/1.7 var(--f-display); text-wrap: pretty; }
 
-function Reveal({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const reduced = useReducedMotion();
-  if (reduced) return <div className={className}>{children}</div>;
+/* ── Payments ── */
+.pay { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden; }
+.pay > div { padding: 56px; min-width: 0; }
+.pay > div + div { display: flex; flex-direction: column; justify-content: space-between; gap: 36px; border-left: 1px solid var(--line-2); background: var(--ink-2); }
+.pay h2 { margin: 0 0 22px; font: 300 2.8rem/1.06 var(--f-display); letter-spacing: -0.035em; text-wrap: balance; }
+.pay p { margin: 0; max-width: 32em; color: var(--mute); font: 400 1rem/1.7 var(--f-display); }
+.pay p b { font-weight: 500; color: var(--bone); }
+.pay-k { font: 400 11px/1 var(--f-mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--mute); }
+.coins { display: flex; flex-wrap: wrap; gap: 8px; }
+.coin { padding: 12px 16px; border: 1px solid var(--line-2); border-radius: 3px; font: 400 12px/1 var(--f-mono); letter-spacing: 0.1em; }
+.pay-n { font: 400 12px/1.5 var(--f-mono); letter-spacing: 0.04em; color: var(--dim); }
+
+@media (max-width: 900px) {
+  .faq-grid, .pay { grid-template-columns: minmax(0, 1fr); }
+  .faq-head { position: static; }
+  .pay > div + div { border-left: 0; border-top: 1px solid var(--line-2); }
+  .cmp th, .cmp td { padding: 16px 18px; }
+}
+/* Small screens get one fixed smaller step — still no fluid scaling. */
+@media (max-width: 720px) {
+  .faq-grid { gap: 24px; }
+  .faq button { font-size: 1.05rem; }
+  .pay > div { padding: 28px; }
+  .pay h2 { font-size: 1.8rem; }
+  .plans-sec { padding-bottom: 80px; }
+}
+`;
+
+function Hero({ billing, onBilling }: { billing: Billing; onBilling: (b: Billing) => void }) {
+  const reduce = !!useReducedMotion();
+  const line = (i: number) =>
+    ({
+      initial: reduce ? false : { y: '110%' },
+      animate: { y: 0 },
+      transition: { duration: 1.1, ease, delay: 0.15 + i * 0.12 },
+    } as const);
+  const fade = (d: number) =>
+    ({
+      initial: reduce ? false : { opacity: 0, y: 12 },
+      animate: { opacity: 1, y: 0 },
+      transition: { duration: 0.9, ease, delay: d },
+    } as const);
+
   return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 22 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
-    >
-      {children}
-    </motion.div>
+    <section className="hero compact">
+      <motion.div
+        className="hero-field"
+        initial={reduce ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 2, ease: 'easeOut' }}
+      >
+        <Field reduce={reduce} />
+      </motion.div>
+      <div className="hero-shade" />
+      <div className="hero-core">
+        <motion.span className="eyebrow" {...fade(0.05)}>Pricing</motion.span>
+        <h1 className="hero-h">
+          <span className="ln"><motion.span {...line(0)}>Unlimited storage.</motion.span></span>
+          <span className="ln"><motion.span {...line(1)}>Your speed, your call.</motion.span></span>
+        </h1>
+        <motion.p className="hero-sub" {...fade(0.55)}>
+          Every plan gets unlimited storage. Upgrading buys speed, concurrency, and priority access to the global edge.
+        </motion.p>
+        <motion.div {...fade(0.7)} style={{ marginTop: 6 }}>
+          <BillingToggle billing={billing} onChange={onBilling} />
+        </motion.div>
+        <motion.p className="hero-note" {...fade(0.8)}>
+          crypto via MaxelPay · no card required · cancel anytime
+        </motion.p>
+      </div>
+    </section>
   );
 }
 
-function FeatureList({ items, dark = false }: { items: readonly (readonly [string, string])[]; dark?: boolean }) {
+function Compare() {
   return (
-    <ul className="space-y-3.5">
-      {items.map(([val, label], i) => (
-        <li key={i} className="flex items-start gap-3 text-[13.5px]">
-          <Check size={16} className="mt-0.5 shrink-0" style={{ color: dark ? C.accentInk : C.accent }} />
-          <span style={{ color: dark ? 'rgba(16,19,0,0.72)' : C.dim }}>
-            <strong className="font-semibold" style={{ color: dark ? C.accentInk : C.paper }}>{val}</strong> {label}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <section className="sec" id="compare">
+      <div className="sec-h">
+        <h2 className="h2">Every limit, on one table.</h2>
+        <p className="lede">Storage is never the limit. Speed, concurrency and priority are.</p>
+      </div>
+      <div className="cmp-wrap">
+        <table className="cmp">
+          <thead>
+            <tr>
+              <th scope="col">Feature</th>
+              <th scope="col">Free</th>
+              <th scope="col">Supporter</th>
+              <th scope="col" className="feat">Supporter+</th>
+            </tr>
+          </thead>
+          <tbody>
+            {COMPARISON_ROWS.map((row) => (
+              <tr key={row.feature}>
+                <td>{row.feature}</td>
+                <td>{row.free}</td>
+                <td className="mid">{row.supp}</td>
+                <td className="feat">{row.suppPlus}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function Faq() {
+  const [open, setOpen] = useState<number | null>(0);
+  return (
+    <section className="sec rule" id="faq">
+      <div className="rule-in" style={{ paddingTop: '180px', paddingBottom: '180px' }}>
+        <div className="faq-grid">
+          <div className="faq-head">
+            <h2 className="h2">Asked, answered.</h2>
+            <p className="lede">The limits and billing details people ask about most.</p>
+          </div>
+          <div>
+            {FAQS.map((f, i) => (
+              <div className={`faq${open === i ? ' open' : ''}`} key={f.q}>
+                <button type="button" aria-expanded={open === i} onClick={() => setOpen(open === i ? null : i)}>
+                  <span>{f.q}</span>
+                  <span className="plus" aria-hidden="true" />
+                </button>
+                <div className="faq-a">
+                  <div>
+                    <p>{f.a}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Payments() {
+  return (
+    <section className="sec tight">
+      <div className="pay">
+        <div>
+          <h2>Secure crypto payments.</h2>
+          <p>
+            All payments are processed securely through <b>MaxelPay</b> — a no-KYC cryptocurrency payment gateway. Pay with USDT, USDC, ETH, BTC, and more. Settled instantly on-chain. No credit card required.
+          </p>
+        </div>
+        <div>
+          <span className="pay-k">Accepted</span>
+          <div className="coins">
+            {['USDT', 'USDC', 'ETH', 'BTC'].map((c) => (
+              <span className="coin" key={c}>{c}</span>
+            ))}
+          </div>
+          <span className="pay-n">and more · settled on-chain</span>
+        </div>
+      </div>
+    </section>
   );
 }
 
 export default function PricingPage() {
-  const { user, profile } = useAuth();
-  const userTier = (profile?.tier as string) ?? 'free';
-  const navigate = useNavigate();
-
   const [billing, setBilling] = useState<Billing>('monthly');
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-
-  usePressFonts();
-
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    document.documentElement.style.scrollBehavior = 'smooth';
-    return () => { document.documentElement.style.scrollBehavior = ''; };
-  }, []);
-
-  const handleSelect = (planId: string) => {
-    if (planId === 'free') {
-      navigate('/auth');
-      return;
-    }
-    navigate(`/checkout?plan=${planId}&billing=${billing}`);
-  };
-
-  const suppPrice = billing === 'weekly' ? PLAN_PRICES.supporter.weekly.display : billing === 'monthly' ? '$4' : '$32';
-  const plusPrice = billing === 'weekly' ? PLAN_PRICES['supporter-plus'].weekly.display : billing === 'monthly' ? '$10' : '$80';
-  const perSuffix = billing === 'annual' ? 'year' : billing === 'weekly' ? 'week' : 'month';
-
-  const PlanButton = ({
-    planId,
-    label,
-    featured = false,
-  }: {
-    planId: string;
-    label: string;
-    featured?: boolean;
-  }) => {
-    const isCurrent = userTier === planId;
-    return (
-      <button
-        onClick={() => !isCurrent && handleSelect(planId)}
-        disabled={isCurrent}
-        className={`inline-flex h-12 w-full items-center justify-center rounded-full text-[13.5px] font-semibold transition-all ${
-          isCurrent ? 'cursor-default opacity-50' : featured ? 'hover:opacity-85' : 'hover:border-white/30'
-        }`}
-        style={featured
-          ? { background: C.accent, color: C.accentInk }
-          : { border: `1px solid ${C.hair}`, color: C.paper, background: 'transparent' }}
-      >
-        {isCurrent ? 'Current plan' : label}
-      </button>
-    );
-  };
-
   return (
-    <div className="min-h-screen font-sans antialiased" style={{ background: C.canvas, color: C.paper }}>
-      <style>{`
-        .sq-pulse { animation: sq-pulse 2.2s ease-in-out infinite; }
-        @keyframes sq-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-      `}</style>
-
-      {/* ═══ NAV (matches landing) ═══ */}
-      <header className="fixed inset-x-0 top-0 z-50 border-b backdrop-blur-md" style={{ borderColor: C.hair, background: 'rgba(6,6,7,0.84)' }}>
-        <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-5">
-          <Link to="/" className="flex items-center gap-2.5">
-            <SquidLogo size={22} mono />
-            <span className="text-[12px] font-semibold uppercase tracking-[0.28em]" style={DISPLAY}>SquidCloud</span>
-          </Link>
-          <nav className="hidden items-center gap-7 md:flex">
-            {[['Plans', '#plans'], ['Compare', '#compare'], ['FAQ', '#faq']].map(([l, h]) => (
-              <a key={l} href={h} className="font-mono text-[11px] uppercase tracking-[0.2em] transition-colors hover:text-white" style={{ ...MONO, color: C.dim }}>
-                {l}
-              </a>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            {!user && (
-              <Link to="/auth" className="hidden px-3 font-mono text-[11px] uppercase tracking-[0.18em] transition-colors hover:text-white sm:inline-flex" style={{ ...MONO, color: C.dim }}>
-                Sign in
-              </Link>
-            )}
-            <Link
-              to={user ? '/dashboard' : '/auth?tab=signup'}
-              className="inline-flex h-9 items-center rounded-full px-4 text-[13px] font-semibold transition-opacity hover:opacity-85"
-              style={{ background: C.accent, color: C.accentInk }}
-            >
-              {user ? 'Dashboard' : 'Get started'}
-            </Link>
-          </div>
-        </div>
-      </header>
-
+    <Shell css={PAGE_CSS}>
+      <Nav links={NAV} />
       <main>
-        {/* ═══ HERO ═══ */}
-        <section className="px-5 pb-14 pt-32 sm:pt-36">
-          <div className="mx-auto max-w-3xl text-center">
-            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
-              <p className="inline-flex items-center gap-2.5 rounded-full border px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em]" style={{ ...MONO, borderColor: C.hair, color: C.dim }}>
-                <span className="sq-pulse inline-block h-1.5 w-1.5 rounded-full" style={{ background: C.accent }} />
-                Pricing
-              </p>
-              <h1 className="mt-8 font-bold leading-[1.0] tracking-[-0.03em]" style={{ ...DISPLAY, fontSize: 'clamp(2.6rem, 6.5vw, 5rem)' }}>
-                Unlimited storage.<br />
-                <span style={{ ...SERIF_IT, fontWeight: 400 }}>Your speed,</span> your call.
-              </h1>
-              <p className="mx-auto mt-6 max-w-xl text-[16px] leading-relaxed" style={{ color: C.dim }}>
-                Every plan gets unlimited storage. Upgrading buys speed,
-                concurrency, and priority access to the global edge.
-              </p>
-            </motion.div>
-
-            {/* Billing toggle */}
-            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.12 }} className="mt-10 flex justify-center">
-              <div className="inline-flex items-center gap-1 rounded-full border p-1.5" style={{ borderColor: C.hair, background: C.panel }}>
-                {BILLING_OPTIONS.map((b) => (
-                  <button
-                    key={b.value}
-                    onClick={() => setBilling(b.value)}
-                    className="relative rounded-full px-5 py-2 font-mono text-[12px] uppercase tracking-[0.12em] transition-all"
-                    style={billing === b.value
-                      ? { ...MONO, background: C.accent, color: C.accentInk, fontWeight: 700 }
-                      : { ...MONO, color: C.dim }}
-                  >
-                    {b.label}
-                    {b.badge && (
-                      <span
-                        className="absolute -right-2 -top-2.5 rounded-full px-1.5 py-0.5 font-mono text-[9px] font-bold normal-case tracking-normal"
-                        style={{ background: billing === b.value ? C.accentInk : C.accent, color: billing === b.value ? C.accent : C.accentInk }}
-                      >
-                        {b.badge}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-            <p className="mt-4 font-mono text-[11px]" style={{ ...MONO, color: C.faint }}>
-              crypto via MaxelPay · no card required · cancel anytime
-            </p>
-          </div>
+        <Hero billing={billing} onBilling={setBilling} />
+        <section className="plans-sec" id="plans">
+          <PlanCards billing={billing} />
         </section>
-
-        {/* ═══ PLAN CARDS ═══ */}
-        <section id="plans" className="scroll-mt-20 px-5 pb-24">
-          <div className="mx-auto grid max-w-[1440px] gap-5 lg:grid-cols-3">
-            {/* FREE */}
-            <Reveal className="h-full">
-              <div className="flex h-full flex-col rounded-2xl border p-8" style={{ borderColor: C.hair, background: C.panel }}>
-                <p className="font-mono text-[11px] uppercase tracking-[0.22em]" style={{ ...MONO, color: C.dim }}>Free</p>
-                <p className="mt-1.5 text-[13px]" style={{ color: C.faint }}>Unlimited storage, always</p>
-                <p className="mt-6 font-semibold tracking-tight" style={{ ...DISPLAY, fontSize: 'clamp(2.4rem, 3.5vw, 3rem)' }}>
-                  $0
-                </p>
-                <p className="mt-1 font-mono text-[11px]" style={{ ...MONO, color: C.faint }}>free forever</p>
-                <div className="mb-8 mt-7">
-                  <PlanButton planId="free" label="Get started" />
-                </div>
-                <div className="border-t pt-7" style={{ borderColor: C.hair }}>
-                  <FeatureList items={FREE_FEATURES} />
-                </div>
-              </div>
-            </Reveal>
-
-            {/* SUPPORTER */}
-            <Reveal delay={0.08} className="h-full">
-              <div className="flex h-full flex-col rounded-2xl border p-8" style={{ borderColor: C.hair, background: C.panel }}>
-                <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em]" style={{ ...MONO, color: C.dim }}>
-                  <Crown size={13} style={{ color: C.accent }} /> Supporter
-                </p>
-                <p className="mt-1.5 text-[13px]" style={{ color: C.faint }}>For serious creators</p>
-                <p className="mt-6 font-semibold tracking-tight" style={{ ...DISPLAY, fontSize: 'clamp(2.4rem, 3.5vw, 3rem)' }}>
-                  {suppPrice}
-                  <span className="ml-1.5 align-middle font-mono text-[12px] font-normal" style={{ ...MONO, color: C.faint }}>/{perSuffix}</span>
-                </p>
-                <p className="mt-1 font-mono text-[11px]" style={{ ...MONO, color: C.faint }}>
-                  {billing === 'annual' ? '$32 billed once a year' : billing === 'weekly' ? 'billed every 7 days' : '$4 billed monthly'}
-                </p>
-                <div className="mb-8 mt-7">
-                  <PlanButton planId="supporter" label="Go Supporter" />
-                </div>
-                <div className="border-t pt-7" style={{ borderColor: C.hair }}>
-                  <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.18em]" style={{ ...MONO, color: C.faint }}>Everything in Free, plus:</p>
-                  <FeatureList items={SUPP_FEATURES} />
-                </div>
-              </div>
-            </Reveal>
-
-            {/* SUPPORTER+ — featured */}
-            <Reveal delay={0.16} className="h-full">
-              <div className="relative flex h-full flex-col rounded-2xl p-8" style={{ background: C.accent, color: C.accentInk }}>
-                <span className="absolute -top-3 left-8 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]" style={{ background: C.accentInk, color: C.accent }}>
-                  <Sparkles size={11} /> Best value
-                </span>
-                <p className="font-mono text-[11px] uppercase tracking-[0.22em]" style={{ ...MONO, color: 'rgba(16,19,0,0.65)' }}>Supporter+</p>
-                <p className="mt-1.5 text-[13px]" style={{ color: 'rgba(16,19,0,0.65)' }}>For power users &amp; teams</p>
-                <p className="mt-6 font-semibold tracking-tight" style={{ ...DISPLAY, fontSize: 'clamp(2.4rem, 3.5vw, 3rem)' }}>
-                  {plusPrice}
-                  <span className="ml-1.5 align-middle font-mono text-[12px] font-normal" style={{ ...MONO, color: 'rgba(16,19,0,0.6)' }}>/{perSuffix}</span>
-                </p>
-                <p className="mt-1 font-mono text-[11px]" style={{ ...MONO, color: 'rgba(16,19,0,0.6)' }}>
-                  {billing === 'annual' ? '$80 billed once a year' : billing === 'weekly' ? 'billed every 7 days' : '$10 billed monthly'}
-                </p>
-                <div className="mb-8 mt-7">
-                  <PlanButton planId="supporter-plus" label="Go Unlimited" featured />
-                </div>
-                <div className="border-t pt-7" style={{ borderColor: 'rgba(16,19,0,0.16)' }}>
-                  <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.18em]" style={{ ...MONO, color: 'rgba(16,19,0,0.6)' }}>Everything in Supporter, plus:</p>
-                  <FeatureList items={PLUS_FEATURES} dark />
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-
-        {/* ═══ COMPARISON ═══ */}
-        <section id="compare" className="scroll-mt-20 border-t px-5 py-24" style={{ borderColor: C.hair }}>
-          <div className="mx-auto max-w-5xl">
-            <Reveal>
-              <p className="text-center font-mono text-[11px] uppercase tracking-[0.24em]" style={{ ...MONO, color: C.faint }}>
-                <span style={{ color: C.accent }}>02</span>
-                <span className="mx-3 inline-block h-px w-8 align-middle" style={{ background: C.hair }} />
-                Compare
-              </p>
-              <h2 className="mt-5 text-center font-semibold tracking-[-0.02em]" style={{ ...DISPLAY, fontSize: 'clamp(1.7rem, 3.2vw, 2.5rem)' }}>
-                Every limit, on one table.
-              </h2>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <div className="mt-10 overflow-hidden rounded-2xl border" style={{ borderColor: C.hair, background: C.panel }}>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[560px] text-left text-[13.5px]">
-                    <thead>
-                      <tr className="border-b font-mono text-[11px] uppercase tracking-[0.16em]" style={{ ...MONO, borderColor: C.hair, color: C.faint }}>
-                        <th className="px-7 py-4 font-medium">Feature</th>
-                        <th className="px-5 py-4 text-center font-medium">Free</th>
-                        <th className="px-5 py-4 text-center font-medium">Supporter</th>
-                        <th className="px-5 py-4 text-center font-medium" style={{ color: C.accent }}>Supporter+</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {COMPARISON_ROWS.map((row, i) => (
-                        <tr key={i} className="transition-colors hover:bg-white/[0.02]" style={i > 0 ? { borderTop: `1px solid ${C.hair}` } : undefined}>
-                          <td className="whitespace-nowrap px-7 py-3.5 font-medium" style={{ color: C.paper }}>{row.feature}</td>
-                          <td className="px-5 py-3.5 text-center" style={{ color: C.dim }}>{row.free}</td>
-                          <td className="px-5 py-3.5 text-center font-medium" style={{ color: C.paper }}>{row.supp}</td>
-                          <td className="px-5 py-3.5 text-center font-semibold" style={{ color: C.accent }}>{row.suppPlus}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-
-        {/* ═══ FAQ ═══ */}
-        <section id="faq" className="scroll-mt-20 border-t px-5 py-24" style={{ borderColor: C.hair, background: C.panel }}>
-          <div className="mx-auto max-w-3xl">
-            <Reveal>
-              <p className="text-center font-mono text-[11px] uppercase tracking-[0.24em]" style={{ ...MONO, color: C.faint }}>
-                <span style={{ color: C.accent }}>03</span>
-                <span className="mx-3 inline-block h-px w-8 align-middle" style={{ background: C.hair }} />
-                FAQ
-              </p>
-              <h2 className="mt-5 text-center font-semibold tracking-[-0.02em]" style={{ ...DISPLAY, fontSize: 'clamp(1.7rem, 3.2vw, 2.5rem)' }}>
-                Asked, answered.
-              </h2>
-            </Reveal>
-            <div className="mt-10 space-y-3">
-              {FAQS.map((faq, i) => (
-                <Reveal key={i} delay={Math.min(i * 0.04, 0.16)}>
-                  <div className="overflow-hidden rounded-xl border transition-colors" style={{ borderColor: openFaq === i ? 'rgba(255,255,255,0.2)' : C.hair, background: C.canvas }}>
-                    <button
-                      onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                      className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left text-[14.5px] font-medium"
-                      style={{ color: C.paper }}
-                    >
-                      {faq.q}
-                      <ChevronDown size={18} className={`shrink-0 transition-transform duration-300 ${openFaq === i ? 'rotate-180' : ''}`} style={{ color: openFaq === i ? C.accent : C.faint }} />
-                    </button>
-                    <AnimatePresence>
-                      {openFaq === i && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.22 }}
-                        >
-                          <p className="px-6 pb-6 text-[13.5px] leading-relaxed" style={{ color: C.dim }}>
-                            {faq.a}
-                          </p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ═══ CRYPTO PAYMENTS ═══ */}
-        <section className="border-t px-5 py-24" style={{ borderColor: C.hair }}>
-          <div className="mx-auto max-w-4xl text-center">
-            <Reveal>
-              <div className="rounded-2xl border p-10 md:p-14" style={{ borderColor: C.hair, background: C.panel }}>
-                <ShieldCheck className="mx-auto h-8 w-8" color={C.accent} />
-                <h2 className="mt-6 font-semibold tracking-[-0.02em]" style={{ ...DISPLAY, fontSize: 'clamp(1.6rem, 3vw, 2.3rem)' }}>
-                  Secure crypto payments.
-                </h2>
-                <p className="mx-auto mt-4 max-w-xl text-[14.5px] leading-relaxed" style={{ color: C.dim }}>
-                  All payments are processed securely through <strong className="font-semibold" style={{ color: C.paper }}>MaxelPay</strong> — a
-                  no-KYC cryptocurrency payment gateway. Pay with USDT, USDC, ETH, BTC, and more.
-                  Settled instantly on-chain. No credit card required.
-                </p>
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 font-mono text-[11px]" style={{ ...MONO, color: C.faint }}>
-                  {['USDT', 'USDC', 'ETH', 'BTC'].map((c) => (
-                    <span key={c} className="rounded-full border px-3 py-1" style={{ borderColor: C.hair }}>{c}</span>
-                  ))}
-                </div>
-                <Link
-                  to="/auth?tab=signup"
-                  className="mt-8 inline-flex h-12 items-center rounded-full px-8 text-[14px] font-semibold transition-opacity hover:opacity-85"
-                  style={{ background: C.accent, color: C.accentInk }}
-                >
-                  Create free account
-                </Link>
-              </div>
-            </Reveal>
-          </div>
-        </section>
+        <Compare />
+        <Faq />
+        <Payments />
+        <Closing
+          title="Start free. Upgrade for speed."
+          body="Every plan has unlimited storage. Switch plans anytime, with no lock-in and no penalties."
+        />
       </main>
-
-      <Footer />
-    </div>
+    </Shell>
   );
 }

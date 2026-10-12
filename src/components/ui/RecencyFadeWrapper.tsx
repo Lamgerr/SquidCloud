@@ -49,15 +49,16 @@ export const RecencyFadeWrapper: React.FC<RecencyFadeWrapperProps> = ({
 
   const style: React.CSSProperties = {
     position:   'relative',
-    opacity,
-    filter:     `saturate(${saturate})`,
+    // Driven by CSS vars so :hover can restore full clarity without re-render
+    ['--rf-o' as string]: opacity,
+    ['--rf-s' as string]: saturate,
     transition: TRANSITION,
   };
 
   return (
     <div
       style={style}
-      className={cn('contents-wrapper', className)}
+      className={cn('[opacity:var(--rf-o)] [filter:saturate(var(--rf-s))] hover:[opacity:1] hover:[filter:saturate(1)]', className)}
       // Native tooltip with age — no extra component needed
       title={fade.label ? `Uploaded ${fade.label}` : undefined}
     >

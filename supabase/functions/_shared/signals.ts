@@ -22,6 +22,8 @@ const SERVICE_TYPE_ALLOWLIST: Record<string, string[]> = {
     'trash_purge',
     'workspace_invite',
     'upload_failed',
+    'import_completed',
+    'import_failed',
     'password_changed',
   ],
   squidveil: [

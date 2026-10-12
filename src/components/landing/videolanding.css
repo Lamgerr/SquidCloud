@@ -1,0 +1,857 @@
+/* ============================================================
+   SquidCloud — single-viewport video landing (React port of
+   landing/styles.css).
+
+   Every selector is scoped under .vl and every keyframe is
+   prefixed vl- so this page cannot leak into, or be broken by,
+   the app's global CSS (which defines .logo, --muted, ...).
+   ============================================================ */
+
+/* Local fallback display face (primary display loads from CDN
+   links in index.html) */
+@font-face {
+  font-family: "Geist Pixel Circle";
+  src: url("/fonts/GeistPixel-Circle.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.vl {
+  /* design tokens — scoped, never on :root (the app's shadcn
+     --muted / --bg vars must keep working elsewhere) */
+  --bg: #000000;
+  --text: #ffffff;
+  --muted: #8e8e8e;
+  --nav-text: #2e2e2e;
+  --pill-dark: #28282a;
+  --sign-in-text: #c8c8c8;
+  --nav-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  --trust-bg: #28282a;
+  --trust-border: rgba(255, 255, 255, 0.4);
+  --trust-text: #c4c2c3;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-display: "BubbledotICG-FinePos", "Geist Pixel Circle", monospace;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.menu-open {
+  overflow: hidden;
+}
+
+.vl a {
+  color: inherit;
+}
+
+.vl :focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------
+   Background video
+   ------------------------------------------------------------ */
+.vl .bg {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.vl .bg-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--bg);
+}
+
+/* ------------------------------------------------------------
+   Page shell — header / hero / stats, one viewport
+   ------------------------------------------------------------ */
+.vl .page {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(16px, 2.4vh, 28px) clamp(14px, 3vw, 32px);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------
+   Entrance animations
+   ------------------------------------------------------------ */
+@keyframes vl-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.98);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes vl-reveal-muted {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.98);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 0.8;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes vl-reveal-pulse {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.98);
+    filter: blur(6px);
+  }
+  62% {
+    opacity: 1;
+    transform: translateY(0) scale(1.03);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes vl-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes vl-headline-fade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes vl-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes vl-menu-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes vl-link-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Base opacity 0 + fill "forwards": the finished state persists no
+   matter what, so an element can never get stuck invisible. */
+.vl .anim {
+  opacity: 0;
+  animation: vl-reveal 0.85s var(--ease-out) forwards;
+  animation-delay: var(--d, 0s);
+}
+
+/* Safety net (also applied by JS after load): force every entrance
+   to its finished state, even if its animation never ran. */
+.vl .anim.done,
+.vl .headline span.done,
+.vl .header.done {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.vl .subhead.anim.done {
+  opacity: 0.8 !important;
+}
+
+/* ------------------------------------------------------------
+   1. Header
+   ------------------------------------------------------------ */
+.vl .header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 2.8vw, 28px);
+  width: 100%;
+  max-width: 720px;
+  flex-shrink: 0;
+  z-index: 1;
+  animation: vl-slide-down 0.7s var(--ease-out) both;
+}
+
+/* Logo */
+.vl .logo {
+  display: grid;
+  place-items: center;
+  width: clamp(40px, 4.4vw, 46px);
+  height: clamp(40px, 4.4vw, 46px);
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: var(--nav-shadow);
+  flex-shrink: 0;
+  transition: transform 0.3s var(--ease-out);
+}
+
+.vl .logo:hover {
+  transform: scale(1.04);
+}
+
+.vl .logo:focus-visible {
+  outline-color: #000000;
+}
+
+.vl .logo img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+}
+
+/* Nav pill */
+.vl .nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  max-width: 430px;
+  height: clamp(44px, 5.2vw, 48px);
+  padding: 4px 8px;
+  background: #ffffff;
+  border-radius: 999px;
+  box-shadow: var(--nav-shadow);
+}
+
+.vl .nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 6px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: clamp(13px, 1.4vw, 15px);
+  letter-spacing: -0.01em;
+  color: var(--nav-text);
+  text-decoration: none;
+  opacity: 0.5;
+  transition: opacity 0.25s ease;
+}
+
+.vl .nav a:hover {
+  opacity: 0.75;
+}
+
+.vl .nav a:active,
+.vl .nav a:focus-visible {
+  opacity: 1;
+}
+
+.vl .nav a:focus-visible {
+  outline-color: #000000;
+  outline-offset: 2px;
+}
+
+/* Three-dot active indicator (applies when a link carries .is-active) */
+.vl .nav a.is-active {
+  opacity: 1;
+}
+
+.vl .nav a.is-active::after {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #000000;
+  transform: translateX(-50%);
+  box-shadow: -5px 0 0 0 #000000, 5px 0 0 0 #000000;
+}
+
+/* Sign in */
+.vl .signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(44px, 5.2vw, 48px);
+  padding: 0 clamp(16px, 2vw, 22px);
+  background: var(--pill-dark);
+  color: var(--sign-in-text);
+  border-radius: 999px;
+  box-shadow: var(--nav-shadow);
+  font-weight: 500;
+  font-size: clamp(13px, 1.4vw, 15px);
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease;
+}
+
+.vl .signin:hover {
+  background: #323234;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.vl .signin:active {
+  transform: translateY(0);
+}
+
+/* ------------------------------------------------------------
+   2. Hero
+   ------------------------------------------------------------ */
+.vl .hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 900px;
+  min-height: 0;
+  z-index: 1;
+}
+
+/* Trust row */
+.vl .trust {
+  display: inline-flex;
+  align-items: center;
+  --trust-size: clamp(36px, 4.5vw, 42px);
+  margin-bottom: clamp(16px, 2.5vh, 26px);
+}
+
+.vl .avatars {
+  display: inline-flex;
+  align-items: center;
+}
+
+.vl .avatar {
+  display: flex;
+  width: var(--trust-size);
+  height: var(--trust-size);
+  padding: 5px;
+  border-radius: 50%;
+  background: var(--trust-bg);
+  border: 1px solid var(--trust-border);
+  transition: transform 0.35s ease;
+}
+
+.vl .avatar-inner {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.vl .avatar-inner svg {
+  display: block;
+  height: calc(var(--trust-size) * 0.34);
+  width: auto;
+  fill: #111111;
+}
+
+.vl .a1 {
+  z-index: 1;
+}
+
+.vl .a2 {
+  z-index: 2;
+  margin-left: calc(var(--trust-size) * -0.42);
+}
+
+.vl .a3 {
+  z-index: 4;
+  margin-left: calc(var(--trust-size) * -0.42);
+}
+
+.vl .a1:hover {
+  transform: translateY(-2px);
+}
+
+.vl .a2:hover {
+  transform: translateY(-4px);
+}
+
+.vl .a3:hover {
+  transform: translateY(-2px);
+}
+
+.vl .trust-pill {
+  display: inline-flex;
+  align-items: center;
+  height: var(--trust-size);
+  margin: 0;
+  margin-left: calc(var(--trust-size) * -0.42);
+  padding-left: calc(var(--trust-size) * 0.58);
+  padding-right: clamp(14px, 1.6vw, 18px);
+  background: var(--trust-bg);
+  border: 1px solid var(--trust-border);
+  border-radius: 999px;
+  color: var(--trust-text);
+  font-weight: 500;
+  font-size: clamp(12px, 1.4vw, 13.5px);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+/* Headline */
+.vl .headline {
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(28px, 6.2vw, 80px);
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.vl .headline span {
+  display: block;
+  opacity: 0;
+  animation: vl-headline-fade 0.85s var(--ease-out) forwards;
+}
+
+.vl .hl-1 {
+  animation-delay: 0.12s;
+}
+
+.vl .hl-2 {
+  animation-delay: 0.3s;
+}
+
+/* Headline owns the reveal itself — never the parent. */
+.vl .headline.anim {
+  animation: none;
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* Subhead */
+.vl .subhead {
+  max-width: min(500px, 92%);
+  margin: clamp(16px, 2.4vh, 26px) 0 0;
+  font-size: clamp(calc(13.5px + 2pt), calc(1.55vw + 2pt), calc(16.5px + 2pt));
+  font-weight: 400;
+  line-height: 1.55;
+  color: #d0d0d0;
+  opacity: 0.8;
+}
+
+.vl .subhead.anim {
+  animation-name: vl-reveal-muted;
+  opacity: 0;
+}
+
+/* CTA — the entrance animation lives on the wrapper so the button's
+   own :hover transform is never overridden by an animation fill. */
+.vl .cta-wrap {
+  display: inline-flex;
+  margin-top: clamp(20px, 3vh, 32px);
+}
+
+.vl .cta-wrap.anim {
+  animation-name: vl-reveal-pulse;
+}
+
+.vl .cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(11px, 1.6vh, 13px) clamp(22px, 3vw, 28px);
+  background: #ffffff;
+  color: #000000;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: clamp(13.5px, 1.5vw, 14.5px);
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.15),
+    0 0 22px rgba(255, 255, 255, 0.32),
+    0 0 44px rgba(255, 255, 255, 0.12);
+  transition:
+    transform 0.3s var(--ease-out),
+    box-shadow 0.3s ease;
+}
+
+.vl .cta:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.28),
+    0 0 30px rgba(255, 255, 255, 0.45),
+    0 0 60px rgba(255, 255, 255, 0.18);
+}
+
+.vl .cta:active {
+  transform: translateY(0) scale(1);
+}
+
+.vl .cta:focus-visible {
+  outline-color: #000000;
+}
+
+/* ------------------------------------------------------------
+   3. Stats footer
+   ------------------------------------------------------------ */
+.vl .stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: clamp(16px, 3vw, 44px);
+  row-gap: 20px;
+  align-items: start;
+  width: 100%;
+  max-width: 920px;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.vl .stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  min-width: 0;
+}
+
+.vl .stat-icon {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(22px, 3vw, 33px);
+  line-height: 1;
+  color: #ffffff;
+}
+
+.vl .stat-value {
+  margin-top: 8px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: clamp(18px, 2.2vw, 26px);
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.vl .stat-label {
+  margin-top: 5px;
+  font-size: clamp(11px, 1.2vw, 12.5px);
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------
+   Mobile burger — fixed above the overlay
+   ------------------------------------------------------------ */
+.vl .burger {
+  position: fixed;
+  top: clamp(16px, 2.4vh, 28px);
+  right: clamp(14px, 3vw, 32px);
+  z-index: 40;
+  display: none;
+  place-content: center;
+  place-items: center;
+  gap: 5px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--pill-dark);
+  box-shadow: var(--nav-shadow);
+  cursor: pointer;
+  transition: background 0.28s ease;
+}
+
+.vl .burger span {
+  display: block;
+  width: 18px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: #ffffff;
+  transition:
+    transform 0.28s var(--ease-out),
+    background 0.28s ease,
+    opacity 0.18s ease;
+}
+
+.vl .burger.is-open {
+  background: #ffffff;
+}
+
+.vl .burger.is-open span {
+  background: #000000;
+}
+
+.vl .burger.is-open span:nth-child(1) {
+  transform: translateY(6.5px) rotate(45deg);
+}
+
+.vl .burger.is-open span:nth-child(2) {
+  opacity: 0;
+}
+
+.vl .burger.is-open span:nth-child(3) {
+  transform: translateY(-6.5px) rotate(-45deg);
+}
+
+/* Overlay + white sheet menu */
+.vl .overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.62);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: vl-overlay-in 0.28s ease both;
+}
+
+.vl .mobile-menu {
+  position: fixed;
+  top: calc(clamp(16px, 2.4vh, 28px) + 62px);
+  left: 50%;
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(360px, calc(100vw - 28px));
+  padding: 22px 18px 20px;
+  background: #ffffff;
+  border-radius: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  animation: vl-menu-in 0.38s var(--ease-out) both;
+}
+
+.vl .m-link,
+.vl .m-signin {
+  opacity: 1;
+  animation: vl-link-in 0.38s var(--ease-out) backwards;
+}
+
+.vl .m-link {
+  display: block;
+  padding: 12px;
+  border-radius: 14px;
+  color: var(--nav-text);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.vl .m-link:hover {
+  background: #f3f3f3;
+}
+
+.vl .m-link:focus-visible,
+.vl .m-signin:focus-visible {
+  outline-color: #000000;
+  outline-offset: 2px;
+}
+
+.vl .m-signin {
+  margin-top: 12px;
+  padding: 13px;
+  border-radius: 999px;
+  background: var(--pill-dark);
+  color: var(--sign-in-text);
+  font-weight: 500;
+  font-size: 15px;
+  text-align: center;
+  text-decoration: none;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.vl .m-signin:hover {
+  background: #323234;
+  color: #ffffff;
+}
+
+.vl .m-link:nth-child(1) {
+  animation-delay: 0.06s;
+}
+
+.vl .m-link:nth-child(2) {
+  animation-delay: 0.11s;
+}
+
+.vl .m-link:nth-child(3) {
+  animation-delay: 0.16s;
+}
+
+.vl .m-link:nth-child(4) {
+  animation-delay: 0.21s;
+}
+
+.vl .m-link:nth-child(5) {
+  animation-delay: 0.26s;
+}
+
+.vl .m-signin:nth-child(6) {
+  animation-delay: 0.31s;
+}
+
+/* ------------------------------------------------------------
+   Responsive
+   ------------------------------------------------------------ */
+@media (max-width: 720px) {
+  .vl .nav,
+  .vl .signin {
+    display: none;
+  }
+
+  .vl .header {
+    justify-content: space-between;
+  }
+
+  .vl .logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .vl .burger {
+    display: grid;
+  }
+
+  .vl .headline {
+    letter-spacing: -0.08em;
+    line-height: 1.05;
+  }
+
+  .vl .trust-pill {
+    font-size: 12px;
+  }
+
+  .vl .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .vl .trust {
+    --trust-size: 34px;
+  }
+
+  .vl .headline {
+    letter-spacing: -0.09em;
+    line-height: 1.04;
+  }
+}
+
+@media (max-height: 700px) {
+  .vl .trust {
+    margin-bottom: clamp(10px, 1.8vh, 16px);
+  }
+
+  .vl .subhead {
+    margin-top: clamp(10px, 1.6vh, 16px);
+  }
+
+  .vl .cta-wrap {
+    margin-top: clamp(14px, 2.2vh, 20px);
+  }
+
+  .vl .stat-value {
+    margin-top: 6px;
+  }
+}
+
+/* ------------------------------------------------------------
+   Reduced motion — kill animation, keep the final state
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .vl *,
+  .vl *::before,
+  .vl *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .vl .anim,
+  .vl .headline span,
+  .vl .header,
+  .vl .trust,
+  .vl .subhead,
+  .vl .cta,
+  .vl .stat,
+  .vl .m-link,
+  .vl .m-signin {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .vl .subhead {
+    opacity: 0.8 !important;
+  }
+
+  .vl .headline span {
+    color: #ffffff;
+  }
+}

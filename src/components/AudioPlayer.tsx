@@ -146,7 +146,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           <audio ref={audioRef} src={src} preload="metadata" />
           
           {/* Waveform Placeholder */}
-          <div className="h-24 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg flex items-center justify-center">
+          <div className="h-24 bg-primary/[0.07] rounded-lg flex items-center justify-center">
             <div className="flex items-center gap-1">
               {Array.from({ length: 40 }).map((_, i) => (
                 <div

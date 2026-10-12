@@ -251,9 +251,9 @@ const ApiKeyManagement = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <Key className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                    <span className="text-sm text-foreground/90 font-medium">{key.name}</span>
+                    <span className="text-sm text-foreground/90 font-medium truncate max-w-[180px]" title={key.name}>{key.name}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                  <div className="flex items-center gap-x-2 gap-y-1 flex-wrap min-w-0 text-xs text-muted-foreground/70">
                     <code className="bg-muted/30 px-1.5 py-0.5 rounded font-mono border border-border/30">
                       {key.key_prefix}****
                     </code>

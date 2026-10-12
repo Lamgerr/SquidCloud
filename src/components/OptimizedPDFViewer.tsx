@@ -7,7 +7,7 @@ import {
   BookmarkPlus, Highlighter, Pen, StickyNote, Type, Underline,
   Italic, Sigma, Eraser, Signature, ClipboardCopy, BookmarkX,
   ScrollText, Play, Undo2, Redo2, Hash, Thermometer,
-  Columns2, Focus, ScanEye,
+  Columns2, Focus, ScanEye, Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1297,7 +1297,7 @@ export default function OptimizedPDFViewer({
                   >
                     {ZOOM_MODE_ICONS[mode]}
                     {ZOOM_MODE_LABELS[mode]}
-                    {zoomMode === mode && <span className="ml-auto text-[9px] text-primary">✓</span>}
+                    {zoomMode === mode && <Check className="ml-auto w-3 h-3 text-primary" />}
                   </button>
                 ))}
               </div>

@@ -32,6 +32,9 @@ const SquidVeilSecrets = () => {
   const [bootstrapping, setBootstrapping] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [bootstrapName, setBootstrapName] = useState('');
+  const [showImport, setShowImport] = useState(false);
+  const [importValue, setImportValue] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const [secrets, setSecrets] = useState<SquidVeilSecret[]>([]);
   const [loading, setLoading] = useState(false);
@@ -153,13 +156,47 @@ const SquidVeilSecrets = () => {
     } catch (e: any) {
       if (e.code === 'ALREADY_BOOTSTRAPPED') {
         setBootstrapError(
-          'Your account already has a token. Tokens are shown only once at creation, so a value created on another device cannot be recovered here. Rotate a token from the Tokens tab to get a fresh value (shown once), or revoke one to reclaim a slot.',
+          'That account already has an active token. Paste its saved value below to reconnect — token values are shown only once, so a lost value can only be replaced by rotating from the Tokens tab once connected.',
         );
+        setShowImport(true);
       } else {
         setBootstrapError(e.message || 'Failed to create token. Please try again.');
       }
     } finally {
       setBootstrapping(false);
+    }
+  };
+
+  // Reconnect with a previously saved token value (e.g. after switching
+  // browsers, clearing site data, or letting a TTL token lapse while a
+  // sibling token stayed active). A 401 means the value is dead; anything
+  // else (including 403 on the admin-only token list) proves it is live.
+  const handleImportToken = async () => {
+    const raw = importValue.trim();
+    if (!raw) return;
+    setImporting(true);
+    try {
+      setSquidVeilToken(raw);
+      setActiveTokenPrefix(raw.slice(0, 8));
+      setActivePrefixState(raw.slice(0, 8));
+      try {
+        await squidveilFetch('/v1/tokens');
+      } catch (probe: any) {
+        if (probe?.status === 401 || probe?.code === 'INVALID_TOKEN' || probe?.code === 'REVOKED') {
+          throw new Error('That token value is no longer valid. Create a fresh one above instead.');
+        }
+      }
+      setImportValue('');
+      setShowImport(false);
+      setBootstrapError(null);
+      setConnected(true);
+      toast({ title: 'Token connected', description: 'Dashboard unlocked with your saved token.' });
+    } catch (e: any) {
+      clearSquidVeilToken();
+      clearActiveTokenPrefix();
+      toast({ title: 'Could not connect', description: e.message, variant: 'destructive' });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -410,27 +447,27 @@ const SquidVeilSecrets = () => {
   if (!connected) {
     return (
       <div className="space-y-5">
-        <div className="relative overflow-hidden rounded-lg bg-card border border-violet-500/20 p-5">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
+        <div className="relative overflow-hidden rounded-lg bg-card border border-primary/20 p-5">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
           <div className="relative z-10 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary shadow-sm">
               <Lock className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">SquidVeil Secrets</h1>
-              <p className="mt-0.5 text-sm text-white/50">Manage encrypted secrets, tokens, and usage monitoring.</p>
+              <h1 className="text-xl font-bold text-foreground">SquidVeil Secrets</h1>
+              <p className="mt-0.5 text-sm text-muted-foreground/80">Manage encrypted secrets, tokens, and usage monitoring.</p>
             </div>
           </div>
         </div>
 
         <div className="rounded-lg bg-card/50 border border-border overflow-hidden p-6">
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400 mb-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
               <KeyRound className="h-7 w-7" />
             </div>
-            <h2 className="text-lg font-semibold text-white mb-1">Create your first token</h2>
-            <p className="text-sm text-white/50 mb-6 max-w-md">
-              SquidVeil issues an <span className="text-violet-400">sv_</span> access token for your account.
+            <h2 className="text-lg font-semibold text-foreground mb-1">Create your first token</h2>
+            <p className="text-sm text-muted-foreground/80 mb-6 max-w-md">
+              SquidVeil issues an <span className="text-primary">sv_</span> access token for your account.
               It is shown only once — store it somewhere safe. The token is then used automatically by this
               dashboard. You can hold up to 3 tokens.
             </p>
@@ -442,15 +479,15 @@ const SquidVeilSecrets = () => {
                   onChange={e => setBootstrapName(e.target.value)}
                   placeholder="Token name (e.g. dashboard-admin)"
                   maxLength={100}
-                  className="w-full h-11 rounded-xl border border-border bg-white/5 px-4 pr-10 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+                  className="w-full h-11 rounded-xl border border-border bg-foreground/[0.05] px-4 pr-10 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 transition-colors"
                   onKeyDown={e => e.key === 'Enter' && !bootstrapping && handleBootstrap()}
                 />
-                <Fingerprint className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
+                <Fingerprint className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
               </div>
               <Button
                 onClick={handleBootstrap}
                 disabled={bootstrapping || !bootstrapName.trim()}
-                className="w-full h-11 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 gap-1.5 disabled:opacity-40"
+                className="w-full h-11 rounded-xl bg-primary/20 text-primary/80 border border-primary/30 hover:bg-primary/30 hover:text-primary/60 gap-1.5 disabled:opacity-40"
               >
                 {bootstrapping ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
                 {bootstrapping ? 'Creating token...' : 'Create my first token'}
@@ -461,11 +498,41 @@ const SquidVeilSecrets = () => {
                   <p className="text-xs text-amber-300/80 leading-relaxed">{bootstrapError}</p>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => setShowImport(v => !v)}
+                className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors"
+                aria-expanded={showImport}
+              >
+                {showImport ? 'Hide saved-token connect' : 'Already have a token? Connect with it'}
+              </button>
+              {showImport && (
+                <div className="rounded-xl border border-border bg-foreground/[0.03] p-3 space-y-2.5 animate-fade-in">
+                  <input
+                    type="password"
+                    value={importValue}
+                    onChange={e => setImportValue(e.target.value)}
+                    placeholder="Paste sv_ token value"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="w-full h-10 rounded-xl border border-border bg-background/60 px-4 font-mono text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 transition-colors"
+                    onKeyDown={e => e.key === 'Enter' && !importing && handleImportToken()}
+                  />
+                  <Button
+                    onClick={handleImportToken}
+                    disabled={importing || !importValue.trim()}
+                    className="w-full h-10 rounded-xl"
+                  >
+                    {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                    {importing ? 'Verifying…' : 'Connect token'}
+                  </Button>
+                </div>
+              )}
               <a
                 href="/help/squidveil"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
               >
                 <ExternalLink className="w-3 h-3" />
                 Read the SquidVeil documentation
@@ -479,16 +546,16 @@ const SquidVeilSecrets = () => {
 
   return (
     <div className="space-y-5">
-      <div className="relative overflow-hidden rounded-lg bg-card border border-violet-500/20 p-5">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
+      <div className="relative overflow-hidden rounded-lg bg-card border border-primary/20 p-5">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
         <div className="relative z-10 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary shadow-sm">
               <Lock className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">SquidVeil Secrets</h1>
-              <p className="mt-0.5 text-sm text-white/50">
+              <h1 className="text-xl font-bold text-foreground">SquidVeil Secrets</h1>
+              <p className="mt-0.5 text-sm text-muted-foreground/80">
                 {activeSecrets.length} active · {tokens.filter(t => !t.revoked_at).length} tokens
               </p>
             </div>
@@ -497,7 +564,7 @@ const SquidVeilSecrets = () => {
             {tab === 'secrets' && (
               <button
                 onClick={() => setShowCreate(true)}
-                className="flex items-center gap-2 h-9 px-4 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 transition-all text-sm font-medium"
+                className="flex items-center gap-2 h-9 px-4 rounded-xl bg-primary/20 text-primary/80 border border-primary/30 hover:bg-primary/30 hover:text-primary/60 transition-all text-sm font-medium"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Secret
@@ -506,7 +573,7 @@ const SquidVeilSecrets = () => {
             {tab === 'tokens' && (
               <>
                 {tokens.length > 0 && (
-                  <span className="flex items-center h-9 px-3 rounded-xl bg-white/5 text-white/40 border border-border text-xs">
+                  <span className="flex items-center h-9 px-3 rounded-xl bg-foreground/[0.05] text-muted-foreground/70 border border-border text-xs">
                     {tokens.length} / {MAX_TOKENS} tokens
                   </span>
                 )}
@@ -514,7 +581,7 @@ const SquidVeilSecrets = () => {
                   onClick={() => setShowTokenCreate(true)}
                   disabled={tokens.length >= MAX_TOKENS}
                   title={tokens.length >= MAX_TOKENS ? `You can have up to ${MAX_TOKENS} tokens. Revoke or delete one to create another.` : undefined}
-                  className="flex items-center gap-2 h-9 px-4 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 transition-all text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 h-9 px-4 rounded-xl bg-primary/20 text-primary/80 border border-primary/30 hover:bg-primary/30 hover:text-primary/60 transition-all text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   New Token
@@ -524,7 +591,7 @@ const SquidVeilSecrets = () => {
             {tab === 'monitor' && (
               <button
                 onClick={fetchMonitor}
-                className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5 text-white/40 border border-border hover:bg-white/10 hover:text-white/60 transition-all text-xs"
+                className="flex items-center gap-2 h-9 px-3 rounded-xl bg-foreground/[0.05] text-muted-foreground/70 border border-border hover:bg-foreground/[0.08] hover:text-muted-foreground transition-all text-xs"
               >
                 <RefreshCw className={cn('w-3 h-3', loadingMonitor && 'animate-spin')} />
                 Refresh
@@ -534,7 +601,7 @@ const SquidVeilSecrets = () => {
               href="/help/squidveil"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-white/5 text-white/40 border border-border hover:bg-white/10 hover:text-white/60 transition-all text-xs"
+              className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-foreground/[0.05] text-muted-foreground/70 border border-border hover:bg-foreground/[0.08] hover:text-muted-foreground transition-all text-xs"
               title="SquidVeil Documentation"
             >
               <ExternalLink className="w-3 h-3" />
@@ -542,7 +609,7 @@ const SquidVeilSecrets = () => {
             </a>
             <button
               onClick={handleDisconnect}
-              className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/5 text-white/40 border border-border hover:bg-white/10 hover:text-white/60 transition-all text-xs"
+              className="flex items-center gap-2 h-9 px-3 rounded-xl bg-foreground/[0.05] text-muted-foreground/70 border border-border hover:bg-foreground/[0.08] hover:text-muted-foreground transition-all text-xs"
               title="Disconnect token"
             >
               <X className="w-3 h-3" />
@@ -563,8 +630,8 @@ const SquidVeilSecrets = () => {
             className={cn(
               'flex items-center gap-2 h-9 px-4 rounded-lg text-sm font-medium transition-all',
               tab === t.id
-                ? 'bg-violet-500/20 text-violet-200 border border-violet-500/30'
-                : 'text-white/40 hover:text-white/70',
+                ? 'bg-primary/20 text-primary/60 border border-primary/30'
+                : 'text-muted-foreground/70 hover:text-foreground/70',
             )}
           >
             <t.icon className="w-4 h-4" />
@@ -577,45 +644,45 @@ const SquidVeilSecrets = () => {
         <div className="rounded-lg bg-card/50 border border-border overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <AlertTriangle className="h-8 w-8 text-red-400 mb-3" />
               <p className="text-sm text-red-400 font-medium">{error}</p>
-              <button onClick={fetchSecrets} className="mt-3 text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2">
+              <button onClick={fetchSecrets} className="mt-3 text-xs text-primary hover:text-primary/80 underline underline-offset-2">
                 Try again
               </button>
             </div>
           ) : activeSecrets.length === 0 && deletedSecrets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/5 text-white/20 mb-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-foreground/[0.05] text-muted-foreground/50 mb-4">
                 <Lock className="h-7 w-7" />
               </div>
-              <p className="text-sm text-white/40 font-medium">No secrets yet</p>
-              <p className="text-xs text-white/30 mt-1">Create your first secret to get started.</p>
+              <p className="text-sm text-muted-foreground/70 font-medium">No secrets yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Create your first secret to get started.</p>
               <Button
                 onClick={() => setShowCreate(true)}
-                className="mt-4 h-9 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 px-4 gap-1.5"
+                className="mt-4 h-9 rounded-xl bg-primary/20 text-primary/80 border border-primary/30 hover:bg-primary/30 hover:text-primary/60 px-4 gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Secret
               </Button>
             </div>
           ) : (
-            <div className="divide-y divide-white/5">
+            <div className="divide-y divide-border">
               {activeSecrets.map(secret => (
                 <div key={secret.id} className="px-5 py-3.5 hover:bg-card/50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400 flex-shrink-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0">
                       <Lock className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white/90 truncate">
+                      <p className="text-sm font-medium text-foreground/90 truncate">
                         {secret.name}
-                        <span className="ml-2 text-[10px] uppercase tracking-wider text-white/30">{secret.secret_type}</span>
+                        <span className="ml-2 text-[10px] uppercase tracking-wider text-muted-foreground/60">{secret.secret_type}</span>
                       </p>
-                      <p className="text-xs text-white/40 mt-0.5">
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">
                         Created {formatDate(secret.created_at)}
                         {secret.description ? ` · ${secret.description}` : ''}
                       </p>
@@ -626,7 +693,7 @@ const SquidVeilSecrets = () => {
                           </code>
                           <button
                             onClick={() => handleCopy(revealed[secret.name])}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex-shrink-0"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-foreground/[0.05] transition-all flex-shrink-0"
                             title="Copy value"
                           >
                             <Copy className="w-3.5 h-3.5" />
@@ -634,15 +701,15 @@ const SquidVeilSecrets = () => {
                         </div>
                       )}
                       {expanded[secret.name] && (
-                        <div className="mt-2 rounded-xl bg-card/50 border border-white/5 p-3 space-y-1.5">
+                        <div className="mt-2 rounded-xl bg-card/50 border border-border p-3 space-y-1.5">
                           {loadingVersions === secret.name ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-violet-400" />
+                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
                           ) : (versions[secret.name] || []).length === 0 ? (
-                            <p className="text-xs text-white/30">No versions</p>
+                            <p className="text-xs text-muted-foreground/60">No versions</p>
                           ) : (
                             (versions[secret.name] || []).map((v: any) => (
                               <div key={v.version_number} className="flex items-center gap-2 text-xs">
-                                <span className="text-white/60 font-medium w-6">v{v.version_number}</span>
+                                <span className="text-muted-foreground font-medium w-6">v{v.version_number}</span>
                                 <span className={cn(
                                   'px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide',
                                   v.state === 'ENABLED' && 'text-emerald-300/80 bg-emerald-500/10',
@@ -651,7 +718,7 @@ const SquidVeilSecrets = () => {
                                 )}>
                                   {v.state}
                                 </span>
-                                <span className="text-white/30">by {v.created_by || 'system'} · {formatDate(v.created_at)}</span>
+                                <span className="text-muted-foreground/60">by {v.created_by || 'system'} · {formatDate(v.created_at)}</span>
                               </div>
                             ))
                           )}
@@ -660,7 +727,7 @@ const SquidVeilSecrets = () => {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all">
+                        <button className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-foreground/[0.05] transition-all">
                           <MoreVertical className="w-3.5 h-3.5" />
                         </button>
                       </DropdownMenuTrigger>
@@ -702,7 +769,7 @@ const SquidVeilSecrets = () => {
                         <Ban className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white/60 truncate">{secret.name}</p>
+                        <p className="text-sm font-medium text-muted-foreground truncate">{secret.name}</p>
                         <p className="text-xs text-amber-300/50 mt-0.5">
                           {secret.delete_after
                             ? `Purges ${formatDate(secret.delete_after)}`
@@ -738,39 +805,39 @@ const SquidVeilSecrets = () => {
         <div className="rounded-lg bg-card/50 border border-border overflow-hidden">
           {loadingTokens ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : tokens.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/5 text-white/20 mb-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-foreground/[0.05] text-muted-foreground/50 mb-4">
                 <KeyRound className="h-7 w-7" />
               </div>
-              <p className="text-sm text-white/40 font-medium">No tokens yet</p>
+              <p className="text-sm text-muted-foreground/70 font-medium">No tokens yet</p>
               <Button
                 onClick={() => setShowTokenCreate(true)}
-                className="mt-4 h-9 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 px-4 gap-1.5"
+                className="mt-4 h-9 rounded-xl bg-primary/20 text-primary/80 border border-primary/30 hover:bg-primary/30 hover:text-primary/60 px-4 gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Token
               </Button>
             </div>
           ) : (
-            <div className="divide-y divide-white/5">
+            <div className="divide-y divide-border">
               {tokens.map(token => {
                 const expired = !token.revoked_at && token.expires_at && new Date(token.expires_at) <= new Date();
                 return (
                   <div key={token.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-card/50 transition-colors">
                     <div className={cn(
                       'flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0',
-                      token.revoked_at ? 'bg-red-500/10 text-red-400' : expired ? 'bg-amber-500/10 text-amber-400' : 'bg-violet-500/10 text-violet-400',
+                      token.revoked_at ? 'bg-red-500/10 text-red-400' : expired ? 'bg-amber-500/10 text-amber-400' : 'bg-primary/10 text-primary',
                     )}>
                       <KeyRound className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-white/90 truncate">{token.name}</p>
+                        <p className="text-sm font-medium text-foreground/90 truncate">{token.name}</p>
                         {token.token_prefix === activePrefix && !token.revoked_at && !expired && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide text-violet-200/90 bg-violet-500/15 border border-violet-500/25">Active</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide text-primary/60/90 bg-primary/15 border border-primary/25">Active</span>
                         )}
                         {token.revoked_at ? (
                           <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide text-red-300/80 bg-red-500/10">Revoked</span>
@@ -780,8 +847,8 @@ const SquidVeilSecrets = () => {
                           <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide text-emerald-300/80 bg-emerald-500/10">Active</span>
                         )}
                       </div>
-                      <p className="text-xs text-white/40 mt-0.5">
-                        <code className="text-violet-300/80">{token.token_prefix}...</code>
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">
+                        <code className="text-primary/80/80">{token.token_prefix}...</code>
                         {' · '}Created {formatDate(token.created_at)}
                         {token.expires_at && ` · Expires ${formatDate(token.expires_at)}`}
                         {token.last_used_at && ` · Last used ${formatDate(token.last_used_at)}`}
@@ -794,7 +861,7 @@ const SquidVeilSecrets = () => {
                           </code>
                           <button
                             onClick={() => handleCopy(rotatedRaw.raw)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all flex-shrink-0"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-foreground/[0.05] transition-all flex-shrink-0"
                             title="Copy new token"
                           >
                             <Copy className="w-3.5 h-3.5" />
@@ -805,7 +872,7 @@ const SquidVeilSecrets = () => {
                     {!token.revoked_at && !expired && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all">
+                          <button className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-foreground/[0.05] transition-all">
                             <MoreVertical className="w-3.5 h-3.5" />
                           </button>
                         </DropdownMenuTrigger>
@@ -848,13 +915,13 @@ const SquidVeilSecrets = () => {
         <div className="space-y-5">
           {loadingMonitor && !monitor ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : !monitor ? (
             <div className="flex flex-col items-center justify-center py-16 text-center rounded-lg bg-card/50 border border-border">
-              <Activity className="h-8 w-8 text-white/20 mb-3" />
-              <p className="text-sm text-white/40">Monitor requires the <code className="text-violet-300/80">audit</code> capability.</p>
-              <button onClick={fetchMonitor} className="mt-3 text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2">
+              <Activity className="h-8 w-8 text-muted-foreground/50 mb-3" />
+              <p className="text-sm text-muted-foreground/70">Monitor requires the <code className="text-primary/80/80">audit</code> capability.</p>
+              <button onClick={fetchMonitor} className="mt-3 text-xs text-primary hover:text-primary/80 underline underline-offset-2">
                 Try again
               </button>
             </div>
@@ -870,12 +937,12 @@ const SquidVeilSecrets = () => {
                   <div key={card.label} className="rounded-lg bg-card/50 border border-border p-4">
                     <div className={cn(
                       'flex h-8 w-8 items-center justify-center rounded-lg mb-3',
-                      card.color === 'red' ? 'bg-red-500/10 text-red-400' : card.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' : card.color === 'sky' ? 'bg-sky-500/10 text-sky-400' : 'bg-violet-500/10 text-violet-400',
+                      card.color === 'red' ? 'bg-red-500/10 text-red-400' : card.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' : card.color === 'sky' ? 'bg-sky-500/10 text-sky-400' : 'bg-primary/10 text-primary',
                     )}>
                       <card.icon className="w-4 h-4" />
                     </div>
-                    <p className="text-2xl font-bold text-white">{card.value}</p>
-                    <p className="text-xs text-white/40 mt-0.5">{card.label}</p>
+                    <p className="text-2xl font-bold text-foreground">{card.value}</p>
+                    <p className="text-xs text-muted-foreground/70 mt-0.5">{card.label}</p>
                   </div>
                 ))}
               </div>
@@ -883,8 +950,8 @@ const SquidVeilSecrets = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                 <div className="lg:col-span-2 rounded-lg bg-card/50 border border-border p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <BarChart3 className="w-4 h-4 text-violet-400" />
-                    <h3 className="text-sm font-semibold text-white">Activity — last 30 days</h3>
+                    <BarChart3 className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">Activity — last 30 days</h3>
                   </div>
                   {stats && stats.activity.length > 0 ? (
                     <div className="flex items-end gap-1 h-32">
@@ -894,7 +961,7 @@ const SquidVeilSecrets = () => {
                         return (
                           <div
                             key={day.day}
-                            className={cn('flex-1 rounded-t transition-all', isToday ? 'bg-violet-400' : 'bg-violet-500/30 hover:bg-violet-500/50')}
+                            className={cn('flex-1 rounded-t transition-all', isToday ? 'bg-primary' : 'bg-primary/30 hover:bg-primary/50')}
                             style={{ height: `${(total / maxActivity) * 100}%`, minHeight: total > 0 ? '3px' : '1px' }}
                             title={`${day.day}: ${day.reads} reads, ${day.writes} writes, ${day.veilrefs} veilrefs, ${day.rotations} rotations`}
                           />
@@ -902,7 +969,7 @@ const SquidVeilSecrets = () => {
                       })}
                     </div>
                   ) : (
-                    <p className="text-xs text-white/30">No activity recorded yet.</p>
+                    <p className="text-xs text-muted-foreground/60">No activity recorded yet.</p>
                   )}
                   {stats && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
@@ -912,10 +979,10 @@ const SquidVeilSecrets = () => {
                         { label: 'Rotations', value: stats.totals.rotations, icon: RefreshCw },
                         { label: 'VeilRefs issued', value: stats.totals.veilrefs_issued, icon: Fingerprint },
                       ] as { label: string; value: number; icon: any }[]).map(s => (
-                        <div key={s.label} className="rounded-xl bg-card/50 border border-white/5 p-3">
-                          <s.icon className="w-3.5 h-3.5 text-white/30 mb-1.5" />
-                          <p className="text-lg font-semibold text-white">{s.value}</p>
-                          <p className="text-[10px] uppercase tracking-wide text-white/30">{s.label}</p>
+                        <div key={s.label} className="rounded-xl bg-card/50 border border-border p-3">
+                          <s.icon className="w-3.5 h-3.5 text-muted-foreground/60 mb-1.5" />
+                          <p className="text-lg font-semibold text-foreground">{s.value}</p>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground/60">{s.label}</p>
                         </div>
                       ))}
                     </div>
@@ -926,7 +993,7 @@ const SquidVeilSecrets = () => {
                   <div className="rounded-lg bg-card/50 border border-border p-5">
                     <div className="flex items-center gap-2 mb-3">
                       <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <h3 className="text-sm font-semibold text-white">Audit chain</h3>
+                      <h3 className="text-sm font-semibold text-foreground">Audit chain</h3>
                     </div>
                     <div className="flex items-center gap-2">
                       {monitor.audit.valid ? (
@@ -938,32 +1005,32 @@ const SquidVeilSecrets = () => {
                         {monitor.audit.valid ? 'Tamper-evident chain intact' : 'Chain broken!'}
                       </p>
                     </div>
-                    <p className="text-xs text-white/30 mt-1">
+                    <p className="text-xs text-muted-foreground/60 mt-1">
                       {monitor.audit.checked} entries verified · last seq {monitor.audit.last_seq}
                     </p>
                   </div>
 
                   <div className="rounded-lg bg-card/50 border border-border p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <Gauge className="w-4 h-4 text-violet-400" />
-                      <h3 className="text-sm font-semibold text-white">Posture</h3>
+                      <Gauge className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-semibold text-foreground">Posture</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-xl bg-card/50 border border-white/5 p-2.5">
+                      <div className="rounded-xl bg-card/50 border border-border p-2.5">
                         <p className="text-lg font-semibold text-emerald-300">{monitor.tokens.active}</p>
-                        <p className="text-white/30">Active tokens</p>
+                        <p className="text-muted-foreground/60">Active tokens</p>
                       </div>
-                      <div className="rounded-xl bg-card/50 border border-white/5 p-2.5">
+                      <div className="rounded-xl bg-card/50 border border-border p-2.5">
                         <p className="text-lg font-semibold text-red-300">{monitor.tokens.revoked + monitor.tokens.expired}</p>
-                        <p className="text-white/30">Revoked / expired</p>
+                        <p className="text-muted-foreground/60">Revoked / expired</p>
                       </div>
-                      <div className="rounded-xl bg-card/50 border border-white/5 p-2.5">
-                        <p className="text-lg font-semibold text-white">{monitor.secrets.total}</p>
-                        <p className="text-white/30">Secrets</p>
+                      <div className="rounded-xl bg-card/50 border border-border p-2.5">
+                        <p className="text-lg font-semibold text-foreground">{monitor.secrets.total}</p>
+                        <p className="text-muted-foreground/60">Secrets</p>
                       </div>
-                      <div className="rounded-xl bg-card/50 border border-white/5 p-2.5">
+                      <div className="rounded-xl bg-card/50 border border-border p-2.5">
                         <p className="text-lg font-semibold text-amber-300">{monitor.secrets.rotation_due.length}</p>
-                        <p className="text-white/30">Rotation due</p>
+                        <p className="text-muted-foreground/60">Rotation due</p>
                       </div>
                     </div>
                     {monitor.secrets.pending_purge.length > 0 && (
@@ -984,14 +1051,14 @@ const SquidVeilSecrets = () => {
                 <div className="rounded-lg bg-red-500/[0.04] border border-red-500/15 p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <ShieldAlert className="w-4 h-4 text-red-400" />
-                    <h3 className="text-sm font-semibold text-white">Failed authentication attempts</h3>
+                    <h3 className="text-sm font-semibold text-foreground">Failed authentication attempts</h3>
                   </div>
                   <div className="space-y-1.5">
                     {monitor.recent_failed_auth.map(f => (
                       <div key={f.seq} className="flex items-center gap-2 text-xs">
                         <span className="text-red-300/80 font-medium w-24 flex-shrink-0">{f.detail}</span>
-                        <span className="text-white/30 truncate flex-1">{f.ip || '—'}</span>
-                        <span className="text-white/30 flex-shrink-0">{formatDate(f.created_at)}</span>
+                        <span className="text-muted-foreground/60 truncate flex-1">{f.ip || '—'}</span>
+                        <span className="text-muted-foreground/60 flex-shrink-0">{formatDate(f.created_at)}</span>
                       </div>
                     ))}
                   </div>
@@ -1001,23 +1068,23 @@ const SquidVeilSecrets = () => {
               {monitor.recent_events.length > 0 && (
                 <div className="rounded-lg bg-card/50 border border-border p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <History className="w-4 h-4 text-violet-400" />
-                    <h3 className="text-sm font-semibold text-white">Recent events</h3>
+                    <History className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">Recent events</h3>
                   </div>
                   <div className="space-y-1.5">
                     {monitor.recent_events.map(e => (
                       <div key={e.seq} className="flex items-center gap-2 text-xs">
                         <span className={cn('flex-shrink-0 w-2 h-2 rounded-full', e.success ? 'bg-emerald-400/70' : 'bg-red-400/70')} />
-                        <code className="text-violet-300/70 w-40 flex-shrink-0 truncate">{e.action}</code>
-                        <span className="text-white/40 truncate flex-1">{e.path}</span>
-                        <span className="text-white/30 flex-shrink-0">{formatDate(e.created_at)}</span>
+                        <code className="text-primary/80/70 w-40 flex-shrink-0 truncate">{e.action}</code>
+                        <span className="text-muted-foreground/70 truncate flex-1">{e.path}</span>
+                        <span className="text-muted-foreground/60 flex-shrink-0">{formatDate(e.created_at)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 text-xs text-white/30 px-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground/60 px-1">
                 <Info className="w-3.5 h-3.5" />
                 Generated {formatDate(monitor.generated_at)} · stats window 30d
               </div>
@@ -1028,36 +1095,36 @@ const SquidVeilSecrets = () => {
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowCreate(false)}>
-          <div className="w-full max-w-md rounded-lg border border-border bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-lg border border-border bg-popover p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-white">New Secret</h2>
-              <button onClick={() => setShowCreate(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-all">
+              <h2 className="text-lg font-semibold text-foreground">New Secret</h2>
+              <button onClick={() => setShowCreate(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/70 hover:text-muted-foreground hover:bg-foreground/[0.05] transition-all">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5">Secret Name</label>
+                <label className="block text-xs font-medium text-muted-foreground/80 mb-1.5">Secret Name</label>
                 <input
                   type="text"
                   value={createName}
                   onChange={e => setCreateName(e.target.value)}
                   placeholder="e.g. STRIPE_API_KEY or db/prod/creds"
-                  className="w-full h-10 rounded-xl border border-border bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+                  className="w-full h-10 rounded-xl border border-border bg-foreground/[0.05] px-4 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5">Secret Value</label>
+                <label className="block text-xs font-medium text-muted-foreground/80 mb-1.5">Secret Value</label>
                 <textarea
                   value={createValue}
                   onChange={e => setCreateValue(e.target.value)}
                   placeholder="Paste the secret value..."
                   rows={3}
-                  className="w-full rounded-xl border border-border bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors resize-none"
+                  className="w-full rounded-xl border border-border bg-foreground/[0.05] px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 transition-colors resize-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5">Type</label>
+                <label className="block text-xs font-medium text-muted-foreground/80 mb-1.5">Type</label>
                 <div className="flex gap-2">
                   {['opaque', 'connection_string', 'hmac_sign'].map(t => (
                     <button
@@ -1066,8 +1133,8 @@ const SquidVeilSecrets = () => {
                       className={cn(
                         'flex-1 h-9 rounded-xl border text-xs font-medium transition-all',
                         createType === t
-                          ? 'border-violet-500/40 bg-violet-500/10 text-violet-200'
-                          : 'border-border bg-white/5 text-white/40 hover:text-white/60',
+                          ? 'border-primary/40 bg-primary/10 text-primary/60'
+                          : 'border-border bg-foreground/[0.05] text-muted-foreground/70 hover:text-muted-foreground',
                       )}
                     >
                       {t.replace('_', ' ')}
@@ -1086,14 +1153,14 @@ const SquidVeilSecrets = () => {
               <Button
                 onClick={() => setShowCreate(false)}
                 variant="ghost"
-                className="flex-1 h-10 rounded-xl text-white/50 hover:text-white/70"
+                className="flex-1 h-10 rounded-xl text-muted-foreground/80 hover:text-foreground/70"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCreate}
                 disabled={creating || !createName.trim() || !createValue.trim()}
-                className="flex-1 h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 disabled:opacity-40 disabled:cursor-not-allowed gap-1.5"
+                className="flex-1 h-10 rounded-xl bg-primary/20 text-primary/80 border border-primary/30 hover:bg-primary/30 hover:text-primary/60 disabled:opacity-40 disabled:cursor-not-allowed gap-1.5"
               >
                 {creating && <Loader2 className="w-4 h-4 animate-spin" />}
                 Create Secret
@@ -1105,26 +1172,26 @@ const SquidVeilSecrets = () => {
 
       {showTokenCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowTokenCreate(false)}>
-          <div className="w-full max-w-md rounded-lg border border-border bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-lg border border-border bg-popover p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-white">New Access Token</h2>
-              <button onClick={() => setShowTokenCreate(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-all">
+              <h2 className="text-lg font-semibold text-foreground">New Access Token</h2>
+              <button onClick={() => setShowTokenCreate(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/70 hover:text-muted-foreground hover:bg-foreground/[0.05] transition-all">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5">Token Name</label>
+                <label className="block text-xs font-medium text-muted-foreground/80 mb-1.5">Token Name</label>
                 <input
                   type="text"
                   value={tokenName}
                   onChange={e => setTokenName(e.target.value)}
                   placeholder="e.g. production-ci"
-                  className="w-full h-10 rounded-xl border border-border bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+                  className="w-full h-10 rounded-xl border border-border bg-foreground/[0.05] px-4 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-white/50 mb-1.5">Expiry (days, optional)</label>
+                <label className="block text-xs font-medium text-muted-foreground/80 mb-1.5">Expiry (days, optional)</label>
                 <input
                   type="number"
                   min={1}
@@ -1132,12 +1199,12 @@ const SquidVeilSecrets = () => {
                   value={tokenTtl}
                   onChange={e => setTokenTtl(e.target.value)}
                   placeholder="Never expires"
-                  className="w-full h-10 rounded-xl border border-border bg-white/5 px-4 text-sm text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 transition-colors"
+                  className="w-full h-10 rounded-xl border border-border bg-foreground/[0.05] px-4 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 transition-colors"
                 />
               </div>
-              <div className="flex items-center gap-2 rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-3">
-                <Info className="w-4 h-4 text-violet-400 flex-shrink-0" />
-                <p className="text-xs text-violet-300/80">
+              <div className="flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-3">
+                <Info className="w-4 h-4 text-primary flex-shrink-0" />
+                <p className="text-xs text-primary/80/80">
                   Up to {MAX_TOKENS} tokens per account. The new token becomes the active token for this
                   dashboard. Store the raw token securely — it is shown only once.
                 </p>
@@ -1147,14 +1214,14 @@ const SquidVeilSecrets = () => {
               <Button
                 onClick={() => setShowTokenCreate(false)}
                 variant="ghost"
-                className="flex-1 h-10 rounded-xl text-white/50 hover:text-white/70"
+                className="flex-1 h-10 rounded-xl text-muted-foreground/80 hover:text-foreground/70"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCreateToken}
                 disabled={creatingToken || !tokenName.trim()}
-                className="flex-1 h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 disabled:opacity-40 disabled:cursor-not-allowed gap-1.5"
+                className="flex-1 h-10 rounded-xl bg-primary/20 text-primary/80 border border-primary/30 hover:bg-primary/30 hover:text-primary/60 disabled:opacity-40 disabled:cursor-not-allowed gap-1.5"
               >
                 {creatingToken && <Loader2 className="w-4 h-4 animate-spin" />}
                 Create Token
@@ -1166,14 +1233,14 @@ const SquidVeilSecrets = () => {
 
       {rawToken && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setRawToken(null)}>
-          <div className="w-full max-w-md rounded-lg border border-violet-500/20 bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-lg border border-primary/20 bg-popover p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Token created</h2>
-                <p className="text-sm text-white/50">Shown once — copy it now.</p>
+                <h2 className="text-lg font-semibold text-foreground">Token created</h2>
+                <p className="text-sm text-muted-foreground/80">Shown once — copy it now.</p>
               </div>
             </div>
             <code className="block w-full text-xs text-emerald-300/90 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-3 break-all mb-2">
@@ -1182,7 +1249,7 @@ const SquidVeilSecrets = () => {
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => handleCopy(rawToken)}
-                className="flex-1 h-10 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 hover:text-violet-200 gap-1.5"
+                className="flex-1 h-10 rounded-xl bg-primary/20 text-primary/80 border border-primary/30 hover:bg-primary/30 hover:text-primary/60 gap-1.5"
               >
                 <Copy className="w-4 h-4" />
                 Copy token
@@ -1190,7 +1257,7 @@ const SquidVeilSecrets = () => {
               <Button
                 onClick={() => setRawToken(null)}
                 variant="ghost"
-                className="h-10 rounded-xl text-white/50 hover:text-white/70"
+                className="h-10 rounded-xl text-muted-foreground/80 hover:text-foreground/70"
               >
                 Done
               </Button>
@@ -1201,24 +1268,24 @@ const SquidVeilSecrets = () => {
 
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setDeleteId(null)}>
-          <div className="w-full max-w-sm rounded-lg border border-border bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-lg border border-border bg-popover p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-red-400">
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Delete Secret</h2>
-                <p className="text-sm text-white/50">Soft delete — restorable within the recovery window.</p>
+                <h2 className="text-lg font-semibold text-foreground">Delete Secret</h2>
+                <p className="text-sm text-muted-foreground/80">Soft delete — restorable within the recovery window.</p>
               </div>
             </div>
-            <p className="text-sm text-white/70 mb-6">
-              Are you sure you want to delete <span className="font-medium text-white">{deleteId}</span>?
+            <p className="text-sm text-foreground/70 mb-6">
+              Are you sure you want to delete <span className="font-medium text-foreground">{deleteId}</span>?
             </p>
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => setDeleteId(null)}
                 variant="ghost"
-                className="flex-1 h-10 rounded-xl text-white/50 hover:text-white/70"
+                className="flex-1 h-10 rounded-xl text-muted-foreground/80 hover:text-foreground/70"
               >
                 Cancel
               </Button>
@@ -1237,14 +1304,14 @@ const SquidVeilSecrets = () => {
 
       {showTokenDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setShowTokenDelete(null); setTokenDeleteConfirmName(''); }}>
-          <div className="w-full max-w-sm rounded-lg border border-border bg-[#0a0a0f] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-lg border border-border bg-popover p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-red-400">
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Delete Token</h2>
-                <p className="text-sm text-white/50">Permanent — the token can never be used again.</p>
+                <h2 className="text-lg font-semibold text-foreground">Delete Token</h2>
+                <p className="text-sm text-muted-foreground/80">Permanent — the token can never be used again.</p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-xl border border-red-500/20 bg-red-500/5 mb-4">
@@ -1259,22 +1326,22 @@ const SquidVeilSecrets = () => {
               </div>
             </div>
             <div className="mb-4">
-              <label className="block text-xs font-medium text-white/50 mb-1.5">
-                Type <span className="font-mono text-white font-semibold">{showTokenDelete.name}</span> to confirm
+              <label className="block text-xs font-medium text-muted-foreground/80 mb-1.5">
+                Type <span className="font-mono text-foreground font-semibold">{showTokenDelete.name}</span> to confirm
               </label>
               <input
                 type="text"
                 value={tokenDeleteConfirmName}
                 onChange={e => setTokenDeleteConfirmName(e.target.value)}
                 placeholder={showTokenDelete.name}
-                className="w-full h-10 rounded-xl border border-border bg-white/5 px-4 text-sm text-white placeholder:text-white/25 outline-none focus:border-red-500/40 font-mono transition-colors"
+                className="w-full h-10 rounded-xl border border-border bg-foreground/[0.05] px-4 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-red-500/40 font-mono transition-colors"
               />
             </div>
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => { setShowTokenDelete(null); setTokenDeleteConfirmName(''); }}
                 variant="ghost"
-                className="flex-1 h-10 rounded-xl text-white/50 hover:text-white/70"
+                className="flex-1 h-10 rounded-xl text-muted-foreground/80 hover:text-foreground/70"
               >
                 Cancel
               </Button>

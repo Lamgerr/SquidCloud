@@ -78,7 +78,7 @@ const FolderRow: React.FC<FolderRowProps> = ({
         >
           <div className="relative w-16 h-12 mb-2.5">
             <div className="absolute inset-0 bg-muted/30 border border-border/40 rounded-md flex items-center justify-center">
-              <Folder className="w-5 h-5 text-muted-foreground/70 group-hover:text-muted-foreground transition-colors duration-150" />
+              <Folder className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors duration-150" />
             </div>
           </div>
 
@@ -353,11 +353,11 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
                 viewMode={viewMode}
                 selected={f.id === selectedId}
                 onOpen={() => onOpen(f)}
-                onDelete={() => onDelete?.(f)}
-                onRename={(name) => onRename?.(f, name)}
-                onMove={() => onMove?.(f)}
-                onDownload={() => onDownload?.(f)}
-                onShare={() => onShare?.(f)}
+                onDelete={onDelete ? () => onDelete(f) : undefined}
+                onRename={onRename ? (name) => onRename(f, name) : undefined}
+                onMove={onMove ? () => onMove(f) : undefined}
+                onDownload={onDownload ? () => onDownload(f) : undefined}
+                onShare={onShare ? () => onShare(f) : undefined}
               />
             ))}
           </div>

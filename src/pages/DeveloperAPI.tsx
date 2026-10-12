@@ -1,29 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
+import React, { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
-import {
-  Activity,
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle2,
-  Code,
-  Copy,
-  FileText,
-  Key,
-  Loader2,
-  Play,
-  Settings2,
-  Sliders,
-  XCircle,
-} from '@/lib/icon-map';
+import { Activity, Code, FileText, Key, Play, Settings2, Sliders } from '@/lib/icon-map';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileScrollToTop from '@/components/MobileScrollToTop';
@@ -43,6 +23,82 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AppShell, AppTheme, TopBar, Wrap, PageHead, Panel, Row, Pill, Dot, Kbd, Meter, Note,
+  Stat, Stats, Empty, SkelRows, Spinner, Ico, CodeBlock, CopyLine, UnderlineTabs,
+  btn, useHashState, useDocTitle, useSearchShortcut,
+} from '@/components/custom/squid-app';
+
+/* ═══════════════════════════════════════════════════════════════
+   DEVELOPER API
+   A working surface for people who live in it: tabs that persist in
+   the URL (#tab=playground), ⌘/Ctrl+Enter to send a request, an
+   endpoint reference you can filter and expand, a docs rail that
+   stays put while you scroll. Data, requests and Supabase calls are
+   unchanged.
+   Place at: src/pages/DeveloperAPI.tsx
+   ═══════════════════════════════════════════════════════════════ */
+
+const TAB_IDS = ['overview', 'keys', 'playground', 'status', 'docs'] as const;
+type TabId = (typeof TAB_IDS)[number];
+
+const DV_CSS = `
+.dv-bar { position: sticky; top: 48px; z-index: 30; padding: 0 var(--sa-gut); border-bottom: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg) 92%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.dv-bar .sa-tabs { max-width: 1120px; margin: 0 auto; border-bottom: 0; }
+.dv-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.dv-split > *, .dv-col, .dv-col > *, .dv-lines > * { min-width: 0; }
+.dv-split > .sa-panel + .sa-panel, .dv-col > .sa-panel + .sa-panel { margin-top: 20px; }
+.dv-split .sa-code.inline { display: flex; width: 100%; }
+.dv-split .sa-code.inline code { flex: 1; min-width: 0; }
+.dv-sticky { position: sticky; top: 108px; }
+@media (max-width: 1100px) { .dv-split { grid-template-columns: minmax(0, 1fr); } .dv-sticky { position: static; } }
+.dv-docs { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: 40px; align-items: start; }
+.dv-docs > *, .dv-docs .sa-panel-b > * { min-width: 0; }
+.dv-docs-nav { position: sticky; top: 108px; }
+@media (max-width: 1100px) { .dv-docs { grid-template-columns: minmax(0, 1fr); gap: 20px; } .dv-docs-nav { display: none; } }
+.dv-sec { scroll-margin-top: 112px; }
+.dv-sec + .dv-sec { margin-top: 24px; }
+.dv-m { min-width: 56px; justify-content: center; }
+.dv-form { display: grid; gap: 14px; padding: 16px; }
+.dv-form .g2 { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 10px; }
+.dv-form .g2 > *, .dv-dl > * { min-width: 0; }
+.dv-ta { height: auto; padding: 10px; font-family: var(--sa-mono); font-size: 12.5px; line-height: 1.6; resize: vertical; }
+.dv-send { display: flex; align-items: center; gap: 10px; }
+.dv-send .sa-btn { flex: 1; }
+.dv-ep { border-top: 1px solid var(--sa-line); }
+.dv-ep:first-child { border-top: 0; }
+.dv-ep > summary { list-style: none; display: grid; grid-template-columns: 60px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 11px 16px; cursor: pointer; transition: background 0.12s; }
+.dv-ep > summary::-webkit-details-marker { display: none; }
+.dv-ep > summary:hover, .dv-ep[open] > summary { background: var(--sa-bg-3); }
+.dv-ep .path { font: 500 12.5px/1.3 var(--sa-mono); color: var(--sa-text); word-break: break-all; }
+.dv-ep .sum { margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--sa-mute); }
+.dv-ep .scopes { display: flex; gap: 4px; }
+.dv-ep .chev { color: var(--sa-mute); transition: transform 0.2s var(--sa-ease); }
+.dv-ep[open] .chev { transform: rotate(90deg); }
+.dv-ep .body { display: grid; gap: 12px; padding: 6px 16px 16px; }
+.dv-ep[open] .body { animation: sa-in 0.22s var(--sa-ease) both; }
+.dv-ep .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 720px) { .dv-ep > summary { grid-template-columns: 56px minmax(0, 1fr); } .dv-ep .scopes { display: none; } }
+.dv-inline { padding: 1px 5px; border: 1px solid var(--sa-line); border-radius: 3px; background: var(--sa-bg-3); font: 400 11.5px/1 var(--sa-mono); color: var(--sa-text); }
+.dv-p { margin: 0; font-size: 13px; line-height: 1.65; color: var(--sa-text-2); }
+.dv-lines { display: grid; gap: 6px; }
+.dv-dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 16px; }
+@media (max-width: 720px) { .dv-dl { grid-template-columns: 1fr; } }
+.dv-dl a { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--sa-line); border-radius: 5px; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
+.dv-dl a:hover { background: var(--sa-bg-3); border-color: var(--sa-dim); }
+.dv-dl b { display: block; font: 500 13px/1.3 var(--sa-f); }
+.dv-dl small { display: block; margin-top: 2px; font-size: 12px; color: var(--sa-mute); }
+.dv-health { display: flex; align-items: center; gap: 8px; font: 400 12px/1 var(--sa-mono); color: var(--sa-mute); }
+`;
+
+const methodTone = (m: string) =>
+  m === 'GET' ? 'info' : m === 'POST' ? 'ok' : m === 'PUT' ? 'warn' : m === 'DELETE' ? 'err' : 'neutral';
+
+function MethodTag({ method }: { method: string }) {
+  return <Pill tone={methodTone(method) as any}><span className="dv-m" style={{ display: 'inline-flex' }}>{method}</span></Pill>;
+}
+
+const statusTone = (code: string) => (code.startsWith('2') ? 'ok' : code.startsWith('5') ? 'err' : 'warn');
 
 type Endpoint = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -607,22 +663,34 @@ const endpoints: Endpoint[] = [
   },
 ];
 
-
-const methodBadgeClass = (method: Endpoint['method']) => {
-  if (method === 'GET') return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
-  if (method === 'POST') return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
-  if (method === 'PUT') return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
-  if (method === 'PATCH') return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
-  return 'bg-red-500/10 text-red-600 border-red-500/20';
-};
-
 const DeveloperAPI = () => {
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useHashState<TabId>('tab', 'overview', TAB_IDS);
   const [endpointStatus, setEndpointStatus] = useState<Record<string, EndpointHealth>>({});
+  const [activeDoc, setActiveDoc] = useState<string>('dv-auth');
+
+  // Scroll-spy for the Docs rail — highlights the section in view.
+  useEffect(() => {
+    if (activeTab !== 'docs') return;
+    const ids = ['dv-auth', 'dv-agent', 'dv-endpoints', 'dv-costs', 'dv-credits', 'dv-codes', 'dv-downloads'];
+    const sections = ids
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => !!el);
+    if (!sections.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (!visible.length) return;
+        visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        setActiveDoc(visible[0].target.id);
+      },
+      { rootMargin: '-120px 0px -70% 0px' },
+    );
+    sections.forEach((s) => observer.observe(s));
+    return () => observer.disconnect();
+  }, [activeTab]);
 
   const [playgroundMethod, setPlaygroundMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'>('GET');
   const [playgroundEndpoint, setPlaygroundEndpoint] = useState('/files');
@@ -874,200 +942,216 @@ const DeveloperAPI = () => {
     const interval = setInterval(calcCountdown, 1000);
     return () => clearInterval(interval);
   }, []);
+  /* ── workbench additions (UI state only) ── */
+  const [endpointFilter, setEndpointFilter] = useState('');
+  const filterRef = useRef<HTMLInputElement>(null);
+  useSearchShortcut(filterRef);
+  useDocTitle('Developer API');
 
   if (isMobile) {
-    return <DeveloperAPIMobile />;
+    return (
+      <>
+        <AppTheme />
+        <DeveloperAPIMobile />
+      </>
+    );
   }
 
+  let respStatus: number | null = null;
+  let respLatency = '';
+  try {
+    const r = JSON.parse(playgroundResponse);
+    if (typeof r?.status === 'number') {
+      respStatus = r.status;
+      respLatency = r.latency || '';
+    }
+  } catch {
+    /* not a formatted response */
+  }
+
+  const q = endpointFilter.trim().toLowerCase();
+  const shownEndpoints = endpoints.filter(
+    (e) => !q || e.path.toLowerCase().includes(q) || e.method.toLowerCase().includes(q) || e.description.toLowerCase().includes(q),
+  );
+  const healthTargets = endpoints.filter((e) => e.statusPath);
+  const onlineCount = healthTargets.filter((e) => endpointStatus[e.path]?.status === 'online').length;
+  const stillChecking = healthTargets.some((e) => !endpointStatus[e.path] || endpointStatus[e.path].status === 'checking');
+
+  const calm = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+
+  const DOC_SECTIONS = [
+    ['dv-auth', 'Authentication'],
+    ['dv-agent', 'AI agent prompt'],
+    ['dv-endpoints', 'Endpoint reference'],
+    ['dv-costs', 'Credit costs'],
+    ['dv-credits', 'Credit system'],
+    ['dv-codes', 'HTTP status codes'],
+    ['dv-downloads', 'Downloads'],
+  ] as const;
+
+  const keyLabel = (key: any) => key.name || key.key_prefix || key.key?.substring(0, 12);
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <AppShell>
+      <style>{DV_CSS}</style>
       <MobileScrollToTop />
 
-      <div className="container mx-auto max-w-6xl px-4 py-6 md:py-8">
-        <div className="flex items-center gap-3 mb-5">
-          <button onClick={() => navigate('/dashboard')} className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold">Developer API</h1>
-            <p className="text-[12px] text-muted-foreground/70">Build with SquidCloud API v4.0</p>
-          </div>
-        </div>
+      <TopBar crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Developer API' }]}>
+        <span className="hide-sm"><Pill>API v4.0</Pill></span>
+      </TopBar>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex gap-0.5 p-0.5 rounded-lg bg-muted/30 mb-4 w-fit">
-            {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'keys', label: 'API Keys' },
-              { id: 'playground', label: 'Playground' },
-              { id: 'status', label: 'Status' },
-              { id: 'docs', label: 'Docs' },
-            ].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={cn("px-2.5 h-7 text-[12px] font-medium rounded-md transition-colors",
-                  activeTab === tab.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}>
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      <div className="dv-bar">
+        <UnderlineTabs<TabId>
+          label="Developer API sections"
+          idPrefix="dv"
+          value={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'keys', label: 'API Keys', count: apiKeys.length || undefined },
+            { id: 'playground', label: 'Playground' },
+            { id: 'status', label: 'Status' },
+            { id: 'docs', label: 'Docs' },
+          ]}
+        />
+      </div>
 
-          <TabsContent value="overview" className="space-y-3 mt-0">
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-3">
-              <div className="flex items-center gap-2.5">
-                <Code className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">SquidCloud API v4.0</span>
-                <span className="text-[11px] text-muted-foreground/50">Credit-based file API with RES54 end-to-end encryption, CDN streaming, secrets vault, and workspace collaboration</span>
-              </div>
-              <div className="h-px bg-border/40" />
-              <div className="flex gap-2">
-                <div className="flex-1 rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                  <div className="text-lg font-semibold tabular-nums">{endpoints.length}</div>
-                  <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Endpoints</div>
-                </div>
-                <div className="flex-1 rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                  <div className="text-lg font-semibold">99.9%</div>
-                  <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Uptime</div>
-                </div>
-                <div className="flex-1 rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                  <div className="text-lg font-semibold">&lt;100ms</div>
-                  <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Latency</div>
-                </div>
-              </div>
-              <div className="h-px bg-border/40" />
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground/70 mb-1.5 uppercase tracking-[0.06em]">Base URL</p>
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-muted/20 px-2.5 h-8">
-                  <code className="text-[11px] text-muted-foreground/80 truncate">{BASE_URL}</code>
-                  <button onClick={() => copyToClipboard(BASE_URL)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent/50 transition-colors flex-shrink-0">
-                    <Copy className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground/70 mb-1.5 uppercase tracking-[0.06em]">Quick Start</p>
-                <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5">
-                  <code className="text-[11px] leading-relaxed whitespace-pre-wrap block font-mono text-muted-foreground/80">
-{`curl -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+      <Wrap>
+        <PageHead eyebrow="Developer" title="Developer API" desc="Build with SquidCloud API v4.0" />
+
+        {/* ═════════ Overview ═════════ */}
+        {activeTab === 'overview' && (
+          <div className="sa-in">
+            <Stats>
+              <Stat label="Endpoints" value={endpoints.length} />
+              <Stat label="Uptime" value="99.9%" />
+              <Stat label="Latency" value="<100ms" />
+            </Stats>
+
+            <div className="dv-split" style={{ marginTop: 16 }}>
+              <div className="dv-col">
+                <Panel
+                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Code className="h-3.5 w-3.5" /> SquidCloud API v4.0</span>}
+                  desc="Credit-based file API with RES54 end-to-end encryption, CDN streaming, secrets vault, and workspace collaboration"
+                >
+                  <div style={{ display: 'grid', gap: 18 }}>
+                    <div>
+                      <div className="sa-label">Base URL</div>
+                      <CopyLine value={BASE_URL} />
+                    </div>
+                    <div>
+                      <div className="sa-label">Quick start</div>
+                      <CodeBlock
+                        lang="bash"
+                        code={`curl -H "X-SquidCloud-Key: YOUR_API_KEY" \\
   -H "X-SquidCloud-Encryption-Key: OPTIONAL_USER_KEY" \\
   ${BASE_URL}/files`}
-                  </code>
-                  <button onClick={() => copyToClipboard(`curl -H "X-SquidCloud-Key: YOUR_API_KEY" -H "X-SquidCloud-Encryption-Key: OPTIONAL_USER_KEY" ${BASE_URL}/files`)}
-                    className="mt-2 inline-flex items-center gap-1.5 h-6 rounded px-2 text-[11px] font-medium text-muted-foreground/70 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40">
-                    <Copy className="w-3 h-3" />
-                    Copy
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/50 bg-card/50 p-6 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Activity className="w-4 h-4 text-muted-foreground/70" />
-                  <span className="text-[13px] font-medium">API Credits</span>
-                </div>
-                {loadingCredits && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" />}
-              </div>
-              {creditInfo ? (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-[12px] text-muted-foreground/70">
-                    <span>{creditInfo.used} used of {creditInfo.daily_limit} today</span>
-                    <span>{creditInfo.remaining} remaining</span>
+                        copyText={`curl -H "X-SquidCloud-Key: YOUR_API_KEY" -H "X-SquidCloud-Encryption-Key: OPTIONAL_USER_KEY" ${BASE_URL}/files`}
+                        wrap
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all duration-500", {
-                        'bg-green-500': creditInfo.remaining / creditInfo.daily_limit > 0.5,
-                        'bg-yellow-500': creditInfo.remaining / creditInfo.daily_limit <= 0.5 && creditInfo.remaining / creditInfo.daily_limit >= 0.25,
-                        'bg-red-500': creditInfo.remaining / creditInfo.daily_limit < 0.25,
-                      })}
-                      style={{ width: `${(creditInfo.remaining / creditInfo.daily_limit) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                !loadingCredits && <p className="text-[12px] text-muted-foreground/50">Sign in to view your credit usage</p>
-              )}
-            </div>
+                </Panel>
+              </div>
 
-            {apiKeys.length > 0 && (
-              <div className="rounded-2xl border border-border/50 bg-card/50 p-6 space-y-3">
-                <div className="flex items-center gap-2.5">
-                  <Sliders className="w-4 h-4 text-muted-foreground/70" />
-                  <span className="text-[13px] font-medium">Per-Key Configuration</span>
-                </div>
-                <p className="text-[12px] text-muted-foreground/60">Configure limits, rate limits, and security per API key</p>
-                <div className="space-y-2">
-                  {apiKeys.map((key) => (
-                    <div key={key.id} className="flex items-center justify-between h-9 px-2.5 rounded-lg hover:bg-accent/20 transition-colors">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Key className="w-3.5 h-3.5 text-muted-foreground/50 flex-shrink-0" />
-                        <code className="text-[12px] text-muted-foreground/80 truncate">{key.name || key.key_prefix || key.key?.substring(0, 12)}</code>
+              <div className="dv-col">
+                <Panel
+                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Activity className="h-3.5 w-3.5" /> API Credits</span>}
+                  actions={loadingCredits ? <Spinner /> : undefined}
+                >
+                  {creditInfo ? (
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }} className="sa-num">
+                        <span>{creditInfo.used} used of {creditInfo.daily_limit} today</span>
+                        <span className="sa-mute">{creditInfo.remaining} remaining</span>
                       </div>
-                      <Dialog open={configDialogOpen && configKey?.id === key.id} onOpenChange={(open) => { setConfigDialogOpen(open); if (open) { setConfigKey(key); setConfigForm({ custom_daily_limit: String(key.custom_daily_limit ?? ''), custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''), allow_hmac: key.allow_hmac ?? false, is_disabled: key.is_disabled ?? false }); } }}>
-                        <DialogTrigger asChild>
-                          <button
-                            className="inline-flex items-center gap-1 h-7 rounded-md px-2 text-[11px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40"
-                            onClick={() => { setConfigKey(key); setConfigForm({ custom_daily_limit: String(key.custom_daily_limit ?? ''), custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''), allow_hmac: key.allow_hmac ?? false, is_disabled: key.is_disabled ?? false }); }}
-                          >
-                            <Settings2 className="w-3 h-3" />
-                            Configure
-                          </button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Key Configuration</DialogTitle>
-                            <DialogDescription>
-                              Configure limits and security for <code className="text-xs">{key.name || key.key_prefix}</code>
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-2">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1.5">
-                                <Label className="text-[11px] text-muted-foreground/70">Daily Credit Limit</Label>
-                                <Input
-                                  className="h-8 text-xs"
-                                  type="number" min="0"
-                                  placeholder="Default"
-                                  value={configForm.custom_daily_limit}
-                                  onChange={(e) => setConfigForm(p => ({ ...p, custom_daily_limit: e.target.value }))}
+                      <Meter value={creditInfo.used} max={creditInfo.daily_limit} label="Credits used today" />
+                    </div>
+                  ) : loadingCredits ? (
+                    <SkelRows rows={1} />
+                  ) : (
+                    <p className="dv-p sa-mute">Sign in to view your credit usage</p>
+                  )}
+                </Panel>
+
+                {apiKeys.length > 0 && (
+                  <Panel
+                    title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Sliders className="h-3.5 w-3.5" /> Per-Key Configuration</span>}
+                    desc="Configure limits, rate limits, and security per API key"
+                    flush
+                  >
+                    {apiKeys.map((key) => (
+                      <Row
+                        key={key.id}
+                        label={<span title={String(keyLabel(key))} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}><Key className="h-3.5 w-3.5 sa-mute" style={{ flex: 'none' }} /><code className="sa-mono" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, maxWidth: 220 }}>{keyLabel(key)}</code></span>}
+                      >
+                        <Dialog open={configDialogOpen && configKey?.id === key.id} onOpenChange={(open) => { setConfigDialogOpen(open); if (open) { setConfigKey(key); setConfigForm({ custom_daily_limit: String(key.custom_daily_limit ?? ''), custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''), allow_hmac: key.allow_hmac ?? false, is_disabled: key.is_disabled ?? false }); } }}>
+                          <DialogTrigger asChild>
+                            <button
+                              type="button"
+                              className={btn('default', 'sm')}
+                              onClick={() => { setConfigKey(key); setConfigForm({ custom_daily_limit: String(key.custom_daily_limit ?? ''), custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''), allow_hmac: key.allow_hmac ?? false, is_disabled: key.is_disabled ?? false }); }}
+                            >
+                              <Settings2 className="h-3 w-3" />
+                              Configure
+                            </button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Key Configuration</DialogTitle>
+                              <DialogDescription>
+                                Configure limits and security for <code className="dv-inline">{key.name || key.key_prefix}</code>
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-2">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs text-muted-foreground">Daily Credit Limit</Label>
+                                  <Input
+                                    className="h-9 text-sm"
+                                    type="number" min="0"
+                                    placeholder="Default"
+                                    value={configForm.custom_daily_limit}
+                                    onChange={(e) => setConfigForm(p => ({ ...p, custom_daily_limit: e.target.value }))}
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs text-muted-foreground">Rate Limit (req/s)</Label>
+                                  <Input
+                                    className="h-9 text-sm"
+                                    type="number" min="0"
+                                    placeholder="Default"
+                                    value={configForm.custom_rate_limit_rps}
+                                    onChange={(e) => setConfigForm(p => ({ ...p, custom_rate_limit_rps: e.target.value }))}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between h-10 px-3 rounded-md border border-border">
+                                <Label className="text-sm">Require HMAC Request Signing</Label>
+                                <Switch
+                                  checked={configForm.allow_hmac}
+                                  onCheckedChange={(v) => setConfigForm(p => ({ ...p, allow_hmac: v }))}
                                 />
                               </div>
-                              <div className="space-y-1.5">
-                                <Label className="text-[11px] text-muted-foreground/70">Rate Limit (req/s)</Label>
-                                <Input
-                                  className="h-8 text-xs"
-                                  type="number" min="0"
-                                  placeholder="Default"
-                                  value={configForm.custom_rate_limit_rps}
-                                  onChange={(e) => setConfigForm(p => ({ ...p, custom_rate_limit_rps: e.target.value }))}
+                              <div className="flex items-center justify-between h-10 px-3 rounded-md border border-border">
+                                <Label className="text-sm">Disable This Key</Label>
+                                <Switch
+                                  checked={configForm.is_disabled}
+                                  onCheckedChange={(v) => setConfigForm(p => ({ ...p, is_disabled: v }))}
                                 />
                               </div>
                             </div>
-                            <div className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
-                              <Label className="text-[12px] text-muted-foreground/80">Require HMAC Request Signing</Label>
-                              <Switch
-                                checked={configForm.allow_hmac}
-                                onCheckedChange={(v) => setConfigForm(p => ({ ...p, allow_hmac: v }))}
-                              />
-                            </div>
-                            <div className="flex items-center justify-between h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
-                              <Label className="text-[12px] text-foreground/80">Disable This Key</Label>
-                              <Switch
-                                checked={configForm.is_disabled}
-                                onCheckedChange={(v) => setConfigForm(p => ({ ...p, is_disabled: v }))}
-                              />
-                            </div>
-                          </div>
-                          <DialogFooter>
-                            <button
-                              className="inline-flex items-center justify-center gap-1 h-8 rounded-md px-3 text-[12px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40"
-                              onClick={() => setConfigDialogOpen(false)}
-                            >Cancel</button>
-                            <button
-                              className="inline-flex items-center justify-center gap-1 h-8 rounded-md px-3 text-[12px] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50"
-                              disabled={savingConfig}
+                            <DialogFooter>
+                              <button
+                                type="button"
+                                className={btn()}
+                                onClick={() => setConfigDialogOpen(false)}
+                              >Cancel</button>
+                              <button
+                                type="button"
+                                className={btn('primary')}
+                                disabled={savingConfig}
                               onClick={async () => {
                                 setSavingConfig(true);
                                 try {
@@ -1101,392 +1185,428 @@ const DeveloperAPI = () => {
                                   setSavingConfig(false);
                                 }
                               }}
-                            >
-                              {savingConfig ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
-                            </button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  ))}
-                </div>
+                              >
+                                {savingConfig ? <Spinner size={12} /> : 'Save'}
+                              </button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </Row>
+                    ))}
+                  </Panel>
+                )}
               </div>
-            )}
-          </TabsContent>
+            </div>
+          </div>
+        )}
 
-          <TabsContent value="keys" className="mt-0">
+        {/* ═════════ API keys ═════════ */}
+        {activeTab === 'keys' && (
+          <div className="sa-in">
             <ApiKeyManagement />
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="playground" className="space-y-3 mt-0">
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-3">
-              <div className="flex items-center gap-2.5">
-                <Play className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">API Playground</span>
-                <span className="text-[11px] text-muted-foreground/50">Send requests with API key and optional encryption key</span>
-              </div>
-              <div className="h-px bg-border/40" />
-              <div className="grid grid-cols-[120px_1fr] gap-2">
-                <div>
-                  <Label className="text-[11px] text-muted-foreground/70">Method</Label>
-                  <Select value={playgroundMethod} onValueChange={(value) => setPlaygroundMethod(value as 'GET' | 'POST' | 'DELETE')}>
-                    <SelectTrigger className="h-8 mt-1 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GET" className="text-xs">GET</SelectItem>
-                      <SelectItem value="POST" className="text-xs">POST</SelectItem>
-                      <SelectItem value="DELETE" className="text-xs">DELETE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-[11px] text-muted-foreground/70">Endpoint Path</Label>
-                  <Input className="h-8 mt-1 text-xs" value={playgroundEndpoint} onChange={(e) => setPlaygroundEndpoint(e.target.value)} placeholder="/files" />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[11px] text-muted-foreground/70">API Key</Label>
-                <Input className="h-8 mt-1 text-xs font-mono" type="password" value={playgroundApiKey} onChange={(e) => setPlaygroundApiKey(e.target.value)} placeholder="cb_your_api_key" />
-              </div>
-              <div>
-                <Label className="text-[11px] text-muted-foreground/70">Encryption Key <span className="text-muted-foreground/40 font-normal">(optional)</span></Label>
-                <Input className="h-8 mt-1 text-xs font-mono" type="password" value={playgroundEncryptionKey} onChange={(e) => setPlaygroundEncryptionKey(e.target.value)} placeholder="optional user encryption key" />
-                <p className="text-[10px] text-muted-foreground/50 mt-1">Wrong key for encrypted download returns 422.</p>
-              </div>
-              {playgroundMethod !== 'GET' && (
-                <div>
-                  <Label className="text-[11px] text-muted-foreground/70">Request Body <span className="text-muted-foreground/40 font-normal">(JSON)</span></Label>
-                  <Textarea className="mt-1 font-mono text-xs" rows={4} value={playgroundBody} onChange={(e) => setPlaygroundBody(e.target.value)} placeholder='{"key":"value"}' />
-                </div>
-              )}
-              <button onClick={testEndpoint} disabled={playgroundLoading}
-                className="flex items-center justify-center gap-1.5 h-8 rounded-lg bg-primary/10 text-primary text-[12px] font-medium hover:bg-primary/20 transition-colors disabled:opacity-50">
-                {playgroundLoading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending Request...</> : <><Play className="w-3.5 h-3.5" /> Send Request</>}
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-medium">Response</span>
-                {playgroundResponse && <span className="text-[10px] text-muted-foreground/50">Latest request result</span>}
-              </div>
-              <Textarea value={playgroundResponse} readOnly rows={10} className="font-mono text-[11px] leading-relaxed min-h-[100px]" placeholder="Response will appear here..." />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="status" className="space-y-3 mt-0">
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-3">
-              <div className="flex items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5">
-                  <Activity className="w-4 h-4 text-muted-foreground/70" />
-                  <span className="text-[13px] font-medium">Account Credits</span>
-                </div>
-                <button
-                  onClick={fetchAccountData}
-                  disabled={statusLoading}
-                  className="inline-flex items-center justify-center gap-1 h-7 rounded-md px-2 text-[11px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40 disabled:opacity-50"
-                >
-                  {statusLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
-                  Refresh
-                </button>
-              </div>
-              <div className="h-px bg-border/40" />
-              {accountCredits ? (
-                <>
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                      <div className="text-lg font-semibold tabular-nums">{accountCredits.credits_used_today}</div>
-                      <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Used Today</div>
+        {/* ═════════ Playground ═════════ */}
+        {activeTab === 'playground' && (
+          <div className="dv-split sa-in">
+            <div
+              className="dv-col"
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !playgroundLoading) {
+                  e.preventDefault();
+                  testEndpoint();
+                }
+              }}
+            >
+              <Panel
+                title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Play className="h-3.5 w-3.5" /> API Playground</span>}
+                desc="Send requests with API key and optional encryption key"
+                flush
+              >
+                <div className="dv-form">
+                  <div className="g2">
+                    <div>
+                      <label className="sa-label">Method</label>
+                      <Select value={playgroundMethod} onValueChange={(value) => setPlaygroundMethod(value as typeof playgroundMethod)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GET" className="text-xs">GET</SelectItem>
+                          <SelectItem value="POST" className="text-xs">POST</SelectItem>
+                          <SelectItem value="PUT" className="text-xs">PUT</SelectItem>
+                          <SelectItem value="PATCH" className="text-xs">PATCH</SelectItem>
+                          <SelectItem value="DELETE" className="text-xs">DELETE</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                      <div className="text-lg font-semibold tabular-nums">{accountCredits.credits_remaining < 0 ? '∞' : accountCredits.credits_remaining}</div>
-                      <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Left</div>
-                    </div>
-                    <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                      <div className="text-lg font-semibold tabular-nums">{accountCredits.daily_limit < 0 ? '∞' : accountCredits.daily_limit}</div>
-                      <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Daily Limit</div>
-                    </div>
-                    <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                      <div className="text-lg font-semibold tabular-nums">{accountRequestCount}</div>
-                      <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Requests Today</div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                      <div className="text-lg font-semibold tabular-nums">{accountWeeklyLog ?? '-'}</div>
-                      <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">This Week</div>
-                    </div>
-                    <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                      <div className="text-lg font-semibold tabular-nums">{accountMonthlyLog ?? '-'}</div>
-                      <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">This Month</div>
-                    </div>
-                    <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 text-center">
-                      <div className="text-lg font-semibold tabular-nums">{resetCountdown}</div>
-                      <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Until Reset</div>
+                    <div>
+                      <label className="sa-label" htmlFor="pg-path">Endpoint path</label>
+                      <input id="pg-path" className="sa-input sa-mono" value={playgroundEndpoint} onChange={(e) => setPlaygroundEndpoint(e.target.value)} placeholder="/files" spellCheck={false} autoComplete="off" />
                     </div>
                   </div>
                   <div>
-                    <div className="flex justify-between text-[12px] text-muted-foreground/70 mb-1">
+                    <label className="sa-label" htmlFor="pg-key">API key</label>
+                    <input id="pg-key" className="sa-input sa-mono" type="password" value={playgroundApiKey} onChange={(e) => setPlaygroundApiKey(e.target.value)} placeholder="cb_your_api_key" autoComplete="off" spellCheck={false} />
+                  </div>
+                  <div>
+                    <label className="sa-label" htmlFor="pg-enc">Encryption key <span className="sa-mute" style={{ fontWeight: 400 }}>(optional)</span></label>
+                    <input id="pg-enc" className="sa-input sa-mono" type="password" value={playgroundEncryptionKey} onChange={(e) => setPlaygroundEncryptionKey(e.target.value)} placeholder="optional user encryption key" autoComplete="off" spellCheck={false} />
+                    <div className="sa-hint">Wrong key for encrypted download returns 422.</div>
+                  </div>
+                  {playgroundMethod !== 'GET' && (
+                    <div>
+                      <label className="sa-label" htmlFor="pg-body">Request body <span className="sa-mute" style={{ fontWeight: 400 }}>(JSON)</span></label>
+                      <textarea id="pg-body" className="sa-input dv-ta" rows={5} value={playgroundBody} onChange={(e) => setPlaygroundBody(e.target.value)} placeholder='{"key":"value"}' spellCheck={false} />
+                    </div>
+                  )}
+                  <div className="dv-send">
+                    <button type="button" onClick={testEndpoint} disabled={playgroundLoading} className={btn('primary', 'lg')}>
+                      {playgroundLoading ? <><Spinner /> Sending request...</> : <><Play className="h-3.5 w-3.5" /> Send request</>}
+                    </button>
+                    <span className="hide-sm" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }} aria-hidden="true"><Kbd>⌘</Kbd><Kbd>↵</Kbd></span>
+                  </div>
+                </div>
+              </Panel>
+            </div>
+
+            <div className="dv-col dv-sticky">
+              <Panel
+                title="Response"
+                desc={playgroundResponse ? 'Latest request result' : undefined}
+                actions={
+                  respStatus !== null ? (
+                    <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                      <Pill tone={statusTone(String(respStatus)) as any}>{respStatus}</Pill>
+                      <span className="sa-num sa-mute" style={{ fontSize: 12 }}>{respLatency}</span>
+                    </span>
+                  ) : undefined
+                }
+                flush={!!playgroundResponse}
+              >
+                {playgroundResponse ? (
+                  <CodeBlock code={playgroundResponse} lang="json" maxHeight={560} />
+                ) : (
+                  <p className="dv-p sa-mute">Response will appear here...</p>
+                )}
+              </Panel>
+            </div>
+          </div>
+        )}
+
+        {/* ═════════ Status ═════════ */}
+        {activeTab === 'status' && (
+          <div className="sa-in">
+            <Panel
+              title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Activity className="h-3.5 w-3.5" /> Account Credits</span>}
+              actions={
+                <button type="button" onClick={fetchAccountData} disabled={statusLoading} className={btn('default', 'sm')}>
+                  {statusLoading ? <Spinner size={12} /> : <Activity className="h-3 w-3" />}
+                  Refresh
+                </button>
+              }
+              flush
+            >
+              {accountCredits ? (
+                <div>
+                  <Stats>
+                    <Stat label="Used today" value={accountCredits.credits_used_today} />
+                    <Stat label="Left" value={accountCredits.credits_remaining < 0 ? '∞' : accountCredits.credits_remaining} />
+                    <Stat label="Daily limit" value={accountCredits.daily_limit < 0 ? '∞' : accountCredits.daily_limit} />
+                    <Stat label="Requests today" value={accountRequestCount} />
+                    <Stat label="This week" value={accountWeeklyLog ?? '-'} />
+                    <Stat label="This month" value={accountMonthlyLog ?? '-'} />
+                    <Stat label="Until reset" value={<span className="sa-num" style={{ fontSize: 20 }}>{resetCountdown}</span>} sub="Resets at 00:00 UTC" />
+                  </Stats>
+                  <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }} className="sa-num">
                       <span>Credits remaining: {accountCredits.credits_remaining < 0 ? '∞' : accountCredits.credits_remaining} / {accountCredits.daily_limit < 0 ? '∞' : accountCredits.daily_limit}</span>
-                      <span>
+                      <span className="sa-mute">
                         {accountCredits.daily_limit > 0
                           ? Math.round((accountCredits.credits_remaining / accountCredits.daily_limit) * 100) + '%'
                           : 'Unlimited'}
                       </span>
                     </div>
                     {accountCredits.daily_limit > 0 && (
-                      <div className="w-full h-2.5 bg-muted/30 rounded-full overflow-hidden">
-                        <div
-                          className={cn("h-full rounded-full transition-all duration-500", {
-                            'bg-green-500': (accountCredits.credits_remaining / accountCredits.daily_limit) > 0.5,
-                            'bg-yellow-500': (accountCredits.credits_remaining / accountCredits.daily_limit) <= 0.5 && (accountCredits.credits_remaining / accountCredits.daily_limit) >= 0.25,
-                            'bg-red-500': (accountCredits.credits_remaining / accountCredits.daily_limit) < 0.25,
-                          })}
-                          style={{ width: `${Math.min(100, (accountCredits.credits_remaining / accountCredits.daily_limit) * 100)}%` }}
-                        />
-                      </div>
+                      <Meter value={accountCredits.credits_used_today} max={accountCredits.daily_limit} label="Credits used today" />
                     )}
+                    <div className="sa-hint" style={{ margin: 0 }}>
+                      Last reset: {new Date(accountCredits.last_reset_date + 'T00:00:00Z').toLocaleDateString()}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground/50 text-center">
-                    Last reset: {new Date(accountCredits.last_reset_date + 'T00:00:00Z').toLocaleDateString()}
-                  </div>
-                </>
+                </div>
+              ) : statusLoading ? (
+                <SkelRows rows={3} />
               ) : (
-                <p className="text-[12px] text-muted-foreground/50 text-center py-4">
-                  {statusLoading ? 'Loading credits...' : 'Sign in to view your account credits'}
-                </p>
+                <Empty icon={<Activity className="h-4 w-4" />} title="No credit data" body="Sign in to view your account credits" />
               )}
-            </div>
+            </Panel>
 
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
-              <div className="flex items-center gap-2.5 pb-1">
-                <Key className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">API Keys (Shared Credits)</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground/60">All keys under your account share the same credit pool</p>
-              <div className="space-y-1">
+            <div className="dv-split" style={{ marginTop: 16 }}>
+              <Panel
+                title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Key className="h-3.5 w-3.5" /> API Keys (Shared Credits)</span>}
+                desc="All keys under your account share the same credit pool"
+                flush
+              >
                 {apiKeys.length > 0 ? apiKeys.map((key) => {
                   const limit = key.custom_daily_limit || key.daily_limit;
                   return (
-                    <div key={key.id} className="flex items-center justify-between h-8 px-2.5 rounded-lg hover:bg-accent/30 transition-colors">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Key className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
-                        <code className="text-[11px] text-muted-foreground/80 truncate">{key.name || key.key_prefix}</code>
-                        {!key.is_active && <span className="text-[10px] text-red-400/80">Disabled</span>}
-                      </div>
-                      <span className="text-[11px] text-muted-foreground/50">
+                    <Row
+                      key={key.id}
+                      label={
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          <code className="sa-mono" style={{ fontSize: 12.5 }}>{key.name || key.key_prefix}</code>
+                          {!key.is_active && <Pill tone="err">Disabled</Pill>}
+                        </span>
+                      }
+                    >
+                      <span className="sa-num sa-mute" style={{ fontSize: 12 }}>
                         {limit ? `${limit}/day` : 'No limit'} · {key.allow_hmac ? 'HMAC' : 'No HMAC'}
                       </span>
-                    </div>
+                    </Row>
                   );
                 }) : (
-                  <p className="text-[12px] text-muted-foreground/50 text-center py-2">No API keys found</p>
+                  <Empty icon={<Key className="h-4 w-4" />} title="No API keys found" body="Create one in the API Keys tab." />
                 )}
-              </div>
-            </div>
+              </Panel>
 
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
-              <div className="flex items-center gap-2.5 pb-2">
-                <Activity className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">Endpoint Health</span>
-              </div>
-              <div className="space-y-1">
-                {endpoints.filter((e) => e.statusPath).map((endpoint) => {
+              <Panel
+                title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Activity className="h-3.5 w-3.5" /> Endpoint Health</span>}
+                actions={
+                  <span className="dv-health">
+                    {stillChecking ? <Spinner size={11} /> : <Dot tone={onlineCount === healthTargets.length ? 'ok' : 'warn'} />}
+                    {onlineCount}/{healthTargets.length} online · every 60s
+                  </span>
+                }
+                flush
+              >
+                {healthTargets.map((endpoint) => {
                   const status = endpointStatus[endpoint.path];
                   return (
-                    <div key={endpoint.path} className="flex items-center justify-between h-8 px-2.5 rounded-lg hover:bg-accent/30 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", methodBadgeClass(endpoint.method))}>{endpoint.method}</span>
-                        <code className="text-[12px] text-muted-foreground/80">{endpoint.path}</code>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[11px]">
-                        {status?.status === 'online' && <><CheckCircle2 className="w-3 h-3 text-emerald-400" /><span className="text-emerald-400/80">{status.latency ? `${status.latency}ms` : 'Online'}</span></>}
-                        {status?.status === 'offline' && <><XCircle className="w-3 h-3 text-red-400" /><span className="text-red-400/80">Offline</span></>}
-                        {(!status || status.status === 'checking') && <><Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" /><span className="text-muted-foreground/50">Checking</span></>}
-                      </div>
-                    </div>
+                    <Row
+                      key={endpoint.path}
+                      label={
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <MethodTag method={endpoint.method} />
+                          <code className="sa-mono" style={{ fontSize: 12.5 }}>{endpoint.path}</code>
+                        </span>
+                      }
+                    >
+                      <span className="dv-health">
+                        {status?.status === 'online' && <><Dot tone="ok" /><span style={{ color: 'var(--sa-ok)' }}>{status.latency ? `${status.latency}ms` : 'Online'}</span></>}
+                        {status?.status === 'offline' && <><Dot tone="err" /><span style={{ color: 'var(--sa-err)' }}>Offline</span></>}
+                        {(!status || status.status === 'checking') && <><Spinner size={11} /><span>Checking</span></>}
+                      </span>
+                    </Row>
                   );
                 })}
-              </div>
-            </div>
-            <ApiUsageChart />
-            <ApiRequestLogs />
-          </TabsContent>
-
-          <TabsContent value="docs" className="space-y-3 mt-0">
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-3">
-              <div className="flex items-center gap-2.5">
-                <Key className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">Authentication</span>
-              </div>
-              <div className="h-px bg-border/40" />
-              <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
-                All requests require <code className="text-[11px] text-foreground/80 bg-muted/30 px-1 py-0.5 rounded">X-SquidCloud-Key</code> with a <code className="text-[11px] text-foreground/80 bg-muted/30 px-1 py-0.5 rounded">cb_...</code> API key (<code className="text-[11px] text-foreground/80 bg-muted/30 px-1 py-0.5 rounded">Authorization: Bearer</code> also works). Upload and download also support optional caller key input.
-              </p>
-              <div className="space-y-1.5">
-                <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
-                  <code className="text-[11px] text-muted-foreground/80">X-SquidCloud-Key: cb_your_api_key_here</code>
-                </div>
-                <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
-                  <code className="text-[11px] text-muted-foreground/80">Authorization: Bearer cb_your_api_key_here (alternative)</code>
-                </div>
-                <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
-                  <code className="text-[11px] text-muted-foreground/80">X-SquidCloud-Encryption-Key: optional_user_encryption_key</code>
-                </div>
-                <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
-                  <code className="text-[11px] text-muted-foreground/80">X-Timestamp: 1700000000000 (Unix ms, ±5 min)</code>
-                </div>
-                <div className="flex items-center h-8 px-2.5 rounded-lg border border-border/40 bg-muted/20">
-                  <code className="text-[11px] text-muted-foreground/80">X-Signature: HMAC-SHA256(timestamp+nonce+body, apiKey)</code>
-                </div>
-              </div>
-              <div className="flex items-start gap-2.5 p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-[12px] font-medium text-amber-400/90">Security notes</p>
-                  <p className="text-[11px] text-amber-400/60 mt-0.5">Invalid encryption key format returns 400. Wrong key for encrypted download returns 422. Opt-in HMAC signing prevents request tampering. Credit deduction info is included in every response.</p>
-                </div>
-              </div>
+              </Panel>
             </div>
 
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.03] p-3 space-y-2">
-              <div className="flex items-center gap-2.5">
-                <Code className="w-4 h-4 text-emerald-400" />
-                <span className="text-[13px] font-medium">AI Agent Prompt</span>
-                <span className="text-[10px] text-emerald-400/60">Copy-paste to any AI agent</span>
-              </div>
-              <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
-                Copy this prompt and paste it into your favorite AI coding assistant (Cursor, Claude, Copilot, GPT…).
-                It contains the complete, verified CloudBliss API spec — the agent will integrate upload, download
-                (including client-side RES54 decryption), streaming, and error handling without guessing.
-              </p>
-              <Textarea
-                readOnly
-                rows={14}
-                value={AI_AGENT_PROMPT}
-                onFocus={(e) => e.currentTarget.select()}
-                className="font-mono text-[10.5px] leading-relaxed resize-y min-h-[140px]"
-              />
-              <div className="flex gap-1.5">
-                <button onClick={() => copyToClipboard(AI_AGENT_PROMPT)}
-                  className="inline-flex items-center gap-1.5 h-7 rounded-md px-3 text-[11px] font-medium text-emerald-500 hover:bg-emerald-500/10 transition-colors border border-emerald-500/20">
-                  <Copy className="w-3 h-3" />
-                  Copy Prompt
-                </button>
-                <button onClick={() => { navigator.clipboard.writeText(AI_AGENT_PROMPT); sonnerToast.success('Prompt copied — paste it into your AI agent'); }}
-                  className="inline-flex items-center gap-1.5 h-7 rounded-md px-3 text-[11px] font-medium text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40">
-                  Copy & Hint
-                </button>
-              </div>
-            </div>
+            <div style={{ marginTop: 16 }}><ApiUsageChart /></div>
+            <div style={{ marginTop: 16 }}><ApiRequestLogs /></div>
+          </div>
+        )}
 
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
-              <div className="flex items-center gap-2.5 pb-1">
-                <FileText className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">Endpoint Reference</span>
-              </div>
-              <div className="space-y-2">
-                {endpoints.map((endpoint) => (
-                  <div key={`${endpoint.method}-${endpoint.path}`} className="rounded-lg border border-border/40 bg-muted/15 p-2.5 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", methodBadgeClass(endpoint.method))}>{endpoint.method}</span>
-                      <code className="text-[12px] font-medium text-foreground/80">{endpoint.path}</code>
-                      <div className="flex gap-1">
-                        {endpoint.scopes.map((scope) => (
-                          <span key={scope} className="text-[9px] text-muted-foreground/50 px-1.5 py-0.5 rounded-full bg-muted/30 border border-border/30">{scope}</span>
-                        ))}
-                      </div>
+        {/* ═════════ Docs ═════════ */}
+        {activeTab === 'docs' && (
+          <div className="dv-docs sa-in">
+            <nav className="dv-docs-nav sa-nav" aria-label="On this page">
+              <div className="sa-nav-h">On this page</div>
+              {DOC_SECTIONS.map(([id, label]) => (
+                <a
+                  key={id}
+                  href={`#${id}`}
+                  className={`sa-nav-i${activeDoc === id ? ' on' : ''}`}
+                  aria-current={activeDoc === id ? 'true' : undefined}
+                  onClick={(e) => { e.preventDefault(); jump(id); }}
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
+
+            <div style={{ minWidth: 0 }}>
+              <section id="dv-auth" className="dv-sec">
+                <Panel
+                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Key className="h-3.5 w-3.5" /> Authentication</span>}
+                >
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <p className="dv-p">
+                      All requests require <code className="dv-inline">X-SquidCloud-Key</code> with a <code className="dv-inline">cb_...</code> API key (<code className="dv-inline">Authorization: Bearer</code> also works). Upload and download also support optional caller key input.
+                    </p>
+                    <div className="dv-lines">
+                      <CopyLine value="X-SquidCloud-Key: cb_your_api_key_here" />
+                      <CopyLine value="Authorization: Bearer cb_your_api_key_here" display="Authorization: Bearer cb_your_api_key_here (alternative)" />
+                      <CopyLine value="X-SquidCloud-Encryption-Key: optional_user_encryption_key" />
+                      <CopyLine value="X-Timestamp: 1700000000000" display="X-Timestamp: 1700000000000 (Unix ms, ±5 min)" />
+                      <CopyLine value="X-Signature: HMAC-SHA256(timestamp+nonce+body, apiKey)" />
                     </div>
-                    <p className="text-[12px] text-muted-foreground/70">{endpoint.description}</p>
-                    <div className="rounded-lg border border-border/30 bg-muted/30 p-2">
-                      <code className="text-[11px] leading-relaxed whitespace-pre-wrap break-all text-muted-foreground/80 font-mono">{endpoint.example}</code>
-                    </div>
-                    {endpoint.sampleResponse && (
-                      <div className="rounded-lg border border-border/30 bg-muted/30 p-2">
-                        <code className="text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground/70 font-mono">{endpoint.sampleResponse}</code>
-                      </div>
-                    )}
-                    <div className="flex gap-1.5 pt-0.5">
-                      <button onClick={() => copyToClipboard(endpoint.example)}
-                        className="inline-flex items-center gap-1 h-6 rounded px-2 text-[11px] text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40">
-                        <Copy className="w-3 h-3" />
-                        Copy cURL
+                    <Note tone="warn" title="Security notes">
+                      Invalid encryption key format returns 400. Wrong key for encrypted download returns 422. Opt-in HMAC signing prevents request tampering. Credit deduction info is included in every response.
+                    </Note>
+                  </div>
+                </Panel>
+              </section>
+
+              <section id="dv-agent" className="dv-sec">
+                <Panel
+                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Code className="h-3.5 w-3.5" /> AI Agent Prompt</span>}
+                  actions={<Pill>Copy-paste to any AI agent</Pill>}
+                >
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <p className="dv-p">
+                      Copy this prompt and paste it into your favorite AI coding assistant (Cursor, Claude, Copilot, GPT…).
+                      It contains the complete, verified CloudBliss API spec — the agent will integrate upload, download
+                      (including client-side RES54 decryption), streaming, and error handling without guessing.
+                    </p>
+                    <textarea
+                      readOnly
+                      rows={12}
+                      value={AI_AGENT_PROMPT}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="sa-input dv-ta"
+                      style={{ minHeight: 140 }}
+                      aria-label="AI agent prompt"
+                    />
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button type="button" onClick={() => copyToClipboard(AI_AGENT_PROMPT)} className={btn('primary', 'sm')}>
+                        <Ico.Copy size={12} /> Copy Prompt
                       </button>
-                      <button onClick={() => { setPlaygroundMethod(endpoint.method); setPlaygroundEndpoint(endpoint.path.replace(':id', 'FILE_ID')); setActiveTab('playground'); }}
-                        className="inline-flex items-center gap-1 h-6 rounded px-2 text-[11px] text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors border border-border/40">
-                        <Play className="w-3 h-3" />
-                        Try in Playground
+                      <button type="button" onClick={() => { navigator.clipboard.writeText(AI_AGENT_PROMPT); sonnerToast.success('Prompt copied — paste it into your AI agent'); }} className={btn('default', 'sm')}>
+                        Copy &amp; Hint
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                </Panel>
+              </section>
 
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
-              <button onClick={() => setCostsOpen(!costsOpen)} className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[13px] font-medium">Credit Costs</span>
-                </div>
-                <span className="text-[11px] text-muted-foreground/50">{costsOpen ? 'Hide' : 'Show'} costs</span>
-              </button>
-              {costsOpen && (
-                <div className="space-y-2 pt-1">
-                  <input
-                    className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Filter by operation name..."
-                    value={costFilter}
-                    onChange={(e) => setCostFilter(e.target.value)}
-                  />
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[11px]">
-                      <thead>
-                        <tr className="text-muted-foreground/50 border-b border-border/40">
-                          <th className="text-left py-1.5 px-2 font-medium">Operation</th>
-                          <th className="text-left py-1.5 px-2 font-medium">Base Cost</th>
-                          <th className="text-left py-1.5 px-2 font-medium">Per MB</th>
-                          <th className="text-left py-1.5 px-2 font-medium">Description</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {operationCosts
-                          .filter(c => !costFilter || c.operation.toLowerCase().includes(costFilter.toLowerCase()))
-                          .map((cost) => (
-                            <tr key={cost.id || cost.operation} className="border-b border-border/20 hover:bg-accent/20 transition-colors">
-                              <td className="py-1.5 px-2 font-mono text-foreground/80">{cost.operation}</td>
-                              <td className="py-1.5 px-2 text-muted-foreground/70">{cost.base_cost}</td>
-                              <td className="py-1.5 px-2 text-muted-foreground/70">{cost.per_mb ?? '-'}</td>
-                              <td className="py-1.5 px-2 text-muted-foreground/60">{cost.description || '-'}</td>
-                            </tr>
+              <section id="dv-endpoints" className="dv-sec">
+                <Panel
+                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><FileText className="h-3.5 w-3.5" /> Endpoint Reference</span>}
+                  desc={`${shownEndpoints.length} of ${endpoints.length} endpoints`}
+                  actions={
+                    <div className="sa-field-wrap" style={{ width: 220 }}>
+                      <Ico.Search size={13} />
+                      <input
+                        ref={filterRef}
+                        className={`sa-input pl${endpointFilter ? '' : ' pr'}`}
+                        style={{ height: 28 }}
+                        placeholder="Filter endpoints"
+                        value={endpointFilter}
+                        onChange={(e) => setEndpointFilter(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Escape') { setEndpointFilter(''); e.currentTarget.blur(); } }}
+                        aria-label="Filter endpoints"
+                        spellCheck={false}
+                      />
+                      {!endpointFilter && <span className="end" aria-hidden="true"><Kbd>/</Kbd></span>}
+                    </div>
+                  }
+                  flush
+                >
+                  {shownEndpoints.length === 0 && (
+                    <Empty title="No endpoints match" body="Try a method, a path fragment or a word from the description." />
+                  )}
+                  {shownEndpoints.map((endpoint) => (
+                    <details key={`${endpoint.method}-${endpoint.path}`} className="dv-ep">
+                      <summary>
+                        <MethodTag method={endpoint.method} />
+                        <div style={{ minWidth: 0 }}>
+                          <div className="path">{endpoint.path}</div>
+                          <div className="sum">{endpoint.description}</div>
+                        </div>
+                        <div className="scopes">
+                          {endpoint.scopes.map((scope) => (
+                            <Pill key={scope}>{scope}</Pill>
                           ))}
-                        {operationCosts.length === 0 && (
-                          <tr>
-                            <td colSpan={4} className="py-3 text-center text-muted-foreground/50">No cost data available</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
+                          <Ico.Chevron className="chev" />
+                        </div>
+                      </summary>
+                      <div className="body">
+                        <CodeBlock code={endpoint.example} lang="curl" wrap />
+                        {endpoint.sampleResponse && <CodeBlock code={endpoint.sampleResponse} lang="response" />}
+                        <div className="acts">
+                          <button
+                            type="button"
+                            className={btn('default', 'sm')}
+                            onClick={() => { setPlaygroundMethod(endpoint.method); setPlaygroundEndpoint(endpoint.path.replace(':id', 'FILE_ID')); setActiveTab('playground'); }}
+                          >
+                            <Play className="h-3 w-3" />
+                            Try in Playground
+                          </button>
+                        </div>
+                      </div>
+                    </details>
+                  ))}
+                </Panel>
+              </section>
 
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
-              <div className="flex items-center gap-2.5 pb-1">
-                <span className="text-[13px] font-medium">Credit System</span>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
-                  Every API call deducts credits based on the operation type and file size (where applicable).
-                  Credits reset daily at midnight UTC. The response headers include your remaining credit balance.
-                </p>
-                <div className="rounded-lg border border-border/30 bg-muted/20 p-2.5 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground/70">Credit deduction response</span>
-                  </div>
-                  <code className="text-[11px] leading-relaxed text-muted-foreground/70 font-mono block">
-{`{
+              <section id="dv-costs" className="dv-sec">
+                <Panel
+                  title="Credit Costs"
+                  actions={
+                    <button type="button" onClick={() => setCostsOpen(!costsOpen)} className={btn('default', 'sm')} aria-expanded={costsOpen}>
+                      {costsOpen ? 'Hide' : 'Show'} costs
+                    </button>
+                  }
+                  flush
+                >
+                  {costsOpen && (
+                    <div>
+                      <div style={{ padding: 16, borderBottom: '1px solid var(--sa-line)' }}>
+                        <input
+                          className="sa-input"
+                          placeholder="Filter by operation name..."
+                          value={costFilter}
+                          onChange={(e) => setCostFilter(e.target.value)}
+                          aria-label="Filter operations"
+                        />
+                      </div>
+                      <div className="sa-tablewrap">
+                        <table className="sa-table">
+                          <thead>
+                            <tr>
+                              <th>Operation</th>
+                              <th>Base Cost</th>
+                              <th>Per MB</th>
+                              <th>Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {operationCosts
+                              .filter(c => !costFilter || c.operation.toLowerCase().includes(costFilter.toLowerCase()))
+                              .map((cost) => (
+                                <tr key={cost.id || cost.operation}>
+                                  <td className="k sa-mono">{cost.operation}</td>
+                                  <td className="sa-num">{cost.base_cost}</td>
+                                  <td className="sa-num">{cost.per_mb ?? '-'}</td>
+                                  <td>{cost.description || '-'}</td>
+                                </tr>
+                              ))}
+                            {operationCosts.length === 0 && (
+                              <tr>
+                                <td colSpan={4} style={{ textAlign: 'center' }} className="sa-mute">No cost data available</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </Panel>
+              </section>
+
+              <section id="dv-credits" className="dv-sec">
+                <Panel title="Credit System">
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <p className="dv-p">
+                      Every API call deducts credits based on the operation type and file size (where applicable).
+                      Credits reset daily at midnight UTC. The response headers include your remaining credit balance.
+                    </p>
+                    <CodeBlock
+                      lang="credit deduction response"
+                      code={`{
   "...": "...",
   "credits": {
     "deducted": 1,
@@ -1495,78 +1615,80 @@ const DeveloperAPI = () => {
     "daily_limit": 1000
   }
 }`}
-                  </code>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
-              <div className="flex items-center gap-2.5 pb-1">
-                <span className="text-[13px] font-medium">HTTP Status Codes</span>
-              </div>
-              <div className="space-y-1">
-                {[
-                  { code: '200 OK', desc: 'Request succeeded' },
-                  { code: '201 Created', desc: 'Resource created (upload, key, secret)' },
-                  { code: '400 Bad Request', desc: 'Invalid input or encryption key format' },
-                  { code: '401 Unauthorized', desc: 'Missing or invalid API key' },
-                  { code: '402 Payment Required', desc: 'Insufficient credits or expired subscription' },
-                  { code: '403 Forbidden', desc: 'Key disabled or insufficient permissions' },
-                  { code: '404 Not Found', desc: 'Resource not found' },
-                  { code: '409 Conflict', desc: 'Duplicate resource (secret name, CDN publish)' },
-                  { code: '422 Unprocessable Entity', desc: 'Encryption key missing/mismatch for encrypted download' },
-                  { code: '503 Service Unavailable', desc: 'API disabled for maintenance (global guard)' },
-                  { code: '500 Server Error', desc: 'Internal server error' },
-                ].map(item => (
-                  <div key={item.code} className="flex items-center justify-between h-7 px-2.5 rounded-lg hover:bg-accent/30 transition-colors">
-                    <code className="text-[12px] text-muted-foreground/80">{item.code}</code>
-                    <span className="text-[11px] text-muted-foreground/50">{item.desc}</span>
+                    />
                   </div>
-                ))}
-              </div>
-            </div>
+                </Panel>
+              </section>
 
-            <div className="rounded-2xl border border-border/50 bg-card/80 p-3 space-y-2">
-              <div className="flex items-center gap-2.5 pb-1">
-                <FileText className="w-4 h-4 text-muted-foreground/70" />
-                <span className="text-[13px] font-medium">Downloadable API Docs</span>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[12px] text-muted-foreground/70 leading-relaxed">
-                  Complete API documentation in Markdown format. Two versions available:
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <a
-                    href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-ai-agents.md"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border/40 bg-muted/20 hover:bg-accent/30 transition-colors"
-                  >
-                    <FileText className="w-4 h-4 text-blue-400" />
-                    <div className="min-w-0">
-                      <div className="text-[12px] font-medium text-foreground/80">AI Agent Guide</div>
-                      <div className="text-[10px] text-muted-foreground/50 truncate">Technical setup guide for AI agents</div>
-                    </div>
-                  </a>
-                  <a
-                    href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-humans.md"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border/40 bg-muted/20 hover:bg-accent/30 transition-colors"
-                  >
-                    <FileText className="w-4 h-4 text-emerald-400" />
-                    <div className="min-w-0">
-                      <div className="text-[12px] font-medium text-foreground/80">User Guide</div>
-                      <div className="text-[10px] text-muted-foreground/50 truncate">Simple English user-friendly guide</div>
-                    </div>
-                  </a>
-                </div>
-              </div>
+              <section id="dv-codes" className="dv-sec">
+                <Panel title="HTTP Status Codes" flush>
+                  {[
+                    { code: '200 OK', desc: 'Request succeeded' },
+                    { code: '201 Created', desc: 'Resource created (upload, key, secret)' },
+                    { code: '400 Bad Request', desc: 'Invalid input or encryption key format' },
+                    { code: '401 Unauthorized', desc: 'Missing or invalid API key' },
+                    { code: '402 Payment Required', desc: 'Insufficient credits or expired subscription' },
+                    { code: '403 Forbidden', desc: 'Key disabled or insufficient permissions' },
+                    { code: '404 Not Found', desc: 'Resource not found' },
+                    { code: '409 Conflict', desc: 'Duplicate resource (secret name, CDN publish)' },
+                    { code: '422 Unprocessable Entity', desc: 'Encryption key missing/mismatch for encrypted download' },
+                    { code: '503 Service Unavailable', desc: 'API disabled for maintenance (global guard)' },
+                    { code: '500 Server Error', desc: 'Internal server error' },
+                  ].map(item => (
+                    <Row
+                      key={item.code}
+                      label={
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                          <Dot tone={statusTone(item.code) as any} />
+                          <code className="sa-mono" style={{ fontSize: 12.5 }}>{item.code}</code>
+                        </span>
+                      }
+                    >
+                      <span className="sa-mute" style={{ fontSize: 12.5 }}>{item.desc}</span>
+                    </Row>
+                  ))}
+                </Panel>
+              </section>
+
+              <section id="dv-downloads" className="dv-sec">
+                <Panel
+                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><FileText className="h-3.5 w-3.5" /> Downloadable API Docs</span>}
+                  desc="Complete API documentation in Markdown format. Two versions available:"
+                  flush
+                >
+                  <div className="dv-dl">
+                    <a
+                      href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-ai-agents.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <div style={{ minWidth: 0 }}>
+                        <b>AI Agent Guide</b>
+                        <small>Technical setup guide for AI agents</small>
+                      </div>
+                      <Ico.ArrowUpRight style={{ marginLeft: 'auto' }} />
+                    </a>
+                    <a
+                      href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-humans.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <div style={{ minWidth: 0 }}>
+                        <b>User Guide</b>
+                        <small>Simple English user-friendly guide</small>
+                      </div>
+                      <Ico.ArrowUpRight style={{ marginLeft: 'auto' }} />
+                    </a>
+                  </div>
+                </Panel>
+              </section>
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+          </div>
+        )}
+      </Wrap>
+    </AppShell>
   );
 };
 

@@ -1,54 +1,81 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatBytes } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { 
-  FileText, 
-  Calendar, 
-  HardDrive, 
-  User, 
-  Link,
-  Shield,
-  Hash,
-  Eye,
-  Folder,
-  Image,
-  Video,
-  Music,
-  Archive,
-  Code,
-  FileJson,
-  MapPin,
-  Clock,
-  Database,
-  FileType,
-  Monitor
+import {
+  FileText, Calendar, HardDrive, User, Link, Shield, Hash, Eye,
+  Folder, Image, Video, Music, Archive, Code, FileJson, MapPin,
+  Clock, Database, FileType, Monitor, Copy, Check, X, Info,
 } from '@/lib/icon-map';
 
 interface FileInfoModalProps {
-  file: any | null; // Made more flexible to accept different file interfaces
+  file: any | null;
   open: boolean;
   onClose: () => void;
 }
 
-const FileInfoModal: React.FC<FileInfoModalProps> = ({
-  file,
-  open,
-  onClose
-}) => {
+function CopyValue({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch { /* clipboard unavailable */ }
+  };
+  return (
+    <div className="group flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground" title={value}>{value}</span>
+      <button
+        onClick={copy}
+        aria-label={`Copy ${label}`}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 transition-all hover:bg-accent hover:text-foreground active:scale-90"
+      >
+        {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+      </button>
+    </div>
+  );
+}
+
+function StatCell({ icon: Icon, label, value, sub }: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string; value: string; sub?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/60 p-3.5 transition-colors duration-150 hover:border-border">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground/70" />
+        <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
+      </div>
+      <p className="mt-1.5 truncate text-[15px] font-semibold tabular-nums tracking-tight text-foreground" title={value}>{value}</p>
+      {sub && <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{sub}</p>}
+    </div>
+  );
+}
+
+function Section({ icon: Icon, title, children }: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string; children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <h4 className="mb-2.5 flex items-center gap-2 text-[12px] font-semibold text-foreground">
+        <Icon className="h-3.5 w-3.5 text-primary" />
+        {title}
+      </h4>
+      {children}
+    </div>
+  );
+}
+
+const FileInfoModal: React.FC<FileInfoModalProps> = ({ file, open, onClose }) => {
   if (!file) return null;
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  const formatDateRelative = (dateString: string) => {
-    return formatDistanceToNow(new Date(dateString), { addSuffix: true });
-  };
+  const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
+  const formatDateRelative = (dateString: string) => formatDistanceToNow(new Date(dateString), { addSuffix: true });
 
   const getFileTypeCategory = (mimeType: string) => {
     if (!mimeType) return 'File';
@@ -64,15 +91,15 @@ const FileInfoModal: React.FC<FileInfoModalProps> = ({
   };
 
   const getFileTypeIcon = (mimeType: string) => {
-    if (!mimeType) return <FileText className="h-5 w-5 text-gray-500" />;
-    if (mimeType.startsWith('image/')) return <Image className="h-5 w-5 text-green-500" />;
-    if (mimeType.startsWith('video/')) return <Video className="h-5 w-5 text-red-500" />;
-    if (mimeType.startsWith('audio/')) return <Music className="h-5 w-5 text-purple-500" />;
-    if (mimeType.includes('pdf')) return <FileText className="h-5 w-5 text-red-600" />;
-    if (mimeType.includes('zip') || mimeType.includes('archive')) return <Archive className="h-5 w-5 text-orange-500" />;
-    if (mimeType.includes('json')) return <FileJson className="h-5 w-5 text-yellow-500" />;
-    if (mimeType.includes('javascript') || mimeType.includes('typescript')) return <Code className="h-5 w-5 text-blue-500" />;
-    return <FileText className="h-5 w-5 text-gray-500" />;
+    if (!mimeType) return FileText;
+    if (mimeType.startsWith('image/')) return Image;
+    if (mimeType.startsWith('video/')) return Video;
+    if (mimeType.startsWith('audio/')) return Music;
+    if (mimeType.includes('pdf')) return FileText;
+    if (mimeType.includes('zip') || mimeType.includes('archive')) return Archive;
+    if (mimeType.includes('json')) return FileJson;
+    if (mimeType.includes('javascript') || mimeType.includes('typescript')) return Code;
+    return FileText;
   };
 
   const getFileSizeCategory = (size: number) => {
@@ -83,234 +110,158 @@ const FileInfoModal: React.FC<FileInfoModalProps> = ({
     return 'Very Large';
   };
 
+  const TypeIcon = getFileTypeIcon(file.type);
+  const flags: Array<{ on: boolean; icon: React.ComponentType<{ className?: string }>; label: string }> = [
+    { on: !!file.encrypted, icon: Shield, label: 'Encrypted' },
+    { on: !!file.shared, icon: Link, label: 'Shared' },
+    { on: !!file.is_public, icon: Eye, label: 'Public' },
+    { on: !!file.preview_available, icon: Monitor, label: 'Preview' },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        "max-w-2xl w-[95vw] max-h-[85vh] flex flex-col p-0 gap-0",
-      )}>
-        <DialogHeader className="p-5 pb-3 flex-shrink-0">
-          <DialogTitle className="flex items-center gap-3">
-            {getFileTypeIcon(file.type)}
-            <div className="flex-1 min-w-0">
-              <div className="text-[15px] font-semibold truncate text-[#E6EDF3]">{file.name}</div>
-              <div className="text-[12px] text-[#768390]">{getFileTypeCategory(file.type || '')}</div>
-            </div>
-          </DialogTitle>
-        </DialogHeader>
-        
-        <ScrollArea className="flex-1 overflow-auto">
-          <div className="px-5 pb-5 space-y-5">
-            {/* File Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <HardDrive className="h-3.5 w-3.5 text-[#768390]" />
-                  <span className="text-[12px] font-medium text-[#8B949E]">Size</span>
-                </div>
-                <div className="text-[15px] font-semibold text-[#E6EDF3]">{formatBytes(file.size || 0)}</div>
-                <div className="text-[11px] text-[#768390]">{getFileSizeCategory(file.size || 0)}</div>
-              </div>
-              
-              <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <FileType className="h-3.5 w-3.5 text-[#768390]" />
-                  <span className="text-[12px] font-medium text-[#8B949E]">Type</span>
-                </div>
-                <div className="text-[15px] font-semibold text-[#E6EDF3]">{getFileTypeCategory(file.type || '')}</div>
-                <div className="text-[11px] text-[#768390] truncate">{file.type || 'Unknown'}</div>
-              </div>
-              
-              <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Clock className="h-3.5 w-3.5 text-[#768390]" />
-                  <span className="text-[12px] font-medium text-[#8B949E]">Created</span>
-                </div>
-                <div className="text-[15px] font-semibold text-[#E6EDF3]">{formatDateRelative(file.created_at)}</div>
-                <div className="text-[11px] text-[#768390]">{new Date(file.created_at).toLocaleDateString()}</div>
-              </div>
+      <DialogContent className="flex max-h-[85vh] w-[95vw] max-w-2xl flex-col gap-0 p-0 animate-fade-in-scale">
+        {/* Header */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-border/60 p-5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <TypeIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="truncate text-[15px] font-semibold tracking-tight text-foreground">{file.name}</DialogTitle>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">{getFileTypeCategory(file.type || '')}</p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-accent hover:text-foreground active:scale-90"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <ScrollArea className="flex-1">
+          <div className="space-y-6 p-5">
+            {/* Overview stats */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <StatCell icon={HardDrive} label="Size" value={formatBytes(file.size || 0)} sub={getFileSizeCategory(file.size || 0)} />
+              <StatCell icon={FileType} label="Type" value={getFileTypeCategory(file.type || '')} sub={file.type || 'Unknown'} />
+              <StatCell icon={Clock} label="Created" value={formatDateRelative(file.created_at)} sub={formatDate(file.created_at)} />
             </div>
 
-            {/* Basic Information */}
-            <div>
-              <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3 flex items-center gap-2">
-                <FileText className="h-3.5 w-3.5 text-[#768390]" />
-                Basic Information
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[12px] font-medium text-[#8B949E] mb-1">File Name</p>
-                    <p className="text-[13px] break-all p-2.5 rounded-[8px] bg-[#2D333B] border border-[#373E47] text-[#E6EDF3]">{file.name}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-[12px] font-medium text-[#8B949E] mb-1">MIME Type</p>
-                    <p className="text-[12px] font-mono bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] text-[#E6EDF3]">{file.type || 'Unknown'}</p>
+            {/* Basic information */}
+            <Section icon={FileText} title="Basic Information">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">File Name</p>
+                  <p className="break-all rounded-lg border border-border/60 bg-muted/40 p-2.5 text-[13px] text-foreground">{file.name}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">MIME Type</p>
+                  <p className="rounded-lg border border-border/60 bg-muted/40 p-2.5 font-mono text-[12px] text-foreground">{file.type || 'Unknown'}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">File Size</p>
+                  <div className="rounded-lg border border-border/60 bg-muted/40 p-2.5">
+                    <p className="text-[13px] font-semibold tabular-nums text-foreground">{formatBytes(file.size || 0)}</p>
+                    <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground/70">{(file.size || 0).toLocaleString()} bytes</p>
                   </div>
                 </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[12px] font-medium text-[#8B949E] mb-1">File Size</p>
-                    <div className="bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px]">
-                      <p className="text-[13px] text-[#E6EDF3]">{formatBytes(file.size || 0)}</p>
-                      <p className="text-[11px] text-[#768390]">{(file.size || 0).toLocaleString()} bytes</p>
+                {file.parent_folder && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Location</p>
+                    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 p-2.5">
+                      <Folder className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <p className="truncate font-mono text-[12px] text-foreground">{file.parent_folder}</p>
                     </div>
                   </div>
-                  
-                  {file.parent_folder && (
-                    <div>
-                      <p className="text-[12px] font-medium text-[#8B949E] mb-1">Location</p>
-                      <div className="flex items-center gap-2 bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px]">
-                        <Folder className="h-3.5 w-3.5 text-[#58A6FF]" />
-                        <p className="text-[12px] font-mono truncate text-[#E6EDF3]">{file.parent_folder}</p>
-                      </div>
+                )}
+              </div>
+            </Section>
+
+            {/* Timestamps */}
+            <Section icon={Calendar} title="Timestamps">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-border/60 bg-card/60 p-3.5">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Created</span>
+                  </div>
+                  <p className="mt-1.5 text-[13px] text-foreground">{formatDate(file.created_at)}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground/70">{formatDateRelative(file.created_at)}</p>
+                </div>
+                {file.updated_at && (
+                  <div className="rounded-xl border border-border/60 bg-card/60 p-3.5">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Last Modified</span>
+                    </div>
+                    <p className="mt-1.5 text-[13px] text-foreground">{formatDate(file.updated_at)}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground/70">{formatDateRelative(file.updated_at)}</p>
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            {/* Storage & Security */}
+            <Section icon={Database} title="Storage & Security">
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {flags.map(f => f.on && (
+                    <Badge key={f.label} variant="outline" className="gap-1.5 bg-muted/40 text-[11px] font-medium">
+                      <f.icon className="h-3 w-3 text-primary" />
+                      {f.label}
+                    </Badge>
+                  ))}
+                </div>
+                <CopyValue value={file.id} label="File ID" />
+              </div>
+            </Section>
+
+            {/* Technical details */}
+            {(file.processor || file.storage_path || file.user_id) && (
+              <Section icon={Code} title="Technical Details">
+                <div className="space-y-3">
+                  {file.processor && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Processor</p>
+                      <p className="rounded-lg border border-border/60 bg-muted/40 p-2.5 font-mono text-[12px] text-foreground">{file.processor}</p>
+                    </div>
+                  )}
+                  {file.storage_path && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Storage Path</p>
+                      <p className="break-all rounded-lg border border-border/60 bg-muted/40 p-2.5 font-mono text-[11px] text-foreground">{file.storage_path}</p>
+                    </div>
+                  )}
+                  {file.user_id && <CopyValue value={file.user_id} label="Owner ID" />}
+                </div>
+              </Section>
+            )}
+
+            {/* Additional metadata */}
+            {(file.checksum || file.version || file.compression) && (
+              <Section icon={Info} title="Additional Metadata">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {file.checksum && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Checksum</p>
+                      <p className="break-all rounded-lg border border-border/60 bg-muted/40 p-2.5 font-mono text-[11px] text-foreground">{file.checksum}</p>
+                    </div>
+                  )}
+                  {file.version && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Version</p>
+                      <p className="rounded-lg border border-border/60 bg-muted/40 p-2.5 text-[13px] text-foreground">{file.version}</p>
+                    </div>
+                  )}
+                  {file.compression && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Compression</p>
+                      <p className="rounded-lg border border-border/60 bg-muted/40 p-2.5 text-[13px] text-foreground">{file.compression}</p>
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-            
-            <div className="h-px bg-[#2D333B]" />
-            
-            {/* Timestamps */}
-            <div>
-              <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3 flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5 text-[#768390]" />
-                Timestamps
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-[#58A6FF]" />
-                    <span className="text-[12px] font-medium text-[#8B949E]">Created</span>
-                  </div>
-                  <p className="text-[13px] text-[#E6EDF3]">{formatDate(file.created_at)}</p>
-                  <p className="text-[11px] text-[#768390]">{formatDateRelative(file.created_at)}</p>
-                </div>
-                
-                {file.updated_at && (
-                  <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-[#58A6FF]" />
-                      <span className="text-[12px] font-medium text-[#8B949E]">Last Modified</span>
-                    </div>
-                    <p className="text-[13px] text-[#E6EDF3]">{formatDate(file.updated_at)}</p>
-                    <p className="text-[11px] text-[#768390]">{formatDateRelative(file.updated_at)}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="h-px bg-[#2D333B]" />
-            
-            {/* Storage & Security */}
-            <div>
-              <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3 flex items-center gap-2">
-                <Database className="h-3.5 w-3.5 text-[#768390]" />
-                Storage & Security
-              </h4>
-              <div className="space-y-3">
-                <div className="p-3 rounded-[10px] bg-[#2D333B] border border-[#373E47]">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Hash className="h-3.5 w-3.5 text-[#768390]" />
-                    <span className="text-[12px] font-medium text-[#8B949E]">File ID</span>
-                  </div>
-                  <p className="text-[11px] font-mono bg-[#1C2128] p-2 rounded-[6px] break-all text-[#8B949E]">{file.id}</p>
-                </div>
-                
-                {(file.encrypted || file.shared || file.is_public || file.preview_available) && (
-                  <div className="flex flex-wrap gap-2">
-                    {file.encrypted && (
-                      <Badge variant="outline" className="justify-center bg-[#1A3A5C] border-[#58A6FF]/30 text-[#58A6FF]">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Encrypted
-                      </Badge>
-                    )}
-                    {file.shared && (
-                      <Badge variant="outline" className="justify-center bg-[#2D333B] border-[#373E47] text-[#8B949E]">
-                        <Link className="h-3 w-3 mr-1" />
-                        Shared
-                      </Badge>
-                    )}
-                    {file.is_public && (
-                      <Badge variant="outline" className="justify-center bg-[#2D333B] border-[#373E47] text-[#8B949E]">
-                        <Eye className="h-3 w-3 mr-1" />
-                        Public
-                      </Badge>
-                    )}
-                    {file.preview_available && (
-                      <Badge variant="outline" className="justify-center bg-[#2D333B] border-[#373E47] text-[#8B949E]">
-                        <Monitor className="h-3 w-3 mr-1" />
-                        Preview
-                      </Badge>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Technical Details */}
-            {(file.processor || file.storage_path || file.user_id) && (
-              <>
-                <div className="h-px bg-[#2D333B]" />
-                <div>
-                  <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3 flex items-center gap-2">
-                    <Code className="h-3.5 w-3.5 text-[#768390]" />
-                    Technical Details
-                  </h4>
-                  <div className="space-y-3">
-                    {file.processor && (
-                      <div>
-                        <p className="text-[12px] font-medium text-[#8B949E] mb-1">Processor</p>
-                        <p className="text-[12px] font-mono bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] text-[#E6EDF3]">{file.processor}</p>
-                      </div>
-                    )}
-                    {file.storage_path && (
-                      <div>
-                        <p className="text-[12px] font-medium text-[#8B949E] mb-1">Storage Path</p>
-                        <p className="text-[11px] font-mono bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] break-all text-[#E6EDF3]">{file.storage_path}</p>
-                      </div>
-                    )}
-                    {file.user_id && (
-                      <div>
-                        <p className="text-[12px] font-medium text-[#8B949E] mb-1">Owner ID</p>
-                        <p className="text-[11px] font-mono bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] break-all text-[#E6EDF3]">{file.user_id}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Additional Metadata */}
-            {(file.checksum || file.version || file.compression) && (
-              <>
-                <div className="h-px bg-[#2D333B]" />
-                <div>
-                  <h4 className="text-[13px] font-semibold text-[#E6EDF3] mb-3">Additional Metadata</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {file.checksum && (
-                      <div>
-                        <p className="text-[12px] font-medium text-[#8B949E] mb-1">Checksum</p>
-                        <p className="text-[11px] bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] font-mono break-all text-[#E6EDF3]">{file.checksum}</p>
-                      </div>
-                    )}
-                    {file.version && (
-                      <div>
-                        <p className="text-[12px] font-medium text-[#8B949E] mb-1">Version</p>
-                        <p className="text-[13px] bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] text-[#E6EDF3]">{file.version}</p>
-                      </div>
-                    )}
-                    {file.compression && (
-                      <div>
-                        <p className="text-[12px] font-medium text-[#8B949E] mb-1">Compression</p>
-                        <p className="text-[13px] bg-[#2D333B] border border-[#373E47] p-2.5 rounded-[8px] text-[#E6EDF3]">{file.compression}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
+              </Section>
             )}
           </div>
         </ScrollArea>
