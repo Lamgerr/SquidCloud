@@ -364,7 +364,7 @@ export default function DeepReadCatalog({ files, onBookOpen }: { files: any[], o
       const [src, ...rest] = (entry.book_key || '').split(':');
       const id = rest.join(':');
       if (src === 'gutendex' && id) {
-        const data = await (await fetch(`https://gutendex.com/books/${encodeURIComponent(id)}`)).json();
+        const data = await (await fetch(`/api/gutendex-proxy?url=${encodeURIComponent(`https://gutendex.com/books/${encodeURIComponent(id)}`)}`)).json();
         const b = data;
         book = {
           key: entry.book_key, source: 'gutendex', sourceId: id,
@@ -379,7 +379,7 @@ export default function DeepReadCatalog({ files, onBookOpen }: { files: any[], o
         onBookOpen({ name: (entry.title || id) + '.epub', url, bookKey: entry.book_key, bookTitle: entry.title, bookAuthor: entry.author, bookCover: entry.cover_url }, 'remote');
         return;
       } else if (src === 'ol' && id) {
-        const data = await (await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(entry.title || '')}&limit=5&fields=key,title,author_name,cover_i,ia,ebook_access`)).json();
+        const data = await (await fetch(`/api/gutendex-proxy?url=${encodeURIComponent(`https://openlibrary.org/search.json?q=${encodeURIComponent(entry.title || '')}&limit=5&fields=key,title,author_name,cover_i,ia,ebook_access`)}`)).json();
         const d = (data.docs || [])[0];
         if (!d) throw new Error('Could not find this edition again.');
         const iaId = Array.isArray(d.ia) ? d.ia[0] : d.ia;

@@ -67,7 +67,10 @@ export async function searchGutendex(opts: ProviderSearchOpts): Promise<{ books:
   if (opts.author) p.set('search', opts.author);
   p.set('sort', GUT_SORT[opts.sort || 'popular']);
   p.set('page', String(opts.page || 1));
-  const data = await getJson(`https://gutendex.com/books/?${p.toString()}`);
+  /* Gutendex is called through a same-origin proxy: browsers block the
+     cross-origin request outright (status 0), which is why the catalog
+     rendered empty. The proxy is an allowlisted edge function. */
+  const data = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://gutendex.com/books/?${p.toString()}`)}`);
   const books: ProviderBook[] = (data.results || []).map((b: any) => ({
     key: `gutendex:${b.id}`,
     source: 'gutendex' as BookSource,
@@ -100,7 +103,7 @@ export async function searchOpenLibrary(opts: ProviderSearchOpts): Promise<{ boo
   p.set('fields', OL_FIELDS);
   p.set('limit', String(opts.limit || 12));
   p.set('page', String(opts.page || 1));
-  const data = await getJson(`https://openlibrary.org/search.json?${p.toString()}`);
+  const data = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://openlibrary.org/search.json?${p.toString()}`)}`);
   const docs = data.docs || [];
   const books: ProviderBook[] = docs.map((d: any) => {
     const key: string = d.key || '';
@@ -141,7 +144,7 @@ export async function searchArchive(opts: ProviderSearchOpts): Promise<{ books: 
   });
   if (opts.sort === 'newest') p.set('sort[]', 'addeddate desc');
   else p.set('sort[]', 'downloads desc');
-  const data = await getJson(`https://archive.org/advancedsearch.php?${p.toString()}`);
+  const data = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://archive.org/advancedsearch.php?${p.toString()}`)}`);
   const docs = data?.response?.docs || [];
   const books: ProviderBook[] = docs.map((d: any) => {
     const creators = Array.isArray(d.creator) ? d.creator : d.creator ? [d.creator] : [];
@@ -207,7 +210,7 @@ export async function searchAllProviders(opts: ProviderSearchOpts): Promise<Unif
 export async function resolveEpubUrl(book: ProviderBook): Promise<string> {
   if (book.epubUrl) return book.epubUrl;
   if (book.iaId) {
-    const meta: any = await getJson(`https://archive.org/metadata/${encodeURIComponent(book.iaId)}`);
+    const meta: any = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://archive.org/metadata/${encodeURIComponent(book.iaId)}`)}`);
     const files: any[] = meta?.files || [];
     const epub = files.find(f => /\.epub$/i.test(f.name || '') && !/(_djvu|_text|_jp2|_pdf|_abbyy|_scandata)/i.test(f.name || ''));
     if (epub) return `https://archive.org/download/${book.iaId}/${encodeURIComponent(epub.name)}`;
