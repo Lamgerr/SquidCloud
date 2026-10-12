@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -174,7 +175,7 @@ interface ContinueEntry {
   total_pages: number;
 }
 
-export default function DeepReadCatalog({ files, onBookOpen }: { files: any[], onBookOpen: (file: any, source?: 'local' | 'remote') => void }) {
+export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files: any[], onBookOpen: (file: any, source?: 'local' | 'remote') => void, onSaved?: (fileId: string) => void }) {
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
@@ -672,22 +673,29 @@ export default function DeepReadCatalog({ files, onBookOpen }: { files: any[], o
         )}
       </div>
 
-      {/* ═══ BOOK INFO DIALOG ═══ */}
-      {infoDialogOpen && selectedBook && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={selectedBook.title}>
+      {/* ═══ BOOK INFO DIALOG — portal so it escapes all stacking contexts ═══ */}
+      {infoDialogOpen && selectedBook && createPortal(
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={selectedBook.title}
+        >
           <div className="absolute inset-0 bg-black/80 animate-fade-in" onClick={() => setInfoDialogOpen(false)} />
-          <div className={cn('relative z-10 flex max-h-[90vh] w-full flex-col overflow-y-auto border border-border bg-card text-foreground shadow-2xl animate-fade-in-scale', isMobile ? 'max-w-md rounded-2xl p-6' : 'max-w-2xl rounded-3xl p-8')}>
+          <div className={cn(
+            'relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto border border-border bg-card text-foreground shadow-2xl animate-fade-in-scale rounded-3xl p-8',
+          )}>
             <button onClick={() => setInfoDialogOpen(false)} aria-label="Close details" className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all hover:bg-accent hover:text-foreground active:scale-90">
               <X className="h-4 w-4" />
             </button>
-            <div className={cn('flex', isMobile ? 'flex-col gap-6' : 'gap-8')}>
-              <div className={cn('shrink-0', isMobile && 'flex justify-center')}>
-                <div className={cn('overflow-hidden rounded-xl border border-border', isMobile ? 'w-40' : 'w-48')}>
+            <div className="flex gap-8">
+              <div className="shrink-0">
+                <div className="w-48 overflow-hidden rounded-xl border border-border">
                   <CoverImg book={selectedBook} className="aspect-[2/3]" />
                 </div>
               </div>
-              <div className="flex min-w-0 flex-1 flex-col justify-center text-center sm:text-left">
-                <h3 className={cn('font-bold leading-tight tracking-tight text-foreground', isMobile ? 'text-xl' : 'text-3xl')}>{selectedBook.title}</h3>
+              <div className="flex min-w-0 flex-1 flex-col justify-center text-left">
+                <h3 className="font-bold leading-tight tracking-tight text-foreground text-3xl">{selectedBook.title}</h3>
                 {selectedBook.authors[0] && (
                   <button
                     onClick={() => { const a = selectedBook.authors[0]; setInfoDialogOpen(false); setActiveTab('discover'); setTopic(null); setSearch(a); }}
@@ -697,13 +705,13 @@ export default function DeepReadCatalog({ files, onBookOpen }: { files: any[], o
                     {selectedBook.authors[0]} →
                   </button>
                 )}
-                <div className={cn('mt-3 flex flex-wrap items-center gap-2', isMobile && 'justify-center')}>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-muted px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{SOURCE_LABEL[selectedBook.source]}</span>
                   {selectedBook.year && <span className="text-xs tabular-nums text-muted-foreground">{selectedBook.year}</span>}
                   <span className="text-xs tabular-nums text-muted-foreground">{selectedBook.popularity > 0 ? `${selectedBook.popularity.toLocaleString()} reads` : 'Reader favorite'}</span>
                 </div>
                 {selectedBook.subjects && selectedBook.subjects.length > 0 && (
-                  <div className={cn('mt-3 flex flex-wrap gap-1.5', isMobile && 'justify-center')}>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
                     {selectedBook.subjects.slice(0, 4).map(s => (
                       <button
                         key={s}
@@ -715,7 +723,7 @@ export default function DeepReadCatalog({ files, onBookOpen }: { files: any[], o
                     ))}
                   </div>
                 )}
-                <div className={cn('mt-4 flex items-center gap-4 text-xs text-muted-foreground', isMobile && 'justify-center')}>
+                <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
                   <span className={cn('flex items-center gap-1.5', selectedBook.epubUrl || selectedBook.iaId ? 'text-foreground' : 'opacity-40')}>
                     <span className={cn('h-1.5 w-1.5 rounded-full', selectedBook.epubUrl || selectedBook.iaId ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
                     EPUB
@@ -739,12 +747,13 @@ export default function DeepReadCatalog({ files, onBookOpen }: { files: any[], o
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ═══ SAVE DIALOG ═══ */}
       {saveBook && (
-        <SaveBookDialog book={saveBook} onClose={() => setSaveBook(null)} />
+        <SaveBookDialog book={saveBook} onClose={() => setSaveBook(null)} onSaved={onSaved} />
       )}
     </div>
   );

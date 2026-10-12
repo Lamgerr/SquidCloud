@@ -46,8 +46,21 @@ async function getJson(url: string, timeoutMs = 12000): Promise<any> {
   const t = setTimeout(() => c.abort(), timeoutMs);
   try {
     const res = await fetch(url, { headers: UA, signal: c.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const text = await res.text();
+    if (!res.ok) {
+      // Try to extract the error message from the JSON body
+      let msg = `HTTP ${res.status}`;
+      try {
+        const json = JSON.parse(text);
+        if (json?.error) msg = json.error;
+      } catch { /* not JSON */ }
+      throw new Error(msg);
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON from provider (HTTP ${res.status})`);
+    }
   } finally {
     clearTimeout(t);
   }
@@ -210,14 +223,28 @@ export async function searchAllProviders(opts: ProviderSearchOpts): Promise<Unif
 export async function resolveEpubUrl(book: ProviderBook): Promise<string> {
   if (book.epubUrl) return book.epubUrl;
   if (book.iaId) {
-    const meta: any = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://archive.org/metadata/${encodeURIComponent(book.iaId)}`)}`);
-    const files: any[] = meta?.files || [];
-    const epub = files.find(f => /\.epub$/i.test(f.name || '') && !/(_djvu|_text|_jp2|_pdf|_abbyy|_scandata)/i.test(f.name || ''));
-    if (epub) return `https://archive.org/download/${book.iaId}/${encodeURIComponent(epub.name)}`;
-    // Fallback: IA's conventional derivative name.
-    return `https://archive.org/download/${book.iaId}/${book.iaId}_epub.epub`;
+    try {
+      const meta: any = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://archive.org/metadata/${encodeURIComponent(book.iaId)}`)}`);
+      const files: any[] = meta?.files || [];
+      // Try EPUB first
+      const epub = files.find(f => /\.epub$/i.test(f.name || '') && !/(_djvu|_text|_jp2|_pdf|_abbyy|_scandata)/i.test(f.name || ''));
+      if (epub) return `https://archive.org/download/${book.iaId}/${encodeURIComponent(epub.name)}`;
+      // Fall back to PDF if no EPUB
+      const pdf = files.find(f => /\.pdf$/i.test(f.name || '') && !/(_djvu|_text|_jp2|_abbyy|_scandata)/i.test(f.name || ''));
+      if (pdf) return `https://archive.org/download/${book.iaId}/${encodeURIComponent(pdf.name)}`;
+      // Last resort: conventional derivative name
+      return `https://archive.org/download/${book.iaId}/${book.iaId}_epub.epub`;
+    } catch (e: any) {
+      // IA metadata lookup failed — provide a specific error
+      const msg = e?.message?.includes('HTTP') ? `Archive.org lookup failed (${e.message})` : `Could not reach Archive.org: ${e?.message || 'network error'}`;
+      throw new Error(msg);
+    }
   }
-  throw new Error('No readable EPUB edition found for this title.');
+  if (book.olKey) {
+    // Open Library — try to find the IA identifier from the work and resolve via IA
+    throw new Error('This edition is not available for free download. Try saving it from a different search result.');
+  }
+  throw new Error('No downloadable edition found for this title.');
 }
 
 /* ── Download EPUB bytes (direct, then same-origin proxy) ─── */
@@ -225,18 +252,31 @@ export async function resolveEpubUrl(book: ProviderBook): Promise<string> {
 export async function fetchEpubBytes(url: string): Promise<{ bytes: Uint8Array; fileName: string }> {
   const tryFetch = async (u: string): Promise<Uint8Array> => {
     const res = await fetch(u);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
     const buf = await res.arrayBuffer();
-    if (buf.byteLength < 5000) throw new Error('File too small to be a book');
+    if (buf.byteLength < 5000) throw new Error('Downloaded file is too small to be a book.');
     const head = new Uint8Array(buf.slice(0, 4));
-    const isZip = head[0] === 0x50 && head[1] === 0x4b;
-    if (!isZip) throw new Error('Not a valid EPUB file');
+    const isZip = head[0] === 0x50 && head[1] === 0x4b; // PK magic
+    if (!isZip) {
+      // Might be an HTML error page — detect and give a clear message
+      const text = new TextDecoder().decode(buf.slice(0, 200));
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        throw new Error('Could not download this book — the source returned a web page instead. Try another edition.');
+      }
+      throw new Error('Downloaded file is not a valid EPUB (unexpected format).');
+    }
     return new Uint8Array(buf);
   };
   try {
     return { bytes: await tryFetch(url), fileName: '' };
-  } catch {
-    const proxied = `/api/epub-proxy?url=${encodeURIComponent(url)}`;
-    return { bytes: await tryFetch(proxied), fileName: '' };
+  } catch (e: any) {
+    // Retry via same-origin proxy
+    try {
+      const proxied = `/api/epub-proxy?url=${encodeURIComponent(url)}`;
+      return { bytes: await tryFetch(proxied), fileName: '' };
+    } catch {
+      // Surface the original error, not the proxy error
+      throw new Error(e?.message || 'Could not download this book. Check your connection and try again.');
+    }
   }
 }

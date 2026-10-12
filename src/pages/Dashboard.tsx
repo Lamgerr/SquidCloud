@@ -1483,6 +1483,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                 <DeepReadCatalog
                   files={files}
                   onBookOpen={handleBookOpen}
+                  onSaved={fetchFiles}
                 />
                 </div>
               )}
@@ -2043,6 +2044,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                     onFileShare={handleFileShare}
                     onFileMoveToFolder={handleFileMoveToFolder}
                     onFolderDelete={handleFolderDelete}
+                    onFolderMove={onFolderMove}
                     onFolderShare={handleFolderShare}
                     onVaultOpen={() => setShowVaultAuth(true)}
                     onRefresh={fetchFiles}
@@ -2096,6 +2098,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                 <DeepReadCatalog
                   files={files}
                   onBookOpen={handleBookOpen}
+                  onSaved={fetchFiles}
                 />
                 </div>
               )}
@@ -2415,6 +2418,7 @@ interface FilesViewProps {
   onFileShare: (f: FileItemType) => void;
   onFileMoveToFolder: (f: FileItemType) => void;
   onFolderDelete: (f: FolderItem) => void;
+  onFolderMove: (f: FolderItem) => void;
   onFolderShare: (f: FolderItem) => void;
   onVaultOpen: () => void;
   onRefresh: () => void;
@@ -2447,7 +2451,7 @@ const FilesView: React.FC<FilesViewProps> = ({
   onGoBack, onNavigateTo, onOpenFolder,
   onOpenFolderInCbCode, onFileClick, onOpenFileInCbCode,
   onFileDownload, onFileDelete, onFileShare, onFileMoveToFolder,
-  onFolderDelete, onFolderShare, onVaultOpen, onRefresh,
+  onFolderDelete, onFolderMove, onFolderShare, onVaultOpen, onRefresh,
   bookmarks, getColor, isBookmarked, onToggleBookmark, onSetColor,
   selectionMode, selectedFiles, onToggleSelection, onToggleSelect, onSelectAll,
   onFileCreated, onUploadComplete,

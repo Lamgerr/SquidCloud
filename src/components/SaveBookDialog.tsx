@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -78,27 +79,35 @@ export default function SaveBookDialog({
         setProgress(8 + Math.round((p / 100) * 88));
         if (p >= 100) setStatus('Finishing…');
       });
+      // Validate result
+      if (!result?.id) {
+        throw new Error('Upload completed but file ID was not returned. Your storage may be full or there may be a server issue.');
+      }
       if (folderId) {
         const { error: moveErr } = await supabase
           .from('files')
           .update({ parent_folder: folderId })
           .eq('id', result.id);
-        if (moveErr) throw new Error('Uploaded, but could not move into the chosen folder.');
+        if (moveErr) {
+          // Non-fatal: file is saved, just not moved
+          console.warn('Book saved but move to folder failed:', moveErr.message);
+        }
       }
       setProgress(100);
       setPhase('done');
       toast({ title: 'Book saved', description: `"${book.title}" is now in your storage.` });
       onSaved?.(result.id);
     } catch (e: any) {
-      setError(e?.message || 'Could not save this book. Try again.');
+      const msg = e?.message || 'Could not save this book. Try again.';
+      setError(msg);
       setPhase('error');
     }
   };
 
   const chosen = folders.find(f => f.id === folderId);
 
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={`Save ${book.title}`}>
+  return createPortal(
+    <div className="fixed inset-0 z-[210] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={`Save ${book.title}`}>
       <div className="absolute inset-0 bg-black/80 animate-fade-in" onClick={() => phase === 'pick' && onClose()} />
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl animate-fade-in-scale">
         <button onClick={onClose} aria-label="Close" className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all hover:bg-accent hover:text-foreground active:scale-90">
@@ -214,6 +223,7 @@ export default function SaveBookDialog({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
