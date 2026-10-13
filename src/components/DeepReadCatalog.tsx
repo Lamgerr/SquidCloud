@@ -6,7 +6,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Search, BookOpen, Loader2, Bookmark, X,
+  Search, BookOpen, Loader2, Bookmark, X, Clock, Info,
   ChevronLeft, ChevronRight, Flame, Sparkles, Rocket,
   Feather, Landmark, Brain, History, Download,
 } from 'lucide-react';
@@ -200,6 +200,7 @@ export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files:
   const [selectedBook, setSelectedBook] = useState<ProviderBook | null>(null);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   const [saveBook, setSaveBook] = useState<ProviderBook | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   const observer = useRef<IntersectionObserver | null>(null);
   const userBooks = files.filter(f => f.name?.match(/\.(epub|pdf|mobi)$/i));
@@ -216,9 +217,9 @@ export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files:
 
   // Dialog behavior: Escape closes, background page stays put while open
   useEffect(() => {
-    if (!infoDialogOpen && !saveBook) return;
+    if (!infoDialogOpen && !saveBook && !aboutOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setInfoDialogOpen(false); setSaveBook(null); }
+      if (e.key === 'Escape') { setInfoDialogOpen(false); setSaveBook(null); setAboutOpen(false); }
     };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -227,7 +228,7 @@ export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files:
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [infoDialogOpen, saveBook]);
+  }, [infoDialogOpen, saveBook, aboutOpen]);
 
   // ── Home shelves (parallel, cached per mount) ──
   useEffect(() => {
@@ -274,15 +275,18 @@ export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files:
     (async () => {
       setGridLoading(true);
       try {
-        const { searchAllProviders } = await import('@/lib/book-providers');
+        const { searchAllProviders, verifyIaBooks } = await import('@/lib/book-providers');
         const { books } = await searchAllProviders({
           query: debouncedSearch.trim() || undefined,
           topic: topic || undefined,
           sort, page: 1, limit: 24,
         });
+        // Archive.org cannot mark borrow-only scans at search time, so
+        // verify them here: only freely downloadable books stay listed.
+        const clean = await verifyIaBooks(books);
         if (!alive) return;
-        setGridBooks(books);
-        setGridHasMore(books.length >= 24);
+        setGridBooks(clean);
+        setGridHasMore(clean.length >= 24);
       } catch {
         if (alive) setCatalogError('Could not reach the book catalogs. Check your connection and try again.');
       } finally {
@@ -296,16 +300,17 @@ export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files:
     if (gridLoading || !gridHasMore) return;
     setGridLoading(true);
     try {
-      const { searchAllProviders } = await import('@/lib/book-providers');
+      const { searchAllProviders, verifyIaBooks } = await import('@/lib/book-providers');
       const next = gridPage + 1;
       const { books } = await searchAllProviders({
         query: debouncedSearch.trim() || undefined,
         topic: topic || undefined,
         sort, page: next, limit: 24,
       });
-      setGridBooks(prev => [...prev, ...books]);
+      const clean = await verifyIaBooks(books);
+      setGridBooks(prev => [...prev, ...clean]);
       setGridPage(next);
-      setGridHasMore(books.length >= 24);
+      setGridHasMore(clean.length >= 24);
     } catch {
       /* keep what we have */
     } finally {
@@ -440,6 +445,14 @@ export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files:
                 <h1 className="truncate text-lg font-bold tracking-tight sm:text-xl">DeepRead</h1>
                 {!isMobile && <p className="truncate text-[13px] text-muted-foreground">Your private digital library</p>}
               </div>
+              <button
+                onClick={() => setAboutOpen(true)}
+                aria-label="About DeepRead books"
+                title="About DeepRead books"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted/50 text-muted-foreground transition-all hover:border-foreground/25 hover:text-foreground active:scale-90"
+              >
+                <Info className="h-4 w-4" />
+              </button>
             </div>
           )}
 
@@ -473,6 +486,16 @@ export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files:
               ) : (
                 <button onClick={() => setShowMobileSearch(true)} aria-label="Search books" className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted/50 text-muted-foreground transition-all hover:text-foreground active:scale-90">
                   <Search className="h-4 w-4" />
+                </button>
+              )}
+              {!showMobileSearch && (
+                <button
+                  onClick={() => setAboutOpen(true)}
+                  aria-label="About DeepRead books"
+                  title="About DeepRead books"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted/50 text-muted-foreground transition-all hover:text-foreground active:scale-90"
+                >
+                  <Info className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -758,6 +781,55 @@ export default function DeepReadCatalog({ files, onBookOpen, onSaved }: { files:
           onClose={() => setSaveBook(null)}
           onSaved={(fileId) => { onSaved?.(fileId); setActiveTab('library'); }}
         />
+      )}
+
+      {/* ═══ ABOUT / LICENSE DISCLAIMER — portal ═══ */}
+      {aboutOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="About DeepRead books"
+        >
+          <div className="absolute inset-0 bg-black/80 animate-fade-in" onClick={() => setAboutOpen(false)} />
+          <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto rounded-3xl border border-border bg-card p-6 text-foreground shadow-2xl animate-fade-in-scale sm:p-8">
+            <button onClick={() => setAboutOpen(false)} aria-label="Close" className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all hover:bg-accent hover:text-foreground active:scale-90">
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <Info className="h-5 w-5" />
+              </div>
+              <h3 className="pr-8 text-lg font-bold tracking-tight">Free books, honestly labeled</h3>
+            </div>
+            <div className="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                <span className="font-semibold text-foreground">Only free downloads are listed.</span>{' '}
+                Borrow-only and rental scans are hidden, so every book you open here has an edition you can read and keep at no cost.
+              </p>
+              <p>
+                <span className="font-semibold text-foreground">SquidCloud holds no book licenses and sells no books.</span>{' '}
+                Everything in DeepRead comes from free public sources: Project Gutenberg (public-domain books),
+                Open Library, and the Internet Archive.
+              </p>
+              <p>
+                Availability can change if a source removes a scan. A book that is free in one country may still be
+                under copyright in yours — only download and keep what is lawful where you live.
+              </p>
+              <p>
+                Books you choose to save are stored as ordinary files in your own SquidCloud storage and count
+                toward your plan limits like any other file.
+              </p>
+            </div>
+            <button
+              onClick={() => setAboutOpen(false)}
+              className="mt-6 flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99]"
+            >
+              Got it
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

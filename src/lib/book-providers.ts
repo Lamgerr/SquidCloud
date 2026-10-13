@@ -154,10 +154,16 @@ export async function searchOpenLibrary(opts: ProviderSearchOpts): Promise<{ boo
   p.set('page', String(opts.page || 1));
   const data = await getJson(`https://openlibrary.org/search.json?${p.toString()}`);
   const docs = data.docs || [];
-  const books: ProviderBook[] = docs.map((d: any) => {
+  /* Free-only: Open Library marks scans as public / borrowable / no_ebook /
+     printdisabled. Borrow-only and rental scans are dropped here so the
+     catalog never lists books SquidCloud cannot hand you as a download. */
+  const books: ProviderBook[] = [];
+  for (const d of docs) {
+    const access = d.ebook_access;
+    if (access === 'borrowable' || access === 'printdisabled' || access === 'no_ebook') continue;
     const key: string = d.key || '';
     const iaId: string | null = Array.isArray(d.ia) ? d.ia[0] : (typeof d.ia === 'string' ? d.ia : null);
-    return {
+    books.push({
       key: `ol:${key}`,
       source: 'openlibrary' as BookSource,
       sourceId: key,
@@ -169,13 +175,13 @@ export async function searchOpenLibrary(opts: ProviderSearchOpts): Promise<{ boo
         : iaId
           ? `https://archive.org/services/img/${iaId}`
           : null,
-      popularity: (d.ratings_count || 0) * 10 + (d.ebook_access === true ? 500 : 0),
+      popularity: (d.ratings_count || 0) * 10 + (access === 'public' ? 500 : 0),
       year: d.first_publish_year || null,
       epubUrl: null, // resolved on open via IA metadata
       iaId,
       olKey: key,
-    };
-  });
+    });
+  }
   const total = data.numFound || 0;
   const got = (opts.page || 1) * (opts.limit || 12);
   return { books, hasMore: total > got };
@@ -221,6 +227,41 @@ export async function searchArchive(opts: ProviderSearchOpts): Promise<{ books: 
   const found = data?.response?.numFound || 0;
   const got = (opts.page || 1) * (opts.limit || 12);
   return { books, hasMore: found > got };
+}
+
+/* ── Free-only verification for Archive.org hits ──────────
+   advancedsearch cannot tell borrow-only scans from free ones, so books
+   from the archive provider are verified against the metadata API before
+   they are shown: restricted/dark items and items with no free EPUB file
+   are dropped. Verified books come back with their EPUB url attached, so
+   opening and saving them needs no second lookup. Items that fail the
+   check on network errors are kept (fail-open); the open-time resolve is
+   the backstop. ─────────────────────────────────────────────────────── */
+
+export async function verifyIaBooks(books: ProviderBook[], timeoutMs = 9000): Promise<ProviderBook[]> {
+  const pending: number[] = [];
+  books.forEach((b, i) => { if (b.source === 'archive' && b.iaId && !b.epubUrl) pending.push(i); });
+  if (pending.length === 0) return books;
+  const out = [...books];
+  const drop = new Set<number>();
+  const check = async (i: number) => {
+    const b = books[i];
+    try {
+      const meta: any = await getJson(`https://archive.org/metadata/${encodeURIComponent(b.iaId!)}`, timeoutMs);
+      if (meta?.access_restricted_item === true || meta?.is_dark === true) { drop.add(i); return; }
+      const files: any[] = meta?.files || [];
+      const epub = files.find(f => /\.epub$/i.test(f.name || '') && !/(_djvu|_text|_jp2|_pdf|_abbyy|_scandata|_lcp)/i.test(f.name || ''));
+      if (epub) out[i] = { ...b, epubUrl: `https://archive.org/download/${b.iaId}/${encodeURIComponent(epub.name)}` };
+      else drop.add(i);
+    } catch {
+      /* fail-open: keep the book, open-time resolve verdicts it */
+    }
+  };
+  const CONC = 6;
+  for (let k = 0; k < pending.length; k += CONC) {
+    await Promise.all(pending.slice(k, k + CONC).map(check));
+  }
+  return out.filter((_, i) => !drop.has(i));
 }
 
 /* ── Unified multi-provider search: parallel, deduped ─────── */
