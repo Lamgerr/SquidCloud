@@ -797,6 +797,65 @@ export const uploadFileWithRes54 = async (
   return { id: createdFile.id, metadata, encryptionKey: dbEncryptionKey };
 };
 
+/* ── Non-canonical row support (uniform read path) ──────────────
+   Writers that predate (or bypass) the res54 uploader leave rows that
+   the canonical parser rejects:
+   • migration / cloud-import / direct-upload rows: NO tags at all, the
+     object at storage_path in the `files` bucket IS the file (plaintext).
+   • legacy SquidFS-bridge rows: chunk locations but NO key material
+     (repo "" / missing encryptionKey). No-BYOK bridge uploads are
+     plaintext; anything framed without a key is unrecoverable.
+   These helpers let every reader (download, preview, dispatcher) route
+   such rows instead of surfacing "Failed to parse chunk …". */
+
+export const MANAGED_STORAGE_PATHS = new Set([
+  'res54_distributed',
+  'distributed_storage',
+  'tebi_external',
+  'tebi_external_encrypted',
+  'sde',
+]);
+
+/** True when a files row carries no chunk metadata and its storage_path
+    is a raw object key (not one of the managed pipeline markers). */
+export function isRawStorageRow(file: any): boolean {
+  const tags = (file as any)?.tags;
+  const hasTags = Array.isArray(tags) && tags.length > 0;
+  const sp = (file as any)?.storage_path;
+  return !hasTags && typeof sp === 'string' && sp.length > 0 && !MANAGED_STORAGE_PATHS.has(sp);
+}
+
+/** Download a raw object straight from the `files` bucket (no decrypt). */
+export async function downloadRawStorageObject(file: any): Promise<Blob> {
+  const sp = file?.storage_path;
+  if (!sp) throw new Error('Download failed: file has no storage location');
+  const { data, error } = await supabase.storage.from('files').download(sp);
+  if (error || !data) throw new Error(`Download failed: ${error?.message || 'file object not found'}`);
+  return data;
+}
+
+function u32le(b: Uint8Array, off: number): number {
+  return new DataView(b.buffer, b.byteOffset + off, 4).getUint32(0, true);
+}
+
+/** True when bytes carry any res54 framing (v3 magic, canonical v2
+    header, or standard single-part v2 framing). */
+export function looksEncryptedChunk(bytes: Uint8Array): boolean {
+  if (bytes.length < 20) return false;
+  if (bytes[0] === 0x52 && bytes[1] === 0x45 && bytes[2] === 0x03) return true; // v3 magic RE\x03
+  const hlen = u32le(bytes, 0);
+  if (hlen >= 8 && hlen <= 512 && bytes.length > 4 + hlen) {
+    try {
+      const h = JSON.parse(new TextDecoder().decode(bytes.subarray(4, 4 + hlen)));
+      if (h && typeof h.version === 'number' && h.version >= 2 && typeof h.chunks === 'number' && h.chunks > 0 && Array.isArray(h.ivs)) {
+        return true; // canonical v2 (web large / CLI / server / decryptor)
+      }
+    } catch { /* not a JSON header */ }
+  }
+  if (hlen >= 8 && hlen <= 128 && bytes.length > 4 + hlen + 12) return true; // standard v2 framing
+  return false;
+}
+
 export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?: string): Promise<any> => {
   if (!chunk.repo || !chunk.path) throw new Error(`Invalid chunk metadata for chunk ${chunk.index}`);
 
@@ -815,7 +874,7 @@ export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?
         downloadUrl = data.downloadUrl;
       }
       // Legacy GitHub repo path
-      else if (chunk.repo && chunk.repo !== 'b2') {
+      else if (chunk.repo && chunk.repo !== 'b2' && chunk.repo !== 'supabase') {
         const { data, error } = await supabase.functions.invoke('squidcloud-cluster', {
           body: {
             action: 'download', path: chunk.path, repo: chunk.repo,
@@ -832,6 +891,13 @@ export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?
           return { index: parsedChunk.chunkIndex, data: parsedChunk.chunkData };
         }
         downloadUrl = responseData.downloadUrl;
+      }
+      // Supabase storage bucket chunks (migration / cloud-import res54 rows)
+      else if (chunk.repo === 'supabase') {
+        const { data, error } = await supabase.storage.from('files').download(chunk.path);
+        if (error || !data) throw new Error(`Supabase storage download error: ${error?.message || 'empty object'}`);
+        const arrayBuffer = await data.arrayBuffer();
+        return { index: chunk.index, data: arrayBufferToBase64(arrayBuffer) };
       }
       // B2 via squidcloud-cluster
       else {
@@ -892,6 +958,15 @@ export const downloadFileWithRes54 = async (
     const { downloadFile } = await import('./api');
     return await downloadFile(fileId, progressCallback);
   }
+
+  // Raw object rows (migration / cloud-import / direct storage uploads):
+  // no chunk metadata — the object at storage_path IS the file.
+  if (isRawStorageRow(file)) {
+    progressCallback?.(30, 'downloading');
+    const blob = await downloadRawStorageObject(file);
+    progressCallback?.(100, 'complete');
+    return blob;
+  }
   
   progressCallback?.(10, 'preparing');
   let metadata: Res54FileMetadata;
@@ -943,6 +1018,20 @@ export const downloadFileWithRes54 = async (
     const sortedChunks = downloadedChunks.sort((a, b) => a.index - b.index).map(chunk => chunk.data);
     if (sortedChunks.length !== metadata.chunks.length) throw new Error(`Download incomplete`);
 
+    // Legacy keyless rows (old SquidFS-bridge uploads): chunk locations but
+    // no key material. No-BYOK bridge uploads are plaintext — sniff the
+    // first chunk and return bytes as-is when no res54 framing is present.
+    if (!metadata.encryptionKey) {
+      const firstBytes = new Uint8Array(base64ToArrayBuffer(sortedChunks[0]));
+      if (!looksEncryptedChunk(firstBytes)) {
+        progressCallback?.(90, 'assembling');
+        const raw = sortedChunks.map(s => base64ToArrayBuffer(s));
+        progressCallback?.(100, 'complete');
+        return new Blob(raw, { type: metadata.fileType });
+      }
+      throw new Error('This file was uploaded by an older client without key material and cannot be decrypted.');
+    }
+
     const byokPolicy = session?.user ? await getBYOKRuntimePolicy(session.user.id) : { enabled: false, strictMode: false, allowDefaultFallback: true, promptEveryDecrypt: false, hasAccountKey: false };
     const downloadReason = options.reason || 'decrypt';
     const promptFileName = options.fileName || metadata.fileName || file.name;
@@ -951,7 +1040,7 @@ export const downloadFileWithRes54 = async (
     const isV3 = sortedChunks.length > 0 && detectEncryptionVersion(sortedChunks[0]!) === 3;
     let v3FileKeyForDecrypt: ArrayBuffer | null = null;
 
-    const encKey = metadata.encryptionKey;
+    const encKey = metadata.encryptionKey || '';
     let v3FileId = fileId;
     if (encKey.startsWith('v3_byok_')) v3FileId = encKey.replace('v3_byok_', '');
     else if (encKey.startsWith('v3_custom_')) v3FileId = encKey.replace('v3_custom_', '');
@@ -1106,6 +1195,13 @@ export const downloadFilePreview = async (fileId: string, maxChunks: number = 3,
   if ((file as any)?.storage_path?.startsWith('tebi_external')) {
     const { downloadFile } = await import('./api');
     const blob = await downloadFile(fileId);
+    return { blob, totalChunks: 1, downloadedChunks: 1, isPartial: false };
+  }
+
+  // Raw object rows (migration / cloud-import / direct storage uploads):
+  // no chunk metadata — the object at storage_path IS the file.
+  if (isRawStorageRow(file)) {
+    const blob = await downloadRawStorageObject(file);
     return { blob, totalChunks: 1, downloadedChunks: 1, isPartial: false };
   }
 

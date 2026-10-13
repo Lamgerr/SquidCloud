@@ -2,6 +2,62 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts';
 
+/* ── Canonical res54 v2 encryption (byte-identical to the dashboard
+   uploader, the CLI transfer path, and POST /upload/encrypted) ──────
+   Key: UTF-8 bytes of key.slice(0,32).padEnd(32,'0') → AES-256-GCM.
+   Framing per logical chunk: [u32le headerLen]
+   [JSON {version:2,chunks,totalSize,ivs:number[][]}]
+   then per 64KB part: [u32le aadLen][aad][u32le encLen][ct‖tag],
+   AAD = `chunk-{i}-{N}-{timestamp}`, random 12B IV per part. */
+const V2_SUB_CHUNK = 64 * 1024;
+
+function generateRes54Key(): string {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(raw).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function res54ChunkSize(totalSize: number): number {
+  if (totalSize > 50 * 1024 * 1024) return 2 * 1024 * 1024;
+  if (totalSize > 10 * 1024 * 1024) return 1024 * 1024;
+  return 512 * 1024;
+}
+
+async function encryptChunkCanonical(plaintext: Uint8Array, keyStr: string): Promise<Uint8Array> {
+  const enc = new TextEncoder();
+  const keyBytes = enc.encode(keyStr.slice(0, 32).padEnd(32, '0'));
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+  const numParts = Math.max(1, Math.ceil(plaintext.length / V2_SUB_CHUNK));
+  const ivs: Uint8Array[] = [];
+  const parts: { aad: Uint8Array; encrypted: Uint8Array }[] = [];
+  const timestamp = Date.now();
+  for (let i = 0; i < numParts; i++) {
+    const sub = plaintext.subarray(i * V2_SUB_CHUNK, Math.min((i + 1) * V2_SUB_CHUNK, plaintext.length));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const aad = enc.encode(`chunk-${i}-${numParts}-${timestamp}`);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, key, sub);
+    ivs.push(iv);
+    parts.push({ aad, encrypted: new Uint8Array(ct) });
+  }
+  const headerBytes = enc.encode(JSON.stringify({
+    version: 2, chunks: numParts, totalSize: plaintext.length,
+    ivs: ivs.map(iv => Array.from(iv)),
+  }));
+  let total = 4 + headerBytes.length;
+  for (const p of parts) total += 4 + p.aad.length + 4 + p.encrypted.length;
+  const out = new Uint8Array(total);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, headerBytes.length, true);
+  out.set(headerBytes, 4);
+  let off = 4 + headerBytes.length;
+  for (const p of parts) {
+    dv.setUint32(off, p.aad.length, true); off += 4;
+    out.set(p.aad, off); off += p.aad.length;
+    dv.setUint32(off, p.encrypted.length, true); off += 4;
+    out.set(p.encrypted, off); off += p.encrypted.length;
+  }
+  return out;
+}
+
 serve(async (req) => {
   return withPrelGateway(req, { functionId: 'start-cloud-import', operation: 'default' }, async (ctx: PrelContext) => {
     if (req.method === 'OPTIONS') {
@@ -144,29 +200,63 @@ async function processFile(file: any, tokens: any, platform: string, userId: str
       throw new Error(`Unsupported platform: ${platform}`);
   }
 
-  // Upload to Supabase storage
-  const filePath = `${userId}/imported/${fileName}`;
-  const { error: uploadError } = await supabase.storage
-    .from('files')
-    .upload(filePath, fileData, {
-      contentType: file.mimeType || 'application/octet-stream',
-      upsert: true
-    });
+  const plainBytes = fileData instanceof Uint8Array ? fileData
+    : fileData instanceof ArrayBuffer ? new Uint8Array(fileData)
+    : new Uint8Array(await fileData.arrayBuffer());
+  const plainSize = plainBytes.length || file.size || 0;
 
-  if (uploadError) {
-    throw uploadError;
+  // Canonical res54: AES-256-GCM exactly like dashboard / CLI uploads,
+  // chunk objects in the `files` bucket, full chunk-location metadata.
+  const fileId = crypto.randomUUID();
+  const encryptionKey = generateRes54Key();
+  const chunkSize = res54ChunkSize(plainSize);
+  const totalChunks = Math.max(1, Math.ceil(plainSize / chunkSize));
+  const chunkMetas: any[] = [];
+  for (let i = 0; i < totalChunks; i++) {
+    const slice = plainBytes.subarray(i * chunkSize, Math.min((i + 1) * chunkSize, plainBytes.length));
+    const encrypted = await encryptChunkCanonical(slice, encryptionKey);
+    const chunkPath = `${userId}/imported/res54/${fileId}/${i}.bin`;
+    const { error: chunkError } = await supabase.storage
+      .from('files')
+      .upload(chunkPath, encrypted, {
+        contentType: 'application/octet-stream',
+        upsert: true
+      });
+    if (chunkError) throw chunkError;
+    chunkMetas.push({
+      index: i, totalChunks, size: slice.length, offset: i * chunkSize, sha256: '',
+      repo: 'supabase', path: chunkPath,
+    });
   }
+  const metadata = {
+    fileId, chunkSize, chunks: chunkMetas, encryptionKey,
+    created: new Date().toISOString(), previewAvailable: false,
+  };
+
+  // Imported files belong to the user's default workspace so they appear
+  // in the dashboard instead of limbo.
+  let workspaceId: string | null = null;
+  try {
+    const { data: wsId } = await supabase.rpc('get_or_create_default_workspace', { p_user_id: userId });
+    if (typeof wsId === 'string' && wsId) workspaceId = wsId;
+  } catch { /* non-fatal */ }
 
   // Create file record in database
   await supabase
     .from('files')
     .insert({
+      id: fileId,
       user_id: userId,
       name: fileName,
-      storage_path: filePath,
-      size: fileData.size || file.size,
+      storage_path: 'res54_distributed',
+      size: plainSize,
       type: file.mimeType || 'application/octet-stream',
-      parent_folder: 'imported'
+      encrypted: true,
+      encryption_key: '',
+      tags: [JSON.stringify(metadata)],
+      processor: 'res54',
+      parent_folder: 'imported',
+      ...(workspaceId ? { workspace_id: workspaceId } : {}),
     });
 }
 

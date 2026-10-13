@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { uploadFileWithRes54, downloadFileWithRes54 } from "./res54";
+import { uploadFileWithRes54, downloadFileWithRes54, isRawStorageRow, downloadRawStorageObject } from "./res54";
 import { decryptData, encryptData, generateEncryptionKey } from "./encryption";
 import { buildPublicUrl } from "@/lib/appLinks";
 import { createSecureFileRecord, fetchFileEncryptionKey } from "@/lib/secure-file-metadata";
@@ -1044,6 +1044,15 @@ export async function downloadFile(fileId: string, onProgress?: (progress: numbe
         { fileName: fileRow.name, mimeType: fileRow.type || 'application/octet-stream' }
       );
 
+      onProgress?.(100, 'complete');
+      return blob;
+    }
+
+    // Raw object rows (migration / cloud-import / direct storage uploads):
+    // no chunk metadata — the object at storage_path IS the file itself.
+    if (isRawStorageRow(fileRow)) {
+      onProgress?.(30, 'downloading');
+      const blob = await downloadRawStorageObject(fileRow);
       onProgress?.(100, 'complete');
       return blob;
     }

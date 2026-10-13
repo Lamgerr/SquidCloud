@@ -14,6 +14,62 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") as string;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
 const BUCKET = 'migration-zips';
 
+/* ── Canonical res54 v2 encryption (byte-identical to the dashboard
+   uploader, the CLI transfer path, and POST /upload/encrypted) ──────
+   Key: UTF-8 bytes of key.slice(0,32).padEnd(32,'0') → AES-256-GCM.
+   Framing per logical chunk: [u32le headerLen]
+   [JSON {version:2,chunks,totalSize,ivs:number[][]}]
+   then per 64KB part: [u32le aadLen][aad][u32le encLen][ct‖tag],
+   AAD = `chunk-{i}-{N}-{timestamp}`, random 12B IV per part. */
+const V2_SUB_CHUNK = 64 * 1024;
+
+function generateRes54Key(): string {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(raw).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function res54ChunkSize(totalSize: number): number {
+  if (totalSize > 50 * 1024 * 1024) return 2 * 1024 * 1024;
+  if (totalSize > 10 * 1024 * 1024) return 1024 * 1024;
+  return 512 * 1024;
+}
+
+async function encryptChunkCanonical(plaintext: Uint8Array, keyStr: string): Promise<Uint8Array> {
+  const enc = new TextEncoder();
+  const keyBytes = enc.encode(keyStr.slice(0, 32).padEnd(32, '0'));
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+  const numParts = Math.max(1, Math.ceil(plaintext.length / V2_SUB_CHUNK));
+  const ivs: Uint8Array[] = [];
+  const parts: { aad: Uint8Array; encrypted: Uint8Array }[] = [];
+  const timestamp = Date.now();
+  for (let i = 0; i < numParts; i++) {
+    const sub = plaintext.subarray(i * V2_SUB_CHUNK, Math.min((i + 1) * V2_SUB_CHUNK, plaintext.length));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const aad = enc.encode(`chunk-${i}-${numParts}-${timestamp}`);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, key, sub);
+    ivs.push(iv);
+    parts.push({ aad, encrypted: new Uint8Array(ct) });
+  }
+  const headerBytes = enc.encode(JSON.stringify({
+    version: 2, chunks: numParts, totalSize: plaintext.length,
+    ivs: ivs.map(iv => Array.from(iv)),
+  }));
+  let total = 4 + headerBytes.length;
+  for (const p of parts) total += 4 + p.aad.length + 4 + p.encrypted.length;
+  const out = new Uint8Array(total);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, headerBytes.length, true);
+  out.set(headerBytes, 4);
+  let off = 4 + headerBytes.length;
+  for (const p of parts) {
+    dv.setUint32(off, p.aad.length, true); off += 4;
+    out.set(p.aad, off); off += p.aad.length;
+    dv.setUint32(off, p.encrypted.length, true); off += 4;
+    out.set(p.encrypted, off); off += p.encrypted.length;
+  }
+  return out;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -99,23 +155,47 @@ serve(async (req) => {
     const errors: string[] = [];
     let processedSize = 0;
 
-    for (const entry of entries) {
+    for (let entryIdx = 0; entryIdx < entries.length; entryIdx++) {
+      const entry = entries[entryIdx];
       try {
-        const storageKey = `${job.user_id}/migration/${job.id}/${entry.path}`;
-
-        const { error: uploadError } = await supabase.storage.from('files').upload(storageKey, entry.content, {
-          contentType: entry.mimeType,
-          upsert: true,
-        });
-        if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+        // Canonical res54: encrypt every entry with AES-256-GCM exactly like
+        // dashboard / CLI uploads, then store encrypted chunk objects plus
+        // full chunk-location metadata so the file reads everywhere.
+        const fileId = crypto.randomUUID();
+        const encryptionKey = generateRes54Key();
+        const chunkSize = res54ChunkSize(entry.size);
+        const totalChunks = Math.max(1, Math.ceil(entry.size / chunkSize));
+        const chunkMetas: any[] = [];
+        for (let i = 0; i < totalChunks; i++) {
+          const slice = entry.content.subarray(i * chunkSize, Math.min((i + 1) * chunkSize, entry.content.length));
+          const encrypted = await encryptChunkCanonical(slice, encryptionKey);
+          const chunkPath = `${job.user_id}/migration/${job.id}/res54/${entryIdx}/${i}.bin`;
+          const { error: chunkError } = await supabase.storage.from('files').upload(chunkPath, encrypted, {
+            contentType: 'application/octet-stream',
+            upsert: true,
+          });
+          if (chunkError) throw new Error(`Chunk upload failed: ${chunkError.message}`);
+          chunkMetas.push({
+            index: i, totalChunks, size: slice.length, offset: i * chunkSize, sha256: '',
+            repo: 'supabase', path: chunkPath,
+          });
+        }
+        const metadata = {
+          fileId, chunkSize, chunks: chunkMetas, encryptionKey,
+          created: new Date().toISOString(), previewAvailable: false,
+        };
 
         const { error: recordError } = await supabase.from('files').insert({
+          id: fileId,
           name: entry.name,
           type: entry.mimeType,
           size: entry.size,
-          storage_path: storageKey,
+          storage_path: 'res54_distributed',
           user_id: job.user_id,
-          encrypted: false,
+          encrypted: true,
+          encryption_key: '',
+          tags: [JSON.stringify(metadata)],
+          processor: 'res54',
           parent_folder: entry.parentFolder,
           ...(workspaceId ? { workspace_id: workspaceId } : {}),
         });
