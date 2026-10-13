@@ -12,6 +12,7 @@ import { BYOKProvider } from "@/contexts/BYOKContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import MainHeader from "@/components/MainHeader";
 import VersionChecker from "@/components/VersionChecker";
+import UpdateAnnouncement from "@/components/UpdateAnnouncement";
 import MobileUploadNotification from "@/components/MobileUploadNotification";
 import { SquidGuardOverlay } from "@/components/SquidGuardOverlay";
 import MobileDownloadNotification from "@/components/MobileDownloadNotification";
@@ -229,6 +230,7 @@ const AppContent = () => {
         <BiometricAuthProvider>
           <BYOKProvider>
             <VersionChecker />
+            <UpdateAnnouncement />
             {showMaintenanceBanner && <MaintenanceBanner />}
             {showHeader && <MainHeader />}
             <Toaster />

@@ -43,6 +43,57 @@ const PatchNotes: React.FC = () => {
 
   const patchNotes: PatchNote[] = [
     {
+      id: 'v12-0-23-rework-drop',
+      version: '12.0.23',
+      date: '2026-10-13',
+      title: 'Rework Drop: Books, Transfers, Dispersal',
+      description: 'Books, transfers, file compatibility, dispersal, and one design language',
+      type: 'minor',
+      highlights: [
+        'Book catalog loads reliably with covers, free editions only',
+        'Saving books and library refresh fixed, Read Now dialog centered',
+        'Transfer panel and transfer center redesigned in Blackox',
+        'Old CLI and migration files open again in the dashboard',
+        'Dispersed uploads now reach Nostr relays and file hosts',
+        'Faster parallel uploads with honest progress and errors',
+      ],
+      tags: ['books', 'transfers', 'storage', 'dispersal', 'redesign'],
+      content: `# Rework Drop v12.0.23
+
+**Release Date:** October 13, 2026
+**Version:** 12.0.23
+**Type:** Minor Release (Feature Drop)
+
+---
+
+## Books That Work End to End
+
+The DeepRead catalog was rebuilt for reliability. Search runs across three public book sources with fallbacks, so one provider having a bad day no longer empties the page. Covers render properly. The list only shows editions you can download and keep for free — rental and borrow-only scans are filtered out before you ever see them.
+
+Saving a book to your storage works again, and saved books appear in your library immediately. The Read Now dialog now opens centered on every screen size, with a clear statement that SquidCloud holds no book licenses — everything comes from free public sources.
+
+## Transfers, Redesigned
+
+The upload/download panel and the full transfer center were rebuilt in Blackox, the design language now shared across the site: ink surfaces, bone type, hairline rules, small corners, mono labels. One progress readout per file, live speed, honest error messages instead of silent stalls. Chunk downloads give up fast on dead links and repair storage links automatically where possible.
+
+## Every File Opens Again
+
+Files uploaded long ago — from the CLI, from migrations, from older app versions — open in the dashboard again. Every upload and download path now uses the same encryption format, old formats are still readable, and storage usage is tracked per bucket so capacity limits actually apply.
+
+## Real Internet Dispersal (SDE Beta)
+
+Dispersed uploads now genuinely leave your device. Encrypted pieces go out over Nostr relays and anonymous file hosts, with your local copy kept as backup. Uploads only report success once pieces are confirmed on the network — a local-only copy never pretends to be dispersed. Chunk uploads run in parallel over reused connections, so large files finish in minutes.
+
+## Smaller Fixes Along the Way
+
+- Folder move dialog wired correctly through the file views
+- File info dialog redesigned with copyable IDs and stat tiles
+- Reader saves and restores progress, with cleaner typography
+- Analytics show real queries instead of placeholder data
+- Storage capacity gates and bucket health checks
+`,
+    },
+    {
       id: 'v1-0-6-cli-auth-fix',
       version: '1.0.6',
       date: '2025-10-07',
