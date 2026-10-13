@@ -36,6 +36,9 @@ interface B2Cluster {
   ownerId?: string;
   limitBytes?: number | null;
   usedBytes?: number;
+  // Read-only clusters (e.g. a full bucket) stay resolvable for downloads
+  // but are skipped by upload rotation. Set via B2_ENV_READONLY=true.
+  readOnly?: boolean;
 }
 
 // ============================================================
@@ -113,6 +116,7 @@ async function loadAllBuckets(
         bucket: bucketName,
         displayName: bucketName,
         kind: "env",
+        readOnly: (Deno.env.get("B2_ENV_READONLY") ?? "").toLowerCase() === "true",
       });
       seen.add(bucketName);
     }
@@ -398,6 +402,13 @@ serve(async (req) => {
       // Prefer the caller's own buckets first (stable — shared pool order unchanged).
       if (userId) {
         clusters.sort((a, b) => Number(b.ownerId === userId) - Number(a.ownerId === userId));
+      }
+      // Full / retired buckets stay readable but leave upload rotation.
+      const writable = clusters.filter(c => !c.readOnly);
+      if (writable.length > 0) {
+        clusters = writable;
+      } else if (clusters.length > 0) {
+        return createErrorResponse("No writable storage buckets available (all buckets are read-only)", 503);
       }
       // Explicit bucket choice bypasses the cap (deliberate); rotation skips
       // buckets already at/over their configured limit (uncapped when null).
