@@ -16,6 +16,8 @@ export interface StorageSubstrate {
   health: number; // 0..1 EWMA
   /** true when puts never leave this device (memory/disk cache tiers) */
   local?: boolean;
+  /** true when puts are best-effort replicas that lag the quorum path */
+  background?: boolean;
   put(chunkId: Uint8Array, payload: Uint8Array): Promise<Locator>;
   get(locator: Locator): Promise<Uint8Array>;
   probe(): Promise<SubstrateHealth>;

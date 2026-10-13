@@ -64,6 +64,13 @@ interface RelayState {
   latency: number;
 }
 
+interface PooledSocket {
+  ws: WebSocket;
+  url: string;
+  broken: boolean;
+  pending: Map<string, { resolve: (s: "acked" | "rejected" | "timeout") => void; timer: ReturnType<typeof setTimeout> }>;
+}
+
 interface NostrEvent {
   id: string;
   pubkey: string;
@@ -89,8 +96,7 @@ function signEvent(sk: Uint8Array, pubkey: string, created: number, tags: string
   return { id, pubkey, created_at: created, kind: KIND, tags, content, sig };
 }
 
-function sendOnce(url: string, msg: unknown, opts: { timeoutMs: number; okId?: string; eoseSub?: string }): Promise<any[]> {
-  const { timeoutMs, okId, eoseSub } = opts;
+function sendOnce(url: string, msg: unknown, opts: { timeoutMs: number; okId?: string; eoseSub?: string }): Promise<any[]> {  const { timeoutMs, okId, eoseSub } = opts;
   return new Promise((resolve) => {
     const received: any[] = [];
     let done = false;
@@ -136,6 +142,11 @@ export class NostrSubstrate implements StorageSubstrate {
   private relays: RelayState[] = RELAYS.map(url => ({ url, fails: 0, skipUntil: 0, latency: 1500 }));
   private okCount = 0;
   private failCount = 0;
+  // Persistent sockets, one per relay, reused across all chunks of an
+  // upload. Handshakes (~200-500ms each) happen once instead of per
+  // chunk — the dominant cost at 100+ chunks.
+  private pool = new Map<string, PooledSocket>();
+  private connecting = new Map<string, Promise<PooledSocket | null>>();
 
   private liveRelays(): RelayState[] {
     const now = Date.now();
@@ -157,50 +168,107 @@ export class NostrSubstrate implements StorageSubstrate {
   }
 
   private publishAll(r: RelayState, events: NostrEvent[]): Promise<boolean> {
-    // One socket per relay, all events pipelined back-to-back; OKs stream
-    // in and we close as soon as every event is ACKed. This turns ~22
-    // sequential round-trips into roughly one.
+    // Pooled socket per relay, all events pipelined back-to-back; OKs
+    // route back by event id. ~22 sequential round-trips become ~one,
+    // and the handshake happens once per relay per upload, not per chunk.
     const t0 = Date.now();
-    return new Promise((resolve) => {
-      const pending = new Set(events.map(e => e.id));
-      let settled = false;
+    return (async () => {
+      const entry = await this.getSocket(r.url);
+      if (!entry) { this.noteResult(r, false, Date.now() - t0); return false; }
+      const results = await Promise.all(events.map(ev => new Promise<string>((resolve) => {
+        const timer = setTimeout(() => {
+          entry.pending.delete(ev.id);
+          resolve("timeout");
+        }, RELAY_TIMEOUT_MS);
+        entry.pending.set(ev.id, { resolve: (s) => { clearTimeout(timer); resolve(s); }, timer });
+        try {
+          entry.ws.send(JSON.stringify(["EVENT", ev]));
+        } catch {
+          entry.pending.delete(ev.id);
+          clearTimeout(timer);
+          resolve("timeout");
+        }
+      })));
+      const ok = results.every(v => v === "acked");
+      if (results.some(v => v === "rejected")) {
+        // Auth-walled relay: healthy socket, useless destination.
+        r.skipUntil = Date.now() + BACKOFF_MS;
+      } else if (!ok && entry.ws.readyState !== WebSocket.OPEN) {
+        this.failSocket(r.url);
+      }
+      this.noteResult(r, ok, Date.now() - t0);
+      return ok;
+    })();
+  }
+
+  private getSocket(url: string): Promise<PooledSocket | null> {
+    const cur = this.pool.get(url);
+    if (cur && !cur.broken && cur.ws.readyState === WebSocket.OPEN) return Promise.resolve(cur);
+    if (cur) this.failSocket(url);
+    const inflight = this.connecting.get(url);
+    if (inflight) return inflight;
+    const p = new Promise<PooledSocket | null>((resolve) => {
       let ws: WebSocket;
-      const done = (ok: boolean) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(kill);
-        try { ws.close(); } catch {}
-        this.noteResult(r, ok, Date.now() - t0);
-        resolve(ok);
-      };
-      const kill = setTimeout(() => done(false), RELAY_TIMEOUT_MS);
+      const entry: PooledSocket = { ws: undefined as unknown as WebSocket, url, broken: false, pending: new Map() };
+      const openTimer = setTimeout(() => {
+        this.connecting.delete(url);
+        resolve(null);
+      }, 8000);
       try {
-        ws = new WebSocket(r.url);
+        ws = new WebSocket(url);
       } catch {
-        done(false);
+        clearTimeout(openTimer);
+        this.connecting.delete(url);
+        resolve(null);
         return;
       }
+      entry.ws = ws;
       ws.onopen = () => {
-        try {
-          for (const ev of events) ws.send(JSON.stringify(["EVENT", ev]));
-        } catch { done(false); }
+        clearTimeout(openTimer);
+        this.connecting.delete(url);
+        const existing = this.pool.get(url);
+        if (existing && existing !== entry && !existing.broken && existing.ws.readyState === WebSocket.OPEN) {
+          try { ws.close(); } catch {}
+          resolve(existing);
+          return;
+        }
+        this.pool.set(url, entry);
+        resolve(entry);
       };
-      ws.onmessage = (m) => {
-        try {
-          const d = JSON.parse((m as MessageEvent).data);
-          if (Array.isArray(d) && d[0] === "OK" && pending.has(d[1])) {
-            if (d[2] === true) {
-              pending.delete(d[1]);
-              if (pending.size === 0) done(true);
-            } else {
-              done(false); // explicit reject (e.g. auth-walled relay)
-            }
-          }
-        } catch {}
-      };
+      ws.onmessage = (m) => this.routeMessage(url, m);
       ws.onerror = () => {};
-      ws.onclose = () => done(false);
+      ws.onclose = () => this.failSocket(url);
     });
+    this.connecting.set(url, p);
+    return p;
+  }
+
+  private routeMessage(url: string, m: MessageEvent) {
+    const entry = this.pool.get(url);
+    if (!entry || entry.broken) return;
+    try {
+      const d = JSON.parse((m as MessageEvent).data);
+      if (Array.isArray(d) && d[0] === "OK" && typeof d[1] === "string") {
+        const w = entry.pending.get(d[1]);
+        if (!w) return;
+        entry.pending.delete(d[1]);
+        clearTimeout(w.timer);
+        w.resolve(d[2] === true ? "acked" : "rejected");
+      }
+    } catch {}
+  }
+
+  private failSocket(url: string) {
+    const entry = this.pool.get(url);
+    this.pool.delete(url);
+    if (!entry) return;
+    entry.broken = true;
+    for (const [, w] of entry.pending) {
+      clearTimeout(w.timer);
+      try { w.resolve("timeout"); } catch {}
+    }
+    entry.pending.clear();
+    try { entry.ws.close(); } catch {}
   }
 
   async put(chunkId: Uint8Array, payload: Uint8Array): Promise<Locator> {
@@ -214,11 +282,14 @@ export class NostrSubstrate implements StorageSubstrate {
       const d = `sde1:${chunkHex}:${i}/${n}`;
       events.push(signEvent(sk, pkHex, created, [["d", d], ["chunk", chunkHex], ["part", `${i}/${n}`]], b64encode(part)));
     }
-    // Publish the whole chunk over one socket per relay; a relay counts
-    // as covering the chunk only if it ACKs every part (write quorum).
+    // Publish to the 4 healthiest relays (quorum needs 2); reads still
+    // fan out to all live relays. Fewer writes per chunk = faster chunks
+    // and kinder to public relays at scale.
     const live = this.liveRelays();
     if (live.length === 0) throw new Error("no nostr relays currently reachable");
-    const cover = await Promise.all(live.map(r => this.publishAll(r, events)));
+    const ranked = [...live].sort((a, b) => (a.fails - b.fails) || (a.latency - b.latency));
+    const targets = ranked.slice(0, 4);
+    const cover = await Promise.all(targets.map(r => this.publishAll(r, events)));
     const covering = cover.filter(Boolean).length;
     if (covering < 2) throw new Error(`nostr write quorum missed (${covering}/2 relays confirmed)`);
     return chunkId;

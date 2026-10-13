@@ -118,12 +118,16 @@ export class SDEBrain {
       chunkIds.push(await deriveChunkId(blobSecret, i));
     }
 
-    // Upload chunks with bounded parallelism (default 4 in flight):
+    // Upload chunks with bounded parallelism (6 in flight):
     // per-chunk crypto is independent, and substrates handle concurrency.
     // Progress reports completed count so the bar stays monotonic.
-    const CONC = 4;
+    // Background-tier replicas (paste-hosts) lag the quorum path: they
+    // settle in parallel and are awaited once at the end, so the slowest
+    // host never gates any single chunk.
+    const CONC = 6;
     let next = 0;
     let completed = 0;
+    const background: Promise<void>[] = [];
     const processChunk = async (i: number): Promise<void> => {
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, buf.length);
@@ -147,11 +151,27 @@ export class SDEBrain {
       envelope.set(ciphertext, 48);
 
       const targets = await this.pickSubstrates(routeSeed, 4);
+      const inline = targets.filter(s => !s.background);
+      const lazy = targets.filter(s => s.background);
       // Confirmed puts are recorded (locators persist outside the brain);
       // background substrates may fail — they simply don't confirm.
       const settled = await Promise.allSettled(
-        targets.map(async (s) => ({ substrate: s, locator: await s.put(chunkId, envelope) }))
+        inline.map(async (s) => ({ substrate: s, locator: await s.put(chunkId, envelope) }))
       );
+      for (const s of lazy) {
+        background.push(
+          s.put(chunkId, envelope).then(locator => {
+            try {
+              opts?.onLocator?.({
+                substrateId: s.id,
+                chunkIndex: i,
+                chunkHex: hexOf(chunkId.slice(0, 20)),
+                locatorB64: b64encode(locator),
+              });
+            } catch { /* locator persistence is best-effort */ }
+          }).catch(() => {})
+        );
+      }
       const confirmed = settled
         .filter((r): r is PromiseFulfilledResult<{ substrate: StorageSubstrate; locator: Uint8Array }> => r.status === "fulfilled")
         .map(r => r.value);
@@ -184,6 +204,9 @@ export class SDEBrain {
       }
     });
     await Promise.all(workers);
+    // Let lagging background replicas finish before the token is built,
+    // so their locators still get persisted by the caller.
+    await Promise.allSettled(background);
 
     const tokenBytes = await buildRecallToken(blobSecret, rtSign, totalChunks, fileHash, buf.length);
     const recallToken = encodeToken(tokenBytes);

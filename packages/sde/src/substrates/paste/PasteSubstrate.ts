@@ -23,6 +23,9 @@ export class PasteSubstrate implements StorageSubstrate {
   maxPayload = 8 * 1024 * 1024;
   avgLatency = 2500;
   health = 1;
+  // Replicas lag the quorum path: the brain awaits them at the end of the
+  // upload instead of blocking every chunk on the slowest paste host.
+  background = true;
 
   private okCount = 0;
   private failCount = 0;
