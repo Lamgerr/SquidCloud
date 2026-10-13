@@ -156,6 +156,53 @@ export class NostrSubstrate implements StorageSubstrate {
     this.health = total === 0 ? 1 : Math.max(0.05, this.okCount / total);
   }
 
+  private publishAll(r: RelayState, events: NostrEvent[]): Promise<boolean> {
+    // One socket per relay, all events pipelined back-to-back; OKs stream
+    // in and we close as soon as every event is ACKed. This turns ~22
+    // sequential round-trips into roughly one.
+    const t0 = Date.now();
+    return new Promise((resolve) => {
+      const pending = new Set(events.map(e => e.id));
+      let settled = false;
+      let ws: WebSocket;
+      const done = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(kill);
+        try { ws.close(); } catch {}
+        this.noteResult(r, ok, Date.now() - t0);
+        resolve(ok);
+      };
+      const kill = setTimeout(() => done(false), RELAY_TIMEOUT_MS);
+      try {
+        ws = new WebSocket(r.url);
+      } catch {
+        done(false);
+        return;
+      }
+      ws.onopen = () => {
+        try {
+          for (const ev of events) ws.send(JSON.stringify(["EVENT", ev]));
+        } catch { done(false); }
+      };
+      ws.onmessage = (m) => {
+        try {
+          const d = JSON.parse((m as MessageEvent).data);
+          if (Array.isArray(d) && d[0] === "OK" && pending.has(d[1])) {
+            if (d[2] === true) {
+              pending.delete(d[1]);
+              if (pending.size === 0) done(true);
+            } else {
+              done(false); // explicit reject (e.g. auth-walled relay)
+            }
+          }
+        } catch {}
+      };
+      ws.onerror = () => {};
+      ws.onclose = () => done(false);
+    });
+  }
+
   async put(chunkId: Uint8Array, payload: Uint8Array): Promise<Locator> {
     const { sk, pkHex } = buildIdentity(chunkId);
     const chunkHex = hexOf(chunkId.slice(0, 20));
@@ -167,25 +214,11 @@ export class NostrSubstrate implements StorageSubstrate {
       const d = `sde1:${chunkHex}:${i}/${n}`;
       events.push(signEvent(sk, pkHex, created, [["d", d], ["chunk", chunkHex], ["part", `${i}/${n}`]], b64encode(part)));
     }
-    // Publish every part to every live relay; a relay counts as covering
-    // the chunk only if it ACKs all parts (write quorum across relays).
+    // Publish the whole chunk over one socket per relay; a relay counts
+    // as covering the chunk only if it ACKs every part (write quorum).
     const live = this.liveRelays();
     if (live.length === 0) throw new Error("no nostr relays currently reachable");
-    const cover = await Promise.all(live.map(async (r) => {
-      const t0 = Date.now();
-      try {
-        for (const ev of events) {
-          const resps = await sendOnce(r.url, ["EVENT", ev], { timeoutMs: RELAY_TIMEOUT_MS, okId: ev.id });
-          const ok = resps.some(d => Array.isArray(d) && d[0] === "OK" && d[1] === ev.id && d[2] === true);
-          if (!ok) { this.noteResult(r, false, Date.now() - t0); return false; }
-        }
-        this.noteResult(r, true, Date.now() - t0);
-        return true;
-      } catch {
-        this.noteResult(r, false, Date.now() - t0);
-        return false;
-      }
-    }));
+    const cover = await Promise.all(live.map(r => this.publishAll(r, events)));
     const covering = cover.filter(Boolean).length;
     if (covering < 2) throw new Error(`nostr write quorum missed (${covering}/2 relays confirmed)`);
     return chunkId;

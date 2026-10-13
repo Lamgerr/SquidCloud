@@ -118,7 +118,13 @@ export class SDEBrain {
       chunkIds.push(await deriveChunkId(blobSecret, i));
     }
 
-    for (let i = 0; i < totalChunks; i++) {
+    // Upload chunks with bounded parallelism (default 4 in flight):
+    // per-chunk crypto is independent, and substrates handle concurrency.
+    // Progress reports completed count so the bar stays monotonic.
+    const CONC = 4;
+    let next = 0;
+    let completed = 0;
+    const processChunk = async (i: number): Promise<void> => {
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, buf.length);
       const plaintext = buf.subarray(start, end);
@@ -167,8 +173,17 @@ export class SDEBrain {
           `storage network unreachable for chunk ${i} (${confirmed.length} confirmations) — kept locally only`
         );
       }
-      onChunk?.(i + 1, totalChunks);
-    }
+      completed++;
+      onChunk?.(completed, totalChunks);
+    };
+    const workers = Array.from({ length: Math.min(CONC, totalChunks) }, async () => {
+      while (true) {
+        const i = next++;
+        if (i >= totalChunks) return;
+        await processChunk(i);
+      }
+    });
+    await Promise.all(workers);
 
     const tokenBytes = await buildRecallToken(blobSecret, rtSign, totalChunks, fileHash, buf.length);
     const recallToken = encodeToken(tokenBytes);
