@@ -1,6 +1,13 @@
 export const config = { runtime: 'edge' }
 
-const ALLOWED_HOSTS = ['www.gutenberg.org', 'gutenberg.org', 'gutenberg.readingroo.ms']
+const ALLOWED_HOSTS = ['www.gutenberg.org', 'gutenberg.org', 'gutenberg.readingroo.ms', 'archive.org', 'www.archive.org']
+
+function hostAllowed(hostname) {
+  if (ALLOWED_HOSTS.includes(hostname)) return true;
+  // Internet Archive download redirect targets (d1/d2/iaXXXXXXXX servers)
+  if (/^([a-z0-9-]+\.)*us\.archive\.org$/.test(hostname)) return true;
+  return false;
+}
 
 export default async function handler(req) {
   const url = new URL(req.url)
@@ -17,7 +24,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'Invalid target URL' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
   }
 
-  if (!ALLOWED_HOSTS.includes(parsedUrl.hostname)) {
+  if (!hostAllowed(parsedUrl.hostname)) {
     return new Response(JSON.stringify({ error: 'Domain not allowed' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 

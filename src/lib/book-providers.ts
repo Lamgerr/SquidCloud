@@ -41,14 +41,46 @@ export interface ProviderSearchOpts {
 
 const UA = { 'User-Agent': 'SquidCloud-DeepRead/1.0 (book discovery)' };
 
-async function getJson(url: string, timeoutMs = 12000): Promise<any> {
+/* Direct-first fetch: the same-origin edge proxy runs on datacenter IPs
+   that archive.org and gutendex throttle/block (edge 400s and timeouts),
+   while all three providers send `Access-Control-Allow-Origin: *` to real
+   browsers. So try the upstream URL straight from the browser first and
+   only fall back to the edge proxy when direct fails. */
+async function fetchUpstream(url: string, timeoutMs: number): Promise<Response> {
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { headers: UA, signal: c.signal });
+    return await fetch(url, { headers: UA, signal: c.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function proxyUrl(url: string): string {
+  return `/api/gutendex-proxy?url=${encodeURIComponent(url)}`;
+}
+
+export async function getJson(url: string, timeoutMs = 12000): Promise<any> {
+  let directErr: any = null;
+  try {
+    const res = await fetchUpstream(url, timeoutMs);
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 160)}`);
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON from provider (HTTP ${res.status})`);
+    }
+  } catch (e: any) {
+    directErr = e;
+    // CORS / network / abort errors have no status — retry via edge proxy.
+    // HTTP errors from the provider itself are still worth one proxy retry
+    // (the proxy normalises them to JSON { error }).
+  }
+  try {
+    const res = await fetchUpstream(proxyUrl(url), timeoutMs);
     const text = await res.text();
     if (!res.ok) {
-      // Try to extract the error message from the JSON body
       let msg = `HTTP ${res.status}`;
       try {
         const json = JSON.parse(text);
@@ -61,8 +93,13 @@ async function getJson(url: string, timeoutMs = 12000): Promise<any> {
     } catch {
       throw new Error(`Invalid JSON from provider (HTTP ${res.status})`);
     }
-  } finally {
-    clearTimeout(t);
+  } catch (e: any) {
+    // Prefer the proxy's message when it actually reached a provider
+    // (it normalises upstream failures to JSON { error }); otherwise
+    // surface the direct failure.
+    const proxyNetworkFail = e instanceof TypeError || e?.name === 'AbortError';
+    if (proxyNetworkFail && directErr) throw directErr;
+    throw e;
   }
 }
 
@@ -80,10 +117,9 @@ export async function searchGutendex(opts: ProviderSearchOpts): Promise<{ books:
   if (opts.author) p.set('search', opts.author);
   p.set('sort', GUT_SORT[opts.sort || 'popular']);
   p.set('page', String(opts.page || 1));
-  /* Gutendex is called through a same-origin proxy: browsers block the
-     cross-origin request outright (status 0), which is why the catalog
-     rendered empty. The proxy is an allowlisted edge function. */
-  const data = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://gutendex.com/books/?${p.toString()}`)}`);
+  /* getJson tries the upstream URL straight from the browser first
+     (providers allow CORS) and falls back to the same-origin proxy. */
+  const data = await getJson(`https://gutendex.com/books/?${p.toString()}`);
   const books: ProviderBook[] = (data.results || []).map((b: any) => ({
     key: `gutendex:${b.id}`,
     source: 'gutendex' as BookSource,
@@ -116,10 +152,11 @@ export async function searchOpenLibrary(opts: ProviderSearchOpts): Promise<{ boo
   p.set('fields', OL_FIELDS);
   p.set('limit', String(opts.limit || 12));
   p.set('page', String(opts.page || 1));
-  const data = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://openlibrary.org/search.json?${p.toString()}`)}`);
+  const data = await getJson(`https://openlibrary.org/search.json?${p.toString()}`);
   const docs = data.docs || [];
   const books: ProviderBook[] = docs.map((d: any) => {
     const key: string = d.key || '';
+    const iaId: string | null = Array.isArray(d.ia) ? d.ia[0] : (typeof d.ia === 'string' ? d.ia : null);
     return {
       key: `ol:${key}`,
       source: 'openlibrary' as BookSource,
@@ -127,11 +164,15 @@ export async function searchOpenLibrary(opts: ProviderSearchOpts): Promise<{ boo
       title: d.title || 'Untitled',
       authors: (d.author_name || []).slice(0, 3),
       subjects: (d.subject || []).slice(0, 8),
-      coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null,
+      coverUrl: d.cover_i
+        ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`
+        : iaId
+          ? `https://archive.org/services/img/${iaId}`
+          : null,
       popularity: (d.ratings_count || 0) * 10 + (d.ebook_access === true ? 500 : 0),
       year: d.first_publish_year || null,
       epubUrl: null, // resolved on open via IA metadata
-      iaId: Array.isArray(d.ia) ? d.ia[0] : (typeof d.ia === 'string' ? d.ia : null),
+      iaId,
       olKey: key,
     };
   });
@@ -157,7 +198,7 @@ export async function searchArchive(opts: ProviderSearchOpts): Promise<{ books: 
   });
   if (opts.sort === 'newest') p.set('sort[]', 'addeddate desc');
   else p.set('sort[]', 'downloads desc');
-  const data = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://archive.org/advancedsearch.php?${p.toString()}`)}`);
+  const data = await getJson(`https://archive.org/advancedsearch.php?${p.toString()}`);
   const docs = data?.response?.docs || [];
   const books: ProviderBook[] = docs.map((d: any) => {
     const creators = Array.isArray(d.creator) ? d.creator : d.creator ? [d.creator] : [];
@@ -220,29 +261,42 @@ export async function searchAllProviders(opts: ProviderSearchOpts): Promise<Unif
 
 /* ── Resolve a readable EPUB url for any provider book ────── */
 
+/* Open Library works often carry no `ia` id on the search doc. The work's
+   editions listing does (`ocaid`) — one lookup rescues those books. */
+async function resolveOlIaId(olKey: string): Promise<string | null> {
+  const data: any = await getJson(`https://openlibrary.org${olKey}/editions.json?limit=25`);
+  const entries: any[] = data?.entries || [];
+  const withScan = entries.find(e => typeof e?.ocaid === 'string' && e.ocaid);
+  return withScan ? withScan.ocaid : null;
+}
+
 export async function resolveEpubUrl(book: ProviderBook): Promise<string> {
   if (book.epubUrl) return book.epubUrl;
-  if (book.iaId) {
+  let iaId = book.iaId;
+  if (!iaId && book.olKey) {
     try {
-      const meta: any = await getJson(`/api/gutendex-proxy?url=${encodeURIComponent(`https://archive.org/metadata/${encodeURIComponent(book.iaId)}`)}`);
-      const files: any[] = meta?.files || [];
-      // Try EPUB first
-      const epub = files.find(f => /\.epub$/i.test(f.name || '') && !/(_djvu|_text|_jp2|_pdf|_abbyy|_scandata)/i.test(f.name || ''));
-      if (epub) return `https://archive.org/download/${book.iaId}/${encodeURIComponent(epub.name)}`;
-      // Fall back to PDF if no EPUB
-      const pdf = files.find(f => /\.pdf$/i.test(f.name || '') && !/(_djvu|_text|_jp2|_abbyy|_scandata)/i.test(f.name || ''));
-      if (pdf) return `https://archive.org/download/${book.iaId}/${encodeURIComponent(pdf.name)}`;
-      // Last resort: conventional derivative name
-      return `https://archive.org/download/${book.iaId}/${book.iaId}_epub.epub`;
-    } catch (e: any) {
-      // IA metadata lookup failed — provide a specific error
-      const msg = e?.message?.includes('HTTP') ? `Archive.org lookup failed (${e.message})` : `Could not reach Archive.org: ${e?.message || 'network error'}`;
-      throw new Error(msg);
+      iaId = await resolveOlIaId(book.olKey);
+    } catch {
+      iaId = null;
     }
   }
+  if (iaId) {
+    let meta: any;
+    try {
+      meta = await getJson(`https://archive.org/metadata/${encodeURIComponent(iaId)}`);
+    } catch (e: any) {
+      throw new Error(`Could not reach Archive.org: ${e?.message || 'network error'}`);
+    }
+    if (meta?.access_restricted_item === true || meta?.is_dark === true) {
+      throw new Error('This scan is borrow-only on Archive.org — no free download exists.');
+    }
+    const files: any[] = meta?.files || [];
+    const epub = files.find(f => /\.epub$/i.test(f.name || '') && !/(_djvu|_text|_jp2|_pdf|_abbyy|_scandata|_lcp)/i.test(f.name || ''));
+    if (epub) return `https://archive.org/download/${iaId}/${encodeURIComponent(epub.name)}`;
+    throw new Error('Archive.org has no free EPUB for this edition. Try another search result.');
+  }
   if (book.olKey) {
-    // Open Library — try to find the IA identifier from the work and resolve via IA
-    throw new Error('This edition is not available for free download. Try saving it from a different search result.');
+    throw new Error('This edition is not freely downloadable. Try another search result.');
   }
   throw new Error('No downloadable edition found for this title.');
 }

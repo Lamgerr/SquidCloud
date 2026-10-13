@@ -170,21 +170,34 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
 
           if (fetchUrl.includes('gutenberg.org')) {
             const match = fetchUrl.match(/\/ebooks\/(\d+)/);
+            // Some ids only have the plain file, others only the -images
+            // file — try both through the same-origin proxy (gutenberg
+            // sends no CORS headers, so direct browser fetch is blocked).
+            const candidates: string[] = [];
             if (match) {
               const id = match[1];
-              fetchUrl = `https://www.gutenberg.org/cache/epub/${id}/pg${id}-images.epub`;
+              candidates.push(`https://www.gutenberg.org/cache/epub/${id}/pg${id}-images.epub`);
+              candidates.push(`https://www.gutenberg.org/cache/epub/${id}/pg${id}.epub`);
+            } else {
+              candidates.push(fetchUrl);
             }
-            const proxyUrl = `/api/epub-proxy?url=${encodeURIComponent(fetchUrl)}`;
-            const res = await fetch(proxyUrl, { signal: controller.signal });
-            if (!res.ok) throw new Error(`Could not download the book (HTTP ${res.status}). Please try a different title.`);
-            const blob = await res.blob();
-            if (blob.type.includes('text/html') || blob.size < 5000) {
-              throw new Error("Downloaded file is not a valid EPUB. Please try a different title.");
+            let blob: Blob | null = null;
+            let lastStatus = 0;
+            for (const cand of candidates) {
+              const proxyUrl = `/api/epub-proxy?url=${encodeURIComponent(cand)}`;
+              const res = await fetch(proxyUrl, { signal: controller.signal });
+              if (!res.ok) { lastStatus = res.status; continue; }
+              const b = await res.blob();
+              if (b.type.includes('text/html') || b.type.includes('application/json') || b.size < 5000) continue;
+              blob = b;
+              break;
             }
+            if (!blob) throw new Error(`Could not download the book${lastStatus ? ` (HTTP ${lastStatus})` : ''}. Please try a different title.`);
             if (isMounted) setDecryptedBlob(blob);
           } else {
             const PROXIES = [
               (url: string) => url,
+              (url: string) => `/api/epub-proxy?url=${encodeURIComponent(url)}`,
               (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
               (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
             ];
@@ -196,7 +209,7 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
                 const res = await fetch(proxyUrl, { signal: controller.signal });
                 if (!res.ok) continue;
                 const blob = await res.blob();
-                if (blob.type.includes('text/html') || blob.size < 5000) continue;
+                if (blob.type.includes('text/html') || blob.type.includes('application/json') || blob.size < 5000) continue;
                 if (isMounted) setDecryptedBlob(blob);
                 success = true;
                 break;
