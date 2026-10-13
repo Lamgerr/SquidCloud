@@ -3,7 +3,6 @@ import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { formatBytes } from '@/lib/api';
@@ -23,8 +22,8 @@ const CustomDialogContent = React.forwardRef<
     <DialogPrimitive.Popup
       ref={ref}
       className={cn(
-        'fixed inset-6 md:inset-10 z-[70] flex flex-col rounded-[2.5rem] border border-zinc-800 bg-[#121212] text-white shadow-[0_20px_50px_-10px_rgba(0,0,0,0.5)] overflow-hidden',
-        'animate-in fade-in zoom-in-95 duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] focus:outline-none',
+        'fixed inset-4 sm:inset-6 md:inset-10 z-[70] flex flex-col rounded-2xl border border-[rgba(232,231,225,0.14)] bg-[#0b0d0c] text-[#e8e7e1] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden',
+        'animate-in fade-in zoom-in-95 duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus:outline-none',
         className
       )}
       {...props}
@@ -118,42 +117,42 @@ export const FullScreenTransferModal: React.FC<FullScreenTransferModalProps> = (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <CustomDialogContent>
         {/* HEADER */}
-        <header className="flex items-center justify-between px-8 h-20 bg-[#121212] border-b border-zinc-800/80 shrink-0">
+        <header className="flex items-center justify-between px-5 sm:px-8 h-20 bg-[#0b0d0c] border-b border-[rgba(232,231,225,0.09)] shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-white text-black flex items-center justify-center shadow-sm">
-              <Activity className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-[6px] bg-[#e8e7e1] text-[#0b0d0c] flex items-center justify-center shrink-0">
+              <Activity className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-3">
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-[#e8e7e1] flex items-center gap-3">
                 Transfer Center
                 {stats.active.length > 0 && (
-                  <Badge className="bg-zinc-800 text-white font-mono text-xs uppercase border-0 px-2.5 py-0.5 rounded-full">
-                    {stats.active.length} ACTIVE
-                  </Badge>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8d8f89]">
+                    {stats.active.length} active
+                  </span>
                 )}
               </h2>
-              <p className="text-sm text-zinc-500 font-medium mt-0.5">
-                Encrypted Client-Side Pipeline
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8d8f89] mt-1">
+                Encrypted client-side pipeline
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={onClose} className="h-10 rounded-xl px-4 bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 font-semibold gap-2 transition-all">
-              <Minimize2 className="w-4 h-4" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onClose} className="h-9 rounded-[4px] px-3.5 bg-transparent border-[rgba(232,231,225,0.16)] text-[#e8e7e1] hover:bg-[rgba(232,231,225,0.06)] hover:text-[#e8e7e1] font-mono text-[10.5px] uppercase tracking-[0.1em] gap-2 transition-all">
+              <Minimize2 className="w-3.5 h-3.5" />
               Minimize
             </Button>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-10 w-10 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all">
-              <X className="w-5 h-5" />
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close" className="h-9 w-9 text-[#8d8f89] hover:text-[#e8e7e1] hover:bg-[rgba(232,231,225,0.07)] rounded-[4px] transition-all">
+              <X className="w-4 h-4" />
             </Button>
           </div>
         </header>
 
-        <div className="flex flex-1 overflow-hidden bg-[#0A0A0A]">
+        <div className="flex flex-1 overflow-hidden bg-[#080908]">
           {/* SIDEBAR */}
-          <aside className="w-72 border-r border-zinc-800/80 p-6 flex flex-col justify-between shrink-0">
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-zinc-600 uppercase tracking-wider mb-4 pl-2">Queues</p>
+          <aside className="w-48 sm:w-64 border-r border-[rgba(232,231,225,0.09)] p-4 sm:p-5 flex flex-col justify-between shrink-0">
+            <div className="space-y-1.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8d8f89] mb-3 pl-2">Queues</p>
               
               {[
                 { id: 'active', label: 'Active', icon: Upload, count: stats.active.length },
@@ -164,89 +163,89 @@ export const FullScreenTransferModal: React.FC<FullScreenTransferModalProps> = (
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as TabType)}
                   className={cn(
-                    "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all",
-                    activeTab === tab.id ? "bg-white text-black shadow-[0_10px_20px_-10px_rgba(255,255,255,0.2)]" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                    "w-full flex items-center justify-between px-3.5 py-3 rounded-[6px] text-[13px] font-medium transition-all",
+                    activeTab === tab.id ? "bg-[#e8e7e1] text-[#0b0d0c]" : "text-[#8d8f89] hover:bg-[rgba(232,231,225,0.05)] hover:text-[#e8e7e1]"
                   )}
                 >
-                  <div className="flex items-center gap-3">
-                    <tab.icon className="w-5 h-5" strokeWidth={2.5} />
+                  <div className="flex items-center gap-2.5">
+                    <tab.icon className="w-4 h-4" strokeWidth={2.5} />
                     <span>{tab.label}</span>
                   </div>
-                  <Badge variant="secondary" className={cn("font-mono text-xs rounded-full px-2", activeTab === tab.id ? "bg-black/10 text-black" : "bg-zinc-800 text-zinc-400")}>
+                  <span className={cn("font-mono text-[11px] tabular-nums", activeTab === tab.id ? "text-[#0b0d0c]/70" : "text-[#8d8f89]")}>
                     {tab.count}
-                  </Badge>
+                  </span>
                 </button>
               ))}
 
-              <div className="pt-6 pb-2">
-                <p className="text-xs font-bold text-zinc-600 uppercase tracking-wider mb-4 pl-2">Telemetry</p>
+              <div className="pt-5 pb-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8d8f89] mb-3 pl-2">Telemetry</p>
                 <button
                   onClick={() => setActiveTab('stats')}
                   className={cn(
-                    "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all",
-                    activeTab === 'stats' ? "bg-white text-black shadow-[0_10px_20px_-10px_rgba(255,255,255,0.2)]" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                    "w-full flex items-center justify-between px-3.5 py-3 rounded-[6px] text-[13px] font-medium transition-all",
+                    activeTab === 'stats' ? "bg-[#e8e7e1] text-[#0b0d0c]" : "text-[#8d8f89] hover:bg-[rgba(232,231,225,0.05)] hover:text-[#e8e7e1]"
                   )}
                 >
-                  <div className="flex items-center gap-3">
-                    <BarChart2 className="w-5 h-5" strokeWidth={2.5} />
+                  <div className="flex items-center gap-2.5">
+                    <BarChart2 className="w-4 h-4" strokeWidth={2.5} />
                     <span>Metrics</span>
                   </div>
-                  <Zap className={cn("w-4 h-4", activeTab === 'stats' ? "text-black" : "text-zinc-600")} />
+                  <Zap className={cn("w-3.5 h-3.5", activeTab === 'stats' ? "text-[#0b0d0c]" : "text-[#8d8f89]")} />
                 </button>
               </div>
             </div>
 
             {/* Live Throughput Pill */}
-            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
-              <div className="flex items-center justify-between text-xs text-zinc-400 font-medium mb-3">
-                <span className="flex items-center gap-1.5 text-zinc-300">
-                  <Wifi className="w-4 h-4" />
-                  Live Speed
+            <div className="p-4 rounded-[6px] bg-[rgba(232,231,225,0.03)] border border-[rgba(232,231,225,0.1)]">
+              <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-[#8d8f89] mb-2.5">
+                <span className="flex items-center gap-1.5">
+                  <Wifi className="w-3.5 h-3.5" />
+                  Live speed
                 </span>
-                <span className="font-bold text-white text-sm font-mono">{currentSpeedMBps} MB/s</span>
+                <span className="font-medium text-[13px] text-[#e8e7e1] tabular-nums normal-case tracking-normal">{currentSpeedMBps} MB/s</span>
               </div>
-              <Progress value={Math.min(100, (currentSpeedMBps / 20) * 100)} className="h-2 bg-zinc-950 [&>div]:bg-white" />
+              <Progress value={Math.min(100, (currentSpeedMBps / 20) * 100)} className="h-[2px] bg-[rgba(232,231,225,0.12)] [&>div]:bg-[#e8e7e1]" />
             </div>
           </aside>
 
           {/* MAIN WORKSPACE */}
           <main className="flex-1 flex flex-col overflow-hidden relative">
             {activeTab === 'stats' ? (
-              <div className="flex-1 overflow-y-auto p-10 space-y-8">
+              <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-6">
                 <div>
-                  <h3 className="text-3xl font-bold text-white tracking-tight">Live Metrics</h3>
-                  <p className="text-zinc-400 mt-2">Streaming throughput and pipeline analysis</p>
+                  <h3 className="text-2xl font-semibold tracking-[-0.02em] text-[#e8e7e1]">Live metrics</h3>
+                  <p className="text-[#8d8f89] mt-1.5 text-[13px]">Streaming throughput and pipeline analysis</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {[
                     { label: 'Bandwidth', val: currentSpeedMBps, unit: 'MB/s' },
-                    { label: 'Pipeline Load', val: stats.overallProgress, unit: '%' },
+                    { label: 'Pipeline load', val: stats.overallProgress, unit: '%' },
                     { label: 'ETA', val: formatExactEta(stats.maxEtaMs), unit: '' },
-                    { label: 'Total Tasks', val: stats.allTasks.length, unit: 'items' },
+                    { label: 'Total tasks', val: stats.allTasks.length, unit: 'items' },
                   ].map((stat, i) => (
-                    <div key={i} className="p-6 rounded-[2rem] bg-[#121212] border border-zinc-800 shadow-xl flex flex-col justify-center">
-                      <span className="text-sm font-semibold text-zinc-500 mb-2">{stat.label}</span>
-                      <p className="text-3xl font-bold font-mono text-white">
-                        {stat.val} <span className="text-sm text-zinc-600 font-sans">{stat.unit}</span>
+                    <div key={i} className="p-5 rounded-[6px] bg-[rgba(232,231,225,0.03)] border border-[rgba(232,231,225,0.1)] flex flex-col justify-center">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8d8f89] mb-2">{stat.label}</span>
+                      <p className="text-2xl font-semibold font-mono tabular-nums text-[#e8e7e1]">
+                        {stat.val} <span className="text-[11px] text-[#8d8f89] font-sans">{stat.unit}</span>
                       </p>
                     </div>
                   ))}
                 </div>
 
-                <div className="p-8 rounded-[2.5rem] bg-[#121212] border border-zinc-800 shadow-xl">
-                  <div className="flex items-center justify-between mb-8">
+                <div className="p-6 sm:p-8 rounded-[6px] bg-[rgba(232,231,225,0.02)] border border-[rgba(232,231,225,0.1)]">
+                  <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h4 className="text-lg font-bold text-white">Throughput Waveform</h4>
-                      <p className="text-sm text-zinc-500 mt-1">10-second historical snapshot</p>
+                      <h4 className="text-[15px] font-semibold text-[#e8e7e1]">Throughput waveform</h4>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#8d8f89] mt-1">10-second snapshot</p>
                     </div>
-                    <Badge className="bg-white text-black font-bold uppercase tracking-wider px-3 py-1 rounded-full border-0">LIVE</Badge>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-400">● Live</span>
                   </div>
-                  <div className="h-48 w-full flex items-end gap-3 pt-4 px-4 bg-[#0A0A0A] rounded-[1.5rem] border border-zinc-800/60">
+                  <div className="h-44 w-full flex items-end gap-2 pt-4 px-4 bg-[#080908] rounded-[4px] border border-[rgba(232,231,225,0.07)]">
                     {speedHistory.map((val, idx) => (
                       <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
                         <div 
-                          className="w-full bg-white rounded-t-lg transition-all duration-300" 
+                          className="w-full bg-[#e8e7e1]/80 rounded-t-[2px] transition-all duration-300" 
                           style={{ height: `${Math.max(4, Math.min(100, (val / 15) * 100))}%` }}
                         />
                       </div>
@@ -257,80 +256,78 @@ export const FullScreenTransferModal: React.FC<FullScreenTransferModalProps> = (
             ) : (
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Search Bar & Actions */}
-                <div className="p-6 border-b border-zinc-800/80 bg-[#121212] flex items-center justify-between gap-6 shrink-0">
+                <div className="p-4 sm:p-6 border-b border-[rgba(232,231,225,0.09)] bg-[#0b0d0c] flex items-center justify-between gap-4 shrink-0">
                   <div className="relative max-w-lg w-full">
-                    <Search className="w-5 h-5 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Search className="w-4 h-4 text-[#8d8f89] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <Input
                       placeholder={`Search ${activeTab} queue…`}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-12 h-12 bg-zinc-900 border-zinc-800 text-white rounded-2xl placeholder:text-zinc-600 focus-visible:ring-1 focus-visible:ring-white transition-all shadow-inner"
+                      className="pl-10 h-10 bg-[rgba(232,231,225,0.04)] border-[rgba(232,231,225,0.12)] text-[#e8e7e1] rounded-[4px] placeholder:text-[#8d8f89]/70 focus-visible:ring-1 focus-visible:ring-[#e8e7e1]/40 transition-all text-[13px]"
                     />
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {activeTab === 'failed' && stats.failed.length > 0 && (
-                      <Button size="lg" onClick={() => backgroundUploadService.retryFailed()} className="bg-white text-black hover:bg-zinc-200 font-bold rounded-xl gap-2 shadow-lg">
-                        <RotateCcw className="w-4 h-4" /> Retry All
+                      <Button size="sm" onClick={() => backgroundUploadService.retryFailed()} className="bg-[#e8e7e1] text-[#0b0d0c] hover:bg-white font-mono text-[10.5px] uppercase tracking-[0.1em] rounded-[4px] gap-2 h-9 px-3.5">
+                        <RotateCcw className="w-3.5 h-3.5" /> Retry all
                       </Button>
                     )}
                     {activeTab === 'completed' && stats.completed.length > 0 && (
-                      <Button size="lg" variant="outline" onClick={() => { backgroundUploadService.clearCompleted(); backgroundDownloadService.clearCompleted(); }} className="border-zinc-700 bg-zinc-800 text-zinc-300 hover:text-white rounded-xl gap-2 shadow-lg">
-                        <Trash2 className="w-4 h-4" /> Clear All
+                      <Button size="sm" variant="outline" onClick={() => { backgroundUploadService.clearCompleted(); backgroundDownloadService.clearCompleted(); }} className="border-[rgba(232,231,225,0.16)] bg-transparent text-[#8d8f89] hover:text-[#e8e7e1] hover:bg-[rgba(232,231,225,0.06)] font-mono text-[10.5px] uppercase tracking-[0.1em] rounded-[4px] gap-2 h-9 px-3.5">
+                        <Trash2 className="w-3.5 h-3.5" /> Clear all
                       </Button>
                     )}
                   </div>
                 </div>
 
                 {/* File List */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
                   {filteredTasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center text-zinc-600">
-                      <div className="w-20 h-20 bg-zinc-900 rounded-[2rem] flex items-center justify-center mb-6">
-                        <Activity className="w-10 h-10 text-zinc-700" />
-                      </div>
-                      <p className="text-lg font-bold text-zinc-500">Queue is empty</p>
+                    <div className="flex flex-col items-center justify-center h-full text-center">
+                      <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#8d8f89]">Queue is empty</p>
                     </div>
                   ) : (
                     filteredTasks.map((task) => (
-                      <div key={task.id} className="flex items-center justify-between p-4 rounded-2xl bg-[#121212] border border-zinc-800 hover:border-zinc-700 transition-colors shadow-sm gap-6 group">
-                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                          <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border",
-                            task.status === 'uploading' || task.status === 'downloading' ? "bg-white text-black border-transparent" :
-                            task.status === 'completed' ? "bg-zinc-800 border-zinc-700 text-zinc-400" :
-                            task.status === 'failed' ? "bg-red-500/10 border-red-500/20 text-red-400" : "bg-zinc-900 border-zinc-800 text-zinc-500"
+                      <div key={task.id} className="flex items-center justify-between py-3.5 border-t border-[rgba(232,231,225,0.09)] first:border-t-0 gap-4 group">
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                          <div className={cn("w-9 h-9 rounded-[6px] flex items-center justify-center shrink-0 border",
+                            task.status === 'uploading' || task.status === 'downloading' ? "bg-[#e8e7e1] text-[#0b0d0c] border-transparent" :
+                            task.status === 'completed' ? "bg-emerald-400/10 border-emerald-400/20 text-emerald-400" :
+                            task.status === 'failed' ? "bg-red-400/10 border-red-400/20 text-red-400" : "bg-[rgba(232,231,225,0.04)] border-[rgba(232,231,225,0.12)] text-[#8d8f89]"
                           )}>
-                            {task.type === 'upload' ? <Upload className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                            {task.type === 'upload' ? <Upload className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-3 mb-1">
-                              <span className="text-base font-bold text-white truncate">{task.name}</span>
-                              <Badge className="bg-zinc-800 text-zinc-400 border-0 rounded-md text-[10px] uppercase font-bold px-2 py-0.5 pointer-events-none">
+                            <div className="flex items-center gap-2.5 mb-1">
+                              <span className="text-[13.5px] font-medium tracking-[-0.005em] text-[#e8e7e1] truncate">{task.name}</span>
+                              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#8d8f89] pointer-events-none shrink-0">
                                 {task.type}
-                              </Badge>
+                              </span>
                             </div>
-                            <div className="flex items-center gap-3 text-sm text-zinc-500 font-medium">
+                            <div className="flex items-center gap-2 font-mono text-[10.5px] tabular-nums tracking-wide text-[#8d8f89]">
                               <span>{formatBytes(task.size)}</span>
-                              <span>•</span>
-                              <span className="text-white font-bold">{Math.round(task.progress)}%</span>
+                              <span className="text-[#8d8f89]/50">·</span>
+                              <span className="text-[#e8e7e1] font-medium">{Math.round(task.progress)}%</span>
                               {task.eta !== undefined && task.status === 'uploading' && (
-                                <><span>•</span><span className="text-zinc-400">{formatExactEta(task.eta)}</span></>
+                                <><span className="text-[#8d8f89]/50">·</span><span>{formatExactEta(task.eta)}</span></>
                               )}
                               {task.status === 'failed' && task.error && (
-                                <><span>•</span><span className="text-red-400 truncate">{task.error}</span></>
+                                <><span className="text-[#8d8f89]/50">·</span><span className="text-red-400/90 truncate">{task.error}</span></>
                               )}
                             </div>
+                            {(task.status === 'uploading' || task.status === 'downloading') && (
+                              <div className="mt-2 h-[2px] overflow-hidden rounded-full bg-[rgba(232,231,225,0.12)]">
+                                <div className="h-full rounded-full bg-[#e8e7e1] transition-[width] duration-300" style={{ width: `${Math.max(0, Math.min(100, task.progress))}%` }} />
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        <div className="w-64 hidden lg:block shrink-0 px-4">
-                          <Progress value={task.progress} className="h-2.5 bg-zinc-900 [&>div]:bg-white" />
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
                           {task.type === 'upload' && (
-                            <Button variant="ghost" size="icon" onClick={() => backgroundUploadService.removeTask(task.id)} className="h-10 w-10 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
-                              <X className="w-5 h-5" />
+                            <Button variant="ghost" size="icon" onClick={() => backgroundUploadService.removeTask(task.id)} aria-label={`Remove ${task.name}`} className="h-8 w-8 text-[#8d8f89] hover:text-[#e8e7e1] hover:bg-[rgba(232,231,225,0.07)] rounded-[4px] transition-colors">
+                              <X className="w-4 h-4" />
                             </Button>
                           )}
                         </div>

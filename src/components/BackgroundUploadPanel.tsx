@@ -215,6 +215,12 @@ const BackgroundUploadPanel = () => {
   const completedTasks = tasks.filter(t => t.status === 'completed');
   const failedTasks = tasks.filter(t => t.status === 'failed');
 
+  // Aggregate remaining bytes across active work (header summary only —
+  // per-file name/size/ETA live on the rows below, never duplicated here).
+  const remainingBytes = activeTasks.reduce(
+    (a, t) => a + (t.size || 0) * (1 - Math.max(0, Math.min(100, t.progress)) / 100), 0
+  );
+
   return (
     <>
       <FullScreenTransferModal isOpen={isFullScreenOpen} onClose={() => setIsFullScreenOpen(false)} />
@@ -273,22 +279,19 @@ const BackgroundUploadPanel = () => {
               </span>
             </span>
             <span className="mt-2 flex items-baseline justify-between gap-3">
-              <span className="truncate text-[17px] font-semibold tracking-[-0.01em] text-[#e8e7e1]">
-                {activeTasks.length > 0 ? activeTasks[0].name : failedTasks.length > 0 ? 'Attention needed' : 'All transfers complete'}
-              </span>
-              <span className="shrink-0 font-mono text-[12px] font-medium tabular-nums text-[#e8e7e1]" aria-live="polite">
+              <span className="shrink-0 font-mono text-[26px] font-medium tabular-nums leading-none tracking-tight text-[#e8e7e1]" aria-live="polite">
                 {Math.round(overall)}%
+              </span>
+              <span className="truncate font-mono text-[10.5px] tabular-nums tracking-wide text-[#8d8f89]">
+                {activeTasks.length > 0
+                  ? `${formatBytes(remainingBytes)} left · ${activeTasks.length} active`
+                  : failedTasks.length > 0
+                    ? `${failedTasks.length} failed`
+                    : `${completedTasks.length} completed`}
               </span>
             </span>
             <span className="mt-2.5 block">
               <HairlineBar value={overall} tone={failedTasks.length > 0 && activeTasks.length === 0 ? 'bad' : 'bone'} />
-            </span>
-            <span className="mt-2 block font-mono text-[10.5px] tabular-nums tracking-wide text-[#8d8f89]">
-              {activeTasks.length > 0
-                ? `${activeTasks[0] ? formatBytes(activeTasks[0].size) : ''}${activeTasks[0]?.eta ? ` · ${formatExactEta(activeTasks[0].eta)} left` : ''}${activeTasks.length > 1 ? ` · +${activeTasks.length - 1} more` : ''}`
-                : failedTasks.length > 0
-                  ? `${failedTasks.length} failed — retry below`
-                  : `${completedTasks.length} completed`}
             </span>
             <span className="block pb-3" />
           </button>
