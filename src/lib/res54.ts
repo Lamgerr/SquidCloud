@@ -820,7 +820,7 @@ export const MANAGED_STORAGE_PATHS = new Set([
     is a raw object key (not one of the managed pipeline markers). */
 export function isRawStorageRow(file: any): boolean {
   const tags = (file as any)?.tags;
-  const hasTags = Array.isArray(tags) && tags.length > 0;
+  const hasTags = Array.isArray(tags) && tags.some(t => typeof t === 'string' && t.trim().length > 0);
   const sp = (file as any)?.storage_path;
   return !hasTags && typeof sp === 'string' && sp.length > 0 && !MANAGED_STORAGE_PATHS.has(sp);
 }
@@ -1018,6 +1018,16 @@ export const downloadFileWithRes54 = async (
     const sortedChunks = downloadedChunks.sort((a, b) => a.index - b.index).map(chunk => chunk.data);
     if (sortedChunks.length !== metadata.chunks.length) throw new Error(`Download incomplete`);
 
+    // Zero-chunk records: a 0-byte file legitimately has no chunks;
+    // anything else with an empty chunk list is a broken upload record.
+    if (sortedChunks.length === 0) {
+      if ((metadata.fileSize || file.size || 0) === 0) {
+        progressCallback?.(100, 'complete');
+        return new Blob([], { type: metadata.fileType });
+      }
+      throw new Error('No downloadable chunks found for this file.');
+    }
+
     // Legacy keyless rows (old SquidFS-bridge uploads): chunk locations but
     // no key material. No-BYOK bridge uploads are plaintext — sniff the
     // first chunk and return bytes as-is when no res54 framing is present.
@@ -1113,14 +1123,24 @@ export const downloadFileWithRes54 = async (
     };
 
     let defaultKey = options.decryptionKey || metadata.encryptionKey;
+    // Vault-backed rows resolve here. If the vault has no key for this file
+    // (legacy BYOK rows whose tags still claim managed_key, deleted vault
+    // entries), fall through to the BYOK prompt instead of failing silently
+    // against the literal 'managed_key' string.
+    let managedKeyResolved = false;
     if (defaultKey === 'managed_key' && !options.decryptionKey) {
       try {
-        defaultKey = await fetchFileEncryptionKey(fileId);
+        const vaultKey = await fetchFileEncryptionKey(fileId);
+        if (vaultKey) { defaultKey = vaultKey; managedKeyResolved = true; }
+        else console.warn('[res54] managed key vault returned empty for', fileId);
       } catch (keyError) {
         console.warn('[res54] managed key fetch failed', keyError);
       }
     }
-    const isExplicitBYOK = defaultKey === 'sha256:byok_encrypted' || defaultKey === 'byok_encrypted' || defaultKey === 'byok_protected' || !defaultKey;
+    const isExplicitBYOK = defaultKey === 'sha256:byok_encrypted' || defaultKey === 'byok_encrypted' || defaultKey === 'byok_protected'
+      || (typeof defaultKey === 'string' && defaultKey.startsWith('sha256:'))
+      || !defaultKey
+      || (defaultKey === 'managed_key' && !managedKeyResolved);
     let decryptedChunks: ArrayBuffer[] | null = null;
 
     if (isExplicitBYOK) {
