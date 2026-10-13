@@ -856,6 +856,22 @@ export function looksEncryptedChunk(bytes: Uint8Array): boolean {
   return false;
 }
 
+// One-time per session: ask the storage cluster to (re)apply bucket CORS
+// rules, then retry. B2 only serves cross-origin reads when the bucket has
+// a matching CORS rule; without it the browser blocks even valid links and
+// reports a plain TypeError with no status.
+let corsFixPromise: Promise<void> | null = null;
+function ensureBucketCorsOnce(): Promise<void> {
+  if (!corsFixPromise) {
+    corsFixPromise = (async () => {
+      try {
+        await supabase.functions.invoke('squidcloud-cluster?action=fix-cors', { method: 'GET' } as any);
+      } catch { /* best-effort: a failed CORS heal must never break downloads */ }
+    })();
+  }
+  return corsFixPromise;
+}
+
 export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?: string): Promise<any> => {
   if (!chunk.repo || !chunk.path) throw new Error(`Invalid chunk metadata for chunk ${chunk.index}`);
 
@@ -916,7 +932,22 @@ export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?
 
       if (!downloadUrl) throw new Error('No download URL received');
 
-      const b2Response = await fetch(downloadUrl);
+      let b2Response: Response;
+      try {
+        b2Response = await fetch(downloadUrl);
+      } catch (fetchErr: any) {
+        // Network-level failure: DNS/TLS/CORS block. The browser hides the
+        // real status, so heal bucket CORS once per session, then retry once.
+        await ensureBucketCorsOnce();
+        b2Response = await fetch(downloadUrl);
+      }
+      if (b2Response.status === 401 || b2Response.status === 403) {
+        // Auth failures never self-heal — fail immediately instead of
+        // burning 5 retries (~15s stall) per chunk.
+        const authErr: any = new Error(`Storage refused access (HTTP ${b2Response.status}) — the download link is invalid or expired. Please retry; if it persists, re-upload the file.`);
+        authErr.nonRetriable = true;
+        throw authErr;
+      }
       if (!b2Response.ok) throw new Error('Failed to fetch from CDN');
       
       const arrayBuffer = await b2Response.arrayBuffer();
@@ -924,7 +955,8 @@ export const downloadChunk = async (chunk: ChunkMetadata, _attempt = 0, shareId?
       
     } catch (error: any) {
       lastError = error;
-      if (attempt < MAX_RETRIES) await delay(backoffDelay(attempt));
+      if (error?.nonRetriable || attempt >= MAX_RETRIES) break;
+      await delay(backoffDelay(attempt));
     }
   }
   
