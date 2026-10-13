@@ -75,7 +75,7 @@ export default function Footer() {
               <span className="text-[12px] font-semibold uppercase tracking-[0.28em]" style={{ ...DISPLAY, color: C.paper }}>SquidCloud</span>
             </Link>
             <p className="max-w-xs text-[13.5px] leading-relaxed" style={{ color: C.dim }}>
-              Privacy-first cloud storage with client-side encryption, powered by the Res54 distributed architecture.
+              Cloud storage that can't read your files. Encrypted on your device, before anything uploads.
             </p>
             <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em]" style={{ ...MONO, color: C.faint }}>
               <span className="sq-pulse inline-block h-1.5 w-1.5 rounded-full" style={{ background: C.accent }} />
