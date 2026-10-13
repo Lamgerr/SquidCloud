@@ -12,6 +12,61 @@ function u32be(n: number): Uint8Array {
   return b;
 }
 
+const hexOf = (b: Uint8Array): string =>
+  Array.from(b).map(x => x.toString(16).padStart(2, "0")).join("");
+
+function b64encode(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(s);
+}
+
+function b64decode(s: string): Uint8Array {
+  const bin = atob(s.replace(/\s/g, ""));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/** Structural + hash-prefix check for a 48B-header envelope. */
+async function validEnvelope(blob: Uint8Array): Promise<boolean> {
+  try {
+    if (!blob || blob.length < 48) return false;
+    const ctLen = (blob[40] << 24) | (blob[41] << 16) | (blob[42] << 8) | blob[43];
+    if (ctLen <= 0 || ctLen > 16 * 1024 * 1024 || 48 + ctLen > blob.length) return false;
+    const ct = blob.subarray(48, 48 + ctLen);
+    const h = await sha256(ct);
+    return h[0] === blob[44] && h[1] === blob[45] && h[2] === blob[46] && h[3] === blob[47];
+  } catch {
+    return false;
+  }
+}
+
+export interface LocatorRecord {
+  substrateId: string;
+  chunkIndex: number;
+  chunkHex: string;
+  locatorB64: string;
+}
+
+export interface UploadOpts {
+  /** fired once per confirmed substrate put (for locator persistence) */
+  onLocator?: (rec: LocatorRecord) => void;
+  /** minimum confirmed substrates per chunk before upload counts (default 1) */
+  minConfirmations?: number;
+  /** require at least one non-local confirmation (default false) */
+  requireRemote?: boolean;
+}
+
+export interface DownloadOpts {
+  fileName?: string;
+  mimeType?: string;
+  /** persisted placements, tried before deterministic routing */
+  resolveLocator?: (index: number) => Promise<Array<{ substrateId: string; locatorB64: string }>>;
+}
+
 export class SDEBrain {
   constructor(private substrates: StorageSubstrate[] = []) {}
 
@@ -46,7 +101,7 @@ export class SDEBrain {
     return picks;
   }
 
-  async upload(file: File, onChunk?: (i: number, total: number) => void): Promise<{ recallToken: string; fileHash: string }> {
+  async upload(file: File, onChunk?: (i: number, total: number) => void, opts?: UploadOpts): Promise<{ recallToken: string; fileHash: string }> {
     const buf = new Uint8Array(await file.arrayBuffer());
     const fileHash = await sha256(buf);
     const dms = await getOrCreateDMS();
@@ -63,7 +118,6 @@ export class SDEBrain {
       chunkIds.push(await deriveChunkId(blobSecret, i));
     }
 
-    const puts: Promise<void>[] = [];
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, buf.length);
@@ -87,17 +141,34 @@ export class SDEBrain {
       envelope.set(ciphertext, 48);
 
       const targets = await this.pickSubstrates(routeSeed, 4);
-      for (const s of targets) {
-        puts.push(
-          s.put(chunkId, envelope).catch(() => {
-            // background substrates may fail — brain records only confirmations, does not block upload
-          })
+      // Confirmed puts are recorded (locators persist outside the brain);
+      // background substrates may fail — they simply don't confirm.
+      const settled = await Promise.allSettled(
+        targets.map(async (s) => ({ substrate: s, locator: await s.put(chunkId, envelope) }))
+      );
+      const confirmed = settled
+        .filter((r): r is PromiseFulfilledResult<{ substrate: StorageSubstrate; locator: Uint8Array }> => r.status === "fulfilled")
+        .map(r => r.value);
+      const chunkHex = hexOf(chunkId.slice(0, 20));
+      for (const c of confirmed) {
+        try {
+          opts?.onLocator?.({
+            substrateId: c.substrate.id,
+            chunkIndex: i,
+            chunkHex,
+            locatorB64: b64encode(c.locator),
+          });
+        } catch { /* locator persistence is best-effort */ }
+      }
+      const minConf = opts?.minConfirmations ?? 1;
+      const remoteOk = confirmed.some(c => !c.substrate.local);
+      if (confirmed.length < minConf || (opts?.requireRemote && !remoteOk)) {
+        throw new Error(
+          `storage network unreachable for chunk ${i} (${confirmed.length} confirmations) — kept locally only`
         );
       }
       onChunk?.(i + 1, totalChunks);
     }
-
-    await Promise.all(puts);
 
     const tokenBytes = await buildRecallToken(blobSecret, rtSign, totalChunks, fileHash, buf.length);
     const recallToken = encodeToken(tokenBytes);
@@ -105,7 +176,7 @@ export class SDEBrain {
     return { recallToken, fileHash: fileHashHex };
   }
 
-  async download(recallToken: string, onStream: (chunk: Uint8Array) => void, opts?: { fileName?: string; mimeType?: string }): Promise<File> {
+  async download(recallToken: string, onStream: (chunk: Uint8Array) => void, opts?: DownloadOpts): Promise<File> {
     const tokenBytes = decodeToken(recallToken);
     const dms = await getOrCreateDMS();
     const identityRoot = await deriveIdentityRoot(dms);
@@ -122,18 +193,34 @@ export class SDEBrain {
 
     await Promise.all(
       Array.from({ length: fetches }, async (_, i) => {
+        let envelope: Uint8Array | null = null;
+        // 0. Persisted placements first (survives fleet changes).
+        if (opts?.resolveLocator) {
+          try {
+            const recs = await opts.resolveLocator(i);
+            for (const rec of recs || []) {
+              const s = this.substrates.find(x => x.id === rec.substrateId);
+              if (!s) continue;
+              try {
+                const blob = await s.get(b64decode(rec.locatorB64));
+                if (validEnvelope(blob)) { envelope = blob; break; }
+              } catch { /* try next placement */ }
+            }
+          } catch { /* fall through to deterministic routing */ }
+        }
         const chunkId = await deriveChunkId(blobSecret, i);
         const routeSeed = await deriveRouteSeed(blobSecret, i);
         const targets = await this.pickSubstrates(routeSeed, 4);
         // race top 3
         const race = targets.slice(0, 3);
-        let envelope: Uint8Array | null = null;
         const errors: unknown[] = [];
         // try raced substrates first
-        const raced = await Promise.allSettled(race.map(s => s.get(chunkId)));
-        for (const r of raced) {
-          if (r.status === "fulfilled" && r.value) { envelope = r.value; break; }
-          if (r.status === "rejected") errors.push(r.reason);
+        if (!envelope) {
+          const raced = await Promise.allSettled(race.map(s => s.get(chunkId)));
+          for (const r of raced) {
+            if (r.status === "fulfilled" && r.value) { envelope = r.value; break; }
+            if (r.status === "rejected") errors.push(r.reason);
+          }
         }
         if (!envelope) {
           // try remaining

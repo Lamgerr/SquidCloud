@@ -14,6 +14,8 @@ export interface StorageSubstrate {
   maxPayload: number;
   avgLatency: number;
   health: number; // 0..1 EWMA
+  /** true when puts never leave this device (memory/disk cache tiers) */
+  local?: boolean;
   put(chunkId: Uint8Array, payload: Uint8Array): Promise<Locator>;
   get(locator: Locator): Promise<Uint8Array>;
   probe(): Promise<SubstrateHealth>;

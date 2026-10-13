@@ -709,12 +709,25 @@ export const uploadFile = async (
         const { SDE } = await import('sde/sdk/SDE');
         const { SDEBrain } = await import('sde/brain/SDEBrain');
         const { DHTSubstrate } = await import('sde/substrates/deep/DHT');
+        const { NostrSubstrate } = await import('sde/substrates/nostr/NostrSubstrate');
+        const { PasteSubstrate } = await import('sde/substrates/paste/PasteSubstrate');
+        const { saveSdeLocators } = await import('@/lib/sde-locators');
         console.log('[SDE] modules loaded, starting upload...');
-        const brain = new SDEBrain([new DHTSubstrate()]);
+        // Internet fleet: local cache + keyless Nostr relays + paste-host
+        // replicas. Quorum (2 confirmations incl. 1 remote) keeps uploads
+        // honest — a local-only copy never reports success as dispersal.
+        const brain = new SDEBrain([new DHTSubstrate(), new NostrSubstrate(), new PasteSubstrate()]);
         const sde = new SDE(brain);
         onProgress?.(0, 'dispersing');
+        const pendingLocators: Array<{ chunkIndex: number; substrateId: string; locatorB64: string }> = [];
         const { recallToken, fileHash } = await sde.upload(file, (i, total) => {
           onProgress?.(Math.round((i / total) * 100), 'dispersing');
+        }, {
+          minConfirmations: 2,
+          requireRemote: true,
+          onLocator: (rec) => {
+            pendingLocators.push({ chunkIndex: rec.chunkIndex, substrateId: rec.substrateId, locatorB64: rec.locatorB64 });
+          },
         });
         console.log('[SDE] upload done, inserting file record...');
         const activeWorkspaceId = getActiveWorkspaceId();
@@ -747,10 +760,21 @@ export const uploadFile = async (
             console.error('[SDE] RPC also failed:', rpcError?.message);
             throw rpcError || new Error('Failed to create file record');
           }
-          Object.assign(data ?? {}, rpcData);
-          await supabase.from('files').update({ processor: 'sde' }).eq('id', rpcData.id);
+          await supabase.from('files').update({ processor: 'sde' }).eq('id', (rpcData as any).id);
+          console.log('[SDE] file inserted via RPC, storing recall token + locators...');
+          const { error: rtErr2 } = await supabase.from('sde_recall_tokens').insert({
+            file_id: (rpcData as any).id,
+            user_id: authUser.id,
+            recall_token: recallToken,
+            file_hash: fileHash,
+          });
+          if (rtErr2) console.error('[SDE] recall token insert error:', rtErr2.message);
+          const { saveSdeLocators: saveLoc } = await import('@/lib/sde-locators');
+          await saveLoc((rpcData as any).id, authUser.id, pendingLocators);
+          onProgress?.(100, 'complete');
+          return rpcData as FileItem;
         }
-        console.log('[SDE] file inserted, storing recall token...');
+        console.log('[SDE] file inserted, storing recall token + locators...');
         const { error: rtErr } = await supabase.from('sde_recall_tokens').insert({
           file_id: data.id,
           user_id: authUser.id,
@@ -758,6 +782,8 @@ export const uploadFile = async (
           file_hash: fileHash,
         });
         if (rtErr) console.error('[SDE] recall token insert error:', rtErr.message);
+        const { saveSdeLocators } = await import('@/lib/sde-locators');
+        await saveSdeLocators(data.id, authUser.id, pendingLocators);
         onProgress?.(100, 'complete');
         return data as FileItem;
       }
@@ -1030,9 +1056,12 @@ export async function downloadFile(fileId: string, onProgress?: (progress: numbe
       const { SDE } = await import('sde/sdk/SDE');
       const { SDEBrain } = await import('sde/brain/SDEBrain');
       const { DHTSubstrate } = await import('sde/substrates/deep/DHT');
-      const dht = new DHTSubstrate();
-      const brain = new SDEBrain([dht]);
+      const { NostrSubstrate } = await import('sde/substrates/nostr/NostrSubstrate');
+      const { PasteSubstrate } = await import('sde/substrates/paste/PasteSubstrate');
+      const { loadSdeLocators } = await import('@/lib/sde-locators');
+      const brain = new SDEBrain([new DHTSubstrate(), new NostrSubstrate(), new PasteSubstrate()]);
       const sde = new SDE(brain);
+      const locatorMap = await loadSdeLocators(fileId);
 
       let lastProgress = 10;
       const blob = await sde.download(
@@ -1041,7 +1070,11 @@ export async function downloadFile(fileId: string, onProgress?: (progress: numbe
           lastProgress = Math.min(lastProgress + 2, 95);
           onProgress?.(lastProgress, 'decrypting chunks');
         },
-        { fileName: fileRow.name, mimeType: fileRow.type || 'application/octet-stream' }
+        {
+          fileName: fileRow.name,
+          mimeType: fileRow.type || 'application/octet-stream',
+          resolveLocator: async (index: number) => locatorMap.get(index) || [],
+        }
       );
 
       onProgress?.(100, 'complete');

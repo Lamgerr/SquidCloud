@@ -63,6 +63,7 @@ export class DHTSubstrate implements StorageSubstrate {
   maxPayload = 1024 * 1024;
   avgLatency = 500;
   health = 1;
+  local = true;
 
   private mem = new Map<string, Uint8Array>();
   private ready: Promise<void>;

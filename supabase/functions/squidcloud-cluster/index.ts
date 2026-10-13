@@ -346,6 +346,9 @@ serve(async (req) => {
 
     const requestData = await req.json();
     const { action, ...body } = requestData;
+    if (action === "download" || action === "resolve-download") {
+      console.log(`[cluster] ${action}: path=${(body as any)?.path || '-'} repo=${(body as any)?.repo || '-'} bucket=${(body as any)?.bucket || '-'} chunks=${Array.isArray((body as any)?.chunks) ? (body as any).chunks.length : '-'}`);
+    }
 
     // ===== GET UPLOAD URLS (smart round-robin across buckets) =====
     if (action === "get-upload-urls") {
@@ -555,6 +558,7 @@ serve(async (req) => {
       if (clusters.length === 0) {
         return createErrorResponse("No storage buckets configured", 503);
       }
+      console.log(`[cluster] download: path=${path} repo=${repo} bucket=${bucket ?? ''} clusterId=${clusterId ?? ''}`);
       const exactCluster = await resolveClusterByBucket(clusters, bucket, clusterId);
       const cluster = exactCluster || clusters[0];
 
