@@ -769,8 +769,7 @@ export const uploadFile = async (
             file_hash: fileHash,
           });
           if (rtErr2) console.error('[SDE] recall token insert error:', rtErr2.message);
-          const { saveSdeLocators: saveLoc } = await import('@/lib/sde-locators');
-          await saveLoc((rpcData as any).id, authUser.id, pendingLocators);
+          await saveSdeLocators((rpcData as any).id, authUser.id, pendingLocators);
           onProgress?.(100, 'complete');
           return rpcData as FileItem;
         }
@@ -782,7 +781,6 @@ export const uploadFile = async (
           file_hash: fileHash,
         });
         if (rtErr) console.error('[SDE] recall token insert error:', rtErr.message);
-        const { saveSdeLocators } = await import('@/lib/sde-locators');
         await saveSdeLocators(data.id, authUser.id, pendingLocators);
         onProgress?.(100, 'complete');
         return data as FileItem;
