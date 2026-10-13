@@ -1,15 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  Upload, Download, XCircle, X, Pause, Play,
+  Upload, Download, X, Pause, Play,
   RotateCcw, Trash2, ChevronUp, Maximize2, Check,
 } from 'lucide-react';
 import { backgroundUploadService, UploadTask } from '@/services/backgroundUpload';
 import { backgroundDownloadService, DownloadTask } from '@/services/backgroundDownload';
 import { formatBytes } from '@/lib/api';
 import { FullScreenTransferModal } from './FullScreenTransferModal';
+
+/* ═══════════════════════════════════════════════════════════════
+   Transfer panel — speaks the house editorial language shared with
+   the index / pricing pages and account settings:
+   ink surface, bone text, hairline rules, small radii, Geist Mono
+   micro-kickers, and the signature ease. Motion stays springy.
+   ═══════════════════════════════════════════════════════════════ */
+
+const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)' as const;
+const SPRING_ENTER = { type: 'spring', stiffness: 300, damping: 26 } as const;
+const SPRING_BOUNCY = { type: 'spring', stiffness: 380, damping: 17 } as const;
+const SPRING_GLIDE = { type: 'spring', stiffness: 110, damping: 22 } as const;
+
+const KICKER = 'font-mono text-[10px] uppercase tracking-[0.14em] text-[#8d8f89]';
 
 const formatExactEta = (ms?: number) => {
   if (!ms || ms <= 0) return 'Calculating…';
@@ -20,11 +33,6 @@ const formatExactEta = (ms?: number) => {
   return `${secs}s`;
 };
 
-// Buttery spring presets — the whole panel lives on these.
-const SPRING_ENTER = { type: 'spring', stiffness: 300, damping: 24 } as const;
-const SPRING_BOUNCY = { type: 'spring', stiffness: 380, damping: 16 } as const;
-const SPRING_GLIDE = { type: 'spring', stiffness: 110, damping: 22 } as const;
-
 type UnifiedTask = {
   id: string;
   name: string;
@@ -33,162 +41,120 @@ type UnifiedTask = {
   status: string;
   type: 'upload' | 'download';
   eta?: number;
+  error?: string;
 };
 
-function OverallRing({ value, size = 40 }: { value: number; size?: number }) {
-  const r = (size - 6) / 2;
-  const c = 2 * Math.PI * r;
+function HairlineBar({ value, tone = 'bone' }: { value: number; tone?: 'bone' | 'ok' | 'bad' }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }} aria-hidden="true">
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={3}
-          className="stroke-zinc-800" />
-        <motion.circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={3}
-          strokeLinecap="round" className="stroke-white"
-          strokeDasharray={c}
-          initial={false}
-          animate={{ strokeDashoffset: c - (c * clamped) / 100 }}
-          transition={SPRING_GLIDE}
-          style={{ filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.45))' }}
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center font-mono text-[9px] font-bold tabular-nums text-white">
-        {Math.round(clamped)}
-      </span>
-    </span>
+    <div className="h-[2px] w-full overflow-hidden rounded-full bg-[rgba(232,231,225,0.12)]" aria-hidden="true">
+      <motion.div
+        className={cn(
+          'h-full w-full origin-left rounded-full',
+          tone === 'ok' ? 'bg-emerald-400' : tone === 'bad' ? 'bg-red-400/80' : 'bg-[#e8e7e1]'
+        )}
+        initial={false}
+        animate={{ scaleX: clamped / 100 }}
+        transition={SPRING_GLIDE}
+      />
+    </div>
   );
 }
 
 function TaskRow({
-  task, index, onRemove,
+  task, onRemove,
 }: {
   task: UnifiedTask;
-  index: number;
   onRemove: () => void;
 }) {
   const reduce = useReducedMotion();
   const active = task.status === 'uploading' || task.status === 'downloading';
   const done = task.status === 'completed';
   const failed = task.status === 'failed';
-  const p = Math.max(0, Math.min(100, task.progress)) / 100;
 
   return (
     <motion.div
       layout
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.97 }}
-      animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-      exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.94, transition: { duration: 0.16 } }}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10 }}
+      animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      exit={reduce ? { opacity: 0 } : { opacity: 0, transition: { duration: 0.15 } }}
       transition={SPRING_BOUNCY}
-      className={cn(
-        'relative overflow-hidden rounded-2xl border p-3',
-        failed
-          ? 'border-red-500/25 bg-red-500/[0.06]'
-          : done
-            ? 'border-emerald-500/20 bg-emerald-500/[0.05]'
-            : 'border-zinc-800/80 bg-zinc-900'
-      )}
+      className="border-t border-[rgba(232,231,225,0.09)] px-4 py-3 transition-colors first:border-t-0 hover:bg-[rgba(232,231,225,0.03)] sm:px-5"
     >
-      {/* failed shake */}
       {failed && !reduce && (
         <motion.span
           className="pointer-events-none absolute inset-0"
           initial={{ x: 0 }}
-          animate={{ x: [0, -7, 7, -4, 4, 0] }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
+          animate={{ x: [0, -6, 6, -3, 3, 0] }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
         />
       )}
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <motion.span
-            className={cn(
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
-              done ? 'bg-emerald-500/15 text-emerald-400'
-                : failed ? 'bg-red-500/15 text-red-400'
-                : 'bg-zinc-800 text-zinc-300'
-            )}
-            animate={active && !reduce ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-            transition={active && !reduce ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : undefined}
-          >
-            {done ? (
-              <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={SPRING_BOUNCY} className="flex">
-                <Check className="h-4 w-4" strokeWidth={3} />
-              </motion.span>
-            ) : failed ? (
-              <XCircle className="h-4 w-4" />
-            ) : task.type === 'upload' ? (
-              <Upload className="h-4 w-4" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-          </motion.span>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-white" title={task.name}>{task.name}</p>
-            <p className="mt-0.5 font-mono text-[10px] tabular-nums text-zinc-500">
-              {formatBytes(task.size)}
-              {active && task.eta ? <span className="text-zinc-400"> • {formatExactEta(task.eta)}</span> : null}
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border',
+            done ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-400'
+              : failed ? 'border-red-400/25 bg-red-400/10 text-red-400'
+              : 'border-[rgba(232,231,225,0.14)] bg-[rgba(232,231,225,0.04)] text-[#e8e7e1]'
+          )}
+        >
+          {done ? (
+            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={SPRING_BOUNCY} className="flex">
+              <Check className="h-3.5 w-3.5" strokeWidth={3} />
+            </motion.span>
+          ) : task.type === 'upload' ? (
+            <Upload className="h-3.5 w-3.5" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-medium tracking-[-0.005em] text-[#e8e7e1]" title={task.name}>
+            {task.name}
+          </p>
+          <p className="mt-1 font-mono text-[10.5px] tabular-nums tracking-wide text-[#8d8f89]">
+            {formatBytes(task.size)}
+            {active && task.eta ? <span> · {formatExactEta(task.eta)}</span> : null}
+            {failed && task.error ? <span className="text-red-400/90"> · {task.error}</span> : null}
+          </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={active ? 'pct' : task.status}
-              initial={reduce ? {} : { opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={reduce ? {} : { opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
-              className={cn(
-                'font-mono text-[11px] font-bold tabular-nums',
-                done ? 'text-emerald-400' : failed ? 'text-red-400' : 'text-white'
-              )}
-              aria-live="polite"
-            >
-              {active ? `${Math.round(task.progress)}%`
-                : done ? 'Done'
-                : failed ? 'Failed' : 'Queued'}
-            </motion.span>
-          </AnimatePresence>
-          {task.type === 'upload' && (
-            <motion.button
-              whileTap={{ scale: 0.8 }}
-              onClick={onRemove}
-              aria-label={`Remove ${task.name}`}
-              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-white"
-            >
-              <X className="h-3 w-3" />
-            </motion.button>
-          )}
-        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={active ? 'pct' : task.status}
+            initial={reduce ? {} : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduce ? {} : { opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className={cn(
+              'shrink-0 font-mono text-[11px] font-medium tabular-nums',
+              done ? 'text-emerald-400' : failed ? 'text-red-400' : 'text-[#e8e7e1]'
+            )}
+            aria-live="polite"
+          >
+            {active ? `${Math.round(task.progress)}%`
+              : done ? 'Done'
+              : failed ? 'Failed' : 'Queued'}
+          </motion.span>
+        </AnimatePresence>
+        {task.type === 'upload' && (
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={onRemove}
+            aria-label={`Remove ${task.name}`}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[#8d8f89] transition-colors hover:bg-[rgba(232,231,225,0.07)] hover:text-[#e8e7e1]"
+          >
+            <X className="h-3 w-3" />
+          </motion.button>
+        )}
       </div>
 
       {(active || done) && (
-        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-zinc-950">
-          <motion.div
-            className={cn(
-              'h-full w-full origin-left rounded-full',
-              done
-                ? 'bg-gradient-to-r from-emerald-400 to-emerald-300'
-                : 'bg-gradient-to-r from-zinc-200 via-white to-zinc-200'
-            )}
-            style={{ boxShadow: done ? '0 0 12px rgba(52,211,153,0.55)' : '0 0 10px rgba(255,255,255,0.35)' }}
-            initial={false}
-            animate={{ scaleX: done ? 1 : p }}
-            transition={SPRING_GLIDE}
-          />
+        <div className="mt-2.5 pl-11">
+          <HairlineBar value={done ? 100 : task.progress} tone={done ? 'ok' : 'bone'} />
         </div>
-      )}
-
-      {/* shimmer sweep while moving */}
-      {active && !reduce && (
-        <motion.div
-          className="pointer-events-none absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/[0.07] to-transparent"
-          animate={{ x: ['-120%', '420%'] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-        />
       )}
     </motion.div>
   );
@@ -216,13 +182,11 @@ const BackgroundUploadPanel = () => {
 
   const tasks = useMemo<UnifiedTask[]>(() => {
     const unified: UnifiedTask[] = [
-      ...uploadTasks.map(t => ({ id: t.id, name: t.file.name, size: t.file.size, progress: t.progress, status: t.status, type: 'upload' as const, eta: t.estimatedTimeRemaining })),
-      ...downloadTasks.map(t => ({ id: t.id, name: t.fileName, size: t.fileSize, progress: t.progress, status: t.status, type: 'download' as const, eta: undefined })),
+      ...uploadTasks.map(t => ({ id: t.id, name: t.file.name, size: t.file.size, progress: t.progress, status: t.status, type: 'upload' as const, eta: t.estimatedTimeRemaining, error: (t as any).error })),
+      ...downloadTasks.map(t => ({ id: t.id, name: t.fileName, size: t.fileSize, progress: t.progress, status: t.status, type: 'download' as const, eta: undefined, error: (t as any).error })),
     ];
-    return unified.sort((a, b) => {
-      const rank = (s: string) => (s === 'uploading' || s === 'downloading' ? 0 : s === 'pending' ? 1 : s === 'failed' ? 2 : 3);
-      return rank(a.status) - rank(b.status);
-    });
+    const rank = (s: string) => (s === 'uploading' || s === 'downloading' ? 0 : s === 'pending' ? 1 : s === 'failed' ? 2 : 3);
+    return unified.sort((a, b) => rank(a.status) - rank(b.status));
   }, [uploadTasks, downloadTasks]);
 
   // Byte-weighted overall progress across active work.
@@ -256,71 +220,77 @@ const BackgroundUploadPanel = () => {
       <FullScreenTransferModal isOpen={isFullScreenOpen} onClose={() => setIsFullScreenOpen(false)} />
 
       <motion.div
-        className="fixed bottom-4 right-4 left-4 z-50 select-none sm:left-auto sm:bottom-6 sm:right-6 sm:w-[400px]"
-        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 32, scale: 0.95 }}
-        animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-        exit={reduce ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.95 }}
+        className="fixed bottom-4 right-4 left-4 z-50 select-none sm:left-auto sm:bottom-6 sm:right-6 sm:w-[380px]"
+        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 28 }}
+        animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+        exit={reduce ? { opacity: 0 } : { opacity: 0, y: 20 }}
         transition={SPRING_ENTER}
         layout
       >
-        <div className="overflow-hidden rounded-3xl border border-zinc-800/80 bg-[#121212]/95 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)] backdrop-blur-2xl">
+        <div className="overflow-hidden rounded-2xl border border-[rgba(232,231,225,0.14)] bg-[#0b0d0c]/95 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] backdrop-blur-xl">
           {/* Header */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             aria-expanded={isExpanded}
-            className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-zinc-900/40 sm:px-5"
+            className="block w-full px-4 pt-4 text-left sm:px-5"
           >
-            <span className="flex min-w-0 items-center gap-3">
-              <OverallRing value={overall} />
-              <span className="min-w-0">
-                <span className="flex items-center gap-2 text-sm font-semibold tracking-tight text-white">
-                  Transfers
-                  <AnimatePresence>
-                    {activeTasks.length > 0 && (
-                      <motion.span
-                        key="count"
-                        initial={reduce ? {} : { scale: 0.4, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.4, opacity: 0 }}
-                        transition={SPRING_BOUNCY}
-                        className="rounded-full bg-zinc-800 px-2 py-0.5 font-mono text-[10px] uppercase text-white"
-                      >
-                        {activeTasks.length} active
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-zinc-500" aria-live="polite">
-                  {activeTasks.length > 0
-                    ? `${Math.round(overall)}% • ${activeTasks[0].name}${activeTasks.length > 1 ? ` +${activeTasks.length - 1} more` : ''}`
-                    : failedTasks.length > 0
-                      ? `${failedTasks.length} failed`
-                      : 'All done'}
-                </span>
+            <span className="flex items-center justify-between gap-3">
+              <span className={KICKER}>
+                Transfers{activeTasks.length > 0 ? ` · ${activeTasks.length} active` : failedTasks.length > 0 ? ` · ${failedTasks.length} failed` : ' · done'}
+              </span>
+              <span className="flex shrink-0 items-center gap-1" onClick={e => e.stopPropagation()}>
+                {activeTasks.some(t => t.type === 'upload') && (
+                  <motion.span whileTap={{ scale: 0.85 }}>
+                    <span
+                      role="button" tabIndex={0}
+                      onClick={handlePauseResume}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePauseResume(); } }}
+                      aria-label={isPaused ? 'Resume all' : 'Pause all'}
+                      className="flex h-7 w-7 items-center justify-center rounded-[4px] text-[#8d8f89] transition-colors hover:bg-[rgba(232,231,225,0.07)] hover:text-[#e8e7e1]"
+                    >
+                      {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                    </span>
+                  </motion.span>
+                )}
+                <motion.span whileTap={{ scale: 0.85 }}>
+                  <span
+                    role="button" tabIndex={0}
+                    onClick={() => setIsFullScreenOpen(true)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsFullScreenOpen(true); } }}
+                    aria-label="Open transfer center" title="Expand"
+                    className="flex h-7 w-7 items-center justify-center rounded-[4px] text-[#8d8f89] transition-colors hover:bg-[rgba(232,231,225,0.07)] hover:text-[#e8e7e1]"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </span>
+                </motion.span>
+                <motion.span
+                  animate={{ rotate: isExpanded ? 180 : 0 }}
+                  transition={SPRING_BOUNCY}
+                  className="flex h-7 w-7 items-center justify-center text-[#8d8f89]"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </motion.span>
               </span>
             </span>
-
-            <span className="flex shrink-0 items-center gap-1" onClick={e => e.stopPropagation()}>
-              {activeTasks.some(t => t.type === 'upload') && (
-                <motion.span whileTap={{ scale: 0.82 }}>
-                  <Button variant="ghost" size="sm" onClick={handlePauseResume} aria-label={isPaused ? 'Resume all' : 'Pause all'} className="h-8 w-8 rounded-full p-0 text-zinc-400 hover:bg-zinc-800 hover:text-white">
-                    {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-                  </Button>
-                </motion.span>
-              )}
-              <motion.span whileTap={{ scale: 0.82 }}>
-                <Button variant="ghost" size="sm" onClick={() => setIsFullScreenOpen(true)} aria-label="Open transfer center" title="Expand to Full Screen" className="h-8 w-8 rounded-full p-0 text-zinc-400 hover:bg-zinc-800 hover:text-white">
-                  <Maximize2 className="h-4 w-4" />
-                </Button>
-              </motion.span>
-              <motion.span
-                animate={{ rotate: isExpanded ? 180 : 0 }}
-                transition={SPRING_BOUNCY}
-                className="flex h-8 w-8 items-center justify-center text-zinc-500"
-              >
-                <ChevronUp className="h-5 w-5" />
-              </motion.span>
+            <span className="mt-2 flex items-baseline justify-between gap-3">
+              <span className="truncate text-[17px] font-semibold tracking-[-0.01em] text-[#e8e7e1]">
+                {activeTasks.length > 0 ? activeTasks[0].name : failedTasks.length > 0 ? 'Attention needed' : 'All transfers complete'}
+              </span>
+              <span className="shrink-0 font-mono text-[12px] font-medium tabular-nums text-[#e8e7e1]" aria-live="polite">
+                {Math.round(overall)}%
+              </span>
             </span>
+            <span className="mt-2.5 block">
+              <HairlineBar value={overall} tone={failedTasks.length > 0 && activeTasks.length === 0 ? 'bad' : 'bone'} />
+            </span>
+            <span className="mt-2 block font-mono text-[10.5px] tabular-nums tracking-wide text-[#8d8f89]">
+              {activeTasks.length > 0
+                ? `${activeTasks[0] ? formatBytes(activeTasks[0].size) : ''}${activeTasks[0]?.eta ? ` · ${formatExactEta(activeTasks[0].eta)} left` : ''}${activeTasks.length > 1 ? ` · +${activeTasks.length - 1} more` : ''}`
+                : failedTasks.length > 0
+                  ? `${failedTasks.length} failed — retry below`
+                  : `${completedTasks.length} completed`}
+            </span>
+            <span className="block pb-3" />
           </button>
 
           {/* Task list */}
@@ -331,17 +301,16 @@ const BackgroundUploadPanel = () => {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={reduce ? { duration: 0.15 } : SPRING_ENTER}
-                className="overflow-hidden"
+                transition={reduce ? { duration: 0.15 } : { duration: 0.45, ease: EASE }}
+                className="overflow-hidden border-t border-[rgba(232,231,225,0.09)]"
               >
-                <div className="space-y-2.5 px-4 pb-4 sm:px-5">
-                  <motion.div layout className="max-h-72 space-y-2.5 overflow-y-auto pr-1 custom-scrollbar">
+                <div className="px-1 py-1">
+                  <motion.div layout className="max-h-72 overflow-y-auto custom-scrollbar">
                     <AnimatePresence initial={false}>
-                      {tasks.slice(0, 5).map((task, i) => (
+                      {tasks.slice(0, 5).map((task) => (
                         <TaskRow
                           key={task.id}
                           task={task}
-                          index={i}
                           onRemove={() => backgroundUploadService.removeTask(task.id)}
                         />
                       ))}
@@ -351,29 +320,37 @@ const BackgroundUploadPanel = () => {
                       <motion.button
                         layout
                         onClick={() => setIsFullScreenOpen(true)}
-                        whileTap={{ scale: 0.97 }}
-                        className="w-full rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-3 text-center text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800"
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full px-5 py-3 text-center font-mono text-[10.5px] uppercase tracking-[0.12em] text-[#8d8f89] transition-colors hover:text-[#e8e7e1]"
                       >
-                        + {tasks.length - 5} more tasks • Click to view all
+                        + {tasks.length - 5} more — open transfer center
                       </motion.button>
                     )}
                   </motion.div>
 
                   {(completedTasks.length > 0 || failedTasks.length > 0) && (
-                    <div className="flex items-center justify-between border-t border-zinc-800 pt-3 text-xs">
+                    <div className="flex items-center justify-between border-t border-[rgba(232,231,225,0.09)] px-4 py-2.5 sm:px-5">
                       {failedTasks.length > 0 ? (
-                        <motion.span whileTap={{ scale: 0.95 }} className="inline-flex">
-                          <Button variant="outline" size="sm" onClick={() => backgroundUploadService.retryFailed()} className="h-8 rounded-lg border-zinc-800 bg-zinc-900 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white">
-                            <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Retry Failed
-                          </Button>
-                        </motion.span>
+                        <motion.button
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => backgroundUploadService.retryFailed()}
+                          className="rounded-[4px] border border-[rgba(232,231,225,0.16)] px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[#e8e7e1] transition-colors hover:bg-[rgba(232,231,225,0.06)]"
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            <RotateCcw className="h-3 w-3" /> Retry failed
+                          </span>
+                        </motion.button>
                       ) : <div />}
                       {completedTasks.length > 0 && (
-                        <motion.span whileTap={{ scale: 0.95 }} className="inline-flex">
-                          <Button variant="ghost" size="sm" onClick={() => { backgroundUploadService.clearCompleted(); backgroundDownloadService.clearCompleted(); }} className="h-8 rounded-lg text-xs text-zinc-400 hover:bg-zinc-900 hover:text-white">
-                            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Clear Done
-                          </Button>
-                        </motion.span>
+                        <motion.button
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => { backgroundUploadService.clearCompleted(); backgroundDownloadService.clearCompleted(); }}
+                          className="rounded-[4px] px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[#8d8f89] transition-colors hover:text-[#e8e7e1]"
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            <Trash2 className="h-3 w-3" /> Clear done
+                          </span>
+                        </motion.button>
                       )}
                     </div>
                   )}
