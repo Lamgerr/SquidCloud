@@ -321,12 +321,40 @@ export async function handleFilesAPI(
     const fileId = crypto.randomUUID();
     const chunkBuckets: Record<string, string> = session.chunk_buckets || {};
 
-    // Register chunks directly — plaintext staging paths on B2
+    // Server-side re-encryption (public API contract): API clients PUT raw
+    // plaintext staging chunks. Complete downloads each one, encrypts it to
+    // canonical RES54 v2 under the session key, stores the ciphertext, and
+    // registers THOSE paths. (Registering plaintext as encrypted made every
+    // spec-flow download fail decrypt.)
+    const stagingResolved = await getClusterDownloadUrls(
+      userId,
+      Array.from({ length: session.total_chunks }, (_, i) => ({
+        path: `${userId}/uploads/${uploadId}/${i}.bin`,
+        index: i,
+        bucket: chunkBuckets[String(i)] || 'BucketSQ1',
+      })),
+    );
     const verifiedChunks: Array<{ index: number; path: string; repo: string; bucket: string }> = [];
     for (let i = 0; i < session.total_chunks; i++) {
-      const chunkPath = `${userId}/uploads/${uploadId}/${i}.bin`;
-      const targetBucket = chunkBuckets[String(i)] || 'BucketSQ1';
-      verifiedChunks.push({ index: i, path: chunkPath, repo: 'b2', bucket: targetBucket });
+      const dl = stagingResolved.find((r) => r.index === i);
+      if (!dl?.downloadUrl) throw new Error(`staging chunk ${i} unavailable`);
+      const sResp = await fetch(dl.downloadUrl);
+      if (!sResp.ok) throw new Error(`staging chunk ${i} download failed (${sResp.status})`);
+      const plaintext = new Uint8Array(await sResp.arrayBuffer());
+      const encrypted = await encryptChunkV2(plaintext, encryptionKey);
+      const encPath = `${userId}/encrypted/${fileId}/${i}.bin`;
+      const upResult = await getClusterUploadUrls(userId,
+        [{ path: encPath, index: i }],
+        encrypted.byteLength, undefined, { internalMint: true });
+      const up = upResult.urls?.[0];
+      if (!up?.uploadUrl) throw new Error(`B2 upload URL failed for chunk ${i}`);
+      const b2Resp = await fetch(up.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: encrypted,
+      });
+      if (!b2Resp.ok) throw new Error(`B2 upload failed for chunk ${i} (${b2Resp.status})`);
+      verifiedChunks.push({ index: i, path: encPath, repo: 'b2', bucket: up.bucket });
     }
 
     // Build metadata matching RES54 format
@@ -350,9 +378,10 @@ export async function handleFilesAPI(
         storage_path: 'res54_distributed',
         parent_folder: session.folder_id || null,
         workspace_id: wsId,
-        // Chunks are client-side encrypted under session.encryption_key (also
-        // mirrored into tags[0].encryptionKey). Must be true or every consumer
-        // treats the stored bytes as plaintext.
+        // Chunks are RES54-v2 ciphertext under session.encryption_key (also
+        // mirrored into tags[0].encryptionKey), encrypted server-side at
+        // complete time from the raw staging PUTs. Must be true or every
+        // consumer treats the stored bytes as plaintext.
         encrypted: true,
         encryption_key: '',
         tags: [JSON.stringify(metadata)],
@@ -604,9 +633,10 @@ export async function handleFilesAPI(
         // Internal platform mint: these bytes were already S-Hawk screened
         // at the POST /upload entry point.
         const encPath = `${userId}/encrypted/${fileId}/${chunk.index}.bin`;
-        const [upload] = await getClusterUploadUrls(userId, [
+        const upResult = await getClusterUploadUrls(userId, [
           { path: encPath, index: chunk.index },
         ], encrypted.byteLength, undefined, { internalMint: true });
+        const upload = upResult.urls?.[0];
         if (!upload?.uploadUrl) throw new Error(`B2 upload URL failed for chunk ${chunk.index}`);
 
         // Upload encrypted data to B2

@@ -514,6 +514,11 @@ export async function swkEnsureToken(
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
+        if (res.status === 400) {
+          // Caller-fixable manifest problem — propagate the real reason so
+          // API clients can correct their request instead of seeing 503.
+          return { ok: false, status: 400, error: data?.error || 'Invalid upload manifest' };
+        }
         return { ok: false, status: 503, error: 'S-Hawk screening unavailable. Try again shortly.' };
       }
       if (data.decision === 'reject' || !data.token) {
