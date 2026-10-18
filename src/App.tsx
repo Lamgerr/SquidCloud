@@ -79,6 +79,7 @@ const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const EmbedPage = lazy(() => import("./pages/EmbedPage"));
 const HybridNoteEditor = lazy(() => import("./components/drawing/HybridNoteEditor"));
 const GitHubOAuthCallback = lazy(() => import("./pages/GitHubOAuthCallback"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const RouteSuspense = ({ children }: { children: ReactNode }) => (
   <Suspense fallback={<div className="flex min-h-[30vh] items-center justify-center text-sm text-muted-foreground">Loading...</div>}>
@@ -242,6 +243,7 @@ const AppContent = () => {
           <Route path="/auth" element={<AnimatedRoute><RouteSuspense><Auth /></RouteSuspense></AnimatedRoute>} />
           <Route path="/auth/callback" element={<AnimatedRoute><RouteSuspense><OAuthCallback /></RouteSuspense></AnimatedRoute>} />
           <Route path="/oauth/callback" element={<AnimatedRoute><RouteSuspense><OAuthCallback /></RouteSuspense></AnimatedRoute>} />
+          <Route path="/oauth/consent" element={<AnimatedRoute><RouteSuspense><OAuthConsent /></RouteSuspense></AnimatedRoute>} />
           <Route path="/github/oauth/callback" element={<AnimatedRoute><RouteSuspense><GitHubOAuthCallback /></RouteSuspense></AnimatedRoute>} />
           <Route path="/oauth/migration-callback" element={<AnimatedRoute><RouteSuspense><ImportOAuthCallback /></RouteSuspense></AnimatedRoute>} />
           <Route path="/dashboard" element={
