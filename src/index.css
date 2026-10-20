@@ -844,6 +844,16 @@ body {
   --ease-apple:      cubic-bezier(0.22, 1, 0.36, 1);
   --ease-snappy:     cubic-bezier(0.2, 0, 0, 1);
 
+  /* Motion system — ease-out. Entrances arrive fast and settle slow.
+     transform + opacity only, so they stay on the compositor at 60fps. */
+  --ease-out:       cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-press:     cubic-bezier(0.32, 0, 0.67, 0);
+  --dur-instant:    0ms;
+  --dur-fast:       120ms;
+  --dur-base:       200ms;
+  --dur-moderate:   300ms;
+  --dur-slow:       450ms;
+
   /* Card radii */
   --radius-card: 14px;
   --radius-file: 14px;
@@ -948,6 +958,85 @@ body {
 .lg-press-subtle:active {
   transform: scale(0.97);
   opacity: 0.85;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOTION SYSTEM — ease-out, transform + opacity only.
+   Every component that appears, moves, or is pressed goes through
+   these. No transition-all, no arbitrary durations inline.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Fast — micro interactions: hover, focus, color, press */
+.motion-fast {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* Base — default state change: toggles, selections, tab switches */
+.motion-base {
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out),
+    background-color var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+}
+
+/* Spatial — large movements: panels, sheets, dialogs */
+.motion-spatial {
+  transition:
+    transform var(--dur-moderate) var(--ease-apple),
+    opacity var(--dur-moderate) var(--ease-apple);
+  will-change: transform, opacity;
+}
+
+/* Press feedback — immediate scale on press, ease-out back on release */
+.motion-press:active {
+  transform: scale(0.97);
+  transition: transform var(--dur-fast) var(--ease-press);
+}
+.motion-press-sm:active {
+  transform: scale(0.985);
+  transition: transform var(--dur-fast) var(--ease-press);
+}
+
+/* Morph entrances — menus, dialogs, popovers grow from their anchor */
+@keyframes motion-pop-in {
+  from { opacity: 0; transform: translate(var(--pop-x, 0px), var(--pop-y, 0px)) scale(0.97); }
+  to   { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+@keyframes motion-pop-out {
+  from { opacity: 1; transform: translate(0, 0) scale(1); }
+  to   { opacity: 0; transform: translate(var(--pop-x, 0px), var(--pop-y, 0px)) scale(0.97); }
+}
+.motion-pop     { animation: motion-pop-in var(--dur-base) var(--ease-out) both; }
+.motion-pop-out { animation: motion-pop-out calc(var(--dur-base) * 0.7) var(--ease-press) both; }
+
+/* Fade only — overlays, backdrops */
+@keyframes motion-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-fade-out { from { opacity: 1; } to { opacity: 0; } }
+.motion-fade     { animation: motion-fade-in var(--dur-base) var(--ease-out) both; }
+.motion-fade-out { animation: motion-fade-out calc(var(--dur-base) * 0.7) var(--ease-press) both; }
+
+/* Pop direction per anchor side */
+[data-side="bottom"].motion-pop { --pop-y: -4px; }
+[data-side="top"].motion-pop    { --pop-y: 4px; }
+[data-side="left"].motion-pop   { --pop-x: 4px; }
+[data-side="right"].motion-pop  { --pop-x: -4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-fast, .motion-base, .motion-spatial {
+    transition: opacity var(--dur-fast) linear;
+  }
+  .motion-press:active, .motion-press-sm:active { transform: none; }
+  .motion-pop, .motion-fade { animation: motion-fade-in var(--dur-fast) linear both; }
+  .motion-pop-out, .motion-fade-out { animation: motion-fade-out var(--dur-fast) linear both; }
 }
 
 /* ── macOS pill tabs ───────────────────────── */

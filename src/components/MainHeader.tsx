@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -52,17 +52,16 @@ const NavIconButton: React.FC<NavIconButtonProps> = ({
 }) => {
   const buttonClasses = cn(
     "relative flex items-center justify-center w-9 h-9 rounded-lg",
-    "transition-all duration-150",
+    "motion-fast motion-press",
     "hover:bg-accent/70",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
-    "active:scale-[0.96]",
     "group",
     isActive && "bg-accent",
     className
   );
 
   const iconClasses = cn(
-    "w-[18px] h-[18px] transition-colors duration-150",
+    "w-[18px] h-[18px] motion-fast",
     "text-muted-foreground group-hover:text-foreground",
     isActive && "text-primary"
   );
@@ -131,6 +130,15 @@ const MainHeader: React.FC = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // Scroll-linked header: gains definition once content moves under it.
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 24);
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
   
   // Hide on mobile for app-shell routes (they have their own nav).
   // NOTE: routes with their own in-page TopBar (developer-api, settings,
@@ -149,8 +157,9 @@ const MainHeader: React.FC = () => {
           "sticky top-0 z-50 w-full",
           "h-14",
           "bg-background/85 backdrop-blur-xl",
-          "border-b border-border/30",
-          "transition-all duration-200"
+          "border-b",
+          scrolled ? "border-border/60 shadow-[0_1px_0_rgba(0,0,0,0.25)]" : "border-border/30",
+          "motion-base"
         )}
         role="banner"
       >
@@ -160,12 +169,12 @@ const MainHeader: React.FC = () => {
             to="/" 
             className={cn(
               "flex items-center gap-2.5",
-              "transition-opacity duration-150 hover:opacity-80 active:opacity-70",
+              "motion-fast hover:opacity-80 active:opacity-70",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 rounded-lg"
             )}
             aria-label="SquidCloud Home"
           >
-            <SquidLogo className="transition-transform duration-150 hover:scale-105" />
+            <SquidLogo className="motion-fast hover:scale-105" />
             <span className="font-semibold text-[15px] tracking-[-0.01em] text-foreground hidden sm:inline-block">
               SquidCloud
             </span>
@@ -177,8 +186,8 @@ const MainHeader: React.FC = () => {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={cn(
                 "w-10 h-10 flex items-center justify-center rounded-lg",
-                "transition-all duration-150",
-                "hover:bg-accent/60 active:scale-95"
+                "motion-fast motion-press",
+                "hover:bg-accent/60"
               )}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
@@ -230,8 +239,8 @@ const MainHeader: React.FC = () => {
                         <button 
                           className={cn(
                             "w-9 h-9 rounded-lg flex items-center justify-center ml-0.5",
-                            "transition-all duration-150",
-                            "hover:bg-accent/60 active:scale-95",
+                            "motion-fast motion-press",
+                            "hover:bg-accent/60",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                           )}
                           aria-label="User menu"
@@ -267,7 +276,7 @@ const MainHeader: React.FC = () => {
                           <DropdownMenuItem asChild>
                             <Link 
                               to="/settings/account" 
-                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors duration-150"
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent/60 motion-fast"
                             >
                               <Settings className="h-4 w-4" />
                               <span className="text-sm">User Settings</span>
@@ -278,7 +287,7 @@ const MainHeader: React.FC = () => {
                         <div className="p-1">
                           <DropdownMenuItem 
                             onClick={signOut}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors duration-150"
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-destructive hover:text-destructive hover:bg-destructive/10 motion-fast"
                           >
                             <LogOut className="h-4 w-4" />
                             <span className="text-sm">Sign Out</span>
@@ -292,13 +301,13 @@ const MainHeader: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <Link 
                     to="/auth" 
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 font-medium"
+                    className="text-sm text-muted-foreground hover:text-foreground motion-fast font-medium"
                   >
                     Sign In
                   </Link>
                   <Button
                     render={<Link to="/auth" />}
-                    className="h-9 px-5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm rounded-lg transition-all duration-150 active:scale-[0.97] shadow-sm shadow-primary/15"
+                    className="h-9 px-5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm rounded-lg motion-fast motion-press shadow-sm shadow-primary/15"
                   >
                     Get Started
                   </Button>
@@ -333,7 +342,7 @@ const MainHeader: React.FC = () => {
                   to={item.to}
                   className={cn(
                     "flex flex-col items-center gap-1.5 p-3 rounded-xl",
-                    "transition-all duration-150 active:scale-95",
+                    "motion-fast motion-press",
                     "hover:bg-accent/60",
                     isActiveRoute(item.to) && "bg-accent/50"
                   )}
@@ -353,8 +362,8 @@ const MainHeader: React.FC = () => {
                 onClick={() => { signOut(); setMobileMenuOpen(false); }}
                 className={cn(
                   "w-full flex items-center justify-center gap-2 p-3 rounded-xl",
-                  "text-destructive hover:bg-destructive/10 active:scale-95",
-                  "transition-all duration-150"
+                  "text-destructive hover:bg-destructive/10",
+                  "motion-fast motion-press"
                 )}
               >
                 <LogOut className="w-4 h-4" />
