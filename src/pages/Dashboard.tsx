@@ -90,7 +90,6 @@ import SquidVeilSecrets from '@/components/SquidVeilSecrets';
 import SquidVeilSecretsMobile from '@/components/SquidVeilSecretsMobile';
 import GitHubRepoCloneDialog from '@/components/GitHubRepoCloneDialog';
 import { TabHeader } from '@/components/dashboard/TabHeader';
-import { AppTheme } from '@/components/custom/squid-app';
 // Icons
 import {
   Search, Grid3X3, List, RefreshCw, ChevronLeft, ChevronRight,
@@ -1308,7 +1307,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   if (isMobile) {
     return (
       <FileViewInfoContext.Provider value={handleViewInfo}>
-      <AppTheme />
       <AppStartupBiometricCheck>
         <DragDropUpload
           onFilesDropped={handleFilesDropped}
@@ -1316,7 +1314,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
           currentFolder={currentFolder}
           allowFolderUpload
         >
-          <div className="min-h-screen bg-background">
+          <div className="min-h-screen bg-background m3-app">
             <MobileNavHeader
               onSearchClick={() => setIsSpotlightOpen(true)}
               onMenuClick={() => setMobileSidebarOpen(true)}
@@ -1853,7 +1851,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   // ─────────────────────────────────────────────────────────
   return (
     <FileViewInfoContext.Provider value={handleViewInfo}>
-    <AppTheme />
     <AppStartupBiometricCheck>
       <DragDropUpload
         onFilesDropped={handleFilesDropped}
@@ -1876,7 +1873,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
           </div>
         )}
 
-        <div className="flex h-screen w-full overflow-hidden bg-background">
+        <div className="flex h-screen w-full overflow-hidden bg-background m3-app">
           {/* Sidebar */}
           <EnterpriseSidebar
             activeTab={activeTab}
@@ -1975,7 +1972,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                   >
                     <Search className="h-3.5 w-3.5" />
                     <span className="text-[12.5px]">Search</span>
-                    <kbd className="sa-kbd">{/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd>
+                    <kbd className="m3-kbd">{/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd>
                   </button>
                   <button
                     onClick={() => setIsSpotlightOpen(true)}
@@ -2811,9 +2808,9 @@ const FilesView: React.FC<FilesViewProps> = ({
             {filteredFolders.length} folders · {filteredFiles.length} files{searchQuery ? ' match' : ''}
           </span>
           <span className="hidden md:flex items-center gap-4">
-            <span className="flex items-center gap-1.5"><kbd className="sa-kbd">←</kbd><kbd className="sa-kbd">↑</kbd><kbd className="sa-kbd">↓</kbd><kbd className="sa-kbd">→</kbd> move</span>
-            <span className="flex items-center gap-1.5"><kbd className="sa-kbd">Enter</kbd> open</span>
-            <span className="flex items-center gap-1.5"><kbd className="sa-kbd">{/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd> search</span>
+            <span className="flex items-center gap-1.5"><kbd className="m3-kbd">←</kbd><kbd className="m3-kbd">↑</kbd><kbd className="m3-kbd">↓</kbd><kbd className="m3-kbd">→</kbd> move</span>
+            <span className="flex items-center gap-1.5"><kbd className="m3-kbd">Enter</kbd> open</span>
+            <span className="flex items-center gap-1.5"><kbd className="m3-kbd">{/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd> search</span>
           </span>
         </div>
       )}

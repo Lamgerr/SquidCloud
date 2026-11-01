@@ -253,7 +253,7 @@ const FolderRow: React.FC<FolderRowProps> = ({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setDeleteConfirmOpen(false); onDelete?.(); }} className="bg-red-600 text-white hover:bg-red-500">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={() => { setDeleteConfirmOpen(false); onDelete?.(); }} className="bg-red-600 text-foreground hover:bg-red-500">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -290,20 +290,20 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
         >
           <ChevronDown
             className={cn(
-              'w-3.5 h-3.5 text-neutral-500 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+              'w-3.5 h-3.5 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
               !expanded && '-rotate-90'
             )}
           />
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Folders</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Folders</h2>
           {folders.length > 0 && (
-            <span className="text-[11px] text-neutral-400 bg-muted px-1.5 py-px rounded-md">
+            <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-px rounded-md">
               {folders.length}
             </span>
           )}
         </button>
         <button
           onClick={onCreateFolder}
-          className="flex items-center justify-center w-7 h-7 rounded-md text-neutral-500 hover:bg-white/10 hover:text-white transition-colors"
+          className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
           aria-label="New Folder"
           title="New Folder"
         >
@@ -324,9 +324,9 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 p-[14px_16px] bg-card/40 border border-white/5 rounded-xl animate-pulse">
-                <div className="w-8 h-8 rounded-lg bg-white/5 animate-pulse" />
+                <div className="w-8 h-8 rounded-lg bg-muted/40 animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-3 w-[40%] rounded bg-white/5" />
+                  <div className="h-3 w-[40%] rounded bg-muted/40" />
                 </div>
               </div>
             ))}
@@ -336,10 +336,10 @@ export const FolderListView: React.FC<FolderListViewProps> = ({
         {showEmpty && (
           <div className="flex flex-col items-center justify-center min-h-[200px] px-4 py-8">
             <div className="w-12 h-12 rounded-lg bg-muted/30 border border-border/40 flex items-center justify-center mb-3">
-              <Plus className="w-6 h-6 text-neutral-500" />
+              <Plus className="w-6 h-6 text-muted-foreground" />
             </div>
-            <h3 className="text-[14px] font-semibold text-white mb-1">No folders yet</h3>
-            <p className="text-[12px] text-neutral-400 mb-4 text-center">Create a folder to organize your files</p>
+            <h3 className="text-[14px] font-semibold text-foreground mb-1">No folders yet</h3>
+            <p className="text-[12px] text-muted-foreground mb-4 text-center">Create a folder to organize your files</p>
             <Button size="sm" className="rounded-md bg-foreground text-background hover:bg-foreground/90" onClick={onCreateFolder}>New folder</Button>
           </div>
         )}

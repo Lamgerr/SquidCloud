@@ -80,7 +80,7 @@ function LimitBar({ value, max }: { value: number; max: number | null }) {
   return (
     <div className="h-1 overflow-hidden rounded-full bg-muted/60" role="progressbar" aria-valuenow={value} aria-valuemax={max} aria-label="Daily usage">
       <div
-        className={cn('h-full rounded-full transition-[width] duration-700 ease-out', hot ? 'bg-amber-400' : 'bg-primary')}
+        className={cn('h-full rounded-full transition-[width] duration-700 ease-out', hot ? 'bg-[hsl(var(--m3-warning-hsl))]' : 'bg-primary')}
         style={{ width: `${Math.max(pct, 2)}%` }}
       />
     </div>
@@ -126,12 +126,12 @@ const Overview: React.FC<OverviewProps> = ({
       {/* Greeting */}
       <div className="flex flex-wrap items-end justify-between gap-4 animate-fade-up [animation-fill-mode:both]" style={fadeUp(0)}>
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-neutral-500" style={MONO}>{today}</p>
+          <p className=" text-[11px] uppercase tracking-[0.22em] m3-on-surface-variant">{today}</p>
           <h1 className="mt-2 text-[26px] font-semibold tracking-tight text-foreground lg:text-[32px]">
             {greeting()}, {displayName}.
           </h1>
           <p className="mt-1.5 flex items-center gap-2 text-[13px] text-muted-foreground">
-            <span className="sq-live-dot inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <span className="sq-live-dot inline-block h-1.5 w-1.5 rounded-full bg-[hsl(var(--m3-primary-hsl))]" />
             Vault sealed · {planLabel} plan · {files.length} files, {folders.length} folders
           </p>
         </div>
@@ -141,7 +141,7 @@ const Overview: React.FC<OverviewProps> = ({
         >
           <Search className="h-4 w-4" />
           <span>Search files…</span>
-          <kbd className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-mono text-[10px]" style={MONO}>⌘K</kbd>
+          <kbd className="rounded border border-border/70 bg-background px-1.5 py-0.5  text-[10px]">⌘K</kbd>
         </button>
       </div>
 
@@ -150,7 +150,7 @@ const Overview: React.FC<OverviewProps> = ({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-border/60 bg-card/60 p-4 transition-colors duration-150 hover:border-border">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground" style={MONO}>Uploads today</span>
+              <span className=" text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Uploads today</span>
               <FileStack className="h-3.5 w-3.5 text-muted-foreground/70" />
             </div>
             <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
@@ -167,7 +167,7 @@ const Overview: React.FC<OverviewProps> = ({
 
           <div className="rounded-xl border border-border/60 bg-card/60 p-4 transition-colors duration-150 hover:border-border">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground" style={MONO}>API calls today</span>
+              <span className=" text-[10px] uppercase tracking-[0.14em] text-muted-foreground">API calls today</span>
               <Zap className="h-3.5 w-3.5 text-muted-foreground/70" />
             </div>
             <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
@@ -184,7 +184,7 @@ const Overview: React.FC<OverviewProps> = ({
 
           <div className="rounded-xl border border-border/60 bg-card/60 p-4 transition-colors duration-150 hover:border-border">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground" style={MONO}>Plan</span>
+              <span className=" text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Plan</span>
               <HardDrive className="h-3.5 w-3.5 text-muted-foreground/70" />
             </div>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground capitalize">{planLabel}</p>
@@ -218,7 +218,7 @@ const Overview: React.FC<OverviewProps> = ({
       {/* Activity */}
       <section aria-label="Recent activity" className="overflow-hidden rounded-xl border border-border/60 bg-card/60 p-5 animate-fade-up [animation-fill-mode:both]" style={fadeUp(180)}>
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-neutral-500" style={MONO}>Activity · 14 days</h2>
+          <h2 className=" text-[11px] uppercase tracking-[0.22em] m3-on-surface-variant">Activity · 14 days</h2>
           <span className="text-[12px] tabular-nums text-muted-foreground">{activity.total} uploads</span>
         </div>
         <div className="mt-4 flex h-20 items-end gap-1" role="img" aria-label={`Upload activity, ${activity.total} files in the last 14 days`}>
@@ -234,7 +234,7 @@ const Overview: React.FC<OverviewProps> = ({
             />
           ))}
         </div>
-        <div className="mt-2 flex justify-between font-mono text-[10px] text-muted-foreground/60" style={MONO} aria-hidden="true">
+        <div className="mt-2 flex justify-between  text-[10px] text-muted-foreground/60" aria-hidden="true">
           <span>{activity.days[0]?.label}</span>
           <span>{activity.days[activity.days.length - 1]?.label}</span>
         </div>
@@ -247,7 +247,7 @@ const Overview: React.FC<OverviewProps> = ({
             onClick={() => onGoToTab('files')}
             className="flex w-full items-center justify-between px-5 pb-1 pt-4 text-left rounded-t-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
           >
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-neutral-500" style={MONO}>Recent files</h2>
+            <h2 className=" text-[11px] uppercase tracking-[0.22em] m3-on-surface-variant">Recent files</h2>
             <span className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors">
               View all <ArrowUpRight className="h-3.5 w-3.5" />
             </span>
@@ -266,16 +266,16 @@ const Overview: React.FC<OverviewProps> = ({
                     onClick={() => onFileClick(f)}
                     className="sq-press flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-150 hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-mono text-[9px] font-bold" style={{ background: tint.bg, color: tint.fg, ...MONO }}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg  text-[9px] font-bold" style={{ background: tint.bg, color: tint.fg }}>
                       {tint.tag}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-medium text-foreground">{f.name}</span>
-                      <span className="block font-mono text-[10.5px] tabular-nums text-muted-foreground" style={MONO}>
+                      <span className="block  text-[10.5px] tabular-nums text-muted-foreground">
                         {formatFileSize(f.size)} · {shortDate(f.updated_at)}{f.shared ? ' · shared' : ''}
                       </span>
                     </span>
-                    {f.encrypted && <Lock className="h-3.5 w-3.5 shrink-0 text-neutral-600" />}
+                    {f.encrypted && <Lock className="h-3.5 w-3.5 shrink-0 m3-on-surface-variant" />}
                   </button>
                 </li>
                 );
@@ -290,7 +290,7 @@ const Overview: React.FC<OverviewProps> = ({
             onClick={() => onGoToTab('files')}
             className="flex w-full items-center justify-between px-5 pb-1 pt-4 text-left rounded-t-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
           >
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-neutral-500" style={MONO}>Folders</h2>
+            <h2 className=" text-[11px] uppercase tracking-[0.22em] m3-on-surface-variant">Folders</h2>
             <span className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors">
               View all <ArrowUpRight className="h-3.5 w-3.5" />
             </span>
@@ -310,7 +310,7 @@ const Overview: React.FC<OverviewProps> = ({
                     <FolderIcon className="h-5 w-5 shrink-0 text-primary" />
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] font-medium text-foreground">{fd.name}</span>
-                      <span className="block truncate font-mono text-[10.5px] text-muted-foreground" style={MONO}>{fd.path || '/'}</span>
+                      <span className="block truncate  text-[10.5px] text-muted-foreground">{fd.path || '/'}</span>
                     </span>
                   </button>
                 </li>
@@ -319,8 +319,8 @@ const Overview: React.FC<OverviewProps> = ({
           )}
           {/* Storage note */}
           <div className="mx-4 mb-4 flex items-center gap-2.5 rounded-lg border border-border/50 bg-background/60 px-3.5 py-3">
-            <HardDrive className="h-4 w-4 shrink-0 text-neutral-500" />
-            <p className="font-mono text-[10.5px] leading-relaxed text-muted-foreground" style={MONO}>
+            <HardDrive className="h-4 w-4 shrink-0 m3-on-surface-variant" />
+            <p className=" text-[10.5px] leading-relaxed text-muted-foreground">
               {formatFileSize(totalSize)} sealed across the pool · no node holds a complete file
             </p>
           </div>

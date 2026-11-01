@@ -56,7 +56,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           isMobile
-            ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] w-full flex-col rounded-t-[28px] border border-white/10 border-b-0 bg-[hsl(var(--card)/0.92)] p-0 text-sm text-popover-foreground shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.55)] backdrop-blur-2xl outline-none data-open:motion-pop data-closed:motion-pop-out [overscroll-behavior-y:contain]"
+            ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] w-full flex-col rounded-t-[28px] border border-[hsl(var(--m3-outline-variant-hsl))] border-b-0 bg-[hsl(var(--card)/0.92)] p-0 text-sm text-popover-foreground shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.55)] backdrop-blur-2xl outline-none data-open:motion-pop data-closed:motion-pop-out [overscroll-behavior-y:contain]"
             : "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overflow-x-hidden break-words data-open:motion-pop data-closed:motion-pop-out",
           className
         )}

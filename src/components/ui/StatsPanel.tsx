@@ -13,11 +13,11 @@ interface StatsPanelProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  Images:    '#e4e4e7',
-  Documents: '#a1a1aa',
-  Video:     '#71717a',
-  Audio:     '#52525b',
-  Other:     '#3f3f46',
+  Images:    'var(--md-sys-color-file-image-container)',
+  Documents: 'var(--md-sys-color-file-doc-container)',
+  Video:     'var(--md-sys-color-file-video-container)',
+  Audio:     'var(--md-sys-color-file-audio-container)',
+  Other:     'var(--md-sys-color-surface-container-highest)',
 };
 
 function categorize(files: FileItemType[]) {
@@ -90,7 +90,7 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({
   return (
     <div
       className={cn(
-        'rounded-[14px] border border-border/40 bg-card px-5 py-3.5 space-y-2.5',
+        'm3-card m3-card--filled px-5 py-3.5 space-y-2.5',
         className
       )}
     >

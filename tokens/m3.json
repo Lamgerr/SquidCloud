@@ -1,0 +1,117 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "Material 3 seed source. The tonal palettes and every --md-sys-color-* role are generated from this file by scripts/gen_m3_theme.mjs. Edit a hue here, run the generator, and the whole app re-themes.",
+
+  "m3": {
+    "$description": "Material 3 color generation inputs, in OKLCH hue degrees.",
+
+    "default-seed": {
+      "$type": "string",
+      "$value": "bliss",
+      "$description": "Default product skin: warm coral on warm charcoal, matching the Sekai Tune reference."
+    },
+
+    "seed": {
+      "bliss": {
+        "label": { "$type": "string", "$value": "Bliss" },
+        "primary-hue": { "$type": "number", "$value": 32 },
+        "tertiary-hue": { "$type": "number", "$value": 345 },
+        "neutral-hue": { "$type": "number", "$value": 30 }
+      },
+      "azure": {
+        "label": { "$type": "string", "$value": "Azure" },
+        "primary-hue": { "$type": "number", "$value": 258 },
+        "tertiary-hue": { "$type": "number", "$value": 45 },
+        "neutral-hue": { "$type": "number", "$value": 256 }
+      },
+      "moss": {
+        "label": { "$type": "string", "$value": "Moss" },
+        "primary-hue": { "$type": "number", "$value": 148 },
+        "tertiary-hue": { "$type": "number", "$value": 70 },
+        "neutral-hue": { "$type": "number", "$value": 146 }
+      },
+      "violet": {
+        "label": { "$type": "string", "$value": "Violet" },
+        "primary-hue": { "$type": "number", "$value": 300 },
+        "tertiary-hue": { "$type": "number", "$value": 25 },
+        "neutral-hue": { "$type": "number", "$value": 298 }
+      }
+    },
+
+    "chroma": {
+      "$description": "Max OKLCH chroma per palette. Material HCT chroma 36 is roughly 0.10 here.",
+      "primary": { "$type": "number", "$value": 0.086 },
+      "secondary": { "$type": "number", "$value": 0.042 },
+      "tertiary": { "$type": "number", "$value": 0.076 },
+      "neutral": { "$type": "number", "$value": 0.0062 },
+      "neutral-variant": { "$type": "number", "$value": 0.0145 },
+      "error": { "$type": "number", "$value": 0.132 }
+    },
+
+    "tone": {
+      "$description": "CIE L* tone per role: [light, dark]. The standard Material 3 assignments.",
+      "primary": { "$type": "number[]", "$value": [40, 80] },
+      "on-primary": { "$type": "number[]", "$value": [100, 20] },
+      "primary-container": { "$type": "number[]", "$value": [90, 30] },
+      "on-primary-container": { "$type": "number[]", "$value": [10, 90] },
+      "inverse-primary": { "$type": "number[]", "$value": [80, 40] },
+      "secondary": { "$type": "number[]", "$value": [40, 80] },
+      "on-secondary": { "$type": "number[]", "$value": [100, 20] },
+      "secondary-container": { "$type": "number[]", "$value": [90, 30] },
+      "on-secondary-container": { "$type": "number[]", "$value": [10, 90] },
+      "tertiary": { "$type": "number[]", "$value": [40, 80] },
+      "on-tertiary": { "$type": "number[]", "$value": [100, 20] },
+      "tertiary-container": { "$type": "number[]", "$value": [90, 30] },
+      "on-tertiary-container": { "$type": "number[]", "$value": [10, 90] },
+      "error": { "$type": "number[]", "$value": [40, 80] },
+      "on-error": { "$type": "number[]", "$value": [100, 20] },
+      "error-container": { "$type": "number[]", "$value": [90, 30] },
+      "on-error-container": { "$type": "number[]", "$value": [10, 90] },
+      "background": { "$type": "number[]", "$value": [99, 6] },
+      "on-background": { "$type": "number[]", "$value": [10, 90] },
+      "surface": { "$type": "number[]", "$value": [98, 6] },
+      "on-surface": { "$type": "number[]", "$value": [10, 90] },
+      "surface-dim": { "$type": "number[]", "$value": [87, 6] },
+      "surface-bright": { "$type": "number[]", "$value": [98, 24] },
+      "surface-container-lowest": { "$type": "number[]", "$value": [100, 4] },
+      "surface-container-low": { "$type": "number[]", "$value": [96, 10] },
+      "surface-container": { "$type": "number[]", "$value": [94, 12] },
+      "surface-container-high": { "$type": "number[]", "$value": [92, 17] },
+      "surface-container-highest": { "$type": "number[]", "$value": [90, 22] },
+      "surface-variant": { "$type": "number[]", "$value": [90, 30] },
+      "on-surface-variant": { "$type": "number[]", "$value": [30, 80] },
+      "outline": { "$type": "number[]", "$value": [50, 60] },
+      "outline-variant": { "$type": "number[]", "$value": [80, 30] },
+      "inverse-surface": { "$type": "number[]", "$value": [20, 90] },
+      "inverse-on-surface": { "$type": "number[]", "$value": [95, 20] },
+      "scrim": { "$type": "number[]", "$value": [0, 0] },
+      "shadow": { "$type": "number[]", "$value": [0, 0] }
+    },
+
+    "file-family": {
+      "$description": "Tonal containers for file kinds, replacing raw hex chips.",
+      "image": { "$type": "number", "$value": 332 },
+      "video": { "$type": "number", "$value": 268 },
+      "audio": { "$type": "number", "$value": 160 },
+      "doc": { "$type": "number", "$value": 214 },
+      "archive": { "$type": "number", "$value": 62 },
+      "code": { "$type": "number", "$value": 286 }
+    }
+  },
+
+  "type": {
+    "$description": "M3 typescale, rendered with the bundled Geist Sans.",
+    "display-small":   { "$type": "typography", "$value": { "fontSize": "36px", "lineHeight": "44px", "fontWeight": 500, "letterSpacing": "-0.4px" } },
+    "headline-medium": { "$type": "typography", "$value": { "fontSize": "28px", "lineHeight": "36px", "fontWeight": 500, "letterSpacing": "-0.3px" } },
+    "headline-small":  { "$type": "typography", "$value": { "fontSize": "24px", "lineHeight": "32px", "fontWeight": 500, "letterSpacing": "-0.2px" } },
+    "title-large":     { "$type": "typography", "$value": { "fontSize": "22px", "lineHeight": "28px", "fontWeight": 500, "letterSpacing": "0px" } },
+    "title-medium":    { "$type": "typography", "$value": { "fontSize": "16px", "lineHeight": "24px", "fontWeight": 500, "letterSpacing": "0.15px" } },
+    "title-small":     { "$type": "typography", "$value": { "fontSize": "14px", "lineHeight": "20px", "fontWeight": 500, "letterSpacing": "0.1px" } },
+    "body-large":      { "$type": "typography", "$value": { "fontSize": "16px", "lineHeight": "24px", "fontWeight": 400, "letterSpacing": "0.5px" } },
+    "body-medium":     { "$type": "typography", "$value": { "fontSize": "14px", "lineHeight": "20px", "fontWeight": 400, "letterSpacing": "0.25px" } },
+    "body-small":      { "$type": "typography", "$value": { "fontSize": "12px", "lineHeight": "16px", "fontWeight": 400, "letterSpacing": "0.4px" } },
+    "label-large":     { "$type": "typography", "$value": { "fontSize": "14px", "lineHeight": "20px", "fontWeight": 500, "letterSpacing": "0.1px" } },
+    "label-medium":    { "$type": "typography", "$value": { "fontSize": "12px", "lineHeight": "16px", "fontWeight": 500, "letterSpacing": "0.5px" } },
+    "label-small":     { "$type": "typography", "$value": { "fontSize": "11px", "lineHeight": "16px", "fontWeight": 500, "letterSpacing": "0.5px" } }
+  }
+}

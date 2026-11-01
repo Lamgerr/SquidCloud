@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { SquidsetThemeProvider } from "@/contexts/SquidsetThemeContext";
+import { M3ThemeProvider } from "@/components/m3/theme";
 import { BiometricAuthProvider } from "@/contexts/BiometricAuthContext";
 import { BYOKProvider } from "@/contexts/BYOKContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -59,6 +60,7 @@ const SecurityCenter = lazy(() => import("./components/SecurityCenter"));
 const SignalsPage = lazy(() => import("./pages/SignalsPage"));
 const StoragePage = lazy(() => import("./pages/StoragePage"));
 const ExtensionLab = lazy(() => import("./pages/ExtensionLab"));
+const DesignSystem = lazy(() => import("./pages/DesignSystem"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const PatchNotes = lazy(() => import("./pages/PatchNotes"));
 const WorkspaceInvite = lazy(() => import("./pages/WorkspaceInvite"));
@@ -313,6 +315,15 @@ const AppContent = () => {
             </RouteSuspense>
             </AnimatedRoute>
           } />
+          <Route path="/design" element={
+            <AnimatedRoute>
+            <RouteSuspense>
+              <ProtectedRoute>
+                <DesignSystem />
+              </ProtectedRoute>
+            </RouteSuspense>
+            </AnimatedRoute>
+          } />
           <Route path="/security" element={
             <AnimatedRoute>
             <RouteSuspense>
@@ -530,11 +541,13 @@ function App() {
         <BlackoutOverlay />
         <ThemeProvider>
           <SquidsetThemeProvider>
+            <M3ThemeProvider>
             <TooltipProvider>
               <KeyboardShortcutsProvider>
                 <AppContent />
               </KeyboardShortcutsProvider>
             </TooltipProvider>
+            </M3ThemeProvider>
           </SquidsetThemeProvider>
         </ThemeProvider>
       </QueryClientProvider>

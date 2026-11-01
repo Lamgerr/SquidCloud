@@ -33,7 +33,7 @@ const MobileNavHeader: React.FC<MobileNavHeaderProps> = ({
   return (
     <div
       className={cn(
-        'sticky top-0 z-40 border-b border-border/20 bg-background/80 backdrop-blur-xl',
+        'm3-appbar m3-appbar--small sticky top-0 z-40 backdrop-blur-xl',
         'pt-[calc(env(safe-area-inset-top)+4px)]',
         className,
       )}

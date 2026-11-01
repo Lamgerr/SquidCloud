@@ -1,18 +1,25 @@
-# Summary
+# Summary — Material 3 redesign
 
-## Done (2026-10-27)
-- LOC analysis for the workspace, excluding comments and markdown:
-  - All non-md tracked text files: **249,950 code lines** (code = non-comment-only, non-blank), 11,754 comment lines, 23,576 blank lines, 1,142 files.
-  - Bulk: TypeScript 796 files / 161,907 lines; then SQL 11,377, JS 5,380, CSS 5,296, HTML 4,627.
-  - Data/generated artifacts inside that total: HAR web capture 17,194; package-lock.json x4 + Cargo.lock 25,877; from repo's own src, ~(about) 206,600 lines.
-  - Markdown: 471 files / 97,673 lines excluded per request.
-- Rigor notes: cloc 2.10 (comment-aware, string-safe); totals verified by summing language rows; HAR misclassification and Cargo.lock skip discovered and corrected by hand.
+## Done
+- M3 token engine + generated theme; contrast gate passes (200 pairs, 4 seeds x light/dark).
+- M3 CSS layer (base + components) and shadcn variable bridge in index.css.
+- React primitives in src/components/m3/ (primitives, navigation, theme, AppShell, index).
+- /design route (DesignSystem specimen page) exercising all primitives.
+- Dashboard: removed <AppTheme />; .sa-kbd -> .m3-kbd; m3-app roots; MobileNavHeader -> m3-appbar.
+- SettingsRow rebuilt as M3 grouped list (light-mode safe).
+- StatsPanel category colors -> M3 file-container tokens.
+- DashboardOverview de-monofied (no mono kickers, neutral colors -> M3 tokens).
+- Overlays pointed at M3 outline tokens; sonner uses m3-snackbar.
+- Verification: tsc --noEmit passes; theme check passes; emoji clean; tokens valid.
 
 ## In progress
-- None.
+- AppShell component created but not wired into Dashboard desktop layout (sidebar/top bar on bridged tokens).
 
-## Blocked - needs a decision
-- None.
+## Blocked (needs human)
+- Full vite build unavailable in this Termux env (@swc/core native binding); tsc used as proxy.
 
 ## Queued next
-- Nothing yet (cold start). Backlog generation not performed for this interactive query.
+- Wire AppShell into Dashboard desktop branch.
+- Restyle FileItem grid/list cards to M3.
+- Chromium render check at 1440/768/390/320.
+- Commit the redesign.
