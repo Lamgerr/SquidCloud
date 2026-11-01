@@ -1,12 +1,6 @@
 import React, { useRef, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-function assignRef<T>(ref: React.Ref<T> | undefined, node: T | null) {
-  if (!ref) return;
-  if (typeof ref === 'function') ref(node);
-  else (ref as React.MutableRefObject<T | null>).current = node;
-}
-
 // ── Ripple helper ───────────────────────────────────────────────────
 export function useRipple() {
   const ref = useRef<HTMLElement | null>(null);
@@ -58,7 +52,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={(node) => {
-          assignRef(ref, node);
+          (ref as React.RefCallback<HTMLButtonElement>)?.(node);
           ripple.ref.current = node;
         }}
         className={cn('m3-btn', variantClass, sizeClass, fullWidth && 'w-full', className)}
@@ -102,7 +96,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     return (
       <button
         ref={(node) => {
-          assignRef(ref, node);
+          (ref as React.RefCallback<HTMLButtonElement>)?.(node);
           ripple.ref.current = node;
         }}
         aria-label={label}
@@ -143,7 +137,7 @@ export const Fab = React.forwardRef<HTMLButtonElement, FabProps>(
     return (
       <button
         ref={(node) => {
-          assignRef(ref, node);
+          (ref as React.RefCallback<HTMLButtonElement>)?.(node);
           ripple.ref.current = node;
         }}
         className={cn(
@@ -221,7 +215,7 @@ export const Chip = React.forwardRef<HTMLButtonElement, ChipProps>(
     return (
       <button
         ref={(node) => {
-          assignRef(ref, node);
+          (ref as React.RefCallback<HTMLButtonElement>)?.(node);
           ripple.ref.current = node;
         }}
         type={props.type || 'button'}
