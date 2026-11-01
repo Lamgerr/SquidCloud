@@ -57,10 +57,6 @@ const MOD = IS_APPLE ? '⌘' : 'Ctrl+';
       the render body get a new identity on every parent render, which remounts
       every button and drops keyboard focus mid-use. ── */
 
-const ROW = 'group relative flex w-full items-center rounded-md outline-none transition-colors duration-100';
-const ROW_IDLE = 'text-muted-foreground hover:bg-accent/60 hover:text-foreground';
-const ROW_ON = 'bg-accent text-foreground';
-
 function NavItem({
   item, active, collapsed, onSelect,
 }: { item: NavDef; active: boolean; collapsed: boolean; onSelect: (id: string) => void }) {
@@ -72,23 +68,14 @@ function NavItem({
       title={collapsed ? item.label : undefined}
       aria-label={collapsed ? item.label : undefined}
       aria-current={active ? 'page' : undefined}
-      className={cn(
-        ROW,
-        collapsed ? 'mx-auto h-8 w-8 justify-center' : 'h-8 gap-2.5 px-2.5',
-        active ? ROW_ON : ROW_IDLE,
-      )}
+      className="m3-nav-item"
     >
-      {active && (
-        <span aria-hidden="true" className="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-foreground" />
-      )}
-      <item.icon className="h-4 w-4 shrink-0" />
+      <span className="m3-nav-item__icon" aria-hidden="true"><item.icon /></span>
       {!collapsed && (
         <>
-          <span className="flex-1 truncate text-left text-[13px]">{item.label}</span>
+          <span className="m3-nav-item__label">{item.label}</span>
           {item.shortcut && (
-            <kbd className="font-mono text-[10px] tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-              {MOD}{item.shortcut}
-            </kbd>
+            <kbd className="m3-kbd opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">{MOD}{item.shortcut}</kbd>
           )}
         </>
       )}
@@ -97,12 +84,8 @@ function NavItem({
 }
 
 function SectionLabel({ collapsed, children }: { collapsed: boolean; children: React.ReactNode }) {
-  if (collapsed) return <div aria-hidden="true" className="mx-2 my-0.5 h-px bg-border" />;
-  return (
-    <p className="px-2.5 pb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-      {children}
-    </p>
-  );
+  if (collapsed) return <div aria-hidden="true" className="mx-2 my-0.5 h-px bg-[hsl(var(--m3-outline-variant-hsl))]" />;
+  return <div className="m3-drawer__section">{children}</div>;
 }
 
 export const EnterpriseSidebar: React.FC<SidebarProps> = ({
@@ -142,14 +125,14 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
     <aside
       aria-label="Workspace sidebar"
       className={cn(
-        'flex flex-shrink-0 select-none flex-col border-r border-border bg-card',
+        'm3-drawer flex-shrink-0 select-none',
         'transition-[width] duration-150 ease-out',
         collapsed ? 'w-[60px]' : 'w-[232px]',
       )}
     >
       {/* Workspace / app identity */}
       <div className={cn(
-        'flex h-12 shrink-0 items-center border-b border-border',
+        'm3-drawer__header',
         collapsed ? 'justify-center' : 'justify-between pl-3 pr-1.5',
       )}>
         {!collapsed && (
@@ -219,7 +202,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
         ref={navRef}
         aria-label="Primary"
         onKeyDown={onNavKeyDown}
-        className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-2 py-3 lg-scrollbar-none"
+        className="m3-drawer__scroll space-y-4 px-2 py-3"
       >
         <div className="space-y-0.5">
           <SectionLabel collapsed={collapsed}>Workspace</SectionLabel>
@@ -247,12 +230,12 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
                 onClick={() => {
                   if (b.type === 'folder' && b.path) { onNavigateToFolder(b.path); onTabChange('files'); }
                 }}
-                className={cn(ROW, ROW_IDLE, 'h-8 gap-2.5 px-2.5')}
+                className="m3-nav-item"
               >
-                {b.type === 'folder'
-                  ? <Folder className="h-4 w-4 shrink-0" />
-                  : <FileStack className="h-4 w-4 shrink-0" />}
-                <span className="truncate text-[13px]">{b.name}</span>
+                <span className="m3-nav-item__icon" aria-hidden="true">
+                  {b.type === 'folder' ? <Folder /> : <FileStack />}
+                </span>
+                <span className="m3-nav-item__label">{b.name}</span>
               </button>
             ))}
           </div>
@@ -260,24 +243,17 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer: settings + account */}
-      <div className="shrink-0 space-y-0.5 border-t border-border p-2">
+      <div className="m3-drawer__footer space-y-0.5 p-0">
         <button
           type="button"
           onClick={() => navigate('/settings/account')}
           title={collapsed ? 'Settings' : undefined}
           aria-label={collapsed ? 'Settings' : undefined}
           aria-current={activeTab === 'settings' ? 'page' : undefined}
-          className={cn(
-            ROW,
-            collapsed ? 'mx-auto h-8 w-8 justify-center' : 'h-8 gap-2.5 px-2.5',
-            activeTab === 'settings' ? ROW_ON : ROW_IDLE,
-          )}
+          className="m3-nav-item"
         >
-          {activeTab === 'settings' && (
-            <span aria-hidden="true" className="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-foreground" />
-          )}
-          <Settings2 className="h-4 w-4 shrink-0" />
-          {!collapsed && <span className="text-[13px]">Settings</span>}
+          <span className="m3-nav-item__icon" aria-hidden="true"><Settings2 /></span>
+          {!collapsed && <span className="m3-nav-item__label">Settings</span>}
         </button>
 
         <DropdownMenu>
@@ -285,17 +261,13 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               aria-label={`Account menu, ${displayName}`}
-              className={cn(
-                'group flex w-full items-center rounded-md outline-none transition-colors hover:bg-accent/60',
-                collapsed ? 'mx-auto h-10 w-10 justify-center' : 'h-11 gap-2.5 px-2',
-              )}
+              className="m3-nav-item"
             >
-              <div
-                aria-hidden="true"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-accent text-[11px] font-medium text-foreground"
-              >
-                {(profile?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-              </div>
+              <span className="m3-nav-item__icon" aria-hidden="true">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[hsl(var(--m3-secondary-container-hsl))] text-[11px] font-medium m3-on-secondary-container">
+                  {(profile?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+                </span>
+              </span>
               {!collapsed && (
                 <>
                   <div className="min-w-0 text-left">
