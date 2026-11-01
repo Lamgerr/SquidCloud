@@ -41,7 +41,7 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[20px] bg-card/80 backdrop-blur-2xl border border-[hsl(var(--m3-outline-variant-hsl))] border-b-0 shadow-2xl [overscroll-behavior-y:contain]",
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[20px] bg-card/80 backdrop-blur-2xl border border-white/10 border-b-0 shadow-2xl [overscroll-behavior-y:contain]",
         className
       )}
       style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}

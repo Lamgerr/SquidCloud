@@ -12,12 +12,6 @@
 @import './styles/squircle.css';
 @import './styles/animations.css';
 @import './styles/toast.css';
-
-/* Material 3 — generated color roles, then the system + component layer */
-@import './styles/m3/theme.css';
-@import './styles/m3/base.css';
-@import './styles/m3/components.css';
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -97,62 +91,53 @@
   }
 
   :root {
-    /* ── Material 3 role bridge ────────────────────────────────
-       Legacy shadcn variables resolve to generated M3 roles, so every
-       component that was not rewritten still inherits the new palette,
-       shape and state colors from one source of truth. */
-    --background: var(--m3-surface-hsl);
-    --foreground: var(--m3-on-surface-hsl);
+    /* ── Light Theme ─────────────────────────────── */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11.2%;
 
-    --card: var(--m3-surface-container-low-hsl);
-    --card-foreground: var(--m3-on-surface-hsl);
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11.2%;
 
-    --popover: var(--m3-surface-container-high-hsl);
-    --popover-foreground: var(--m3-on-surface-hsl);
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11.2%;
 
-    --primary: var(--m3-primary-hsl);
-    --primary-foreground: var(--m3-on-primary-hsl);
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: var(--m3-secondary-container-hsl);
-    --secondary-foreground: var(--m3-on-secondary-container-hsl);
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
 
-    --muted: var(--m3-surface-container-hsl);
-    --muted-foreground: var(--m3-on-surface-variant-hsl);
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: var(--m3-surface-container-high-hsl);
-    --accent-foreground: var(--m3-on-surface-hsl);
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11.2%;
 
-    --destructive: var(--m3-error-hsl);
-    --destructive-foreground: var(--m3-on-error-hsl);
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: var(--m3-outline-variant-hsl);
-    --input: var(--m3-outline-variant-hsl);
-    --ring: var(--m3-primary-hsl);
-    --brand: var(--m3-primary-hsl);
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    --sidebar-background: var(--m3-surface-container-low-hsl);
-    --sidebar-foreground: var(--m3-on-surface-hsl);
-    --sidebar-primary: var(--m3-primary-hsl);
-    --sidebar-primary-foreground: var(--m3-on-primary-hsl);
-    --sidebar-accent: var(--m3-secondary-container-hsl);
-    --sidebar-accent-foreground: var(--m3-on-secondary-container-hsl);
-    --sidebar-border: var(--m3-outline-variant-hsl);
-    --sidebar-ring: var(--m3-primary-hsl);
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5% 26%;
+    --sidebar-primary: 240 6% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 5% 96%;
+    --sidebar-accent-foreground: 240 6% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217 91% 60%;
 
     /* ── Semantic Status Colors ──────────────────── */
-    --success: var(--m3-success-hsl);
-    --success-foreground: var(--m3-on-success-hsl);
-    --warning: var(--m3-warning-hsl);
-    --warning-foreground: var(--m3-on-warning-hsl);
-    --info: var(--m3-tertiary-hsl);
-    --info-foreground: var(--m3-on-tertiary-hsl);
-
-    /* ── Squidset Design System Colors ───────────── */
-    --squid-error: var(--m3-error-hsl);
-    --squid-success: var(--m3-success-hsl);
-    --squid-warning: var(--m3-warning-hsl);
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
 
     /* ── Squidset Design System Colors ───────────── */
     --squid-blue-50: 214 100% 97%;
@@ -176,6 +161,10 @@
     --squid-gray-700: 217 19% 27%;
     --squid-gray-800: 215 28% 17%;
     --squid-gray-900: 221 39% 11%;
+
+    --squid-error: 0 84% 60%;
+    --squid-success: 142 71% 45%;
+    --squid-warning: 38 92% 50%;
 
     /* ── Typography Scale ─────────────────────────── */
     --font-size-xs: 0.6875rem;     /* 11px */
@@ -217,13 +206,53 @@
   }
 
   .dark {
+    /* ── Dark Theme — near-black canvas, signal-lime primary ─────── */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 93%;
+
+    --card: 0 0% 7.5%;
+    --card-foreground: 0 0% 93%;
+
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 93%;
+
+    --primary: 80 85% 62%;
+    --primary-foreground: 80 60% 8%;
+
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 93%;
+
+    --muted: 0 0% 9%;
+    --muted-foreground: 0 0% 50%;
+
+    --accent: 0 0% 13%;
+    --accent-foreground: 0 0% 93%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 13%;
+    --input: 0 0% 13%;
+    --ring: 80 85% 62%;
+
+    --brand: 80 85% 62%;
+
+    --sidebar-background: 0 0% 3%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 80 85% 62%;
+    --sidebar-primary-foreground: 80 60% 8%;
+    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent-foreground: 0 0% 93%;
+    --sidebar-border: 0 0% 10%;
+    --sidebar-ring: 80 85% 62%;
+
     /* ── Elevation Scale (dark) ────────────────────── */
     --elevation-1: 0 1px 2px hsl(0 0% 0% / 0.3);
     --elevation-2: 0 2px 4px hsl(0 0% 0% / 0.35), 0 1px 2px hsl(0 0% 0% / 0.3);
     --elevation-3: 0 4px 8px hsl(0 0% 0% / 0.4), 0 2px 4px hsl(0 0% 0% / 0.3);
     --elevation-4: 0 8px 16px hsl(0 0% 0% / 0.45), 0 4px 8px hsl(0 0% 0% / 0.3);
     --elevation-5: 0 16px 32px hsl(0 0% 0% / 0.5), 0 8px 16px hsl(0 0% 0% / 0.35);
-    --help-foreground: var(--m3-on-surface-variant-hsl);
+    --help-foreground: oklch(0.82 0 0);
   }
   .theme {
     --color-help-foreground: var(--help-foreground);
@@ -238,11 +267,11 @@
     @apply bg-background text-foreground;
   }
   ::selection {
-    background: hsl(var(--m3-primary-container-hsl));
-    color: hsl(var(--m3-on-primary-container-hsl));
+    background: hsl(80 85% 62% / 0.85);
+    color: hsl(80 60% 8%);
   }
   :focus-visible {
-    outline: 2px solid hsl(var(--m3-primary-hsl) / 0.9);
+    outline: 2px solid hsl(80 85% 62% / 0.7);
     outline-offset: 2px;
   }
 }

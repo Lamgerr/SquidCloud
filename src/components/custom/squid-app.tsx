@@ -852,7 +852,7 @@ export function Dot({ tone = 'neutral', pulse }: { tone?: Exclude<Tone, 'solid'>
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="m3-kbd">{children}</kbd>;
+  return <kbd className="sa-kbd">{children}</kbd>;
 }
 
 /** `plain` keeps the bar neutral (progress). Without it the bar warns near the

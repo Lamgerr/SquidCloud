@@ -11,7 +11,6 @@ interface SettingsRowProps {
   className?: string;
   disabled?: boolean;
   trailing?: React.ReactNode;
-  leadingTone?: 'primary' | 'tonal' | 'tertiary' | 'surface' | 'error';
 }
 
 export const SettingsRow: React.FC<SettingsRowProps> = ({
@@ -23,40 +22,46 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
   className,
   disabled,
   trailing,
-  leadingTone,
 }) => {
-  const destructive = variant === 'destructive';
-  const tone = leadingTone || (destructive ? 'error' : 'tonal');
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'm3-list-item',
-        destructive && 'm3-list-item--danger' as any,
-        disabled && 'm3-list-item--disabled',
+        'group flex w-full items-center gap-3 px-4 h-12 text-left transition-all duration-150',
+        variant === 'destructive'
+          ? 'hover:bg-red-500/5'
+          : 'hover:bg-white/[0.04]',
+        disabled && 'opacity-50 cursor-not-allowed',
         className
       )}
     >
-      <span className="m3-list-item__leading">
+      <Icon className={cn(
+        'w-4 h-4 flex-shrink-0',
+        variant === 'destructive'
+          ? 'text-red-400/60'
+          : 'text-white/50 group-hover:text-white/70'
+      )} />
+      <span className={cn(
+        'text-[14px] flex-1 font-medium',
+        variant === 'destructive' ? 'text-red-400' : 'text-white'
+      )}>
+        {label}
+      </span>
+      {description && (
         <span className={cn(
-          'm3-icon-well m3-icon-well--sm',
-          tone === 'primary' && '',
-          tone === 'tonal' && 'm3-icon-well--tonal',
-          tone === 'tertiary' && 'm3-icon-well--tertiary',
-          tone === 'surface' && 'm3-icon-well--surface',
-          tone === 'error' && 'm3-icon-well--error',
+          'text-[12px] hidden sm:inline',
+          variant === 'destructive' ? 'text-red-400/40' : 'text-white/40'
         )}>
-          <Icon className="h-4 w-4" />
+          {description}
         </span>
-      </span>
-      <span className="m3-list-item__content">
-        <span className={cn('m3-list-item__headline', destructive && 'm3-error-text')}>{label}</span>
-        {description && <span className="m3-list-item__supporting">{description}</span>}
-      </span>
-      <span className="m3-list-item__trailing">
-        {trailing || <ChevronRight className="h-4 w-4" />}
-      </span>
+      )}
+      {trailing || (
+        <ChevronRight className={cn(
+          'w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5',
+          variant === 'destructive' ? 'text-red-400/20' : 'text-white/20'
+        )} />
+      )}
     </button>
   );
 };
@@ -64,12 +69,14 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
 interface SettingsCardProps {
   children: React.ReactNode;
   className?: string;
-  outlined?: boolean;
 }
 
-export const SettingsCard: React.FC<SettingsCardProps> = ({ children, className, outlined }) => {
+export const SettingsCard: React.FC<SettingsCardProps> = ({ children, className }) => {
   return (
-    <div className={cn('m3-list-group', outlined && 'm3-list-group--outlined', className)}>
+    <div className={cn(
+      'bg-white/[0.06] rounded-2xl border border-white/10 overflow-hidden',
+      className
+    )}>
       {children}
     </div>
   );
@@ -80,5 +87,5 @@ interface SettingsDividerProps {
 }
 
 export const SettingsDivider: React.FC<SettingsDividerProps> = ({ className }) => {
-  return <div className={cn('m3-divider m3-divider--inset', className)} />;
+  return <div className={cn('h-px bg-white/[0.06] mx-4', className)} />;
 };

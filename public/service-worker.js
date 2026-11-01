@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidcloud-v12.0.23-1793515341332'; // Dynamic cache name
+const CACHE_NAME = 'squidcloud-v12.0.22-1791838240076'; // Dynamic cache name
 
 self.addEventListener('install', () => self.skipWaiting());
 
