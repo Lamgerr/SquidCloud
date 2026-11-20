@@ -151,7 +151,32 @@ moves unrelated content.
   refresh. Micro-copy lives in the dock, not in toasts.
 - Empty states own the viewport and point to the dock's Upload action.
 
-### 5.3 Toasts
+### 5.3 Sidebar (vertical segmented control)
+
+The sidebar is the `GlassSegment` language rotated vertical — **one floating dark capsule**,
+not a full-height panel:
+- `src/components/ui/EnterpriseSidebar.tsx` renders two capsules: the nav segment and the
+  footer (settings + account) segment, plus a small collapse face at top.
+- Each item is an icon-first `.sb-seg-b` button; the active item carries a single shared
+  `layoutId="sb-seg-thumb"` so the thumb **slides vertically** between selections.
+- Collapsed = icons only (tool via `title`); expanded adds the label inline. No white fills,
+  no per-item backgrounds, no section-label text in collapsed mode (a 2px divider instead).
+- Motion: `stiffness 520 / damping 30` press+hover, `stiffness 420 / damping 30` thumb,
+  staggered slide-in, all with reduced-motion variants.
+- Contract preserved: same props, tab ids, keyboard arrow nav, and ARIA as before.
+
+### 5.4 Spotlight (command palette)
+
+`src/components/CommandPalette.tsx` is the global search — same floating tier as the dock:
+- One `.spot-panel` capsule (near-black glass, hairline rim, 14px radius), spring pop-in.
+- Header: mono `SPOTLIGHT` kicker + one leading input + clear button; hairline divider.
+- Results grouped by mono uppercase kicker; the highlighted row uses a single
+  `layoutId="spotlight-selected"` thumb that slides between rows (not a highlight repaint).
+- Rows: dark icon well, label + optional description, hairline shortcut chip, Enter glyph.
+- Footer: `↑↓ Navigate · ↵ Run · esc Close`. Mobile uses a bottom sheet with the same surface.
+- All search/command logic and props are unchanged; only the presentation was redesigned.
+
+### 5.5 Toasts
 
 Reserve toasts for: errors (destructive), and one-off non-transfer confirmations
 (e.g. "links copied"). Never for upload start/progress/complete. Keep them short:
@@ -191,3 +216,4 @@ Reserve toasts for: errors (destructive), and one-off non-transfer confirmations
 | Date | Change |
 |---|---|
 | 2026-11-20 | Initial standard. Dock owns transfer feedback; global glass + separate panel + duplicate toasts removed; spring/tier/state contracts defined. |
+| 2026-11-20 | Sidebar rebuilt as a vertical segmented control; Spotlight redesigned on the same floating dark-glass tier with a sliding selection thumb. |

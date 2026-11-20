@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { 
   Search, 
   Command,
@@ -21,6 +22,7 @@ import {
   Plus,
   Eye,
   ArrowRight,
+  X,
   CornerDownLeft,
   History,
   File,
@@ -44,6 +46,53 @@ import {
 import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+
+/* ── Spotlight styles: same floating dark-glass tier as the dock & sidebar.
+      One leading surface, hairline rules, mono micro-labels, no white fills. ── */
+const SPOTLIGHT_CSS = `
+html.sq-app-root .spot-panel {
+  --sp-fill: color-mix(in srgb, var(--sa-bg-2, #141612) 90%, transparent);
+  --sp-line: var(--sa-line, rgba(232,231,225,0.10));
+  background: var(--sp-fill); border: 1px solid var(--sp-line); border-radius: 14px;
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.08), 0 30px 70px -24px rgba(0,0,0,0.8);
+  color: var(--sa-text); font-family: var(--sa-f, inherit); overflow: hidden;
+}
+html.sq-app-root .spot-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--sp-line); }
+html.sq-app-root .spot-kicker { font: 500 10px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sa-mute); }
+html.sq-app-root .spot-input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--sa-text);
+  font: 400 16px/1.4 var(--sa-f, inherit); }
+html.sq-app-root .spot-input::placeholder { color: var(--sa-mute); }
+html.sq-app-root .spot-input:focus-visible { outline: none; }
+html.sq-app-root .spot-clear { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border: 0; border-radius: 999px;
+  background: rgba(232,231,225,0.06); color: var(--sa-mute); cursor: pointer; }
+html.sq-app-root .spot-clear:hover { color: var(--sa-text); background: rgba(232,231,225,0.11); }
+html.sq-app-root .spot-list { overflow-y: auto; min-height: 0; }
+html.sq-app-root .spot-group-label { font: 500 10px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--sa-mute); padding: 14px 18px 6px; }
+html.sq-app-root .spot-row { position: relative; display: flex; align-items: center; gap: 12px; margin: 1px 8px; padding: 9px 10px;
+  border-radius: 9px; cursor: pointer; color: var(--sa-text-2, var(--sa-text)); list-style: none; }
+html.sq-app-root .spot-row[data-selected="true"] { color: var(--sa-text); }
+html.sq-app-root .spot-row-thumb { position: absolute; inset: 0; border-radius: 9px; background: rgba(232,231,225,0.08);
+  border: 1px solid rgba(232,231,225,0.08); box-shadow: inset 0 1px 0 rgba(232,231,225,0.06); }
+html.sq-app-root .spot-ico { position: relative; z-index: 1; display: grid; place-items: center; width: 34px; height: 34px; flex: none;
+  border-radius: 8px; border: 1px solid var(--sp-line); background: rgba(232,231,225,0.05); color: var(--sa-text); }
+html.sq-app-root .spot-main { position: relative; z-index: 1; flex: 1; min-width: 0; }
+html.sq-app-root .spot-label { font-size: 13.5px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.sq-app-root .spot-desc { font-size: 11.5px; color: var(--sa-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+html.sq-app-root .spot-kbd { position: relative; z-index: 1; font: 400 10.5px/1 var(--sa-mono, ui-monospace, monospace);
+  padding: 4px 7px; border-radius: 5px; border: 1px solid var(--sp-line); background: rgba(232,231,225,0.04); color: var(--sa-mute); }
+html.sq-app-root .spot-enter { position: relative; z-index: 1; color: var(--sa-mute); }
+html.sq-app-root .spot-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 44px 24px; color: var(--sa-mute); }
+html.sq-app-root .spot-empty p { font-size: 13.5px; color: var(--sa-text-2, var(--sa-text)); }
+html.sq-app-root .spot-empty span { font-size: 12px; margin-top: 6px; }
+html.sq-app-root .spot-foot { display: flex; align-items: center; gap: 16px; padding: 11px 18px; border-top: 1px solid var(--sp-line);
+  background: rgba(232,231,225,0.02); font-size: 11px; color: var(--sa-mute); }
+html.sq-app-root .spot-foot > span { display: inline-flex; align-items: center; gap: 6px; }
+html.sq-app-root .spot-foot kbd { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); padding: 3px 6px; border-radius: 4px;
+  border: 1px solid var(--sp-line); background: rgba(232,231,225,0.05); color: var(--sa-text-2, var(--sa-text)); }
+@media (prefers-reduced-motion: reduce) { html.sq-app-root .spot-row, html.sq-app-root .spot-row-thumb { transition-duration: 0.01ms !important; } }
+`;
 
 type CommandCategory = 'files' | 'navigation' | 'actions' | 'view' | 'create' | 'recent';
 
@@ -194,6 +243,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const reduce = !!useReducedMotion();
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase();
 
@@ -783,175 +833,120 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   // Shared content for both mobile and desktop
   const commandContent = (
     <>
-      {/* Search header */}
-      <div className={cn(
-        "flex items-center gap-3 border-b border-border/40",
-        isMobile ? "px-4 py-4 pr-14" : "px-4 py-3 pr-12"
-      )}>
-        <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+      <style>{SPOTLIGHT_CSS}</style>
+
+      {/* Search header — mono kicker, one leading input */}
+      <div className="spot-head">
+        <Search className="w-[18px] h-[18px] shrink-0 text-muted-foreground" />
+        <span className="spot-kicker hidden sm:inline">Spotlight</span>
         <input
           ref={inputRef}
           type="text"
-          placeholder={isMobile ? "Search files or commands..." : "Search files, folders, or type a command..."}
+          placeholder={isMobile ? "Search files, folders or commands…" : "Search files, folders, or type a command…"}
           value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setSelectedIndex(0);
-          }}
-          className={cn(
-            "flex-1 bg-transparent",
-            isMobile ? "text-lg" : "text-base",
-            "placeholder:text-muted-foreground",
-            "focus:outline-none"
-          )}
+          onChange={(e) => { setSearchQuery(e.target.value); setSelectedIndex(0); }}
+          className="spot-input"
+          aria-label="Search files and commands"
         />
+        {searchQuery && (
+          <button type="button" className="spot-clear" aria-label="Clear search"
+            onClick={() => { setSearchQuery(''); setSelectedIndex(0); inputRef.current?.focus(); }}>
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
-      {/* Commands list */}
-      <div 
-        ref={listRef}
-        className={cn(
-          "overflow-y-auto min-h-0",
-          isMobile ? "flex-1" : "max-h-[360px]"
-        )}
-      >
+      {/* Results — grouped, one sliding selection thumb */}
+      <div ref={listRef} className={cn("spot-list", isMobile ? "flex-1" : "max-h-[380px]")}>
         {groupedCommands.map((group) => (
-          <div key={group.category} className="py-2">
-            <div className={cn(
-              "text-xs font-semibold text-muted-foreground uppercase tracking-wider",
-              isMobile ? "px-4 py-2" : "px-4 py-1.5"
-            )}>
-              {group.label}
-            </div>
+          <div key={group.category}>
+            <div className="spot-group-label">{group.label}</div>
             {group.items.map((cmd) => {
               const itemIndex = currentIndex++;
               const isSelected = !isMobile && itemIndex === selectedIndex;
-              
               return (
-                <div
+                <motion.div
                   key={cmd.id}
                   data-index={itemIndex}
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={cmd.action}
                   onMouseEnter={() => !isMobile && setSelectedIndex(itemIndex)}
-                  className={cn(
-                    "flex items-center gap-3 cursor-pointer transition-colors",
-                    isMobile 
-                      ? "px-4 py-3.5 active:bg-accent/70" 
-                      : "px-4 py-2.5",
-                    isSelected 
-                      ? "bg-primary/10 text-foreground" 
-                      : isMobile 
-                        ? "text-foreground" 
-                        : "hover:bg-accent/50 text-muted-foreground"
-                  )}
+                  whileTap={reduce ? undefined : { scale: 0.985 }}
+                  className="spot-row"
+                  data-selected={isSelected}
                 >
-                  <div className={cn(
-                    "flex items-center justify-center rounded-lg",
-                    isMobile ? "w-10 h-10 bg-accent/50" : ""
-                  )}>
-                    {React.cloneElement(cmd.icon as React.ReactElement, {
-                      className: cn(
-                        isMobile ? "w-5 h-5" : "w-4 h-4",
-                        (cmd.icon as React.ReactElement).props.className
-                      )
-                    })}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className={cn(
-                      "font-medium truncate",
-                      isMobile ? "text-base" : "text-sm"
-                    )}>
-                      {cmd.label}
-                    </div>
-                    {cmd.description && (
-                      <div className={cn(
-                        "text-muted-foreground truncate",
-                        isMobile ? "text-sm" : "text-xs"
-                      )}>
-                        {cmd.description}
-                      </div>
-                    )}
-                  </div>
-
-                  {!isMobile && cmd.shortcut && (
-                    <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs text-muted-foreground font-mono">
-                      {cmd.shortcut}
-                    </kbd>
+                  {isSelected && (
+                    <motion.span
+                      layoutId="spotlight-selected"
+                      className="spot-row-thumb"
+                      transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 34, mass: 0.9 }}
+                    />
                   )}
-
-                  {!isMobile && isSelected && (
-                    <CornerDownLeft className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  )}
-                  
-                  {isMobile && (
-                    <ArrowRight className="w-4 h-4 text-muted-foreground/50" />
-                  )}
-                </div>
+                  <span className="spot-ico">
+                    {React.cloneElement(cmd.icon as React.ReactElement, { className: "w-[17px] h-[17px]" })}
+                  </span>
+                  <span className="spot-main">
+                    <span className="spot-label">{cmd.label}</span>
+                    {cmd.description && <span className="spot-desc" style={{ display: 'block' }}>{cmd.description}</span>}
+                  </span>
+                  {!isMobile && cmd.shortcut && <kbd className="spot-kbd">{cmd.shortcut}</kbd>}
+                  {!isMobile && isSelected && <CornerDownLeft className="spot-enter w-4 h-4 shrink-0" />}
+                  {isMobile && <ArrowRight className="spot-enter w-4 h-4 shrink-0" />}
+                </motion.div>
               );
             })}
           </div>
         ))}
 
         {flatCommands.length === 0 && (
-          <div className={cn(
-            "text-center text-muted-foreground",
-            isMobile ? "px-4 py-12" : "px-4 py-8"
-          )}>
-            <Search className={cn(
-              "mx-auto mb-3 opacity-50",
-              isMobile ? "w-12 h-12" : "w-8 h-8"
-            )} />
-            <p className={isMobile ? "text-base" : "text-sm"}>
-              {searchQuery.length > 0 ? "No files or commands found" : "No commands found"}
-            </p>
-            <p className={cn("mt-1", isMobile ? "text-sm" : "text-xs")}>
-              {searchQuery.length > 0 
-                ? "Try a different search term or check the file name" 
-                : "Start typing to search files and commands"}
-            </p>
+          <div className="spot-empty" role="status">
+            <Search className="w-8 h-8 mb-3 opacity-40" />
+            <p>{searchQuery.length > 0 ? "No files or commands found" : "No commands found"}</p>
+            <span>{searchQuery.length > 0 ? "Try a different search term" : "Start typing to search"}</span>
           </div>
         )}
       </div>
 
-      {/* Footer hints - Desktop only */}
+      {/* Footer hints — desktop only */}
       {!isMobile && (
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-border/40 bg-muted/30 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-muted rounded">↑↓</kbd>
-            Navigate
-          </span>
-          <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-muted rounded">↵</kbd>
-            Run
-          </span>
-          <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-muted rounded">esc</kbd>
-            Close
-          </span>
+        <div className="spot-foot">
+          <span><kbd>↑↓</kbd> Navigate</span>
+          <span><kbd>↵</kbd> Run</span>
+          <span><kbd>esc</kbd> Close</span>
         </div>
       )}
     </>
   );
 
-  // Mobile: Use full-screen sheet from bottom
+  // Mobile: full-screen sheet from bottom, same surface language
   if (isMobile) {
     return (
       <BottomSheet open={open} onOpenChange={onOpenChange}>
-        <BottomSheetContent className="flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 rounded-t-[28px] bg-[hsl(var(--card)/0.92)]">
+        <BottomSheetContent className="spot-panel flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 rounded-t-[20px]">
           {commandContent}
         </BottomSheetContent>
       </BottomSheet>
     );
   }
 
-  // Desktop: Use dialog
+  // Desktop: centered floating panel with a spring pop-in
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden [&>button:last-child]:top-2.5 [&>button:last-child]:right-3">
-        {commandContent}
-      </DialogContent>
-    </Dialog>
+    <AnimatePresence>
+      {open && (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="spot-panel max-w-[600px] w-full p-0 gap-0 [&>button:last-child]:top-3 [&>button:last-child]:right-3 [&>button:last-child]:rounded-full [&>button:last-child]:bg-foreground/[0.06] [&>button:last-child]:text-muted-foreground [&>button:last-child]:hover:bg-foreground/[0.12]">
+            <motion.div
+              initial={reduce ? false : { opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 30, mass: 0.9 }}
+            >
+              {commandContent}
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </AnimatePresence>
   );
 };
 

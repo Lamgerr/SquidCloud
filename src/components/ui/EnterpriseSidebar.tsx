@@ -6,7 +6,7 @@ import { useKeyboardShortcutsContext } from '@/components/KeyboardShortcuts';
 import {
   Home, FileStack, Users, Trash2, Activity, Book,
   Settings2, PanelLeftClose, PanelLeft, Star, Folder,
-  Keyboard, ChevronsUpDown, LogOut, User, Key,
+  Keyboard, ChevronsUpDown, LogOut, User,
   Inbox, Zap, Lock,
   type Icon,
 } from '@/lib/icon-map';
@@ -15,9 +15,12 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import SwitchAccountSheet from '@/components/SwitchAccountSheet';
-import SquidLogo from '@/components/ui/SquidLogo';
 
-/* ── Sidebar contract: props, tab ids and handlers unchanged ── */
+/* ── Sidebar contract: props, tab ids and handlers unchanged.
+      Visual language: the same segmented control used for the view options,
+      rotated vertical — one floating dark capsule, a layoutId thumb that
+      slides to the active item, spring press/hover, icon-first. ── */
+
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -53,22 +56,19 @@ const IS_APPLE =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '');
 const MOD = IS_APPLE ? '⌘' : 'Ctrl+';
 
-/* ── Motion vocabulary shared with the floating dock ── */
-const SPRING = { type: 'spring' as const, stiffness: 420, damping: 28, mass: 0.8 };
-const PRESS = { scale: 0.92 };
-const HOVER = { scale: 1.04 };
-const slideIn = (i: number, reduce: boolean) =>
-  reduce ? { opacity: 1, x: 0 } : { opacity: 0, x: -10 };
+/* Same presets as the dock / GlassSegment */
+const SPRING = { type: 'spring' as const, stiffness: 520, damping: 30, mass: 0.8 };
+const THUMB = { type: 'spring' as const, stiffness: 420, damping: 30, mass: 0.9 };
+const PRESS = { scale: 0.9 };
+const HOVER = { scale: 1.05 };
 
-const ROW = 'group relative flex w-full items-center rounded-full outline-none transition-colors duration-150';
-const ROW_IDLE = 'text-muted-foreground hover:text-foreground';
-const ROW_ON = 'text-foreground';
-
-function NavItem({
-  item, active, collapsed, onSelect, layoutId, reduce, index,
+/* One item in the vertical segment. The thumb is a single layoutId shared by
+   every item, so it slides vertically between the active selection. */
+function SegItem({
+  item, active, collapsed, onSelect, reduce, index,
 }: {
   item: NavDef; active: boolean; collapsed: boolean; onSelect: (id: string) => void;
-  layoutId: string; reduce: boolean; index: number;
+  reduce: boolean; index: number;
 }) {
   return (
     <motion.button
@@ -78,46 +78,35 @@ function NavItem({
       title={collapsed ? item.label : undefined}
       aria-label={collapsed ? item.label : undefined}
       aria-current={active ? 'page' : undefined}
-      initial={slideIn(index, reduce)}
+      initial={reduce ? false : { opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.02 * index }}
       whileHover={reduce ? undefined : HOVER}
       whileTap={reduce ? undefined : PRESS}
       className={cn(
-        ROW,
-        collapsed ? 'mx-auto h-11 w-11 justify-center' : 'h-10 gap-2.5 px-3',
-        active ? ROW_ON : ROW_IDLE,
+        'sb-seg-b',
+        collapsed ? 'sb-seg-icon' : 'sb-seg-wide',
+        active ? 'sb-on' : 'sb-idle',
       )}
     >
       {active && (
         <motion.span
-          layoutId={layoutId}
-          className="absolute inset-0 rounded-full bg-foreground/[0.09] border border-foreground/[0.07]"
-          transition={reduce ? { duration: 0 } : SPRING}
+          layoutId="sb-seg-thumb"
+          className="sb-seg-thumb"
+          transition={reduce ? { duration: 0 } : THUMB}
         />
       )}
-      <item.icon className="relative z-[1] h-[19px] w-[19px] shrink-0" strokeWidth={1.7} />
-      {!collapsed && (
-        <>
-          <span className="relative z-[1] flex-1 truncate text-left text-[13px]">{item.label}</span>
-          {item.shortcut && (
-            <kbd className="relative z-[1] font-mono text-[10px] tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-              {MOD}{item.shortcut}
-            </kbd>
-          )}
-        </>
+      <item.icon className="sb-seg-i" strokeWidth={1.7} />
+      {!collapsed && <span className="sb-seg-label">{item.label}</span>}
+      {!collapsed && item.shortcut && (
+        <kbd className="sb-seg-kbd">{MOD}{item.shortcut}</kbd>
       )}
     </motion.button>
   );
 }
 
-function SectionLabel({ collapsed, children }: { collapsed: boolean; children: React.ReactNode }) {
-  if (collapsed) return <div aria-hidden="true" className="mx-auto my-2 h-px w-6 bg-foreground/10" />;
-  return (
-    <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/55">
-      {children}
-    </p>
-  );
+function SegDivider() {
+  return <div aria-hidden="true" className="mx-auto my-1 h-px w-5 bg-foreground/10" />;
 }
 
 export const EnterpriseSidebar: React.FC<SidebarProps> = ({
@@ -155,112 +144,55 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
   return (
     <motion.aside
       aria-label="Workspace sidebar"
-      initial={reduce ? false : { x: -18, opacity: 0 }}
+      initial={reduce ? false : { x: -16, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.05 }}
-      className="sb-rail flex flex-shrink-0 select-none flex-col"
-      style={{ width: collapsed ? 72 : 228 }}
+      className="sb-rail flex flex-shrink-0 select-none flex-col items-center py-3"
+      style={{ width: collapsed ? 64 : 212 }}
     >
-      {/* Workspace / app identity */}
-      <div className={cn(
-        'flex h-14 shrink-0 items-center border-b border-foreground/[0.06]',
-        collapsed ? 'justify-center' : 'justify-between pl-3 pr-1.5',
-      )}>
-        {!collapsed && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <motion.button
-                type="button"
-                whileHover={reduce ? undefined : HOVER}
-                whileTap={reduce ? undefined : PRESS}
-                aria-label="Account and workspace menu"
-                className="-ml-0.5 flex min-w-0 items-center gap-2 rounded-full py-1 pr-2 outline-none transition-colors hover:bg-foreground/[0.05]"
-              >
-                <SquidLogo size={20} mono />
-                <span className="truncate text-[13px] font-medium tracking-tight text-foreground">SquidCloud</span>
-                <ChevronsUpDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-              </motion.button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <div className="px-2 py-1.5">
-                <p className="truncate text-[13px] font-medium text-foreground">{profile?.full_name || 'User'}</p>
-                <p className="truncate text-[12px] text-muted-foreground">{user?.email}</p>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => navigate('/pricing')}>
-                <Star className="h-3.5 w-3.5" /><span>{profile?.is_premium ? 'Manage plan' : 'Upgrade plan'}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => navigate('/settings/account')}>
-                <Settings2 className="h-3.5 w-3.5" /><span>Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => navigate('/developer-api')}>
-                <Key className="h-3.5 w-3.5" /><span>API keys</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => setOverlayOpen(true)}>
-                <Keyboard className="h-3.5 w-3.5" /><span>Shortcuts</span>
-                <kbd className="ml-auto font-mono text-[10px] text-muted-foreground">{MOD}/</kbd>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => setSwitchOpen(true)}>
-                <User className="h-3.5 w-3.5" /><span>Switch account</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="cursor-pointer gap-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive"
-                onClick={onSignOut}
-              >
-                <LogOut className="h-3.5 w-3.5" /><span>Sign out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        <motion.button
-          type="button"
-          onClick={onToggleCollapse}
-          whileHover={reduce ? undefined : HOVER}
-          whileTap={reduce ? undefined : PRESS}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-expanded={!collapsed}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
-        >
-          {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-        </motion.button>
-      </div>
+      <style>{SB_CSS}</style>
 
-      {/* Navigation */}
+      {/* Collapse toggle — a small segment face at the top */}
+      <motion.button
+        type="button"
+        onClick={onToggleCollapse}
+        whileHover={reduce ? undefined : HOVER}
+        whileTap={reduce ? undefined : PRESS}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-expanded={!collapsed}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className="sb-seg-face sb-toggle"
+      >
+        {collapsed ? <PanelLeft className="sb-seg-i" size={17} /> : <PanelLeftClose className="sb-seg-i" size={17} />}
+      </motion.button>
+
+      {/* One vertical segment = navigation */}
       <nav
         ref={navRef}
         aria-label="Primary"
         onKeyDown={onNavKeyDown}
-        className="flex-1 space-y-2 overflow-y-auto overflow-x-hidden px-2.5 py-3 lg-scrollbar-none"
+        className="sb-seg mt-2.5 flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-1 py-1 lg-scrollbar-none"
       >
-        <div className="space-y-0.5">
-          <SectionLabel collapsed={collapsed}>Workspace</SectionLabel>
-          {PRIMARY_NAV.map((item, i) => (
-            <NavItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed}
-              onSelect={onTabChange} layoutId="sb-active" reduce={reduce} index={i} />
-          ))}
-        </div>
-
-        <div className="space-y-0.5">
-          <SectionLabel collapsed={collapsed}>Tools</SectionLabel>
-          {TOOLS_NAV.map((item, i) => (
-            <NavItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed}
-              onSelect={onTabChange} layoutId="sb-active" reduce={reduce} index={i + PRIMARY_NAV.length} />
-          ))}
-        </div>
+        {PRIMARY_NAV.map((item, i) => (
+          <SegItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed}
+            onSelect={onTabChange} reduce={reduce} index={i} />
+        ))}
+        <SegDivider />
+        {TOOLS_NAV.map((item, i) => (
+          <SegItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed}
+            onSelect={onTabChange} reduce={reduce} index={i + PRIMARY_NAV.length} />
+        ))}
 
         {!collapsed && bookmarks.length > 0 && (
-          <div className="space-y-0.5">
-            <SectionLabel collapsed={collapsed}>Favorites</SectionLabel>
+          <>
+            <SegDivider />
             {bookmarks.slice(0, 5).map((b, i) => (
               <motion.button
                 key={b.id}
                 type="button"
                 data-sb-item=""
                 title={b.path || b.name}
-                initial={slideIn(i, reduce)}
+                initial={reduce ? false : { opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.01 * i }}
                 whileHover={reduce ? undefined : HOVER}
@@ -268,20 +200,20 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
                 onClick={() => {
                   if (b.type === 'folder' && b.path) { onNavigateToFolder(b.path); onTabChange('files'); }
                 }}
-                className={cn(ROW, ROW_IDLE, 'h-9 gap-2.5 px-3')}
+                className="sb-seg-b sb-seg-wide sb-idle"
               >
                 {b.type === 'folder'
-                  ? <Folder className="h-4 w-4 shrink-0" strokeWidth={1.7} />
-                  : <FileStack className="h-4 w-4 shrink-0" strokeWidth={1.7} />}
-                <span className="truncate text-[13px]">{b.name}</span>
+                  ? <Folder className="sb-seg-i" strokeWidth={1.7} />
+                  : <FileStack className="sb-seg-i" strokeWidth={1.7} />}
+                <span className="sb-seg-label">{b.name}</span>
               </motion.button>
             ))}
-          </div>
+          </>
         )}
       </nav>
 
-      {/* Footer: settings + account */}
-      <div className="shrink-0 space-y-0.5 border-t border-foreground/[0.06] p-2.5">
+      {/* Footer segment: settings + account */}
+      <div className="sb-seg mt-auto flex flex-col gap-0.5 px-1 py-1">
         <motion.button
           type="button"
           onClick={() => navigate('/settings/account')}
@@ -290,18 +222,13 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
           aria-current={activeTab === 'settings' ? 'page' : undefined}
           whileHover={reduce ? undefined : HOVER}
           whileTap={reduce ? undefined : PRESS}
-          className={cn(
-            ROW,
-            collapsed ? 'mx-auto h-11 w-11 justify-center' : 'h-10 gap-2.5 px-3',
-            activeTab === 'settings' ? ROW_ON : ROW_IDLE,
-          )}
+          className={cn('sb-seg-b', collapsed ? 'sb-seg-icon' : 'sb-seg-wide', activeTab === 'settings' ? 'sb-on' : 'sb-idle')}
         >
           {activeTab === 'settings' && (
-            <motion.span layoutId="sb-active" className="absolute inset-0 rounded-full bg-foreground/[0.09] border border-foreground/[0.07]"
-              transition={reduce ? { duration: 0 } : SPRING} />
+            <motion.span layoutId="sb-seg-thumb" className="sb-seg-thumb" transition={reduce ? { duration: 0 } : THUMB} />
           )}
-          <Settings2 className="relative z-[1] h-[19px] w-[19px] shrink-0" strokeWidth={1.7} />
-          {!collapsed && <span className="relative z-[1] text-[13px]">Settings</span>}
+          <Settings2 className="sb-seg-i" strokeWidth={1.7} />
+          {!collapsed && <span className="sb-seg-label">Settings</span>}
         </motion.button>
 
         <DropdownMenu>
@@ -311,42 +238,38 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
               whileHover={reduce ? undefined : HOVER}
               whileTap={reduce ? undefined : PRESS}
               aria-label={`Account menu, ${displayName}`}
-              className={cn(
-                'group flex w-full items-center rounded-full outline-none transition-colors hover:bg-foreground/[0.05]',
-                collapsed ? 'mx-auto h-11 w-11 justify-center' : 'h-11 gap-2.5 px-2',
-              )}
+              title={collapsed ? displayName : undefined}
+              className={cn('sb-seg-b sb-account', collapsed ? 'sb-seg-icon' : 'sb-seg-wide', 'sb-idle')}
             >
-              <div
-                aria-hidden="true"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-foreground/10 bg-foreground/[0.07] text-[11px] font-medium text-foreground"
-              >
+              <span className="sb-avatar" aria-hidden="true">
                 {(profile?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-              </div>
+              </span>
               {!collapsed && (
                 <>
-                  <div className="min-w-0 text-left">
-                    <p className="truncate text-[12.5px] font-medium leading-tight text-foreground">{displayName}</p>
-                    <p className="truncate font-mono text-[10px] uppercase leading-tight tracking-[0.12em] text-muted-foreground">{planLabel}</p>
-                  </div>
-                  <ChevronsUpDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+                  <span className="sb-seg-label sb-name">{displayName}</span>
+                  <ChevronsUpDown className="sb-seg-kbd" size={13} />
                 </>
               )}
             </motion.button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align={collapsed ? 'center' : 'start'} side="top" sideOffset={10} className="w-56">
+          <DropdownMenuContent align={collapsed ? 'center' : 'start'} side="right" sideOffset={12} className="w-56">
             <div className="px-2 py-1.5">
               <p className="truncate text-[13px] font-medium text-foreground">{profile?.full_name || 'User'}</p>
               <p className="truncate text-[12px] text-muted-foreground">{user?.email}</p>
+              <p className="mt-1 inline-flex rounded border border-border px-1.5 py-px font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{planLabel} plan</p>
             </div>
             <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => navigate('/pricing')}>
+              <Star className="h-3.5 w-3.5" /><span>{profile?.is_premium ? 'Manage plan' : 'Upgrade plan'}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => setOverlayOpen(true)}>
+              <Keyboard className="h-3.5 w-3.5" /><span>Shortcuts</span>
+            </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => setSwitchOpen(true)}>
               <User className="h-3.5 w-3.5" /><span>Switch account</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="cursor-pointer gap-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive"
-              onClick={onSignOut}
-            >
+            <DropdownMenuItem className="cursor-pointer gap-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive" onClick={onSignOut}>
               <LogOut className="h-3.5 w-3.5" /><span>Sign out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -359,3 +282,39 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
 };
 
 export default EnterpriseSidebar;
+
+/* ── Styles: the GlassSegment language, vertical. No white fills. ── */
+const SB_CSS = `
+.sb-rail { background: transparent; }
+.sb-seg, .sb-seg-face {
+  --sb-fill: color-mix(in srgb, var(--sa-bg-2, #141612) 86%, transparent);
+  --sb-line: var(--sa-line, rgba(232,231,225,0.10));
+  --sb-thumb: color-mix(in srgb, var(--sa-bg-4, #23251f) 92%, #e8e7e1);
+}
+.sb-seg { background: var(--sb-fill); border: 1px solid var(--sb-line); border-radius: 999px;
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.07); }
+.sb-seg-face { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 999px;
+  background: var(--sb-fill); border: 1px solid var(--sb-line); color: var(--sa-mute);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.sb-seg-b { position: relative; display: flex; align-items: center; border: 0; border-radius: 999px;
+  background: none; cursor: pointer; color: var(--sa-mute); outline: none; -webkit-tap-highlight-color: transparent;
+  transition: color 0.18s; scale: none !important; }
+.sb-seg-b:focus-visible { outline: 1px solid var(--sa-text); outline-offset: 2px; }
+.sb-seg-icon { width: 42px; height: 42px; justify-content: center; }
+.sb-seg-wide { width: 100%; height: 42px; gap: 10px; padding: 0 12px; }
+.sb-idle:hover, .sb-idle:focus-visible { color: var(--sa-text); }
+.sb-on { color: var(--sa-text); }
+.sb-seg-thumb { position: absolute; inset: 0; border-radius: 999px; background: var(--sb-thumb);
+  border: 1px solid rgba(232,231,225,0.09); box-shadow: inset 0 1px 0 rgba(232,231,225,0.08), 0 4px 12px -2px rgba(0,0,0,0.5); }
+.sb-seg-i, .sb-seg-b svg { position: relative; z-index: 1; width: 19px; height: 19px; flex: none; }
+.sb-seg-label { position: relative; z-index: 1; flex: 1; min-width: 0; text-align: left;
+  font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-seg-kbd { position: relative; z-index: 1; font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); opacity: 0.6; }
+.sb-account { margin-top: 2px; }
+.sb-avatar { position: relative; z-index: 1; display: grid; place-items: center; width: 26px; height: 26px;
+  flex: none; border-radius: 999px; border: 1px solid rgba(232,231,225,0.12); background: rgba(232,231,225,0.07);
+  font-size: 11px; color: var(--sa-text); }
+.sb-name { font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { .sb-seg-b, .sb-seg-thumb { transition-duration: 0.01ms !important; } }
+`;
