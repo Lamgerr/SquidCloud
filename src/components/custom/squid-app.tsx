@@ -245,6 +245,35 @@ html.sq-app-root :is(.lg-hover-reveal, .lg-hover-reveal-subtle) { transition: op
 html.sq-app-root :focus-within > :is(.lg-hover-reveal, .lg-hover-reveal-subtle),
 html.sq-app-root .group:focus-within :is(.lg-hover-reveal, .lg-hover-reveal-subtle) { opacity: 1; }
 
+/* ── Tab normalization: collapse decorative feature banners into the Files-tab
+      compact header language. One title row, no gradient, no big icon tile,
+      no explanatory subtitle. Applies to every sidebar tab. ── */
+html.sq-app-root :is(.bg-gradient-to-br, [class*="gradient-to-br"]) { background-image: none !important; background: var(--sa-bg-2) !important; }
+html.sq-app-root :is(.bg-red-500\/10, .bg-primary\/10, .bg-white\/\[0\.06\]) { background: var(--sa-bg-2) !important; }
+html.sq-app-root .blur-3xl, html.sq-app-root .blur-2xl { display: none !important; }
+/* descriptive subtitles under page titles — remove the AI-ish instruction lines */
+html.sq-app-root :is(.lg-caption, [class*="lg-caption"]) { display: none !important; }
+/* decorative one-line page subtitles only (not body copy in cards) */
+html.sq-app-root .relative.z-10 > div > p:is(.text-muted-foreground, .text-white\/50, [class*="text-muted-foreground"]) { display: none !important; }
+/* big leading icon tiles → quiet 24px glyph, monochrome */
+html.sq-app-root :is(.h-12.w-12, .h-14.w-14):is([class*="rounded-xl"], [class*="rounded-lg"], [class*="rounded-2xl"]) {
+  width: 28px !important; height: 28px !important; border-radius: 7px !important;
+  background: rgba(232,231,225,0.06) !important; color: var(--sa-text) !important; box-shadow: none !important;
+}
+html.sq-app-root :is(.h-12.w-12, .h-14.w-14):is([class*="rounded-xl"], [class*="rounded-lg"], [class*="rounded-2xl"]) svg { width: 16px !important; height: 16px !important; color: var(--sa-text) !important; }
+html.sq-app-root h1 { font-size: 24px !important; font-weight: 400 !important; letter-spacing: -0.02em !important; }
+/* section kickers: mono light, no bold shouting */
+html.sq-app-root h2[class*="uppercase"] { font-family: var(--sa-mono); font-weight: 400 !important; letter-spacing: 0.1em; color: var(--sa-mute); }
+html.sq-app-root h2[class*="uppercase"] + span[class*="rounded-md"] { border-radius: 999px; background: rgba(232,231,225,0.05); }
+html.sq-app-root h1.font-bold { font-weight: 400 !important; }
+/* analytics-style white icon tile → quiet dark glyph */
+html.sq-app-root .bg-foreground:is(.h-12, .h-10):is(.w-12, .w-10) { background: rgba(232,231,225,0.06) !important; color: var(--sa-text) !important; box-shadow: none !important; }
+html.sq-app-root .bg-foreground:is(.h-12, .h-10):is(.w-12, .w-10) svg { color: var(--sa-text) !important; }
+/* feature banner shell: drop heavy padding/border/radius to match Files header */
+html.sq-app-root :is(.rounded-2xl, .rounded-xl):is(.border):is(.p-5, .p-6):has(> .relative > div > h1) { padding: 14px 18px !important; border-radius: 10px !important; border-color: var(--sa-line) !important; background: var(--sa-bg-2) !important; }
+/* compact default section spacing across tabs */
+html.sq-app-root :is(.space-y-6, .space-y-5) > .sq-tab-enter { margin-bottom: 0; }
+
 /* ── Shared tab polish: one near-black tier, hairline rules, pill actions ──
    Applied to every sidebar tab so pages stay consistent without per-page CSS. */
 html.sq-app-root .sq-tab-enter { animation: sa-tab-in 0.42s cubic-bezier(0.2, 0, 0, 1) both; }

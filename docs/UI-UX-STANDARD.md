@@ -153,13 +153,15 @@ moves unrelated content.
 
 ### 5.2b Home overview (`src/components/DashboardOverview.tsx`)
 
-- **One lead:** the greeting. Kicker date + 28px light title + one status line.
-- Preferences live in a spring-open sheet off a gear pill (compact lists, show activity),
-  persisted to `localStorage` under `sq.home.*`.
-- Actions are monochrome pills (`ov-pill`) — no colored accents. Quick links jump to tabs.
-- A single "Today" surface holds the three metrics inline; storage and activity are slim
-  hairline bars; recent files use monochrome tag chips (no hue tints).
-- All entrances and interactions use the shared spring vocabulary with reduced-motion branches.
+- **Extremely minimal:** one lead greeting row (date kicker + light title + search/gear
+  pills), one stat strip (numbers only: files, folders, storage, uploads today, optional
+  14-day sparkline), one recent-files list. No banners, no explanatory copy, no colored cards.
+- Preferences live in a spring-open sheet off the gear pill (activity sparkline), persisted
+  to `localStorage` under `sq.home.*`.
+- All entrances/interactions use the shared spring vocabulary with reduced-motion branches.
+- The global tab-normalization layer in `AppTheme` collapses decorative feature banners
+  across every other tab into this same compact language: no gradient tiles, no big icon
+  blocks, no descriptive subtitles, one 24px light title per screen.
 
 ### 5.2c Shared tab polish (`squid-app.tsx` → `AppTheme`)
 
