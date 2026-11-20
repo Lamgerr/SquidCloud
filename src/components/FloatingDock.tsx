@@ -699,13 +699,13 @@ export const DOCK_CSS = `
 .sq-orb-lg { width: 116px; height: 116px; }
 .sq-orb-slot { display: inline-grid; }
 
-/* icon-only segmented control */
+/* icon-only segmented control — dark tier, no white pill */
 .sq-seg { position: relative; display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px;
-  background: rgba(232, 231, 225, 0.07); border: 1px solid var(--g-line); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  background: var(--g-fill); border: 1px solid var(--g-line); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
   box-shadow: inset 0 1px 0 var(--g-rim); }
-.sq-seg-b { position: relative; display: grid; place-items: center; width: 38px; height: 30px; border: 0; border-radius: 999px; background: none; color: rgba(232, 231, 225, 0.55); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color 0.2s !important; scale: none !important; }
+.sq-seg-b { position: relative; display: grid; place-items: center; width: 38px; height: 30px; border: 0; border-radius: 999px; background: none; color: rgba(232, 231, 225, 0.5); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color 0.2s !important; scale: none !important; }
 .sq-seg-b:hover, .sq-seg-b[aria-pressed="true"] { color: var(--g-ink); }
-.sq-seg-thumb { position: absolute; inset: 0; border-radius: 999px; background: rgba(232, 231, 225, 0.11); box-shadow: inset 0 1px 0 var(--g-rim), 0 4px 12px -2px rgba(0,0,0,0.35); }
+.sq-seg-thumb { position: absolute; inset: 0; border-radius: 999px; background: color-mix(in srgb, var(--sa-bg-4, #23251f) 92%, #e8e7e1); border: 1px solid rgba(232, 231, 225, 0.09); box-shadow: inset 0 1px 0 rgba(232, 231, 225, 0.08), 0 4px 12px -2px rgba(0,0,0,0.5); }
 .sq-seg-i { position: relative; display: grid; place-items: center; }
 
 @media (prefers-reduced-motion: reduce) {

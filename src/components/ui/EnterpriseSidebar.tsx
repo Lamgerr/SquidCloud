@@ -57,9 +57,9 @@ const MOD = IS_APPLE ? '⌘' : 'Ctrl+';
       the render body get a new identity on every parent render, which remounts
       every button and drops keyboard focus mid-use. ── */
 
-const ROW = 'group relative flex w-full items-center rounded-md outline-none transition-colors duration-100';
-const ROW_IDLE = 'text-muted-foreground hover:bg-accent/60 hover:text-foreground';
-const ROW_ON = 'bg-accent text-foreground';
+const ROW = 'group relative flex w-full items-center rounded-full outline-none transition-all duration-200';
+const ROW_IDLE = 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground';
+const ROW_ON = 'bg-foreground/[0.10] text-foreground';
 
 function NavItem({
   item, active, collapsed, onSelect,
@@ -74,14 +74,11 @@ function NavItem({
       aria-current={active ? 'page' : undefined}
       className={cn(
         ROW,
-        collapsed ? 'mx-auto h-8 w-8 justify-center' : 'h-8 gap-2.5 px-2.5',
+        collapsed ? 'mx-auto h-10 w-10 justify-center' : 'h-9 gap-2.5 px-3',
         active ? ROW_ON : ROW_IDLE,
       )}
     >
-      {active && (
-        <span aria-hidden="true" className="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-foreground" />
-      )}
-      <item.icon className="h-4 w-4 shrink-0" />
+      <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
       {!collapsed && (
         <>
           <span className="flex-1 truncate text-left text-[13px]">{item.label}</span>
@@ -97,9 +94,9 @@ function NavItem({
 }
 
 function SectionLabel({ collapsed, children }: { collapsed: boolean; children: React.ReactNode }) {
-  if (collapsed) return <div aria-hidden="true" className="mx-2 my-0.5 h-px bg-border" />;
+  if (collapsed) return <div aria-hidden="true" className="mx-auto my-1.5 h-px w-6 bg-foreground/10" />;
   return (
-    <p className="px-2.5 pb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+    <p className="px-3 pb-1 pt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">
       {children}
     </p>
   );
@@ -142,14 +139,14 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
     <aside
       aria-label="Workspace sidebar"
       className={cn(
-        'flex flex-shrink-0 select-none flex-col border-r border-border bg-card',
-        'transition-[width] duration-150 ease-out',
-        collapsed ? 'w-[60px]' : 'w-[232px]',
+        'sb-rail flex flex-shrink-0 select-none flex-col',
+        'transition-[width] duration-300 ease-out',
+        collapsed ? 'w-[68px]' : 'w-[224px]',
       )}
     >
       {/* Workspace / app identity */}
       <div className={cn(
-        'flex h-12 shrink-0 items-center border-b border-border',
+        'flex h-12 shrink-0 items-center border-b border-foreground/[0.06]',
         collapsed ? 'justify-center' : 'justify-between pl-3 pr-1.5',
       )}>
         {!collapsed && (
@@ -208,7 +205,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent/60 hover:text-foreground"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
@@ -219,16 +216,16 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
         ref={navRef}
         aria-label="Primary"
         onKeyDown={onNavKeyDown}
-        className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-2 py-3 lg-scrollbar-none"
+        className="flex-1 space-y-2.5 overflow-y-auto overflow-x-hidden px-2.5 py-3 lg-scrollbar-none"
       >
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           <SectionLabel collapsed={collapsed}>Workspace</SectionLabel>
           {PRIMARY_NAV.map((item) => (
             <NavItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed} onSelect={onTabChange} />
           ))}
         </div>
 
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           <SectionLabel collapsed={collapsed}>Tools</SectionLabel>
           {TOOLS_NAV.map((item) => (
             <NavItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed} onSelect={onTabChange} />
@@ -236,7 +233,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
         </div>
 
         {!collapsed && bookmarks.length > 0 && (
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             <SectionLabel collapsed={collapsed}>Favorites</SectionLabel>
             {bookmarks.slice(0, 5).map((b) => (
               <button
@@ -260,7 +257,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer: settings + account */}
-      <div className="shrink-0 space-y-0.5 border-t border-border p-2">
+      <div className="shrink-0 space-y-1 border-t border-foreground/[0.06] p-2.5">
         <button
           type="button"
           onClick={() => navigate('/settings/account')}
@@ -269,14 +266,11 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
           aria-current={activeTab === 'settings' ? 'page' : undefined}
           className={cn(
             ROW,
-            collapsed ? 'mx-auto h-8 w-8 justify-center' : 'h-8 gap-2.5 px-2.5',
+            collapsed ? 'mx-auto h-10 w-10 justify-center' : 'h-9 gap-2.5 px-3',
             activeTab === 'settings' ? ROW_ON : ROW_IDLE,
           )}
         >
-          {activeTab === 'settings' && (
-            <span aria-hidden="true" className="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-foreground" />
-          )}
-          <Settings2 className="h-4 w-4 shrink-0" />
+          <Settings2 className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
           {!collapsed && <span className="text-[13px]">Settings</span>}
         </button>
 

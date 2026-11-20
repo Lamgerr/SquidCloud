@@ -1946,7 +1946,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                 onSnooze={snoozeNotification}
               />
             ))}
-            <main data-scroll-container="true" className="flex-1 overscroll-y-contain overflow-y-auto px-5 lg:px-8 pb-10 pt-5">
+            <main data-scroll-container="true" className="flex-1 overscroll-y-contain overflow-y-auto px-5 lg:px-8 pb-6 pt-2">
               <div className="mx-auto w-full max-w-[1680px]">
 
               {/* ── Home overview ── */}
@@ -2556,7 +2556,7 @@ const FilesView: React.FC<FilesViewProps> = ({
   const resultCount = filteredFiles.length + filteredFolders.length;
 
   return (
-    <div className="sq-tab-enter space-y-6 pb-28" ref={kbdContainerRef} onMouseMove={handleKbdMouseMove}>
+    <div className="sq-tab-enter space-y-3 pb-24" ref={kbdContainerRef} onMouseMove={handleKbdMouseMove}>
 
       {/* ── Where you are · what's here ── */}
       <header className="flex items-center justify-between gap-4">

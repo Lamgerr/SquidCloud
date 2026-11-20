@@ -165,6 +165,12 @@ html.sq-app-root.light .shadow, html.sq-app-root.light .shadow-md, html.sq-app-r
 html.sq-app-root.light .shadow-xl, html.sq-app-root.light .shadow-2xl { box-shadow: 0 18px 44px -20px rgba(20, 24, 22, 0.28); }
 
 /* Legacy glass utilities used by the dashboard, flattened to hairlines */
+/* Floating sidebar rail — same near-black tier as the dock, no white glass */
+html.sq-app-root .sb-rail {
+  background: color-mix(in srgb, var(--sa-bg-2) 88%, transparent);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  border-right: 1px solid var(--sa-line);
+}
 html.sq-app-root .lg-card { background: var(--sa-bg-2); border: 1px solid var(--sa-line); border-radius: 6px; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 html.sq-app-root .lg-dropdown { background: var(--sa-bg-2); border: 1px solid var(--sa-line-2); border-radius: 6px; -webkit-backdrop-filter: none; backdrop-filter: none; }
 html.sq-app-root .lg-tab-group { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--sa-line); border-radius: 5px; background: var(--sa-bg-2); box-shadow: none; }
@@ -238,6 +244,26 @@ html.sq-app-root .lg-press:active { transform: scale(0.98); }
 html.sq-app-root :is(.lg-hover-reveal, .lg-hover-reveal-subtle) { transition: opacity 0.12s; }
 html.sq-app-root :focus-within > :is(.lg-hover-reveal, .lg-hover-reveal-subtle),
 html.sq-app-root .group:focus-within :is(.lg-hover-reveal, .lg-hover-reveal-subtle) { opacity: 1; }
+
+/* ── Shared overlays: dialogs, popovers, menus, toasts, tabs ──
+   One near-black surface, hairline rim, small radius, spring pop. No white glass. */
+html.sq-app-root :is([role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper] > [data-state]) {
+  background: var(--sa-bg-2); border: 1px solid var(--sa-line-2); border-radius: 10px;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: 0 24px 56px -20px rgba(0, 0, 0, 0.7), inset 0 1px 0 var(--sa-line);
+}
+html.sq-app-root :is([role="menu"], [role="listbox"]) { background: var(--sa-bg-2); border: 1px solid var(--sa-line-2); border-radius: 8px; }
+html.sq-app-root :is([role="menuitem"], [role="option"], [role="tab"]) { border-radius: 5px; }
+html.sq-app-root :is([role="menuitem"], [role="option"])[data-highlighted] { background: var(--sa-bg-4); }
+html.sq-app-root [data-sonner-toast] {
+  background: var(--sa-bg-2); border: 1px solid var(--sa-line-2); border-radius: 8px;
+  -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+  color: var(--sa-text); font-family: var(--sa-f);
+}
+html.sq-app-root [role="tablist"] { background: var(--sa-bg-2); border: 1px solid var(--sa-line); border-radius: 7px; padding: 2px; }
+html.sq-app-root [role="tab"][data-state="active"] { background: var(--sa-bg-4); color: var(--sa-text); }
+html.sq-app-root [role="dialog"][data-state="open"] { animation: sa-pop 0.32s cubic-bezier(0.2, 0, 0, 1) both; }
+@keyframes sa-pop { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
 
 /* Ambient motion has no place in an all-day tool */
 html.sq-app-root :is(.sq-live-dot, .glow-pulse, .animate-gradient-x, .animate-ambient-1, .animate-ambient-2, .lg-stagger > *) { animation: none; }
