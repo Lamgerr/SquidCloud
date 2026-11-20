@@ -166,10 +166,12 @@ const SharedView: React.FC<SharedViewProps> = ({
         </div>
       </motion.div>
 
-      {/* Numbers strip — no cards, no colored icons */}
-      <motion.div className="sh-strip" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...SPRING, delay: 0.04 }}>
+      {/* Numbers only — no strip, no box (matches Files tab stats) */}
+      <motion.div className="sh-stats" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...SPRING, delay: 0.04 }}>
         <span><b>{totalSharedCount}</b> links</span>
+        <i aria-hidden="true" />
         <span><b>{formatFileSize(sharedSize)}</b> shared</span>
+        <i aria-hidden="true" />
         <span><b>{folderShares.length}</b> folders</span>
       </motion.div>
 
@@ -177,9 +179,8 @@ const SharedView: React.FC<SharedViewProps> = ({
         <div className="sh-loading"><Loader2 className="h-5 w-5 animate-spin" /></div>
       ) : empty ? (
         <motion.div className="sh-empty" initial={reduce ? false : { opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={SPRING}>
-          <div className="sh-empty-ico"><Share2 size={20} /></div>
+          <div className="sh-empty-ico"><Share2 size={22} /></div>
           <p>{searchQuery ? 'No matches' : 'Nothing shared'}</p>
-          <span>{searchQuery ? 'Clear the filter to see all links' : 'Share a file or folder to create a link'}</span>
         </motion.div>
       ) : (
         <motion.div className="sh-list" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...SPRING, delay: 0.08 }}>
@@ -218,43 +219,49 @@ const SharedView: React.FC<SharedViewProps> = ({
 export default SharedView;
 
 const SH_CSS = `
-.sh-root { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 14px 2px 96px; }
+/* All controls use the floating-dock glass tier: dark, hairline rim, circle */
+.sh-root { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 16px 2px 96px; }
 .sh-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .sh-title { font-size: 24px; font-weight: 400; letter-spacing: -0.02em; color: var(--sa-text); }
 .sh-tools { display: flex; align-items: center; gap: 8px; }
-.sh-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 999px;
-  border: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg-2, #141612) 86%, transparent); color: var(--sa-mute);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-.sh-search input { width: 150px; border: 0; outline: none; background: none; color: var(--sa-text); font-size: 12.5px; }
-.sh-search input::placeholder { color: var(--sa-mute); }
-.sh-search button { border: 0; background: none; color: var(--sa-mute); cursor: pointer; display: grid; place-items: center; }
-.sh-pill { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 999px;
-  border: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg-2, #141612) 86%, transparent); color: var(--sa-text);
-  font-size: 12.5px; cursor: pointer; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-.sh-pill:hover { border-color: var(--sa-line-2); }
-.sh-icon { width: 36px; padding: 0; justify-content: center; }
-.sh-strip { display: flex; align-items: baseline; gap: 18px; padding: 12px 18px; border: 1px solid var(--sa-line); border-radius: 10px;
-  background: color-mix(in srgb, var(--sa-bg-2, #141612) 70%, transparent);
-  font: 400 11px/1 var(--sa-mono, ui-monospace, monospace); color: var(--sa-mute); letter-spacing: 0.04em; }
-.sh-strip b { font-size: 15px; font-weight: 400; color: var(--sa-text); }
+.sh-search, .sh-pill { display: inline-flex; align-items: center; height: 40px; border-radius: 999px;
+  border: 1px solid rgba(232,231,225,0.10); background: rgba(13,14,13,0.86);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.12), 0 8px 20px -10px rgba(0,0,0,0.6);
+  color: #e8e7e1; font-size: 12.5px; }
+.sh-search { gap: 8px; padding: 0 14px; color: rgba(232,231,225,0.6); }
+.sh-search input { width: 150px; border: 0; outline: none; background: none; color: #e8e7e1; font-size: 12.5px; }
+.sh-search input::placeholder { color: rgba(232,231,225,0.45); }
+.sh-search button { border: 0; background: none; color: rgba(232,231,225,0.6); cursor: pointer; display: grid; place-items: center; }
+.sh-pill { gap: 7px; padding: 0 16px; cursor: pointer; }
+.sh-pill:hover, .sh-search:hover { border-color: rgba(232,231,225,0.2); }
+.sh-icon { width: 40px; padding: 0; justify-content: center; }
+/* stats: plain text like the Files tab — no box */
+.sh-stats { display: flex; align-items: center; gap: 12px; font: 400 11px/1 var(--sa-mono, ui-monospace, monospace);
+  color: var(--sa-mute); letter-spacing: 0.04em; }
+.sh-stats b { font-size: 14px; font-weight: 400; color: var(--sa-text); }
+.sh-stats i { width: 1px; height: 12px; background: var(--sa-line); }
 .sh-loading { display: grid; place-items: center; padding: 60px; color: var(--sa-mute); }
-.sh-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 72px 20px; text-align: center;
-  border: 1px solid var(--sa-line); border-radius: 12px; background: color-mix(in srgb, var(--sa-bg-2, #141612) 60%, transparent); }
-.sh-empty-ico { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px;
-  border: 1px solid var(--sa-line); color: var(--sa-mute); margin-bottom: 6px; }
-.sh-empty p { margin: 0; font-size: 14px; color: var(--sa-text); }
-.sh-empty span { font-size: 12px; color: var(--sa-mute); }
-.sh-list { display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--sa-line); border-radius: 12px;
-  background: color-mix(in srgb, var(--sa-bg-2, #141612) 60%, transparent); }
-.sh-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 12px; border: 0; border-radius: 9px;
-  background: none; color: var(--sa-text); cursor: pointer; text-align: left; }
-.sh-row:hover { background: rgba(232,231,225,0.04); }
-.sh-tag { display: grid; place-items: center; width: 32px; height: 30px; flex: none; border-radius: 7px;
-  border: 1px solid var(--sa-line); color: var(--sa-text); }
+/* empty state: no box, just one circular face + one line */
+.sh-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 96px 20px; text-align: center; }
+.sh-empty-ico { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 999px;
+  border: 1px solid rgba(232,231,225,0.10); background: rgba(13,14,13,0.86);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.12), 0 10px 24px -10px rgba(0,0,0,0.6);
+  color: #e8e7e1; }
+.sh-empty p { margin: 0; font-size: 13.5px; color: var(--sa-text); }
+/* list: no outer box — rows are quiet hairline-separated text */
+.sh-list { display: flex; flex-direction: column; }
+.sh-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 10px; border: 0;
+  border-bottom: 1px solid var(--sa-line); border-radius: 0; background: none; color: var(--sa-text); cursor: pointer; text-align: left; }
+.sh-row:hover { background: rgba(232,231,225,0.035); }
+.sh-tag { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 999px;
+  border: 1px solid rgba(232,231,225,0.10); background: rgba(13,14,13,0.7); color: #e8e7e1;
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 .sh-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 .sh-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sh-meta { font: 400 10.5px/1 var(--sa-mono, ui-monospace, monospace); color: var(--sa-mute); }
-.sh-file { border-radius: 9px; }
+.sh-file { border-radius: 0; border-bottom: 1px solid var(--sa-line); }
 @media (max-width: 560px) { .sh-search input { width: 96px; } .sh-title { font-size: 22px; } }
 @media (prefers-reduced-motion: reduce) { .sh-pill, .sh-row { transition-duration: 0.01ms !important; } }
 `;
