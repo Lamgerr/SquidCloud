@@ -229,6 +229,10 @@ html.sq-app-root .lg-selected { border-color: var(--sa-text-2) !important; box-s
 /* Badges, labels and captions: hairline mono, text that clears AA */
 html.sq-app-root .lg-badge { padding: 1px 6px; border-radius: 4px; border: 1px solid var(--sa-line-2); background: transparent; color: var(--sa-text-2); font: 400 10.5px/1.4 var(--sa-mono); letter-spacing: 0.04em; text-transform: uppercase; }
 html.sq-app-root .lg-badge-primary { background: var(--sa-bg-4); color: var(--sa-text); }
+/* shadcn Badge variant="default" appears white in dark theme — flatten to a quiet dark chip */
+html.sq-app-root [data-slot="badge"][data-variant="default"] {
+  background-color: var(--sa-bg-4); color: var(--sa-text); border-color: var(--sa-line-2);
+}
 html.sq-app-root .lg-badge-success { color: var(--sa-ok); border-color: color-mix(in srgb, var(--sa-ok) 45%, transparent); background: transparent; }
 html.sq-app-root .lg-badge-warning { color: var(--sa-warn); border-color: color-mix(in srgb, var(--sa-warn) 45%, transparent); background: transparent; }
 html.sq-app-root .lg-badge-danger { color: var(--sa-err); border-color: color-mix(in srgb, var(--sa-err) 45%, transparent); background: transparent; }

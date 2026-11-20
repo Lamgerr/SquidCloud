@@ -1868,7 +1868,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
 
           {/* Main content */}
           <div className="flex-1 min-w-0 flex h-screen flex-col overflow-hidden bg-background">
-            <div className="sticky top-0 z-20 px-5 pt-3 lg:px-8">
+            <div className="sticky top-0 z-20 px-5 pt-2 lg:px-8">
               <div className="lq-bar flex h-14 w-full items-center justify-between rounded-full px-2.5">
                 <div className="flex items-center gap-2.5">
                   <button
@@ -2556,21 +2556,12 @@ const FilesView: React.FC<FilesViewProps> = ({
   const resultCount = filteredFiles.length + filteredFolders.length;
 
   return (
-    <div className="sq-tab-enter space-y-3 pb-24" ref={kbdContainerRef} onMouseMove={handleKbdMouseMove}>
+    <div className="sq-tab-enter space-y-2 pb-24" ref={kbdContainerRef} onMouseMove={handleKbdMouseMove}>
 
-      {/* ── Where you are · what's here ── */}
-      <header className="flex items-center justify-between gap-4">
-        <PathBar currentFolder={currentFolder} onNavigate={onNavigateTo} />
-        <ul className="m-0 hidden list-none items-center gap-5 p-0 text-[12.5px] tabular-nums text-muted-foreground sm:flex">
-          <Stat icon={<I.Folder size={15} />} value={folders.length} label="folders" />
-          <Stat icon={<I.File size={15} />} value={files.length} label="files" />
-          {sharedFiles.length > 0 && <Stat icon={<I.Share size={15} />} value={sharedFiles.length} label="shared" />}
-        </ul>
-      </header>
-
-      {/* ── Toolbar ── */}
-      <div className="flex min-h-[36px] items-center justify-between gap-3">
+      {/* ── Single dense header row: context left, actions right ── */}
+      <div className="flex min-h-[40px] items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
+          <PathBar currentFolder={currentFolder} onNavigate={onNavigateTo} />
           {currentFolder && (
             <button type="button" onClick={onGoBack} aria-label="Back" title="Back" className={ICON_BTN}>
               <I.ChevronLeft size={18} />
@@ -2612,6 +2603,11 @@ const FilesView: React.FC<FilesViewProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          <ul className="m-0 mr-1 hidden list-none items-center gap-3 p-0 text-[12px] tabular-nums text-muted-foreground lg:flex">
+            <Stat icon={<I.Folder size={14} />} value={folders.length} label="folders" />
+            <Stat icon={<I.File size={14} />} value={files.length} label="files" />
+            {sharedFiles.length > 0 && <Stat icon={<I.Share size={14} />} value={sharedFiles.length} label="shared" />}
+          </ul>
           <button
             type="button"
             onClick={onToggleSelection}
