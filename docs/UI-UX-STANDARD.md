@@ -153,10 +153,14 @@ moves unrelated content.
 
 ### 5.3 Sidebar (vertical segmented control)
 
-The sidebar is the `GlassSegment` language rotated vertical — **one floating dark capsule**,
-not a full-height panel:
-- `src/components/ui/EnterpriseSidebar.tsx` renders two capsules: the nav segment and the
-  footer (settings + account) segment, plus a small collapse face at top.
+The sidebar is the `GlassSegment` language rotated vertical — **floating icon pills**, not
+a full-height panel and not a capsule with a background behind it:
+- `src/components/ui/EnterpriseSidebar.tsx` renders two plain stacks: the nav segment and the
+  footer (settings + account), plus a small collapse icon at top. **The columns have no
+  background, no border and no outline** — only the active pill (a `layoutId` thumb) carries
+  a surface, matching the view segmented control exactly.
+- The active thumb has **no border/outline**; it is the same dark raised fill as the view
+  control (`--sa-bg-4` blend + soft shadow). Focus-visible outline remains for keyboard users.
 - Each item is an icon-first `.sb-seg-b` button; the active item carries a single shared
   `layoutId="sb-seg-thumb"` so the thumb **slides vertically** between selections.
 - Collapsed = icons only (tool via `title`); expanded adds the label inline. No white fills,

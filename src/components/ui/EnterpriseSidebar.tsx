@@ -56,11 +56,9 @@ const IS_APPLE =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '');
 const MOD = IS_APPLE ? '⌘' : 'Ctrl+';
 
-/* Same presets as the dock / GlassSegment */
-const SPRING = { type: 'spring' as const, stiffness: 520, damping: 30, mass: 0.8 };
-const THUMB = { type: 'spring' as const, stiffness: 420, damping: 30, mass: 0.9 };
-const PRESS = { scale: 0.9 };
-const HOVER = { scale: 1.05 };
+/* Exactly the GlassSegment / floating-dock motion vocabulary */
+const THUMB = { type: 'spring' as const, stiffness: 380, damping: 21, mass: 0.8 };
+const ICON_TAP = { type: 'spring' as const, stiffness: 600, damping: 16 };
 
 /* One item in the vertical segment. The thumb is a single layoutId shared by
    every item, so it slides vertically between the active selection. */
@@ -80,9 +78,7 @@ function SegItem({
       aria-current={active ? 'page' : undefined}
       initial={reduce ? false : { opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.02 * index }}
-      whileHover={reduce ? undefined : HOVER}
-      whileTap={reduce ? undefined : PRESS}
+      transition={reduce ? { duration: 0 } : { ...THUMB, delay: 0.02 * index }}
       className={cn(
         'sb-seg-b',
         collapsed ? 'sb-seg-icon' : 'sb-seg-wide',
@@ -96,7 +92,9 @@ function SegItem({
           transition={reduce ? { duration: 0 } : THUMB}
         />
       )}
-      <item.icon className="sb-seg-i" strokeWidth={1.7} />
+      <motion.span className="sb-seg-i-wrap" whileTap={reduce ? undefined : { scale: 0.78 }} transition={ICON_TAP}>
+        <item.icon className="sb-seg-i" strokeWidth={1.7} />
+      </motion.span>
       {!collapsed && <span className="sb-seg-label">{item.label}</span>}
       {!collapsed && item.shortcut && (
         <kbd className="sb-seg-kbd">{MOD}{item.shortcut}</kbd>
@@ -146,7 +144,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
       aria-label="Workspace sidebar"
       initial={reduce ? false : { x: -16, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.05 }}
+      transition={reduce ? { duration: 0 } : { ...THUMB, delay: 0.05 }}
       className="sb-rail flex flex-shrink-0 select-none flex-col items-center py-3"
       style={{ width: collapsed ? 64 : 212 }}
     >
@@ -156,14 +154,14 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
       <motion.button
         type="button"
         onClick={onToggleCollapse}
-        whileHover={reduce ? undefined : HOVER}
-        whileTap={reduce ? undefined : PRESS}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         aria-expanded={!collapsed}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className="sb-seg-face sb-toggle"
+        className="sb-seg-b sb-toggle"
       >
-        {collapsed ? <PanelLeft className="sb-seg-i" size={17} /> : <PanelLeftClose className="sb-seg-i" size={17} />}
+        <motion.span className="sb-seg-i-wrap" whileTap={reduce ? undefined : { scale: 0.78 }} transition={ICON_TAP}>
+          {collapsed ? <PanelLeft className="sb-seg-i" size={17} /> : <PanelLeftClose className="sb-seg-i" size={17} />}
+        </motion.span>
       </motion.button>
 
       {/* One vertical segment = navigation */}
@@ -194,17 +192,17 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
                 title={b.path || b.name}
                 initial={reduce ? false : { opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.01 * i }}
-                whileHover={reduce ? undefined : HOVER}
-                whileTap={reduce ? undefined : PRESS}
+                transition={reduce ? { duration: 0 } : { ...THUMB, delay: 0.01 * i }}
                 onClick={() => {
                   if (b.type === 'folder' && b.path) { onNavigateToFolder(b.path); onTabChange('files'); }
                 }}
                 className="sb-seg-b sb-seg-wide sb-idle"
               >
-                {b.type === 'folder'
-                  ? <Folder className="sb-seg-i" strokeWidth={1.7} />
-                  : <FileStack className="sb-seg-i" strokeWidth={1.7} />}
+                <motion.span className="sb-seg-i-wrap" whileTap={reduce ? undefined : { scale: 0.78 }} transition={ICON_TAP}>
+                  {b.type === 'folder'
+                    ? <Folder className="sb-seg-i" strokeWidth={1.7} />
+                    : <FileStack className="sb-seg-i" strokeWidth={1.7} />}
+                </motion.span>
                 <span className="sb-seg-label">{b.name}</span>
               </motion.button>
             ))}
@@ -220,14 +218,14 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
           title={collapsed ? 'Settings' : undefined}
           aria-label={collapsed ? 'Settings' : undefined}
           aria-current={activeTab === 'settings' ? 'page' : undefined}
-          whileHover={reduce ? undefined : HOVER}
-          whileTap={reduce ? undefined : PRESS}
           className={cn('sb-seg-b', collapsed ? 'sb-seg-icon' : 'sb-seg-wide', activeTab === 'settings' ? 'sb-on' : 'sb-idle')}
         >
           {activeTab === 'settings' && (
             <motion.span layoutId="sb-seg-thumb" className="sb-seg-thumb" transition={reduce ? { duration: 0 } : THUMB} />
           )}
-          <Settings2 className="sb-seg-i" strokeWidth={1.7} />
+          <motion.span className="sb-seg-i-wrap" whileTap={reduce ? undefined : { scale: 0.78 }} transition={ICON_TAP}>
+            <Settings2 className="sb-seg-i" strokeWidth={1.7} />
+          </motion.span>
           {!collapsed && <span className="sb-seg-label">Settings</span>}
         </motion.button>
 
@@ -235,15 +233,15 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
           <DropdownMenuTrigger asChild>
             <motion.button
               type="button"
-              whileHover={reduce ? undefined : HOVER}
-              whileTap={reduce ? undefined : PRESS}
               aria-label={`Account menu, ${displayName}`}
               title={collapsed ? displayName : undefined}
               className={cn('sb-seg-b sb-account', collapsed ? 'sb-seg-icon' : 'sb-seg-wide', 'sb-idle')}
             >
+              <motion.span className="sb-seg-i-wrap" whileTap={reduce ? undefined : { scale: 0.78 }} transition={ICON_TAP}>
               <span className="sb-avatar" aria-hidden="true">
                 {(profile?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
               </span>
+              </motion.span>
               {!collapsed && (
                 <>
                   <span className="sb-seg-label sb-name">{displayName}</span>
@@ -283,37 +281,36 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
 
 export default EnterpriseSidebar;
 
-/* ── Styles: the GlassSegment language, vertical. No white fills. ── */
+/* ── Styles: exactly the GlassSegment language, vertical.
+      No background behind the column, no outline on the thumb. ── */
 const SB_CSS = `
 .sb-rail { background: transparent; }
-.sb-seg, .sb-seg-face {
-  --sb-fill: color-mix(in srgb, var(--sa-bg-2, #141612) 86%, transparent);
-  --sb-line: var(--sa-line, rgba(232,231,225,0.10));
-  --sb-thumb: color-mix(in srgb, var(--sa-bg-4, #23251f) 92%, #e8e7e1);
-}
-.sb-seg { background: var(--sb-fill); border: 1px solid var(--sb-line); border-radius: 999px;
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,0.07); }
-.sb-seg-face { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 999px;
-  background: var(--sb-fill); border: 1px solid var(--sb-line); color: var(--sa-mute);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.sb-seg { display: flex; flex-direction: column; }
+/* the nav/footer columns are plain stacks — the pills themselves are the only surfaces */
 .sb-seg-b { position: relative; display: flex; align-items: center; border: 0; border-radius: 999px;
-  background: none; cursor: pointer; color: var(--sa-mute); outline: none; -webkit-tap-highlight-color: transparent;
+  background: transparent; cursor: pointer; color: var(--sa-mute); outline: none; -webkit-tap-highlight-color: transparent;
   transition: color 0.18s; scale: none !important; }
 .sb-seg-b:focus-visible { outline: 1px solid var(--sa-text); outline-offset: 2px; }
-.sb-seg-icon { width: 42px; height: 42px; justify-content: center; }
-.sb-seg-wide { width: 100%; height: 42px; gap: 10px; padding: 0 12px; }
+.sb-seg-icon { width: 42px; height: 38px; justify-content: center; }
+.sb-seg-wide { width: 100%; height: 38px; gap: 10px; padding: 0 12px; }
 .sb-idle:hover, .sb-idle:focus-visible { color: var(--sa-text); }
 .sb-on { color: var(--sa-text); }
-.sb-seg-thumb { position: absolute; inset: 0; border-radius: 999px; background: var(--sb-thumb);
-  border: 1px solid rgba(232,231,225,0.09); box-shadow: inset 0 1px 0 rgba(232,231,225,0.08), 0 4px 12px -2px rgba(0,0,0,0.5); }
+/* the active thumb is the same dark raised surface as the view control — no border */
+.sb-seg-thumb { position: absolute; inset: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--sa-bg-4, #23251f) 92%, #e8e7e1);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.07), 0 4px 12px -2px rgba(0,0,0,0.5); }
+.sb-seg-i-wrap { position: relative; z-index: 1; display: grid; place-items: center; }
 .sb-seg-i, .sb-seg-b svg { position: relative; z-index: 1; width: 19px; height: 19px; flex: none; }
 .sb-seg-label { position: relative; z-index: 1; flex: 1; min-width: 0; text-align: left;
   font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sb-seg-kbd { position: relative; z-index: 1; font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); opacity: 0.6; }
+.sb-seg-kbd { position: relative; z-index: 1; font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); opacity: 0.55; }
+/* collapse face: a plain icon, no capsule/outline behind it */
+.sb-toggle { width: 38px; height: 38px; justify-content: center; border-radius: 999px;
+  background: transparent; color: var(--sa-mute); }
+.sb-toggle:hover { color: var(--sa-text); background: rgba(232,231,225,0.05); }
 .sb-account { margin-top: 2px; }
-.sb-avatar { position: relative; z-index: 1; display: grid; place-items: center; width: 26px; height: 26px;
-  flex: none; border-radius: 999px; border: 1px solid rgba(232,231,225,0.12); background: rgba(232,231,225,0.07);
+.sb-avatar { position: relative; z-index: 1; display: grid; place-items: center; width: 25px; height: 25px;
+  flex: none; border-radius: 999px; background: rgba(232,231,225,0.07);
   font-size: 11px; color: var(--sa-text); }
 .sb-name { font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { .sb-seg-b, .sb-seg-thumb { transition-duration: 0.01ms !important; } }

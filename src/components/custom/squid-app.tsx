@@ -165,12 +165,8 @@ html.sq-app-root.light .shadow, html.sq-app-root.light .shadow-md, html.sq-app-r
 html.sq-app-root.light .shadow-xl, html.sq-app-root.light .shadow-2xl { box-shadow: 0 18px 44px -20px rgba(20, 24, 22, 0.28); }
 
 /* Legacy glass utilities used by the dashboard, flattened to hairlines */
-/* Floating sidebar rail — same near-black tier as the dock, no white glass */
-html.sq-app-root .sb-rail {
-  background: color-mix(in srgb, var(--sa-bg-2) 88%, transparent);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  border-right: 1px solid var(--sa-line);
-}
+/* The sidebar rail is transparent — only its segment pills carry a surface.
+   See EnterpriseSidebar.tsx -> SB_CSS. */
 html.sq-app-root .lg-card { background: var(--sa-bg-2); border: 1px solid var(--sa-line); border-radius: 6px; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 html.sq-app-root .lg-dropdown { background: var(--sa-bg-2); border: 1px solid var(--sa-line-2); border-radius: 6px; -webkit-backdrop-filter: none; backdrop-filter: none; }
 html.sq-app-root .lg-tab-group { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--sa-line); border-radius: 5px; background: var(--sa-bg-2); box-shadow: none; }
