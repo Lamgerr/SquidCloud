@@ -482,9 +482,10 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
   return (
     <div
       ref={readerContainerRef}
-      className="fixed inset-0 z-[200] flex flex-col overflow-hidden font-serif transition-colors duration-500"
+      className="rd-dock fixed inset-0 z-[200] flex flex-col overflow-hidden font-serif transition-colors duration-500"
       style={{ backgroundColor: THEMES[theme].bg, color: THEMES[theme].fg }}
     >
+      <style>{RD_DOCK_CSS}</style>
       {/* ═══ HEADER ═══ */}
       <AnimatePresence>
         {showUI && (
@@ -733,3 +734,35 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
     </div>
   );
 }
+
+/* ── Reader chrome in the floating-dock visual language.
+      Scoped to .rd-dock; epub engine + reading logic untouched.
+      Circular pill controls, one dark glass tier, spring curves. ── */
+const RD_DOCK_CSS = `
+.rd-dock {
+  --rd-line: rgba(232,231,225,0.10);
+  --rd-glass: rgba(13,14,13,0.86);
+  --rd-spring: linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1);
+}
+.rd-dock header { background: var(--rd-glass) !important; border-bottom: 1px solid var(--rd-line) !important;
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: inset 0 1px 0 rgba(232,231,225,0.08) !important; }
+/* header icon buttons → circular dock pills */
+.rd-dock header button:is([class*="w-9"], [class*="w-10"], [class*="h-9"], [class*="h-10"]) {
+  width: 38px !important; height: 38px !important; border-radius: 999px !important;
+  background: rgba(232,231,225,0.05) !important; border: 1px solid var(--rd-line) !important;
+  color: rgba(232,231,225,0.65) !important;
+  transition: all 0.2s var(--rd-spring) !important; }
+.rd-dock header button:hover { background: rgba(232,231,225,0.11) !important; color: #e8e7e1 !important; }
+.rd-dock header button:active { transform: scale(0.9) !important; }
+.rd-dock header button[class*="bg-accent"] { background: rgba(232,231,225,0.12) !important; color: #e8e7e1 !important; }
+/* Annotate / labelled buttons → pills */
+.rd-dock header button[class*="px-4"] { border-radius: 999px !important; }
+.rd-dock header [class*="font-bold"] { font-weight: 400 !important; letter-spacing: 0.02em !important; }
+/* settings / toc / panels → dock glass with hairline rim */
+.rd-dock [class*="absolute"][class*="bg-card"], .rd-dock [class*="bg-background/95"] { background: var(--rd-glass) !important;
+  border: 1px solid var(--rd-line) !important; border-radius: 14px !important;
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.1), 0 24px 50px -20px rgba(0,0,0,0.75) !important; }
+.rd-dock [class*="animate-in"] { animation-timing-function: var(--rd-spring) !important; }
+@media (prefers-reduced-motion: reduce) { .rd-dock header button { transition-duration: 0.01ms !important; } .rd-dock [class*="animate-in"] { animation-duration: 0.01ms !important; } }
+`;

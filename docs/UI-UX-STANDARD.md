@@ -205,6 +205,18 @@ a full-height panel and not a capsule with a background behind it:
 - No stat cards, no colored file-type icons, no empty-state instruction paragraph.
 - Rows use the `SH_CSS` surface tier (hairline, 9px radius), spring press, and reduced motion.
 
+### 5.4c Preview & readers
+
+- **Instant preview** (`EnhancedInstantPreviewModal.tsx`): one full-screen near-black surface;
+  a single header with a file-name lead and a row of circular dock-glass pills (prev/next,
+  fullscreen, share, download, close). All file-type rendering logic unchanged. Controls use
+  `motion.button` spring press; the stage fades in.
+- **PDF viewer** (`OptimizedPDFViewer.tsx`) and **EPUB reader** (`DeepReadReader.tsx`): their
+  chrome is restyled by scoped dock-language CSS (`.pdf-dock`, `.rd-dock`) — circular pill
+  buttons, hairline rims, dark glass panels with spring pop, spring easing curves. The
+  rendering/annotation/engine logic is deliberately untouched; these are presentation skins
+  that can be refined without risking document rendering.
+
 ### 5.5 Toasts
 
 Reserve toasts for: errors (destructive), and one-off non-transfer confirmations

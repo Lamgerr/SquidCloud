@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,33 @@ import { createFileShare } from '@/lib/api';
 const decryptedBlobCache = new Map<string, { blob: Blob; url: string; timestamp: number }>();
 const MAX_CACHE_ITEMS = 15;
 
+/* ── Preview chrome: the floating-dock language, applied to a full-screen
+      surface. One near-black tier, circular pill controls, spring physics. ── */
+const PREVIEW_CSS = `
+.pv-root { --pv-line: rgba(232,231,225,0.10); --pv-fill: rgba(13,14,13,0.86); color: #e8e7e1; }
+.pv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  height: 56px; padding: 0 16px; border-bottom: 1px solid var(--pv-line);
+  background: linear-gradient(180deg, rgba(13,14,13,0.9), rgba(13,14,13,0.7));
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); flex: none; }
+.pv-name { font-size: 13px; font-weight: 400; letter-spacing: -0.01em; color: #e8e7e1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-meta { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,0.45); margin-top: 4px; }
+.pv-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+.pv-pill { display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 38px; min-width: 38px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--pv-line); background: var(--pv-fill);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.12), 0 8px 20px -10px rgba(0,0,0,0.6);
+  color: #e8e7e1; font-size: 12.5px; cursor: pointer; }
+.pv-pill:hover { border-color: rgba(232,231,225,0.2); }
+.pv-pill:focus-visible { outline: 2px solid rgba(232,231,225,0.8); outline-offset: 3px; }
+.pv-icon { width: 38px; padding: 0; }
+.pv-count { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,0.5); padding: 0 4px; }
+.pv-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--sa-bg, #0c0d09); }
+.pv-float { position: absolute; z-index: 80; display: flex; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .pv-pill { transition-duration: 0.01ms !important; } }
+`;
+
 const CustomDialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Popup>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Popup>
@@ -36,7 +64,7 @@ const CustomDialogContent = React.forwardRef<
     <DialogPrimitive.Popup
       ref={ref}
       className={cn(
-        'fixed inset-0 z-[60] flex flex-col w-screen h-screen max-w-none rounded-none border-0 bg-background text-foreground shadow-2xl overflow-hidden',
+        'pv-root fixed inset-0 z-[60] flex flex-col w-screen h-screen max-w-none rounded-none border-0 bg-background text-foreground shadow-2xl overflow-hidden',
         'data-[open]:opacity-100 data-[closed]:opacity-0',
         'transition-all duration-200 ease-out will-change-transform',
         className
@@ -83,6 +111,8 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const reduce = !!useReducedMotion();
+  const pillTap = reduce ? undefined : { scale: 0.92 };
   const loadGenRef = useRef(0);
   const isClosingRef = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -336,53 +366,49 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     return <div className="flex h-full items-center justify-center bg-background"><p className="text-sm text-muted-foreground">Preview not supported</p></div>;
   };
 
-  const hideOuterHeaderOnMobile = isMobile && (isPDF || isText || isImage);
+  const Pill: React.FC<{ label: string; onClick: () => void; children: React.ReactNode; wide?: boolean }> =
+    ({ label, onClick, children, wide }) => (
+      <motion.button type="button" onClick={onClick} aria-label={label} title={label}
+        className={cn('pv-pill', !wide && 'pv-icon')} whileTap={pillTap}>
+        {children}
+      </motion.button>
+    );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <CustomDialogContent ref={contentRef}>
+        <style>{PREVIEW_CSS}</style>
         <DialogPrimitive.Title className="sr-only">Preview {file?.name || 'file'}</DialogPrimitive.Title>
         <DialogPrimitive.Description className="sr-only">Full-screen document preview.</DialogPrimitive.Description>
-        
-        {/* Universal Floating Glass Close Pill for Mobile */}
-        {isMobile && (
-          <div className="absolute top-3 right-3 z-[80] flex items-center gap-1.5 pointer-events-auto">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="h-9 w-9 rounded-full bg-card/90 hover:bg-card text-foreground backdrop-blur-xl border border-border shadow-2xl active:scale-95 transition-transform"
-              title="Close Preview"
-            >
-              <X className="h-4.5 w-4.5" />
-            </Button>
+
+        <header className="pv-head">
+          <div className="min-w-0">
+            <motion.h2 key={file.name} className="pv-name"
+              initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}>
+              {file.name}
+            </motion.h2>
+            <div className="pv-meta">{getFileTypeLabel(file)} · {formatFileSize(file.size || 0)}{currentIndex != null && totalFiles ? ` · ${currentIndex + 1}/${totalFiles}` : ''}</div>
           </div>
-        )}
 
-        {!hideOuterHeaderOnMobile && (
-          <header className="flex items-center justify-between gap-3 h-12 sm:h-14 px-3 sm:px-6 bg-card/95 border-b border-border/80 shrink-0 select-none z-50">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="min-w-0">
-                <h2 className="truncate text-xs sm:text-sm font-semibold text-foreground">{file.name}</h2>
-              </div>
-            </div>
+          <div className="pv-tools">
+            {totalFiles && totalFiles > 1 && (
+              <span className="pv-count">{hasPrevious ? 'prev' : ''}{hasPrevious && hasNext ? ' · ' : ''}{hasNext ? 'next' : ''}</span>
+            )}
+            {hasPrevious && <Pill label="Previous" onClick={onPrevious!}><ChevronLeft className="h-[18px] w-[18px]" /></Pill>}
+            {hasNext && <Pill label="Next" onClick={onNext!}><ChevronRight className="h-[18px] w-[18px]" /></Pill>}
+            <Pill label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={toggleFullscreen}>
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </Pill>
+            <Pill label="Share" onClick={handleShare}><Share2 className="h-4 w-4" /></Pill>
+            {!isArchive && <Pill label="Download" onClick={handleDownload}><Download className="h-4 w-4" /></Pill>}
+            <Pill label="Close" onClick={handleClose}><X className="h-[18px] w-[18px]" /></Pill>
+          </div>
+        </header>
 
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              {hasPrevious && <Button variant="ghost" size="sm" onClick={onPrevious} className="h-8 w-8 rounded-xl p-0 text-muted-foreground"><ChevronLeft className="h-4 w-4" /></Button>}
-              {hasNext && <Button variant="ghost" size="sm" onClick={onNext} className="h-8 w-8 rounded-xl p-0 text-muted-foreground"><ChevronRight className="h-4 w-4" /></Button>}
-              <Button variant="ghost" size="sm" onClick={toggleFullscreen} title={isFullscreen ? 'Exit full screen' : 'Full screen'} className="h-8 w-8 rounded-xl p-0 text-muted-foreground">
-                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleShare} className="h-8 w-8 sm:h-9 sm:px-3 rounded-xl gap-2 text-muted-foreground"><Share2 className="h-4 w-4" /></Button>
-              {!isArchive && <Button variant="ghost" size="sm" onClick={handleDownload} className="h-8 w-8 sm:h-9 sm:px-3 rounded-xl gap-2 text-muted-foreground"><Download className="h-4 w-4" /></Button>}
-              {!isMobile && (
-                <Button variant="ghost" size="sm" onClick={handleClose} className="h-8 w-8 sm:h-9 sm:px-3 rounded-xl ml-1 bg-muted text-muted-foreground"><X className="h-4 w-4" /></Button>
-              )}
-            </div>
-          </header>
-        )}
-
-        <div className="flex-1 w-full h-full overflow-hidden relative bg-background">{renderPreview()}</div>
+        <motion.div className="pv-stage" initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }}>
+          {renderPreview()}
+        </motion.div>
       </CustomDialogContent>
     </Dialog>
   );

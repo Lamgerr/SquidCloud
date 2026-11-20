@@ -1252,7 +1252,8 @@ export default function OptimizedPDFViewer({
 
   // ───────────────── DESKTOP ─────────────────
   return (
-    <div ref={containerRef} className={cn("flex flex-col w-full h-full bg-background text-foreground select-none overflow-hidden font-sans", focusMode && "cursor-none")} style={{ filter: blueLightFilter ? `brightness(${themeBrightness / 100})` : 'none' }}>
+    <div ref={containerRef} className={cn("pdf-dock flex flex-col w-full h-full bg-background text-foreground select-none overflow-hidden font-sans", focusMode && "cursor-none")} style={{ filter: blueLightFilter ? `brightness(${themeBrightness / 100})` : 'none' }}>
+      <style>{PDF_DOCK_CSS}</style>
       {!focusMode && <div className="absolute top-0 left-0 right-0 h-0.5 z-[60] bg-border/40 pointer-events-none">
         <div style={{ width: `${progress}%`, transition: `width 400ms ${SPRING_EASE}` }} className="h-full bg-primary/80" />
       </div>}
@@ -1753,3 +1754,38 @@ const Keyboard = ({ className }: { className?: string }) => (
     <line x1="18" x2="18.01" y1="13" y2="13" />
   </svg>
 );
+
+/* ── PDF chrome in the floating-dock visual language.
+      Scoped to .pdf-dock so the complex rendering logic is untouched.
+      Circular pill controls, one dark glass tier, spring curves. ── */
+const PDF_DOCK_CSS = `
+.pdf-dock {
+  --pd-line: rgba(232,231,225,0.10);
+  --pd-glass: rgba(13,14,13,0.86);
+  --pd-spring: linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1);
+}
+.pdf-dock header { background: var(--pd-glass) !important; border-bottom: 1px solid var(--pd-line) !important;
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: inset 0 1px 0 rgba(232,231,225,0.08) !important; }
+/* all ghost icon buttons in the chrome become circular pills */
+.pdf-dock header button { border-radius: 999px !important; background: transparent !important;
+  border: 1px solid transparent !important; color: rgba(232,231,225,0.6) !important;
+  transition: all 0.2s var(--pd-spring) !important; }
+.pdf-dock header button:hover { background: rgba(232,231,225,0.08) !important; color: #e8e7e1 !important; border-color: var(--pd-line) !important; }
+.pdf-dock header button:active { transform: scale(0.9) !important; }
+.pdf-dock header button[data-active="true"], .pdf-dock header .text-primary { color: #e8e7e1 !important; background: rgba(232,231,225,0.10) !important; }
+.pdf-dock header span.font-semibold { font-weight: 400 !important; letter-spacing: -0.01em !important; }
+/* page-nav cluster → one floating capsule */
+.pdf-dock header > div:nth-child(2) { border-radius: 999px !important; border: 1px solid var(--pd-line) !important;
+  background: var(--pd-glass) !important; box-shadow: inset 0 1px 0 rgba(232,231,225,0.1) !important; padding: 3px !important; }
+/* floating tool panels → dock glass with hairline rim, spring pop */
+.pdf-dock [class*="absolute"][class*="bg-card"] { background: var(--pd-glass) !important; border: 1px solid var(--pd-line) !important;
+  border-radius: 14px !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.1), 0 24px 50px -20px rgba(0,0,0,0.75) !important; }
+.pdf-dock [class*="animate-in"] { animation-timing-function: var(--pd-spring) !important; }
+/* focus-mode controls already a capsule — give it the dock rim */
+.pdf-dock .bg-card\\/80 { background: var(--pd-glass) !important; border: 1px solid var(--pd-line) !important;
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+/* progress hairline */
+.pdf-dock [class*="bg-primary\\/80"] { background: #e8e7e1 !important; }
+@media (prefers-reduced-motion: reduce) { .pdf-dock header button { transition-duration: 0.01ms !important; } .pdf-dock [class*="animate-in"] { animation-duration: 0.01ms !important; } }
+`;
