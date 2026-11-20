@@ -131,7 +131,59 @@ html.sq-app-root {
   --sa-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --sa-gut: clamp(16px, 2.6vw, 32px);
   --radius: 0.3rem;
+
+  /* ── Adaptive display scale ──
+     The whole UI is px-based, so the reliable way to make it legible on a
+     4K/large monitor is a page-level scale (not browser zoom — the user's
+     own browser zoom still works on top of this). --sa-zoom (set below by the
+     runtime) compensates the vh units so full-height panes stay correct. */
+  --sq-scale: 1;
+  zoom: var(--sq-scale);
+
+  /* ── Depth + one disciplined accent ──
+     Monochrome was disciplined but read as flat/2D. These tokens add tonal
+     elevation and a single sage accent used only for active/selected/focus
+     states — never as decoration. */
+  --sa-accent: #86c3a1;
+  --sa-accent-soft: color-mix(in srgb, var(--sa-accent) 14%, transparent);
+  --sa-elev-1: inset 0 1px 0 rgba(232,231,225,0.05), 0 8px 24px -14px rgba(0,0,0,0.55);
+  --sa-elev-2: inset 0 1px 0 rgba(232,231,225,0.07), 0 18px 44px -20px rgba(0,0,0,0.7);
+  --sa-rim: rgba(232,231,225,0.12);
   ${themeBlock(DARK, fmt)}
+}
+/* Fluid steps: larger screens get a larger scale; user override wins. */
+@media (min-width: 1600px) { html.sq-app-root:not([data-scale]) { --sq-scale: 1.08; } }
+@media (min-width: 2000px) { html.sq-app-root:not([data-scale]) { --sq-scale: 1.18; } }
+@media (min-width: 2560px) { html.sq-app-root:not([data-scale]) { --sq-scale: 1.28; } }
+html.sq-app-root[data-scale="compact"] { --sq-scale: 0.94; }
+html.sq-app-root[data-scale="default"] { --sq-scale: 1; }
+html.sq-app-root[data-scale="large"] { --sq-scale: 1.18; }
+html.sq-app-root[data-scale="xlarge"] { --sq-scale: 1.32; }
+
+/* Ambient depth wash — very quiet, behind everything, no gradient soup */
+html.sq-app-root body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  background:
+    radial-gradient(65% 45% at 88% -12%, var(--sa-accent-soft), transparent 70%),
+    radial-gradient(55% 40% at -8% 108%, rgba(140,150,190,0.06), transparent 72%);
+}
+html.sq-app-root.light body::before { opacity: 0.55; }
+
+/* Elevated surfaces: tonal gradient + rim + lifted shadow (real depth) */
+html.sq-app-root :is(.lg-card, .ov-panel, .sh-list, .hm-stats, .hm-recent, .spot-panel) {
+  background-image: linear-gradient(180deg, rgba(232,231,225,0.035), transparent 48%) !important;
+  box-shadow: var(--sa-elev-1) !important;
+}
+
+/* One accent for active/selected/focus — breaks flat monochrome with intent */
+html.sq-app-root :is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"], [data-selected="true"]) {
+  color: var(--sa-accent);
+}
+html.sq-app-root :is(button, a, [role="button"], [role="menuitem"]):focus-visible {
+  outline-color: var(--sa-accent);
+}
+html.sq-app-root :is([role="progressbar"] > div, .sq-act-bar, .ov-bar-fill, .hm-spark-bar) {
+  background: var(--sa-accent);
 }
 html.sq-app-root.light, html.sq-app-root[data-theme="light"] {
   color-scheme: light;

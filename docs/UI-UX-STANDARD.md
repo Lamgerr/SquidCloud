@@ -27,10 +27,14 @@ surfaces are washed-out/white, or motion is decorative. All three are forbidden.
 
 ## 2. Non-negotiable rules (violating any one = rejected change)
 
-1. **One surface tier.** Backgrounds are near-black (`var(--sa-bg)` / `--sa-bg-2`). Surfaces
-   use a hairline border and a faint inset top rim. No white fills, no `rgba(255,255,255,0.5)`
-   panels. The only translucent glass allowed is the floating dock, and it is **dark**
-   in both themes (see `src/components/FloatingDock.tsx` → `DOCK_CSS`).
+1. **One surface tier, with real depth.** Backgrounds are near-black (`var(--sa-bg)` /
+   `--sa-bg-2`). Surfaces use a hairline rim, a faint top-to-bottom tonal gradient and a
+   soft lifted shadow (`--sa-elev-1/2`) — they should read as physical layers, not flat
+   stickers. No white fills, no `rgba(255,255,255,0.5)` panels, no gradient soup. The only
+   frosted glass is the floating dock tier, dark in both themes.
+   **One disciplined accent** (`--sa-accent`, muted sage) is allowed — only on active /
+   selected / focus / progress states, never as decoration. This is what keeps the UI from
+   reading as a flat monochrome wash while staying calm.
 2. **One thing leads.** Each screen has exactly one primary action and one focal content
    area. Display type is ≥ 2.5× body size. No "four equal cards" grids that the eye
    cannot land on.
@@ -59,8 +63,11 @@ surfaces are washed-out/white, or motion is decorative. All three are forbidden.
    Arrow navigation, focus return, `aria-expanded`/`aria-haspopup`, and `role="menu"`.
    Live status uses `aria-live="polite"`.
 10. **Density rules.** Micro-labels are Geist Mono, `text-[10–11px]`, uppercase with
-    `letter-spacing` — but sentence-case for body. File rows use a 2px hairline progress
-    bar. Targets ≥ 24px (44px for the two dock actions).
+    `letter-spacing` — but sentence-case for body. Targets ≥ 24px (44px for the two dock
+    actions). The whole UI scales automatically on large monitors via `--sq-scale` page
+    zoom (1600/2000/2560px steps) and can be overridden by the user's *Display size*
+    control (S/M/L/XL, persisted in `sq.ui.scale`). Never use browser zoom; the runtime
+    publishes `--sa-zoom` so `vh` units stay correct under page scale.
 
 ---
 

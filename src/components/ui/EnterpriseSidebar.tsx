@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -118,6 +118,19 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
   const collapsed = sidebarCollapsed;
   const [switchOpen, setSwitchOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
+
+  /* Display scale: persisted user choice overrides the automatic large-screen step. */
+  const [scale, setScale] = useState<string>(() => {
+    try { return localStorage.getItem('sq.ui.scale') || ''; } catch { return ''; }
+  });
+  useEffect(() => {
+    const root = document.documentElement;
+    if (scale) root.setAttribute('data-scale', scale);
+    else root.removeAttribute('data-scale');
+    try { scale ? localStorage.setItem('sq.ui.scale', scale) : localStorage.removeItem('sq.ui.scale'); } catch { /* ignore */ }
+    // AppTheme syncs --sa-zoom on resize; nudge it after a scale change.
+    window.dispatchEvent(new Event('resize'));
+  }, [scale]);
 
   const planLabel = profile?.is_premium
     ? (profile?.tier === 'supporter-plus' ? 'Supporter+' : 'Supporter')
@@ -260,6 +273,20 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
             <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => navigate('/pricing')}>
               <Star className="h-3.5 w-3.5" /><span>{profile?.is_premium ? 'Manage plan' : 'Upgrade plan'}</span>
             </DropdownMenuItem>
+            {/* Display size — fixes "too small on large monitors" with a user choice */}
+            <div className="px-2 py-1.5">
+              <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Display size</p>
+              <div className="flex gap-1 rounded-full border border-border bg-muted/40 p-0.5">
+                {([['compact','S'],['default','M'],['large','L'],['xlarge','XL']] as const).map(([v, label]) => (
+                  <button key={v} type="button" onClick={() => setScale(v === 'default' ? '' : v)}
+                    aria-pressed={(scale || 'default') === v}
+                    className={cn('h-7 flex-1 rounded-full text-[11px] transition-colors',
+                      (scale || 'default') === v ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5')}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => setOverlayOpen(true)}>
               <Keyboard className="h-3.5 w-3.5" /><span>Shortcuts</span>
             </DropdownMenuItem>
@@ -296,10 +323,15 @@ const SB_CSS = `
 .sb-seg-kbd { display: none; }
 .sb-idle:hover, .sb-idle:focus-visible { color: var(--sa-text); }
 .sb-on { color: var(--sa-text); }
-/* the active thumb is the same dark raised surface as the view control — no border */
+/* the active thumb: a raised surface tinted by the one disciplined accent */
 .sb-seg-thumb { position: absolute; inset: 0; border-radius: 999px;
-  background: color-mix(in srgb, var(--sa-bg-4, #23251f) 92%, #e8e7e1);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,0.07), 0 4px 12px -2px rgba(0,0,0,0.5); }
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--sa-accent, #86c3a1) 15%, var(--sa-bg-4, #23251f)),
+    color-mix(in srgb, var(--sa-accent, #86c3a1) 5%, var(--sa-bg-3, #141816)));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07),
+              0 0 0 1px color-mix(in srgb, var(--sa-accent, #86c3a1) 22%, transparent),
+              0 6px 18px -6px color-mix(in srgb, var(--sa-accent, #86c3a1) 28%, transparent); }
+.sb-on > .sb-seg-i { color: var(--sa-accent, #86c3a1); }
 .sb-seg-i-wrap { position: relative; z-index: 1; display: grid; place-items: center; }
 .sb-seg-i, .sb-seg-b svg { position: relative; z-index: 1; width: 19px; height: 19px; flex: none; }
 .sb-seg-label { position: relative; z-index: 1; flex: 1; min-width: 0; text-align: left;
