@@ -245,6 +245,18 @@ html.sq-app-root :is(.lg-hover-reveal, .lg-hover-reveal-subtle) { transition: op
 html.sq-app-root :focus-within > :is(.lg-hover-reveal, .lg-hover-reveal-subtle),
 html.sq-app-root .group:focus-within :is(.lg-hover-reveal, .lg-hover-reveal-subtle) { opacity: 1; }
 
+/* ── Shared tab polish: one near-black tier, hairline rules, pill actions ──
+   Applied to every sidebar tab so pages stay consistent without per-page CSS. */
+html.sq-app-root .sq-tab-enter { animation: sa-tab-in 0.42s cubic-bezier(0.2, 0, 0, 1) both; }
+@keyframes sa-tab-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
+html.sq-app-root :is(.lg-card, .sa-panel, [data-tab-card]) { border: 1px solid var(--sa-line); border-radius: 10px; background: color-mix(in srgb, var(--sa-bg-2) 70%, transparent); }
+html.sq-app-root :is(.lg-card, .sa-panel):hover { border-color: var(--sa-line-2); }
+html.sq-app-root :is(h2, h3)[class*="uppercase"], html.sq-app-root [class*="section-header"] { font-family: var(--sa-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--sa-mute); }
+html.sq-app-root :is(button, [role="button"]):not(.sq-hit) { transition: background-color 0.16s, color 0.16s, border-color 0.16s, transform 0.16s cubic-bezier(0.2, 0, 0, 1); }
+html.sq-app-root :is(button, [role="button"]):not(.sq-hit):active { transform: scale(0.97); }
+html.sq-app-root kbd { border: 1px solid var(--sa-line); border-radius: 4px; background: rgba(232,231,225,0.04); color: var(--sa-mute); font-family: var(--sa-mono); }
+html.sq-app-root :is(.sa-pill, .lg-badge, [data-pill]) { border-radius: 999px; border: 1px solid var(--sa-line); background: rgba(232,231,225,0.05); color: var(--sa-text-2, var(--sa-text)); }
+
 /* ── Shared overlays: dialogs, popovers, menus, toasts, tabs ──
    One near-black surface, hairline rim, small radius, spring pop. No white glass. */
 html.sq-app-root :is([role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper] > [data-state]) {

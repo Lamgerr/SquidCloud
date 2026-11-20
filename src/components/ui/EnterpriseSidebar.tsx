@@ -146,7 +146,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
       animate={{ x: 0, opacity: 1 }}
       transition={reduce ? { duration: 0 } : { ...THUMB, delay: 0.05 }}
       className="sb-rail flex flex-shrink-0 select-none flex-col items-center py-3"
-      style={{ width: collapsed ? 64 : 212 }}
+      style={{ width: collapsed ? 56 : 152 }}
     >
       <style>{SB_CSS}</style>
 
@@ -292,7 +292,8 @@ const SB_CSS = `
   transition: color 0.18s; scale: none !important; }
 .sb-seg-b:focus-visible { outline: 1px solid var(--sa-text); outline-offset: 2px; }
 .sb-seg-icon { width: 42px; height: 38px; justify-content: center; }
-.sb-seg-wide { width: 100%; height: 38px; gap: 10px; padding: 0 12px; }
+.sb-seg-wide { width: 100%; height: 38px; gap: 8px; padding: 0 10px; }
+.sb-seg-kbd { display: none; }
 .sb-idle:hover, .sb-idle:focus-visible { color: var(--sa-text); }
 .sb-on { color: var(--sa-text); }
 /* the active thumb is the same dark raised surface as the view control — no border */

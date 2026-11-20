@@ -151,6 +151,22 @@ moves unrelated content.
   refresh. Micro-copy lives in the dock, not in toasts.
 - Empty states own the viewport and point to the dock's Upload action.
 
+### 5.2b Home overview (`src/components/DashboardOverview.tsx`)
+
+- **One lead:** the greeting. Kicker date + 28px light title + one status line.
+- Preferences live in a spring-open sheet off a gear pill (compact lists, show activity),
+  persisted to `localStorage` under `sq.home.*`.
+- Actions are monochrome pills (`ov-pill`) — no colored accents. Quick links jump to tabs.
+- A single "Today" surface holds the three metrics inline; storage and activity are slim
+  hairline bars; recent files use monochrome tag chips (no hue tints).
+- All entrances and interactions use the shared spring vocabulary with reduced-motion branches.
+
+### 5.2c Shared tab polish (`squid-app.tsx` → `AppTheme`)
+
+- Every sidebar tab renders through `.sq-tab-enter` (single spring-in, no per-page fades).
+- All tabs inherit one card tier (hairline, 10px radius), pill action shapes, mono hairline
+  section headers, and a hairline `kbd`. Do not add per-tab palettes or colored chips.
+
 ### 5.3 Sidebar (vertical segmented control)
 
 The sidebar is the `GlassSegment` language rotated vertical — **floating icon pills**, not
