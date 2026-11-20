@@ -256,7 +256,7 @@ html.sq-app-root :is([role="dialog"], [role="alertdialog"], [data-radix-popper-c
   -webkit-backdrop-filter: none; backdrop-filter: none;
   box-shadow: 0 24px 56px -20px rgba(0, 0, 0, 0.7), inset 0 1px 0 var(--sa-line);
 }
-html.sq-app-root :is([role="menu"], [role="listbox"]) { background: var(--sa-bg-2); border: 1px solid var(--sa-line-2); border-radius: 8px; }
+html.sq-app-root :is([role="menu"], [role="listbox"]):not(.sq-menu) { background: var(--sa-bg-2); border: 1px solid var(--sa-line-2); border-radius: 8px; }
 html.sq-app-root :is([role="menuitem"], [role="option"], [role="tab"]) { border-radius: 5px; }
 html.sq-app-root :is([role="menuitem"], [role="option"])[data-highlighted] { background: var(--sa-bg-4); }
 html.sq-app-root [data-sonner-toast] {

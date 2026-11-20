@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useKeyboardShortcutsContext } from '@/components/KeyboardShortcuts';
 import {
   Home, FileStack, Users, Trash2, Activity, Book,
@@ -48,55 +49,72 @@ const TOOLS_NAV: NavDef[] = [
   { id: 'books', label: 'Books', icon: Book },
 ];
 
-/* The modifier key people actually have under their finger. */
 const IS_APPLE =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '');
 const MOD = IS_APPLE ? '⌘' : 'Ctrl+';
 
-/* ── Small pieces live at module level on purpose: components declared inside
-      the render body get a new identity on every parent render, which remounts
-      every button and drops keyboard focus mid-use. ── */
+/* ── Motion vocabulary shared with the floating dock ── */
+const SPRING = { type: 'spring' as const, stiffness: 420, damping: 28, mass: 0.8 };
+const PRESS = { scale: 0.92 };
+const HOVER = { scale: 1.04 };
+const slideIn = (i: number, reduce: boolean) =>
+  reduce ? { opacity: 1, x: 0 } : { opacity: 0, x: -10 };
 
-const ROW = 'group relative flex w-full items-center rounded-full outline-none transition-all duration-200';
-const ROW_IDLE = 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground';
-const ROW_ON = 'bg-foreground/[0.10] text-foreground';
+const ROW = 'group relative flex w-full items-center rounded-full outline-none transition-colors duration-150';
+const ROW_IDLE = 'text-muted-foreground hover:text-foreground';
+const ROW_ON = 'text-foreground';
 
 function NavItem({
-  item, active, collapsed, onSelect,
-}: { item: NavDef; active: boolean; collapsed: boolean; onSelect: (id: string) => void }) {
+  item, active, collapsed, onSelect, layoutId, reduce, index,
+}: {
+  item: NavDef; active: boolean; collapsed: boolean; onSelect: (id: string) => void;
+  layoutId: string; reduce: boolean; index: number;
+}) {
   return (
-    <button
+    <motion.button
       type="button"
       data-sb-item=""
       onClick={() => onSelect(item.id)}
       title={collapsed ? item.label : undefined}
       aria-label={collapsed ? item.label : undefined}
       aria-current={active ? 'page' : undefined}
+      initial={slideIn(index, reduce)}
+      animate={{ opacity: 1, x: 0 }}
+      transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.02 * index }}
+      whileHover={reduce ? undefined : HOVER}
+      whileTap={reduce ? undefined : PRESS}
       className={cn(
         ROW,
-        collapsed ? 'mx-auto h-10 w-10 justify-center' : 'h-9 gap-2.5 px-3',
+        collapsed ? 'mx-auto h-11 w-11 justify-center' : 'h-10 gap-2.5 px-3',
         active ? ROW_ON : ROW_IDLE,
       )}
     >
-      <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
+      {active && (
+        <motion.span
+          layoutId={layoutId}
+          className="absolute inset-0 rounded-full bg-foreground/[0.09] border border-foreground/[0.07]"
+          transition={reduce ? { duration: 0 } : SPRING}
+        />
+      )}
+      <item.icon className="relative z-[1] h-[19px] w-[19px] shrink-0" strokeWidth={1.7} />
       {!collapsed && (
         <>
-          <span className="flex-1 truncate text-left text-[13px]">{item.label}</span>
+          <span className="relative z-[1] flex-1 truncate text-left text-[13px]">{item.label}</span>
           {item.shortcut && (
-            <kbd className="font-mono text-[10px] tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            <kbd className="relative z-[1] font-mono text-[10px] tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
               {MOD}{item.shortcut}
             </kbd>
           )}
         </>
       )}
-    </button>
+    </motion.button>
   );
 }
 
 function SectionLabel({ collapsed, children }: { collapsed: boolean; children: React.ReactNode }) {
-  if (collapsed) return <div aria-hidden="true" className="mx-auto my-1.5 h-px w-6 bg-foreground/10" />;
+  if (collapsed) return <div aria-hidden="true" className="mx-auto my-2 h-px w-6 bg-foreground/10" />;
   return (
-    <p className="px-3 pb-1 pt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">
+    <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/55">
       {children}
     </p>
   );
@@ -109,6 +127,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const { setOverlayOpen } = useKeyboardShortcutsContext();
+  const reduce = !!useReducedMotion();
   const collapsed = sidebarCollapsed;
   const [switchOpen, setSwitchOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
@@ -118,8 +137,6 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
     : 'Free';
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
 
-  /* ↑ ↓ Home End move between items; stopPropagation keeps the file grid's own
-     arrow-key navigation from also reacting. */
   const onNavKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
     const items = Array.from(navRef.current?.querySelectorAll<HTMLElement>('[data-sb-item]') ?? []);
@@ -136,44 +153,42 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside
+    <motion.aside
       aria-label="Workspace sidebar"
-      className={cn(
-        'sb-rail flex flex-shrink-0 select-none flex-col',
-        'transition-[width] duration-300 ease-out',
-        collapsed ? 'w-[68px]' : 'w-[224px]',
-      )}
+      initial={reduce ? false : { x: -18, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.05 }}
+      className="sb-rail flex flex-shrink-0 select-none flex-col"
+      style={{ width: collapsed ? 72 : 228 }}
     >
       {/* Workspace / app identity */}
       <div className={cn(
-        'flex h-12 shrink-0 items-center border-b border-foreground/[0.06]',
+        'flex h-14 shrink-0 items-center border-b border-foreground/[0.06]',
         collapsed ? 'justify-center' : 'justify-between pl-3 pr-1.5',
       )}>
         {!collapsed && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
+              <motion.button
                 type="button"
+                whileHover={reduce ? undefined : HOVER}
+                whileTap={reduce ? undefined : PRESS}
                 aria-label="Account and workspace menu"
-                className="-ml-0.5 flex min-w-0 items-center gap-2 rounded-md py-1 pr-2 outline-none transition-colors hover:bg-accent/60"
+                className="-ml-0.5 flex min-w-0 items-center gap-2 rounded-full py-1 pr-2 outline-none transition-colors hover:bg-foreground/[0.05]"
               >
                 <SquidLogo size={20} mono />
                 <span className="truncate text-[13px] font-medium tracking-tight text-foreground">SquidCloud</span>
                 <ChevronsUpDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-              </button>
+              </motion.button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
               <div className="px-2 py-1.5">
                 <p className="truncate text-[13px] font-medium text-foreground">{profile?.full_name || 'User'}</p>
                 <p className="truncate text-[12px] text-muted-foreground">{user?.email}</p>
-                <p className="mt-1.5 inline-flex rounded border border-border px-1.5 py-px font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  {planLabel} plan
-                </p>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => navigate('/pricing')}>
-                <Star className="h-3.5 w-3.5" />
-                <span>{profile?.is_premium ? 'Manage plan' : 'Upgrade plan'}</span>
+                <Star className="h-3.5 w-3.5" /><span>{profile?.is_premium ? 'Manage plan' : 'Upgrade plan'}</span>
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer gap-2 text-[13px]" onClick={() => navigate('/settings/account')}>
                 <Settings2 className="h-3.5 w-3.5" /><span>Settings</span>
@@ -199,16 +214,18 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        <button
+        <motion.button
           type="button"
           onClick={onToggleCollapse}
+          whileHover={reduce ? undefined : HOVER}
+          whileTap={reduce ? undefined : PRESS}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-        </button>
+        </motion.button>
       </div>
 
       {/* Navigation */}
@@ -216,77 +233,92 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
         ref={navRef}
         aria-label="Primary"
         onKeyDown={onNavKeyDown}
-        className="flex-1 space-y-2.5 overflow-y-auto overflow-x-hidden px-2.5 py-3 lg-scrollbar-none"
+        className="flex-1 space-y-2 overflow-y-auto overflow-x-hidden px-2.5 py-3 lg-scrollbar-none"
       >
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <SectionLabel collapsed={collapsed}>Workspace</SectionLabel>
-          {PRIMARY_NAV.map((item) => (
-            <NavItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed} onSelect={onTabChange} />
+          {PRIMARY_NAV.map((item, i) => (
+            <NavItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed}
+              onSelect={onTabChange} layoutId="sb-active" reduce={reduce} index={i} />
           ))}
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <SectionLabel collapsed={collapsed}>Tools</SectionLabel>
-          {TOOLS_NAV.map((item) => (
-            <NavItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed} onSelect={onTabChange} />
+          {TOOLS_NAV.map((item, i) => (
+            <NavItem key={item.id} item={item} active={activeTab === item.id} collapsed={collapsed}
+              onSelect={onTabChange} layoutId="sb-active" reduce={reduce} index={i + PRIMARY_NAV.length} />
           ))}
         </div>
 
         {!collapsed && bookmarks.length > 0 && (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <SectionLabel collapsed={collapsed}>Favorites</SectionLabel>
-            {bookmarks.slice(0, 5).map((b) => (
-              <button
+            {bookmarks.slice(0, 5).map((b, i) => (
+              <motion.button
                 key={b.id}
                 type="button"
                 data-sb-item=""
                 title={b.path || b.name}
+                initial={slideIn(i, reduce)}
+                animate={{ opacity: 1, x: 0 }}
+                transition={reduce ? { duration: 0 } : { ...SPRING, delay: 0.01 * i }}
+                whileHover={reduce ? undefined : HOVER}
+                whileTap={reduce ? undefined : PRESS}
                 onClick={() => {
                   if (b.type === 'folder' && b.path) { onNavigateToFolder(b.path); onTabChange('files'); }
                 }}
-                className={cn(ROW, ROW_IDLE, 'h-8 gap-2.5 px-2.5')}
+                className={cn(ROW, ROW_IDLE, 'h-9 gap-2.5 px-3')}
               >
                 {b.type === 'folder'
-                  ? <Folder className="h-4 w-4 shrink-0" />
-                  : <FileStack className="h-4 w-4 shrink-0" />}
+                  ? <Folder className="h-4 w-4 shrink-0" strokeWidth={1.7} />
+                  : <FileStack className="h-4 w-4 shrink-0" strokeWidth={1.7} />}
                 <span className="truncate text-[13px]">{b.name}</span>
-              </button>
+              </motion.button>
             ))}
           </div>
         )}
       </nav>
 
       {/* Footer: settings + account */}
-      <div className="shrink-0 space-y-1 border-t border-foreground/[0.06] p-2.5">
-        <button
+      <div className="shrink-0 space-y-0.5 border-t border-foreground/[0.06] p-2.5">
+        <motion.button
           type="button"
           onClick={() => navigate('/settings/account')}
           title={collapsed ? 'Settings' : undefined}
           aria-label={collapsed ? 'Settings' : undefined}
           aria-current={activeTab === 'settings' ? 'page' : undefined}
+          whileHover={reduce ? undefined : HOVER}
+          whileTap={reduce ? undefined : PRESS}
           className={cn(
             ROW,
-            collapsed ? 'mx-auto h-10 w-10 justify-center' : 'h-9 gap-2.5 px-3',
+            collapsed ? 'mx-auto h-11 w-11 justify-center' : 'h-10 gap-2.5 px-3',
             activeTab === 'settings' ? ROW_ON : ROW_IDLE,
           )}
         >
-          <Settings2 className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
-          {!collapsed && <span className="text-[13px]">Settings</span>}
-        </button>
+          {activeTab === 'settings' && (
+            <motion.span layoutId="sb-active" className="absolute inset-0 rounded-full bg-foreground/[0.09] border border-foreground/[0.07]"
+              transition={reduce ? { duration: 0 } : SPRING} />
+          )}
+          <Settings2 className="relative z-[1] h-[19px] w-[19px] shrink-0" strokeWidth={1.7} />
+          {!collapsed && <span className="relative z-[1] text-[13px]">Settings</span>}
+        </motion.button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
+            <motion.button
               type="button"
+              whileHover={reduce ? undefined : HOVER}
+              whileTap={reduce ? undefined : PRESS}
               aria-label={`Account menu, ${displayName}`}
               className={cn(
-                'group flex w-full items-center rounded-md outline-none transition-colors hover:bg-accent/60',
-                collapsed ? 'mx-auto h-10 w-10 justify-center' : 'h-11 gap-2.5 px-2',
+                'group flex w-full items-center rounded-full outline-none transition-colors hover:bg-foreground/[0.05]',
+                collapsed ? 'mx-auto h-11 w-11 justify-center' : 'h-11 gap-2.5 px-2',
               )}
             >
               <div
                 aria-hidden="true"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-accent text-[11px] font-medium text-foreground"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-foreground/10 bg-foreground/[0.07] text-[11px] font-medium text-foreground"
               >
                 {(profile?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
@@ -299,7 +331,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
                   <ChevronsUpDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
                 </>
               )}
-            </button>
+            </motion.button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align={collapsed ? 'center' : 'start'} side="top" sideOffset={10} className="w-56">
             <div className="px-2 py-1.5">
@@ -322,7 +354,7 @@ export const EnterpriseSidebar: React.FC<SidebarProps> = ({
       </div>
 
       <SwitchAccountSheet open={switchOpen} onOpenChange={setSwitchOpen} />
-    </aside>
+    </motion.aside>
   );
 };
 
