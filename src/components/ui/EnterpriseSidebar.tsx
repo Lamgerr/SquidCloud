@@ -323,15 +323,12 @@ const SB_CSS = `
 .sb-seg-kbd { display: none; }
 .sb-idle:hover, .sb-idle:focus-visible { color: var(--sa-text); }
 .sb-on { color: var(--sa-text); }
-/* the active thumb: a raised surface tinted by the one disciplined accent */
+/* the active thumb: a raised neutral surface — depth from tone, not color */
 .sb-seg-thumb { position: absolute; inset: 0; border-radius: 999px;
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--sa-accent, #86c3a1) 15%, var(--sa-bg-4, #23251f)),
-    color-mix(in srgb, var(--sa-accent, #86c3a1) 5%, var(--sa-bg-3, #141816)));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07),
-              0 0 0 1px color-mix(in srgb, var(--sa-accent, #86c3a1) 22%, transparent),
-              0 6px 18px -6px color-mix(in srgb, var(--sa-accent, #86c3a1) 28%, transparent); }
-.sb-on > .sb-seg-i { color: var(--sa-accent, #86c3a1); }
+  background: linear-gradient(180deg, var(--sa-bg-4, #23251f), var(--sa-bg-3, #141816));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08),
+              0 0 0 1px rgba(232,231,225,0.10),
+              0 6px 18px -6px rgba(0,0,0,0.55); }
 .sb-seg-i-wrap { position: relative; z-index: 1; display: grid; place-items: center; }
 .sb-seg-i, .sb-seg-b svg { position: relative; z-index: 1; width: 19px; height: 19px; flex: none; }
 .sb-seg-label { position: relative; z-index: 1; flex: 1; min-width: 0; text-align: left;

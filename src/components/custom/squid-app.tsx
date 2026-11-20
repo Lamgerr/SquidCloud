@@ -140,12 +140,11 @@ html.sq-app-root {
   --sq-scale: 1;
   zoom: var(--sq-scale);
 
-  /* ── Depth + one disciplined accent ──
-     Monochrome was disciplined but read as flat/2D. These tokens add tonal
-     elevation and a single sage accent used only for active/selected/focus
-     states — never as decoration. */
-  --sa-accent: #86c3a1;
-  --sa-accent-soft: color-mix(in srgb, var(--sa-accent) 14%, transparent);
+  /* ── Depth via tone only ──
+     Flatness is fixed with elevation, rims and soft shadows — not color.
+     Active/selected/focus states use the same bone-white as everything else. */
+  --sa-accent: #e8e7e1;
+  --sa-accent-soft: rgba(232, 231, 225, 0.05);
   --sa-elev-1: inset 0 1px 0 rgba(232,231,225,0.05), 0 8px 24px -14px rgba(0,0,0,0.55);
   --sa-elev-2: inset 0 1px 0 rgba(232,231,225,0.07), 0 18px 44px -20px rgba(0,0,0,0.7);
   --sa-rim: rgba(232,231,225,0.12);
@@ -160,12 +159,12 @@ html.sq-app-root[data-scale="default"] { --sq-scale: 1; }
 html.sq-app-root[data-scale="large"] { --sq-scale: 1.18; }
 html.sq-app-root[data-scale="xlarge"] { --sq-scale: 1.32; }
 
-/* Ambient depth wash — very quiet, behind everything, no gradient soup */
+/* Ambient depth wash — neutral, very quiet, behind everything */
 html.sq-app-root body::before {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
   background:
     radial-gradient(65% 45% at 88% -12%, var(--sa-accent-soft), transparent 70%),
-    radial-gradient(55% 40% at -8% 108%, rgba(140,150,190,0.06), transparent 72%);
+    radial-gradient(55% 40% at -8% 108%, rgba(232,231,225,0.025), transparent 72%);
 }
 html.sq-app-root.light body::before { opacity: 0.55; }
 

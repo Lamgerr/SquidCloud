@@ -32,9 +32,9 @@ surfaces are washed-out/white, or motion is decorative. All three are forbidden.
    soft lifted shadow (`--sa-elev-1/2`) — they should read as physical layers, not flat
    stickers. No white fills, no `rgba(255,255,255,0.5)` panels, no gradient soup. The only
    frosted glass is the floating dock tier, dark in both themes.
-   **One disciplined accent** (`--sa-accent`, muted sage) is allowed — only on active /
-   selected / focus / progress states, never as decoration. This is what keeps the UI from
-   reading as a flat monochrome wash while staying calm.
+   **No color accents in the chrome.** Active / selected / focus states use the same
+   bone-white as base text; depth comes from tone, rims and shadow. A color may appear
+   only for genuinely semantic status (success / warning / error), never as UI flavor.
 2. **One thing leads.** Each screen has exactly one primary action and one focal content
    area. Display type is ≥ 2.5× body size. No "four equal cards" grids that the eye
    cannot land on.
