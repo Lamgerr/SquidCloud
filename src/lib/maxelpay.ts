@@ -16,8 +16,15 @@ async function callProxy(endpoint: string, payload: any, testMode = false): Prom
     body: JSON.stringify({ endpoint, payload, mode: testMode ? 'test' : 'live' }),
   });
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Proxy error: ${res.status}`);
+  // Never let an HTML/error page surface as a raw JSON.parse error to users.
+  const raw = await res.text();
+  let data: any;
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new Error('The payment provider is temporarily unavailable. Please try again shortly.');
+  }
+  if (!res.ok) throw new Error(data.error || data.message || `Payment error (${res.status})`);
   return data;
 }
 
