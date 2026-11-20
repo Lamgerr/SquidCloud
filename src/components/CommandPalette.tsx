@@ -51,47 +51,57 @@ import { useIsMobile } from '@/hooks/use-mobile';
       One leading surface, hairline rules, mono micro-labels, no white fills. ── */
 const SPOTLIGHT_CSS = `
 html.sq-app-root .spot-panel {
-  --sp-fill: color-mix(in srgb, var(--sa-bg-2, #141612) 90%, transparent);
-  --sp-line: var(--sa-line, rgba(232,231,225,0.10));
-  background: var(--sp-fill); border: 1px solid var(--sp-line); border-radius: 14px;
-  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,0.08), 0 30px 70px -24px rgba(0,0,0,0.8);
+  --sp-spring: linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1);
+  --sp-fill: color-mix(in srgb, var(--sa-bg-2, #141612) 88%, transparent);
+  --sp-line: rgba(232,231,225,0.09);
+  background: var(--sp-fill); border: 1px solid var(--sp-line); border-radius: 22px;
+  -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,0.1), 0 30px 70px -24px rgba(0,0,0,0.8);
   color: var(--sa-text); font-family: var(--sa-f, inherit); overflow: hidden;
 }
-html.sq-app-root .spot-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--sp-line); }
-html.sq-app-root .spot-kicker { font: 500 10px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sa-mute); }
+/* clean input bar: one rounded search capsule, nothing inside competes */
+html.sq-app-root .spot-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--sp-line); }
+html.sq-app-root .spot-searchbar { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; height: 42px; padding: 0 14px;
+  border-radius: 999px; border: 1px solid var(--sp-line); background: rgba(13,14,13,0.6);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+html.sq-app-root .spot-searchbar > svg { flex: none; color: var(--sa-mute); }
 html.sq-app-root .spot-input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--sa-text);
-  font: 400 16px/1.4 var(--sa-f, inherit); }
+  font: 400 15px/1.4 var(--sa-f, inherit); }
 html.sq-app-root .spot-input::placeholder { color: var(--sa-mute); }
 html.sq-app-root .spot-input:focus-visible { outline: none; }
 html.sq-app-root .spot-clear { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border: 0; border-radius: 999px;
-  background: rgba(232,231,225,0.06); color: var(--sa-mute); cursor: pointer; }
-html.sq-app-root .spot-clear:hover { color: var(--sa-text); background: rgba(232,231,225,0.11); }
+  background: rgba(232,231,225,0.07); color: var(--sa-mute); cursor: pointer; transition: all 0.2s var(--sp-spring); }
+html.sq-app-root .spot-clear:hover { color: var(--sa-text); background: rgba(232,231,225,0.14); }
+html.sq-app-root .spot-clear:active { transform: scale(0.88); }
+html.sq-app-root .spot-close { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 999px;
+  border: 1px solid var(--sp-line); background: rgba(13,14,13,0.6); color: var(--sa-mute); cursor: pointer; transition: all 0.2s var(--sp-spring); }
+html.sq-app-root .spot-close:hover { color: var(--sa-text); background: rgba(232,231,225,0.1); }
+html.sq-app-root .spot-close:active { transform: scale(0.9); }
 html.sq-app-root .spot-list { overflow-y: auto; min-height: 0; }
 html.sq-app-root .spot-group-label { font: 500 10px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--sa-mute); padding: 14px 18px 6px; }
-html.sq-app-root .spot-row { position: relative; display: flex; align-items: center; gap: 12px; margin: 1px 8px; padding: 9px 10px;
-  border-radius: 9px; cursor: pointer; color: var(--sa-text-2, var(--sa-text)); list-style: none; }
+  color: var(--sa-mute); padding: 14px 18px 8px; }
+html.sq-app-root .spot-row { position: relative; display: flex; align-items: center; gap: 12px; margin: 2px 10px; padding: 10px 12px;
+  border-radius: 14px; cursor: pointer; color: var(--sa-text-2, var(--sa-text)); list-style: none; transition: color 0.2s var(--sp-spring); }
 html.sq-app-root .spot-row[data-selected="true"] { color: var(--sa-text); }
-html.sq-app-root .spot-row-thumb { position: absolute; inset: 0; border-radius: 9px; background: rgba(232,231,225,0.08);
-  border: 1px solid rgba(232,231,225,0.08); box-shadow: inset 0 1px 0 rgba(232,231,225,0.06); }
-html.sq-app-root .spot-ico { position: relative; z-index: 1; display: grid; place-items: center; width: 34px; height: 34px; flex: none;
-  border-radius: 8px; border: 1px solid var(--sp-line); background: rgba(232,231,225,0.05); color: var(--sa-text); }
+html.sq-app-root .spot-row-thumb { position: absolute; inset: 0; border-radius: 14px; background: rgba(232,231,225,0.09);
+  border: 1px solid rgba(232,231,225,0.08); box-shadow: inset 0 1px 0 rgba(232,231,225,0.08); }
+html.sq-app-root .spot-ico { position: relative; z-index: 1; display: grid; place-items: center; width: 38px; height: 38px; flex: none;
+  border-radius: 12px; border: 1px solid var(--sp-line); background: rgba(232,231,225,0.05); color: var(--sa-text); }
 html.sq-app-root .spot-main { position: relative; z-index: 1; flex: 1; min-width: 0; }
 html.sq-app-root .spot-label { font-size: 13.5px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.sq-app-root .spot-desc { font-size: 11.5px; color: var(--sa-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 html.sq-app-root .spot-kbd { position: relative; z-index: 1; font: 400 10.5px/1 var(--sa-mono, ui-monospace, monospace);
-  padding: 4px 7px; border-radius: 5px; border: 1px solid var(--sp-line); background: rgba(232,231,225,0.04); color: var(--sa-mute); }
+  padding: 4px 7px; border-radius: 6px; border: 1px solid var(--sp-line); background: rgba(232,231,225,0.04); color: var(--sa-mute); }
 html.sq-app-root .spot-enter { position: relative; z-index: 1; color: var(--sa-mute); }
-html.sq-app-root .spot-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 44px 24px; color: var(--sa-mute); }
+html.sq-app-root .spot-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 48px 24px; color: var(--sa-mute); }
 html.sq-app-root .spot-empty p { font-size: 13.5px; color: var(--sa-text-2, var(--sa-text)); }
 html.sq-app-root .spot-empty span { font-size: 12px; margin-top: 6px; }
-html.sq-app-root .spot-foot { display: flex; align-items: center; gap: 16px; padding: 11px 18px; border-top: 1px solid var(--sp-line);
+html.sq-app-root .spot-foot { display: flex; align-items: center; gap: 16px; padding: 12px 18px; border-top: 1px solid var(--sp-line);
   background: rgba(232,231,225,0.02); font-size: 11px; color: var(--sa-mute); }
 html.sq-app-root .spot-foot > span { display: inline-flex; align-items: center; gap: 6px; }
-html.sq-app-root .spot-foot kbd { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); padding: 3px 6px; border-radius: 4px;
+html.sq-app-root .spot-foot kbd { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); padding: 3px 6px; border-radius: 5px;
   border: 1px solid var(--sp-line); background: rgba(232,231,225,0.05); color: var(--sa-text-2, var(--sa-text)); }
-@media (prefers-reduced-motion: reduce) { html.sq-app-root .spot-row, html.sq-app-root .spot-row-thumb { transition-duration: 0.01ms !important; } }
+@media (prefers-reduced-motion: reduce) { html.sq-app-root .spot-row, html.sq-app-root .spot-row-thumb, html.sq-app-root .spot-clear, html.sq-app-root .spot-close { transition-duration: 0.01ms !important; } }
 `;
 
 type CommandCategory = 'files' | 'navigation' | 'actions' | 'view' | 'create' | 'recent';
@@ -835,25 +845,30 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     <>
       <style>{SPOTLIGHT_CSS}</style>
 
-      {/* Search header — mono kicker, one leading input */}
+      {/* Search header — one clean rounded input bar + own close pill */}
       <div className="spot-head">
-        <Search className="w-[18px] h-[18px] shrink-0 text-muted-foreground" />
-        <span className="spot-kicker hidden sm:inline">Spotlight</span>
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={isMobile ? "Search files, folders or commands…" : "Search files, folders, or type a command…"}
-          value={searchQuery}
-          onChange={(e) => { setSearchQuery(e.target.value); setSelectedIndex(0); }}
-          className="spot-input"
-          aria-label="Search files and commands"
-        />
-        {searchQuery && (
-          <button type="button" className="spot-clear" aria-label="Clear search"
-            onClick={() => { setSearchQuery(''); setSelectedIndex(0); inputRef.current?.focus(); }}>
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="spot-searchbar">
+          <Search className="w-[17px] h-[17px] shrink-0" />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={isMobile ? "Search files, folders or commands…" : "Search files, folders, or type a command…"}
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setSelectedIndex(0); }}
+            className="spot-input"
+            aria-label="Search files and commands"
+          />
+          {searchQuery && (
+            <button type="button" className="spot-clear" aria-label="Clear search"
+              onClick={() => { setSearchQuery(''); setSelectedIndex(0); inputRef.current?.focus(); }}>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        <button type="button" className="spot-close" aria-label="Close search"
+          onClick={() => onOpenChange(false)}>
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Results — grouped, one sliding selection thumb */}
@@ -923,7 +938,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   if (isMobile) {
     return (
       <BottomSheet open={open} onOpenChange={onOpenChange}>
-        <BottomSheetContent className="spot-panel flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 rounded-t-[20px]">
+        <BottomSheetContent className="spot-panel flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 rounded-t-[22px]">
           {commandContent}
         </BottomSheetContent>
       </BottomSheet>
@@ -935,7 +950,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     <AnimatePresence>
       {open && (
         <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="spot-panel max-w-[600px] w-full p-0 gap-0 [&>button:last-child]:top-3 [&>button:last-child]:right-3 [&>button:last-child]:rounded-full [&>button:last-child]:bg-foreground/[0.06] [&>button:last-child]:text-muted-foreground [&>button:last-child]:hover:bg-foreground/[0.12]">
+          <DialogContent className="spot-panel max-w-[600px] w-full p-0 gap-0 [&>[data-slot='dialog-close']]:hidden">
             <motion.div
               initial={reduce ? false : { opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

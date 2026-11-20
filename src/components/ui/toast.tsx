@@ -29,9 +29,9 @@ const toastVariants = cva(
   [
     // Aurora glass body (src/styles/toast.css owns the tokens & animations)
     "sq-toast",
-    "group pointer-events-auto relative flex w-full items-start gap-3.5",
-    "p-3.5 pr-11",
-    "rounded-[18px]",
+    "group pointer-events-auto relative flex w-full items-center gap-3",
+    "py-2.5 pl-3 pr-11",
+    "rounded-full",
     "will-change-[transform,opacity]",
     "data-[swipe=move]:transition-none",
   ].join(" "),

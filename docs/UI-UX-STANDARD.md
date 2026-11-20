@@ -189,6 +189,10 @@ a full-height panel and not a capsule with a background behind it:
 
 ### 5.4 Spotlight (command palette)
 
+- Header has **no title** — one rounded search capsule + a dedicated circular close pill;
+  the Radix default close is hidden so it never overlaps the input. Corners are 22px/14px
+  (round), controls use the dock spring curve, selection uses a `layoutId` thumb.
+
 `src/components/CommandPalette.tsx` is the global search — same floating tier as the dock:
 - One `.spot-panel` capsule (near-black glass, hairline rim, 14px radius), spring pop-in.
 - Header: mono `SPOTLIGHT` kicker + one leading input + clear button; hairline divider.
@@ -219,9 +223,12 @@ a full-height panel and not a capsule with a background behind it:
 
 ### 5.5 Toasts
 
-Reserve toasts for: errors (destructive), and one-off non-transfer confirmations
-(e.g. "links copied"). Never for upload start/progress/complete. Keep them short:
-`title` + `description`; description tells the user where to go or what to do.
+- Global toast (`src/styles/toast.css` + `toast.tsx`) uses the floating-dock tier: one
+  near-black glass capsule, **fully circular corners**, hairline rim, circular icon/close
+  pills, spring enter/exit, progress hairline. Dark in both themes.
+- Reserve toasts for: errors (destructive), and one-off non-transfer confirmations
+  (e.g. "links copied"). Never for upload start/progress/complete. Keep them short:
+  `title` + `description`; description tells the user where to go or what to do.
 
 ---
 
