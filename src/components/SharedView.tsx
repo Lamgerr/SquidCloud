@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
-import { cn, formatFileSize } from '@/lib/utils';
+import { formatFileSize } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import type { FileItem } from '@/lib/api';
 import FileItemComponent from '@/components/FileItem';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
-  Share2, HardDrive, Clock, RefreshCw, Loader2,
-  Users, FileText, Image, Video, Music, Archive, File as FileIcon,
-  Folder, X, Check, ChevronsUpDown, Search
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Share2, RefreshCw, Loader2,
+  Folder, X, Check, ChevronsUpDown, Search,
 } from '@/lib/icon-map';
 
 type SortKey = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc' | 'size-desc' | 'size-asc';
@@ -48,16 +47,9 @@ const sortOptions: { key: SortKey; label: string }[] = [
   { key: 'size-asc', label: 'Smallest' },
 ];
 
-const getFileTypeIcon = (file: FileItem) => {
-  const t = (file.type || '').toLowerCase();
-  const n = file.name.toLowerCase();
-  if (t.startsWith('image/')) return { icon: Image, color: 'text-emerald-400', bg: 'bg-emerald-500/10' };
-  if (t.startsWith('video/')) return { icon: Video, color: 'text-rose-400', bg: 'bg-rose-500/10' };
-  if (t.startsWith('audio/')) return { icon: Music, color: 'text-violet-400', bg: 'bg-violet-500/10' };
-  if (t.includes('pdf') || n.endsWith('.pdf')) return { icon: FileText, color: 'text-rose-400', bg: 'bg-rose-500/10' };
-  if (/\.(zip|rar|7z|tar|gz)$/i.test(n)) return { icon: Archive, color: 'text-amber-400', bg: 'bg-amber-500/10' };
-  return { icon: FileIcon, color: 'text-blue-400', bg: 'bg-blue-500/10' };
-};
+/* Same spring vocabulary as the floating dock / segment */
+const SPRING = { type: 'spring' as const, stiffness: 380, damping: 26, mass: 0.8 };
+const TAP = { scale: 0.96 };
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '';
@@ -67,74 +59,53 @@ const formatDate = (dateStr: string) => {
 
 const SharedView: React.FC<SharedViewProps> = ({
   files, onFileDownload, onFileShare, onFileDelete,
-  onFileClick, onOpenFileInCbCode, onRefresh, onViewInfo, onFolderShareClick
+  onFileClick, onOpenFileInCbCode, onRefresh, onViewInfo, onFolderShareClick,
 }) => {
-  const isMobile = useIsMobile();
+  const reduce = !!useReducedMotion();
   const [sharedIds, setSharedIds] = useState<Set<string>>(new Set());
   const [folderShares, setFolderShares] = useState<FolderShareItem[]>([]);
   const [loadingShared, setLoadingShared] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date-desc');
-  const { pullDistance, refreshing, onTouchStart, onTouchMove, onTouchEnd } = usePullToRefresh(onRefresh, loadingShared);
 
   useEffect(() => {
     let mounted = true;
-    const loadSharedIds = async () => {
+    const load = async () => {
       try {
         setLoadingShared(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-
         const [fileSharesRes, folderSharesRes] = await Promise.all([
-          supabase
-            .from('shares')
-            .select('file_id')
-            .eq('user_id', user.id)
-            .is('folder_id', null),
-          supabase
-            .from('shares')
-            .select('share_id, folder_id, created_at, expires_at, is_active, share_views, download_count, folder:folders(id, name)')
-            .eq('user_id', user.id)
-            .not('folder_id', 'is', null)
-            .not('share_id', 'is', null),
+          supabase.from('shares').select('file_id').eq('user_id', user.id).is('folder_id', null),
+          supabase.from('shares').select('share_id, folder_id, created_at, expires_at, is_active, share_views, download_count, folder:folders(id, name)')
+            .eq('user_id', user.id).not('folder_id', 'is', null).not('share_id', 'is', null),
         ]);
-
         if (fileSharesRes.error) throw fileSharesRes.error;
         if (folderSharesRes.error) throw folderSharesRes.error;
-
         if (mounted) {
           setSharedIds(new Set((fileSharesRes.data || []).map(s => s.file_id)));
-          const fShares = (folderSharesRes.data || []).map((s: any) => ({
-            share_id: s.share_id,
-            folder_id: s.folder_id,
-            folder_name: s.folder?.name || 'Unknown Folder',
-            created_at: s.created_at,
-            expires_at: s.expires_at,
-            is_active: s.is_active,
-            share_views: s.share_views || 0,
-            download_count: s.download_count || 0,
-          }));
-          setFolderShares(fShares);
+          setFolderShares((folderSharesRes.data || []).map((s: any) => ({
+            share_id: s.share_id, folder_id: s.folder_id,
+            folder_name: s.folder?.name || 'Folder', created_at: s.created_at,
+            expires_at: s.expires_at, is_active: s.is_active,
+            share_views: s.share_views || 0, download_count: s.download_count || 0,
+          })));
         }
-      } catch (err: any) {
-        console.error('Failed to load shared files:', err);
-      } finally {
-        if (mounted) setLoadingShared(false);
-      }
+      } catch (e) { console.error('Failed to load shared files:', e); }
+      finally { if (mounted) setLoadingShared(false); }
     };
-    loadSharedIds();
+    load();
     return () => { mounted = false; };
   }, []);
 
   const sharedFiles = useMemo(() => {
-    const fromFilter = files.filter(f => f.shared);
-    const fromShares = files.filter(f => sharedIds.has(f.id));
     const merged = new Map<string, FileItem>();
-    for (const f of [...fromFilter, ...fromShares]) merged.set(f.id, f);
+    for (const f of [...files.filter(f => f.shared), ...files.filter(f => sharedIds.has(f.id))]) merged.set(f.id, f);
     return Array.from(merged.values());
   }, [files, sharedIds]);
 
   const totalSharedCount = sharedFiles.length + folderShares.length;
+  const sharedSize = useMemo(() => sharedFiles.reduce((s, f) => s + (f.size || 0), 0), [sharedFiles]);
 
   const processedFiles = useMemo(() => {
     let result = sharedFiles;
@@ -155,350 +126,135 @@ const SharedView: React.FC<SharedViewProps> = ({
     });
   }, [sharedFiles, searchQuery, sortKey]);
 
-  const sharedSize = useMemo(
-    () => sharedFiles.reduce((sum, file) => sum + (file.size || 0), 0),
-    [sharedFiles]
-  );
-
-  const recentlyShared = useMemo(() => {
-    if (sharedFiles.length === 0) return null;
-    return [...sharedFiles].sort((a, b) => (
-      new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()
-    ))[0];
-  }, [sharedFiles]);
-
   const currentSortLabel = sortOptions.find(o => o.key === sortKey)?.label || 'Newest';
-
-  if (isMobile) {
-    return (
-      <div className="space-y-3" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-        {refreshing && (
-          <div className="flex items-center justify-center py-3">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <span className="ml-2 text-xs text-muted-foreground">Refreshing...</span>
-          </div>
-        )}
-        {pullDistance > 10 && !refreshing && (
-          <div
-            className="flex items-center justify-center transition-all"
-            style={{ transform: `translateY(${Math.min(pullDistance, 40)}px)`, opacity: Math.min(pullDistance / 80, 1) }}
-          >
-            <svg
-              className={cn('h-5 w-5 text-muted-foreground', pullDistance > 60 && 'text-primary')}
-              style={{ transform: `rotate(${pullDistance * 1.5}deg)` }}
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
-          </div>
-        )}
-
-        <div className="relative">
-          <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none">
-            <Search className="w-4 h-4 text-muted-foreground/60" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search shared files..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 rounded-xl bg-card border border-border/40 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 transition-colors"
-          />
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-card border border-border/40 p-3">
-            <div className="w-6 h-6 rounded-lg bg-blue-500/15 flex items-center justify-center mb-1.5">
-              <Share2 className="w-3 h-3 text-blue-400" />
-            </div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Shared</p>
-            <p className="text-lg font-bold text-foreground mt-0.5">{totalSharedCount}</p>
-          </div>
-          <div className="rounded-xl bg-card border border-border/40 p-3">
-            <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center mb-1.5">
-              <HardDrive className="w-3 h-3 text-emerald-400" />
-            </div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Size</p>
-            <p className="text-lg font-bold text-foreground mt-0.5">{formatFileSize(sharedSize)}</p>
-          </div>
-          <div className="rounded-xl bg-card border border-border/40 p-3">
-            <div className="w-6 h-6 rounded-lg bg-purple-500/15 flex items-center justify-center mb-1.5">
-              <Users className="w-3 h-3 text-purple-400" />
-            </div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Links</p>
-            <p className="text-lg font-bold text-foreground mt-0.5">{totalSharedCount}</p>
-          </div>
-        </div>
-
-        {loadingShared ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : processedFiles.length === 0 && folderShares.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-[18px] bg-muted/60 border border-border/40 flex items-center justify-center mb-4">
-              <Share2 className="w-7 h-7 text-muted-foreground/60" />
-            </div>
-            <p className="text-[15px] font-semibold text-foreground mb-1">
-              {searchQuery ? 'No matching files' : 'No shared items'}
-            </p>
-            <p className="text-[13px] text-muted-foreground max-w-[240px]">
-              {searchQuery ? 'Try a different search term' : 'Share a file or folder to create a link'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {folderShares.map(fs => (
-              <div
-                key={fs.share_id}
-                className="bg-card border border-border/40 rounded-xl px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99] transition-all duration-150"
-                onClick={() => onFolderShareClick?.(fs.share_id)}
-              >
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
-                  <Folder className="w-5 h-5 text-purple-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-medium text-foreground block truncate" title={fs.folder_name}>
-                    {fs.folder_name}
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-muted-foreground">Folder share</span>
-                    <span className="text-muted-foreground/30">·</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(fs.created_at)}</span>
-                    {fs.share_views > 0 && (
-                      <>
-                        <span className="text-muted-foreground/30">·</span>
-                        <span className="text-xs text-muted-foreground">{fs.share_views} views</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {processedFiles.map(f => (
-              <div
-                key={f.id}
-                className="bg-card border border-border/40 rounded-xl px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99] transition-all duration-150"
-                onClick={() => onFileClick(f)}
-              >
-                {(() => {
-                  const cfg = getFileTypeIcon(f);
-                  const Icon = cfg.icon;
-                  return (
-                    <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', cfg.bg)}>
-                      <Icon className={cn('w-5 h-5', cfg.color)} />
-                    </div>
-                  );
-                })()}
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-medium text-foreground block truncate" title={f.name}>
-                    {f.name}
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-muted-foreground">{formatFileSize(f.size || 0)}</span>
-                    <span className="text-muted-foreground/30">·</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(f.updated_at || f.created_at)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const empty = processedFiles.length === 0 && folderShares.length === 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <h1 className="lg-title">Shared</h1>
-          <p className="lg-caption mt-1">Manage links, files, and folders from one place.</p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
-            >
-              <X className="w-3.5 h-3.5" />
-              Clear
-            </button>
-          )}
-          <div className="relative w-60">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
-            <input
-              type="text"
-              placeholder="Filter by name..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full h-8 pl-9 pr-3 rounded-lg bg-muted/30 border border-border/40 text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/30 transition-colors"
-            />
+    <div className="sh-root">
+      <style>{SH_CSS}</style>
+
+      {/* One compact header — pill controls only */}
+      <motion.div className="sh-head" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={SPRING}>
+        <h1 className="sh-title">Shared</h1>
+        <div className="sh-tools">
+          <div className="sh-search">
+            <Search size={15} />
+            <input type="text" placeholder="Filter" value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)} aria-label="Filter shared items" />
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear filter"><X size={13} /></button>
+            )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-[12px] font-medium">
-                <ChevronsUpDown className="w-3.5 h-3.5" />
-                {currentSortLabel}
-              </Button>
+              <motion.button type="button" className="sh-pill" whileTap={reduce ? undefined : TAP}>
+                <ChevronsUpDown size={14} /><span>{currentSortLabel}</span>
+              </motion.button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
               {sortOptions.map(opt => (
-                <DropdownMenuItem
-                  key={opt.key}
-                  onClick={() => setSortKey(opt.key)}
-                  className="text-[12px]"
-                >
+                <DropdownMenuItem key={opt.key} onClick={() => setSortKey(opt.key)} className="text-[12px]">
                   <span className="flex-1">{opt.label}</span>
-                  {sortKey === opt.key && (
-                    <Check className="w-3.5 h-3.5 text-primary" />
-                  )}
+                  {sortKey === opt.key && <Check className="w-3.5 h-3.5" />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="sm" onClick={onRefresh} className="gap-1.5 h-8">
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
-          </Button>
+          <motion.button type="button" className="sh-pill sh-icon" onClick={onRefresh} aria-label="Refresh" title="Refresh" whileTap={reduce ? undefined : TAP}>
+            <RefreshCw size={15} />
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border/30 bg-card/60 p-4.5 hover:bg-card/80 transition-all duration-150">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/12 text-blue-400">
-              <Share2 className="h-4.5 w-4.5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Shared</p>
-              <p className="mt-0.5 text-2xl font-bold text-foreground tabular-nums">{totalSharedCount}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border/30 bg-card/60 p-4.5 hover:bg-card/80 transition-all duration-150">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-400">
-              <HardDrive className="h-4.5 w-4.5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Total Shared Size</p>
-              <p className="mt-0.5 text-2xl font-bold text-foreground tabular-nums">{formatFileSize(sharedSize)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border/30 bg-card/60 p-4.5 hover:bg-card/80 transition-all duration-150">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/12 text-purple-400">
-              <Clock className="h-4.5 w-4.5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Latest Shared</p>
-              <p className="mt-0.5 text-sm font-medium text-foreground truncate max-w-[200px]">
-                {recentlyShared ? recentlyShared.name : folderShares.length > 0 ? folderShares[0].folder_name : 'No shared items yet'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Numbers strip — no cards, no colored icons */}
+      <motion.div className="sh-strip" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...SPRING, delay: 0.04 }}>
+        <span><b>{totalSharedCount}</b> links</span>
+        <span><b>{formatFileSize(sharedSize)}</b> shared</span>
+        <span><b>{folderShares.length}</b> folders</span>
+      </motion.div>
 
-      {/* File List */}
       {loadingShared ? (
-        <div className="rounded-xl border border-border/30 bg-card/40 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/15">
-            <div className="h-1 w-5 rounded-full bg-muted/30" />
-            <div className="h-3 w-28 rounded bg-muted/20 animate-pulse" />
-          </div>
-          <div className="p-2 space-y-1">
-            {[1,2,3].map(i => (
-              <div key={i} className="flex items-center gap-3 px-4 h-12 rounded-xl animate-pulse">
-                <div className="w-8 h-8 rounded-lg bg-muted/20 flex-shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 w-3/5 rounded bg-muted/20" />
-                  <div className="h-2.5 w-1/4 rounded bg-muted/10" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : processedFiles.length === 0 && folderShares.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-border/15 bg-card/20">
-          <div className="w-14 h-14 rounded-[16px] bg-muted/50 border border-border/30 flex items-center justify-center mb-4 text-muted-foreground">
-            <Share2 className="w-6 h-6" />
-          </div>
-          <p className="text-[15px] font-semibold text-foreground mb-1">
-            {searchQuery ? 'No matching items' : 'No shared items yet'}
-          </p>
-          <p className="text-[13px] text-muted-foreground max-w-[280px]">
-            {searchQuery
-              ? 'Try a different name or clear the filter'
-              : 'Share a file or folder to generate a link and manage access from one place.'}
-          </p>
-        </div>
+        <div className="sh-loading"><Loader2 className="h-5 w-5 animate-spin" /></div>
+      ) : empty ? (
+        <motion.div className="sh-empty" initial={reduce ? false : { opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={SPRING}>
+          <div className="sh-empty-ico"><Share2 size={20} /></div>
+          <p>{searchQuery ? 'No matches' : 'Nothing shared'}</p>
+          <span>{searchQuery ? 'Clear the filter to see all links' : 'Share a file or folder to create a link'}</span>
+        </motion.div>
       ) : (
-        <div className="rounded-xl border border-border/30 bg-card/40 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/15">
-            <span className="w-1 h-4 rounded-full bg-primary/30" />
-            <h2 className="text-[13px] font-semibold text-foreground">All Shared</h2>
-            <span className="text-[11px] text-muted-foreground/50 ml-auto tabular-nums">
-              {totalSharedCount} item{totalSharedCount !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <div className="p-1.5 space-y-0.5">
-            {folderShares.map((fs, idx) => (
-              <div
-                key={fs.share_id}
-                style={{ animationDelay: `${idx * 30}ms` }}
-                className="animate-fadeInUp flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-accent/30 cursor-pointer transition-colors"
-                onClick={() => onFolderShareClick?.(fs.share_id)}
-              >
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
-                  <Folder className="w-5 h-5 text-purple-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium text-foreground truncate">{fs.folder_name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-muted-foreground">Folder share</span>
-                    <span className="text-muted-foreground/30">·</span>
-                    <span className="text-[11px] text-muted-foreground">{formatDate(fs.created_at)}</span>
-                    {fs.share_views > 0 && (
-                      <>
-                        <span className="text-muted-foreground/30">·</span>
-                        <span className="text-[11px] text-muted-foreground">{fs.share_views} views</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {processedFiles.map((f, idx) => (
-              <div
-                key={f.id}
-                style={{ animationDelay: `${(folderShares.length + idx) * 30}ms` }}
-                className="animate-fadeInUp"
-              >
-                <FileItemComponent
-                  file={f}
-                  viewMode="list"
-                  onOpenInCbCode={onOpenFileInCbCode}
-                  onDelete={onFileDelete}
-                  onDownload={onFileDownload}
-                  onShare={onFileShare}
-                  onViewInfo={onViewInfo ? (file) => onViewInfo(file) : undefined}
-                  onClick={onFileClick}
-                  onPreview={() => onFileClick(f)}
-                  onShareRevoked={onRefresh}
-                  onShareChange={onRefresh}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <motion.div className="sh-list" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...SPRING, delay: 0.08 }}>
+          {folderShares.map((fs, i) => (
+            <motion.button key={fs.share_id} type="button" className="sh-row"
+              onClick={() => onFolderShareClick?.(fs.share_id)}
+              initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              transition={reduce ? { duration: 0 } : { ...SPRING, delay: Math.min(i * 0.02, 0.2) }}
+              whileHover={reduce ? undefined : { x: 2 }} whileTap={reduce ? undefined : TAP}>
+              <span className="sh-tag"><Folder size={15} /></span>
+              <span className="sh-main">
+                <span className="sh-name">{fs.folder_name}</span>
+                <span className="sh-meta">Folder · {formatDate(fs.created_at)}{fs.share_views > 0 ? ` · ${fs.share_views} views` : ''}</span>
+              </span>
+            </motion.button>
+          ))}
+          {processedFiles.map((f, i) => (
+            <motion.div key={f.id} className="sh-file"
+              initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              transition={reduce ? { duration: 0 } : { ...SPRING, delay: Math.min((folderShares.length + i) * 0.02, 0.2) }}>
+              <FileItemComponent
+                file={f} viewMode="list"
+                onOpenInCbCode={onOpenFileInCbCode} onDelete={onFileDelete} onDownload={onFileDownload}
+                onShare={onFileShare} onViewInfo={onViewInfo ? (file) => onViewInfo(file) : undefined}
+                onClick={onFileClick} onPreview={() => onFileClick(f)}
+                onShareRevoked={onRefresh} onShareChange={onRefresh}
+              />
+            </motion.div>
+          ))}
+        </motion.div>
       )}
     </div>
   );
 };
 
 export default SharedView;
+
+const SH_CSS = `
+.sh-root { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 14px 2px 96px; }
+.sh-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sh-title { font-size: 24px; font-weight: 400; letter-spacing: -0.02em; color: var(--sa-text); }
+.sh-tools { display: flex; align-items: center; gap: 8px; }
+.sh-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg-2, #141612) 86%, transparent); color: var(--sa-mute);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.sh-search input { width: 150px; border: 0; outline: none; background: none; color: var(--sa-text); font-size: 12.5px; }
+.sh-search input::placeholder { color: var(--sa-mute); }
+.sh-search button { border: 0; background: none; color: var(--sa-mute); cursor: pointer; display: grid; place-items: center; }
+.sh-pill { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg-2, #141612) 86%, transparent); color: var(--sa-text);
+  font-size: 12.5px; cursor: pointer; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.sh-pill:hover { border-color: var(--sa-line-2); }
+.sh-icon { width: 36px; padding: 0; justify-content: center; }
+.sh-strip { display: flex; align-items: baseline; gap: 18px; padding: 12px 18px; border: 1px solid var(--sa-line); border-radius: 10px;
+  background: color-mix(in srgb, var(--sa-bg-2, #141612) 70%, transparent);
+  font: 400 11px/1 var(--sa-mono, ui-monospace, monospace); color: var(--sa-mute); letter-spacing: 0.04em; }
+.sh-strip b { font-size: 15px; font-weight: 400; color: var(--sa-text); }
+.sh-loading { display: grid; place-items: center; padding: 60px; color: var(--sa-mute); }
+.sh-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 72px 20px; text-align: center;
+  border: 1px solid var(--sa-line); border-radius: 12px; background: color-mix(in srgb, var(--sa-bg-2, #141612) 60%, transparent); }
+.sh-empty-ico { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--sa-line); color: var(--sa-mute); margin-bottom: 6px; }
+.sh-empty p { margin: 0; font-size: 14px; color: var(--sa-text); }
+.sh-empty span { font-size: 12px; color: var(--sa-mute); }
+.sh-list { display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--sa-line); border-radius: 12px;
+  background: color-mix(in srgb, var(--sa-bg-2, #141612) 60%, transparent); }
+.sh-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 12px; border: 0; border-radius: 9px;
+  background: none; color: var(--sa-text); cursor: pointer; text-align: left; }
+.sh-row:hover { background: rgba(232,231,225,0.04); }
+.sh-tag { display: grid; place-items: center; width: 32px; height: 30px; flex: none; border-radius: 7px;
+  border: 1px solid var(--sa-line); color: var(--sa-text); }
+.sh-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.sh-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-meta { font: 400 10.5px/1 var(--sa-mono, ui-monospace, monospace); color: var(--sa-mute); }
+.sh-file { border-radius: 9px; }
+@media (max-width: 560px) { .sh-search input { width: 96px; } .sh-title { font-size: 22px; } }
+@media (prefers-reduced-motion: reduce) { .sh-pill, .sh-row { transition-duration: 0.01ms !important; } }
+`;

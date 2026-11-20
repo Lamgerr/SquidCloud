@@ -207,35 +207,6 @@ const PathBar = memo(({
 PathBar.displayName = 'PathBar';
 
 // ─────────────────────────────────────────────────────────
-// Back card
-// ─────────────────────────────────────────────────────────
-
-const BackCard = memo(({
-  viewMode,
-  onClick,
-}: {
-  viewMode: 'grid' | 'list' | 'compact';
-  onClick: () => void;
-}) => (
-  <div
-    role="button"
-    tabIndex={0}
-    aria-label="Go back"
-    title="Back"
-    onClick={onClick}
-    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
-    className={cn(
-      'group grid cursor-pointer select-none place-items-center rounded-[18px] bg-foreground/[0.04] text-muted-foreground',
-      'transition-[background-color,color,transform] duration-150 hover:bg-foreground/[0.08] hover:text-foreground active:scale-[0.98]',
-      viewMode === 'grid' ? 'h-24' : 'h-11'
-    )}
-  >
-    <I.ChevronLeft size={viewMode === 'grid' ? 26 : 20} className="transition-transform duration-200 group-hover:-translate-x-0.5" />
-  </div>
-));
-BackCard.displayName = 'BackCard';
-
-// ─────────────────────────────────────────────────────────
 // Vault entry card
 // ─────────────────────────────────────────────────────────
 
@@ -2666,10 +2637,7 @@ const FilesView: React.FC<FilesViewProps> = ({
         </div>
       )}
 
-      {/* ── Folders ── */}
-      {!error && showFolders && currentFolder && (
-        <BackCard viewMode={viewMode} onClick={onGoBack} />
-      )}
+      {/* ── Folders ── (back control lives in the single header row) ── */}
       {!error && showFolders && (
         <FolderListView
           folders={filteredFolders}

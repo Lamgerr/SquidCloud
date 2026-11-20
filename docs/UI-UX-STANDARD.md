@@ -198,6 +198,13 @@ a full-height panel and not a capsule with a background behind it:
 - Footer: `↑↓ Navigate · ↵ Run · esc Close`. Mobile uses a bottom sheet with the same surface.
 - All search/command logic and props are unchanged; only the presentation was redesigned.
 
+### 5.4b Shared tab (`src/components/SharedView.tsx`)
+
+- Redesigned to the dock/pill language: one compact header (title + filter pill, sort pill,
+  refresh icon pill), a numbers-only strip, then spring-animated rows.
+- No stat cards, no colored file-type icons, no empty-state instruction paragraph.
+- Rows use the `SH_CSS` surface tier (hairline, 9px radius), spring press, and reduced motion.
+
 ### 5.5 Toasts
 
 Reserve toasts for: errors (destructive), and one-off non-transfer confirmations
