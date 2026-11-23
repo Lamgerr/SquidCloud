@@ -1,3 +1,11 @@
+## 2026-11-23 - Start + check secos daemon (interactive query)
+- User asked "start secos check". secos is the dex outbound-only device agent at ~/dex/secos (outside this repo but part of the user's environment).
+- Found no running process; log stale since 2026-11-16. Ran ~/.termux/boot/start-secos -> agent printed "Enter your dex token:" and exited because the boot script passes only SECOS_PASSWORD, not a token.
+- secos/bin/secos.js reads DEX_TOKEN or DEX_DASHBOARD_TOKEN; ~/dex/.env has DEX_DASHBOARD_TOKEN. Started detached with that token + SECOS_PASSWORD and --name termux-phone; appended to ~/.termux/boot/secos.log.
+- Verified: pid 30941 alive after 25s, log shows "connected: localhost", no new ws errors.
+- Did NOT patch the boot script (config outside assigned working dir); logged it as a blocker needing user approval.
+- Next: only if asked, fix ~/.termux/boot/start-secos to source the token so it survives reboots.
+
 ## 2026-11-23 - Palette polish + remove AI live context (interactive query)
 - Human: live context bar looked AI-ish, remove it; also make the command palette more polished overall.
 - Removed the `.spot-ctx` JSX block, its CSS rules and @keyframes spot-live. aiContext/currentFolder are still forwarded to squidAgent.ask(), so behaviour is unchanged.

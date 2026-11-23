@@ -1,19 +1,20 @@
 {
-  "goal": "Polish command palette UI/UX and remove the AI live context strip.",
-  "goal_source": "interactive query from human (not from backlog)",
+  "goal": "Start and check the secos device agent (out-of-band device-control daemon in ~/dex/secos).",
+  "goal_source": "interactive query from human ('start secos check')",
   "last_actions": [
-    "2026-11-23: Removed the LIVE CONTEXT bar from AI mode (JSX, .spot-ctx CSS and spot-live keyframes); aiContext/currentFolder still passed to squidAgent.ask().",
-    "Polished palette: subtler .spot-clip grain veil (.55 -> .3), neutral non-white selected-row surface and icon highlight, 56px search pill, hairline active scope chips + divider, refined group labels, styled scrollbars, roomier rows, refined empty state / suggestion hover / footer, stronger focus rings.",
-    "Updated docs/UI-UX-STANDARD.md. Committed 09b8c4ff. First vercel deploy returned 'Not authorized'; immediate retry succeeded with READY."
+    "2026-11-23: Checked secos: no process running, log last written 2026-11-16. Boot script ~/.termux/boot/start-secos exists but only passes SECOS_PASSWORD, not a dex token, so starting it prompted 'Enter your dex token:' and exited.",
+    "Found DEX_DASHBOARD_TOKEN in ~/dex/.env (secos.js accepts DEX_TOKEN/DEX_DASHBOARD_TOKEN). Started detached: DEX_TOKEN from .env + SECOS_PASSWORD + --name termux-phone, logging to ~/.termux/boot/secos.log.",
+    "Verified: process 30941 alive >25s, log ends with '[secos] connected: localhost' with no new errors."
   ],
   "key_numbers": {
-    "commit": "09b8c4ff",
-    "deploy_url": "https://cloudbliss-storage-12gjmgunl-sqc.vercel.app",
-    "deploy_state": "READY"
+    "secos_pid": 30941,
+    "agent": "~/dex/secos/bin/secos.js",
+    "server": "wss://5egcncyznf.apps.bot-hosting.cloud/ws/agent",
+    "log": "~/.termux/boot/secos.log"
   },
   "blockers": [
-    "No local tsc; Vercel cloud build authoritative (build passed).",
-    "Vercel CLI intermittently returns 'Not authorized' on first attempt; a retry has worked each time."
+    "Boot script ~/.termux/boot/start-secos is broken: it does not pass DEX_TOKEN, so the agent will prompt for a token and exit on next Termux boot. NOT changed (outside assigned working dir) - needs user approval or a fix request.",
+    "No local tsc; Vercel cloud build authoritative for the app repo."
   ],
-  "next": "Await visual feedback on the polished palette."
+  "next": "If the user wants persistence across reboots, ask permission to patch ~/.termux/boot/start-secos to source DEX_DASHBOARD_TOKEN from ~/dex/.env."
 }

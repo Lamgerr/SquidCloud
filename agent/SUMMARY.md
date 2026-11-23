@@ -1,16 +1,16 @@
 # What happened while you were away
 
 ## Done
-- **Removed the AI live context bar** — no more LIVE CONTEXT strip or pulsing dot. The same context is still passed to the agent internally, so answers are unchanged.
-- **Palette polish** — subtler grain on the scope card, neutral (non-white) selected-row and icon surfaces, refined search pill and scope chips with hairline active states, quieter group labels, styled scrollbars, roomier rows, and refined empty state, suggestion hover, footer hints and focus rings.
-- Updated `docs/UI-UX-STANDARD.md`. Committed `09b8c4ff`. Deployed — **READY** at `https://cloudbliss-storage-12gjmgunl-sqc.vercel.app`.
+- **secos is started and checked.** It wasn't running (log was a week old). The existing boot script launches it without a dex token, so it prompted and exited; I started it with the token from `~/dex/.env` instead. Process `30941` has been alive and the log ends with `[secos] connected: localhost` — stable, no new errors.
+- No changes were made to the app repo for this request.
 
 ## In progress
-- Nothing actively being edited. Awaiting your visual feedback.
+- Nothing actively being edited.
 
 ## Blocked / needs a decision
-- No local `tsc` here; Vercel's cloud build passed and is the verification authority.
-- Vercel CLI first attempt returned "Not authorized"; an immediate retry deployed successfully.
+- **`~/.termux/boot/start-secos` is broken**: it doesn't pass `DEX_TOKEN`, so secos will prompt for a token and exit on the next Termux boot. I deliberately did not patch it because it's a config file outside this repo. Say the word and I'll fix it.
+- No local `tsc` here; Vercel's cloud build is the verification authority for the app.
+- Vercel CLI first attempt can return "Not authorized"; an immediate retry has worked.
 
 ## Queued next
-- Any further palette or player UX tuning.
+- Patch the secos boot script (on approval), or any further app UX tuning.
