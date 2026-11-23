@@ -1,114 +1,65 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { withPrelGateway, jsonResponse, getCorsHeaders, PrelContext } from '../_shared/kza-prel.ts'
 
+/* Squid AI — ported from dex's model loop: persona + native tool_calls.
+   The model can request tools; the function returns the request to the client,
+   which executes them via the SquidCloud tool bench and replies with results. */
+
+const SYSTEM = `You are Squid, the user's personal AI inside SquidCloud — a real collaborator, not a generic chatbot.
+Identity: you are Squid (not Gemini/Claude/GPT). Protect the user's files and privacy.
+Voice: straight, concise, confident, warm when it fits. Have a point of view; if an approach is weak, say what's better. No emoji, ever. No "Great question" or filler. Lead with the outcome.
+Operating mode: for anything needing a check, change, creation or verification, CALL A TOOL immediately — never guess counts or invent results. Prefer dedicated tools. After a tool call, summarise its result in one or two plain sentences; never dump raw JSON. If a tool fails, try one sensible alternative, then report the blocker with evidence.
+Output: plain text, short, one idea per paragraph. Markdown only for short lists or real code.`;
+
 serve(async (req) => {
   return withPrelGateway(req, { functionId: 'squid-ai-chat', operation: 'default' }, async (ctx: PrelContext) => {
-    if (req.method === 'OPTIONS') {
-      return new Response(null, { headers: getCorsHeaders() })
-    }
+    if (req.method === 'OPTIONS') return new Response(null, { headers: getCorsHeaders() })
 
     try {
-      const { messages, context } = await req.json()
+      const { messages, context, tools } = await req.json()
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
+      if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured')
 
-      if (!LOVABLE_API_KEY) {
-        throw new Error('LOVABLE_API_KEY is not configured')
-      }
-
-      // Build system prompt with context
-      let systemPrompt = `You are Squid AI, an intelligent, cute assistant for SquidCloud storage system. You help users organize files, create content, and manage their cloud storage.
-
-Available Actions:
-- CREATE_FOLDER: Create new folders
-- MOVE_FILES: Move files to folders
-- ORGANIZE_FILES: Automatically organize files by type
-- GENERATE_CONTENT: Generate file content (README, documentation, etc.)
-- ANALYZE_FILE: Analyze file content and provide insights
-
-When user asks you to perform actions, respond in JSON format with:
-{
-  "action": "ACTION_NAME",
-  "parameters": { ... },
-  "message": "Human-readable response"
-}
-
-For general questions, just respond normally in a friendly and helpful way.`
-
+      let system = SYSTEM
       if (context) {
-        systemPrompt += `\n\nCurrent Context:
-- File: ${context.fileName || 'N/A'}
-- Type: ${context.fileType || 'N/A'}
-- Path: ${context.filePath || 'N/A'}`
-
-        if (context.fileContent) {
-          systemPrompt += `\n- Content Preview: ${context.fileContent.substring(0, 500)}...`
-        }
+        system += `\n\nCurrent context:\n- File: ${context.fileName || 'N/A'}\n- Type: ${context.fileType || 'N/A'}\n- Path: ${context.filePath || 'N/A'}`
+        if (context.fileContent) system += `\n- Content preview: ${String(context.fileContent).slice(0, 500)}`
       }
 
-      // Prepare messages array with system prompt
-      const fullMessages = [
-        { role: 'system', content: systemPrompt },
-        ...messages
-      ]
-
-      console.log('Calling Lovable AI with messages:', fullMessages.length)
+      const body: Record<string, unknown> = {
+        model: 'google/gemini-2.5-flash',
+        messages: [{ role: 'system', content: system }, ...(messages || [])],
+        temperature: 0.6,
+        max_tokens: 2048,
+      }
+      // Real JSON-schema tools when the client supplies them (dex-style bench)
+      if (Array.isArray(tools) && tools.length) {
+        body.tools = tools
+        body.tool_choice = 'auto'
+      }
 
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: fullMessages,
-          temperature: 0.7,
-          max_tokens: 2048,
-        }),
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Lovable AI error:', response.status, errorText)
-
-        if (response.status === 429) {
-          return jsonResponse({ error: 'Rate limit exceeded. Please try again in a moment.' }, 429)
-        }
-
-        if (response.status === 402) {
-          return jsonResponse({ error: 'Payment required. Please add credits to your Lovable workspace.' }, 402)
-        }
-
-        throw new Error(`Lovable AI error: ${response.statusText}`)
+        const t = await response.text()
+        if (response.status === 429) return jsonResponse({ error: 'Rate limit reached. Try again shortly.' }, 429)
+        if (response.status === 402) return jsonResponse({ error: 'AI credits exhausted.' }, 402)
+        throw new Error(`Lovable AI error ${response.status}: ${t.slice(0, 200)}`)
       }
 
       const data = await response.json()
-      const assistantMessage = data.choices[0].message.content
-
-      console.log('Received response from Lovable AI')
-
-      // Try to parse action from response
-      let action = null
-      try {
-        const jsonMatch = assistantMessage.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          action = JSON.parse(jsonMatch[0])
-        }
-      } catch (e) {
-        console.log('No action found in response')
-      }
-
+      const msg = data.choices?.[0]?.message || {}
       return jsonResponse({
-        message: assistantMessage,
-        action: action
+        message: msg.content || '',
+        tool_calls: msg.tool_calls || null,
+        finish_reason: data.choices?.[0]?.finish_reason || null,
       })
-
     } catch (error) {
-      console.error('Error in squid-ai-chat function:', error)
-      return jsonResponse({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        message: 'Sorry, I encountered an error. Please try again.'
-      }, 500)
+      return jsonResponse({ error: error instanceof Error ? error.message : 'Unknown error' }, 500)
     }
   })
 })

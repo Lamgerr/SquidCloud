@@ -47,8 +47,7 @@ import {
 import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { squidAI } from '@/services/squid-ai';
-import { SquidAITools } from '@/services/squid-ai-tools';
+import { squidAgent, type AgentStep } from '@/services/squid-agent';
 import { useToast } from '@/hooks/use-toast';
 
 /* ── Squid Search · floating-dock glass + Squid AI mode ── */
@@ -84,17 +83,22 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-hint, .spot-go { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
 .spot-root kbd { font: 500 11px/1 var(--sa-f, system-ui); padding: 3px 6px; border-radius: 6px; background: var(--hi); border: 1px solid var(--line); color: var(--mute); }
 
-/* Squid AI mode: same dock glass, one quiet neutral rim — no color soup */
+/* Squid AI mode — bring back the soft colour, but keep the dock shape */
 .spot-pill::before, .spot-ai::before, .spot-pill::after, .spot-ai::after { content: ''; position: absolute; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .7s ease; }
-.spot-pill::before, .spot-ai::before { inset: 0; z-index: -1; }
-.spot-pill::after, .spot-ai::after { inset: -1px; z-index: 1; border: 1px solid rgba(232,231,225,.18); box-shadow: inset 0 1px 0 rgba(232,231,225,.12); }
-.spot-pill[data-ai="true"] { --ink: #e8e7e1; --mute: rgba(232,231,225,.55); background: rgba(13,14,13,.94); border-color: rgba(232,231,225,.16);
-  animation: spot-swell .8s ${SPRING} both; box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.75); }
-.spot-pill[data-ai="true"]::after, .spot-ai[data-on="true"]::after { opacity: .9; }
-.spot-orb { display: block; width: 18px; height: 18px; border-radius: 50%; flex: none;
-  background: var(--ink); box-shadow: inset 0 1px 1px rgba(0,0,0,.25), 0 0 10px rgba(232,231,225,.25); }
-.spot-orb[data-busy="true"] { animation: spot-shimmer 1.6s linear infinite; }
-.spot-orb.big { width: 40px; height: 40px; }
+.spot-pill::before, .spot-ai::before { inset: 0; z-index: -1; background-size: 220% 220%; }
+.spot-pill::after, .spot-ai::after { inset: -1px; z-index: 1; border: 1px solid rgba(255,255,255,.34); box-shadow: 0 0 22px rgba(140,150,255,.3), 0 0 2px rgba(255,255,255,.5), inset 0 0 18px rgba(170,160,255,.14); }
+.spot-pill[data-ai="true"] { --ink: #fff; --mute: rgba(255,255,255,.62); background: linear-gradient(180deg, rgba(34,36,52,.86), rgba(10,11,20,.94)); border-color: rgba(255,255,255,.16);
+  animation: spot-swell .8s ${SPRING} both; box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 28px 70px -22px rgba(90,100,200,.45); }
+.spot-pill[data-ai="true"]::before { opacity: 1; animation: spot-drift 7s ease-in-out infinite alternate; background-image:
+  radial-gradient(48% 90% at 18% 110%, rgba(122,142,255,.62), transparent 70%), radial-gradient(44% 90% at 52% 120%, rgba(176,140,255,.52), transparent 70%),
+  radial-gradient(40% 80% at 84% 115%, rgba(244,164,200,.46), transparent 70%), radial-gradient(30% 70% at 66% -20%, rgba(255,206,160,.3), transparent 70%); }
+.spot-pill[data-ai="true"]::after, .spot-ai[data-on="true"]::after { opacity: .95; animation: spot-glow 3.4s ease-in-out infinite; }
+.spot-ai[data-on="true"]::before { opacity: 1; background-image: radial-gradient(70% 90% at 20% 110%, rgba(122,142,255,.62), transparent 70%), radial-gradient(60% 90% at 85% 110%, rgba(244,164,200,.52), transparent 70%); }
+.spot-pill[data-busy="true"]::before { animation-duration: 2.2s; } .spot-pill[data-busy="true"]::after { animation-duration: 1.4s; }
+.spot-orb { display: block; width: 20px; height: 20px; border-radius: 50%; flex: none; background-color: #1a1c2c; background-size: 220% 220%;
+  background-image: radial-gradient(circle at 28% 24%, rgba(255,255,255,.75), transparent 34%), radial-gradient(circle at 25% 80%, #7a8eff, transparent 60%), radial-gradient(circle at 80% 75%, #f4a4c8, transparent 58%), radial-gradient(circle at 70% 20%, #b08cff, transparent 60%);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.6), 0 0 14px rgba(150,150,255,.5); animation: spot-drift 5s ease-in-out infinite alternate; }
+.spot-orb[data-busy="true"] { animation-duration: 1.6s; } .spot-orb.big { width: 44px; height: 44px; }
 /* panel */
 .spot-panel { border-radius: 30px; display: grid; grid-template-rows: 0fr; opacity: 0; translate: 0 -10px; scale: .97; transform-origin: top center; pointer-events: none;
   transition: grid-template-rows .7s ${SPRING}, opacity .25s ease, translate .7s ${SPRING}, scale .7s ${SPRING}; }
@@ -104,16 +108,16 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-panel > .spot-foot { overflow: hidden; }
 .spot-root[data-mobile="true"] .spot-panel { flex: 1; grid-template-rows: 1fr; opacity: 1; translate: none; scale: 1; pointer-events: auto; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .spot-root[data-mobile="true"] .spot-panel > .spot-clip { border-radius: 0; }
-.spot-chips { display: flex; gap: 8px; padding: 14px 16px 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.spot-chips { display: flex; gap: 7px; padding: 10px 14px 4px; overflow-x: auto; scrollbar-width: none; flex: none; }
 .spot-chips button { flex: none; padding: 6px 14px; border-radius: 999px; font-size: 13.5px; color: var(--mute); background: transparent; border: 1px solid var(--line); cursor: pointer; transition: background-color .2s, color .2s; }
 .spot-chips button:hover { background: var(--hi); color: var(--ink); }
 .spot-chips button[data-on="true"] { background: var(--ink); color: #111; border-color: transparent; }
-.spot-list { overflow-y: auto; min-height: 0; padding: 6px 10px 10px; scrollbar-width: thin; max-height: min(400px, 50vh); }
+.spot-list { overflow-y: auto; min-height: 0; padding: 4px 10px 10px; scrollbar-width: thin; max-height: min(400px, 50vh); }
 .spot-root[data-mobile="true"] .spot-list { max-height: none; flex: 1; }
-.spot-group-label { font-size: 12.5px; font-weight: 500; color: var(--mute); padding: 10px 12px 6px; }
+.spot-group-label { font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--mute); padding: 10px 12px 5px; }
 .spot-row.spot-row { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 16px; cursor: pointer; color: var(--ink); list-style: none; background: transparent !important; }
 .spot-row-thumb { position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.1)); box-shadow: inset 0 1px 0 var(--rim); }
-.spot-ico { position: relative; z-index: 1; width: 38px; height: 38px; flex: none; border-radius: 11px; display: grid; place-items: center; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 10px -4px rgba(0,0,0,.45); }
+.spot-ico { position: relative; z-index: 1; width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; color: var(--ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 10px -4px rgba(0,0,0,.45); }
 .spot-ico.spot-ico-ai { background: rgba(20,20,28,.6); }
 .spot-main { position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .spot-label { font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .spot-label b { font-weight: 700; }
@@ -123,12 +127,19 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-empty p { margin: 0; font-size: 15px; color: var(--ink); }
 
 /* ask */
-.spot-ask { padding: 22px 26px 24px; min-height: 120px; max-height: min(420px, 55vh); overflow-y: auto; flex: 1; }
+.spot-ask { padding: 20px 24px 22px; min-height: 120px; max-height: min(420px, 55vh); overflow-y: auto; flex: 1; }
 .spot-ask-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; color: var(--mute); padding: 8px 0; }
 .spot-ask-empty p { margin: 0; font-size: 15px; }
 .spot-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .spot-suggest button { padding: 7px 14px; border-radius: 999px; font-size: 13.5px; color: var(--ink); background: var(--hi); border: 1px solid var(--line); cursor: pointer; }
 .spot-answer { margin: 0; font-size: 20px; line-height: 1.42; font-weight: 450; letter-spacing: -.012em; white-space: pre-wrap; animation: spot-rise .6s ${SPRING} both; } .spot-answer b { font-weight: 700; }
+.spot-steps { display: flex; flex-direction: column; gap: 5px; margin: 4px 0 14px; }
+.spot-step { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: rgba(232,231,225,.03); font-size: 12.5px; color: var(--mute); }
+.spot-step[data-kind="tool"] b { color: var(--ink); font-weight: 500; }
+.spot-step .spot-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mute); flex: none; }
+.spot-step[data-status="running"] .spot-dot { animation: spot-glow 1s ease-in-out infinite; }
+.spot-step[data-status="done"] .spot-dot { background: #8fc98f; }
+.spot-step[data-status="failed"] .spot-dot { background: #d98080; }
 .spot-searching { display: inline-block; font-size: 18px; font-weight: 500; padding: 4px 0 10px; color: transparent; background: linear-gradient(100deg, var(--mute) 30%, var(--ink) 50%, var(--mute) 70%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; animation: spot-shimmer 1.6s linear infinite; text-shadow: 0 0 18px rgba(150,160,255,.35); }
 .spot-foot { display: flex; gap: 18px; padding: 10px 20px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mute); white-space: nowrap; overflow-x: auto; }
 .spot-foot > span { display: inline-flex; align-items: center; gap: 6px; }
@@ -273,10 +284,10 @@ const getKind = (type: string, name: string): 'doc' | 'image' | 'code' | 'other'
   return 'other';
 };
 const TINT: Record<string, string> = {
-  folder: 'linear-gradient(160deg,#6cc6ff,#2f8cff)', image: 'linear-gradient(160deg,#ff9bd0,#ff6a5c)', doc: 'linear-gradient(160deg,#ffd27a,#ff9a3d)',
-  code: 'linear-gradient(160deg,#9f8bff,#5a63ff)', other: 'linear-gradient(160deg,#b9c0cc,#7b8494)',
-  navigation: 'linear-gradient(160deg,#7db4ff,#3c6df0)', actions: 'linear-gradient(160deg,#ffb25c,#ff6a3d)', view: 'linear-gradient(160deg,#b79bff,#6a5cff)',
-  create: 'linear-gradient(160deg,#7be3a1,#1fae6a)', recent: 'linear-gradient(160deg,#c3c9d4,#7b8494)', danger: 'linear-gradient(160deg,#ff8a8a,#e5484d)',
+  folder: 'rgba(232,231,225,.10)', image: 'rgba(232,231,225,.10)', doc: 'rgba(232,231,225,.10)',
+  code: 'rgba(232,231,225,.10)', other: 'rgba(232,231,225,.10)', navigation: 'rgba(232,231,225,.10)',
+  actions: 'rgba(232,231,225,.10)', view: 'rgba(232,231,225,.10)', create: 'rgba(232,231,225,.10)',
+  recent: 'rgba(232,231,225,.10)', danger: 'rgba(217,128,128,.14)',
 };
 const DANGER = ['action-delete', 'action-signout', 'nav-trash'];
 const SCOPES: { id: Scope; label: string }[] = [
@@ -330,43 +341,22 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [mode, setMode] = useState<'search' | 'ask'>('search');
   const [response, setResponse] = useState('');
   const [shown, setShown] = useState('');
+  const [steps, setSteps] = useState<AgentStep[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const aiReady = useRef(false);
   const askRef = useRef<(q?: string) => void>(() => {});
   const { toast } = useToast();
-
-  const finish = (title: string, description: string, ms: number) => {
-    toast({ title, description });
-    onActionComplete?.();
-    setTimeout(() => onOpenChange(false), ms);
-  };
-
-  const runAIAction = async (action: any) => {
-    // dex-style: every automation goes through one dispatcher that returns a
-    // short verdict string. SquidAITools.runTool is the SquidCloud bench.
-    const args = {
-      ...(action.parameters || {}),
-      files,
-      folder: currentFolder,
-    };
-    const verdict = await SquidAITools.runTool(action.action, args);
-    toast({ title: 'Squid AI', description: verdict });
-    finish('Done', verdict, 1500);
-  };
 
   const ask = async (raw?: string) => {
     const query = (raw ?? searchQuery).trim();
     if (!query || isLoading) return;
-    setMode('ask'); setSearchQuery(query); setIsLoading(true); setResponse('');
+    setMode('ask'); setSearchQuery(query); setIsLoading(true);
+    setResponse(''); setShown(''); setSteps([]);
     try {
-      if (!aiReady.current) aiReady.current = await squidAI.initialize();
-      if (!aiReady.current) {
-        setResponse('Squid AI isn’t set up yet. Add GEMINI_API_KEY to your Supabase secrets.');
-        return;
-      }
-      const result = await squidAI.chat(query, aiContext);
+      // Runs as a background job — closing the palette does not cancel it.
+      const result = await squidAgent.ask(query, { ...aiContext, currentFolder });
+      setSteps(result.steps);
       setResponse(result.message);
-      if (result.action) await runAIAction(result.action);
+      if (result.steps.some(s => s.status === 'done')) onActionComplete?.();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       setResponse('Something went wrong. Try asking again.');
@@ -1131,6 +1121,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       <button key={p} type="button" onClick={() => ask(p)}>{p}</button>
                     ))}
                   </div>
+                </div>
+              )}
+              {steps.length > 0 && (
+                <div className="spot-steps">
+                  {steps.map((s, i) => (
+                    <div key={i} className="spot-step" data-kind={s.kind} data-status={s.status || 'running'}>
+                      <span className="spot-dot" />
+                      <span>{s.kind === 'tool' ? <b>{s.label}</b> : s.label}</span>
+                      {s.detail && <span style={{ marginLeft: 'auto', opacity: .7 }}>{s.detail}</span>}
+                    </div>
+                  ))}
                 </div>
               )}
               {isLoading && <div className="spot-searching">Searching…</div>}

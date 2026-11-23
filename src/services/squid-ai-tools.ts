@@ -638,9 +638,10 @@ export class SquidAITools {
    */
   static async runTool(name: string, args: Record<string, any> = {}): Promise<string> {
     try {
-      switch (name) {
+      // Accept both the UI action names and the model's camelCase schema names
+      switch (name.toUpperCase().replace(/([A-Z])/g, '_$1').replace(/^_/, '')) {
         case 'ORGANIZE_FILES': {
-          const r = await this.organizeFilesByType((args.files || []) as any[], args.folder || '');
+          const r = await this.organizeFilesByType((args.files || []) as any[], args.currentPath || args.folder || '');
           return `Organized: ${r.summary}`;
         }
         case 'CREATE_FOLDER': {
@@ -651,17 +652,33 @@ export class SquidAITools {
           const n = await this.moveFilesToFolder(args.fileIds || [], args.targetFolder || '');
           return `Moved ${n} file${n === 1 ? '' : 's'}`;
         }
-        case 'GET_ANALYTICS': {
+        case 'GET_FILE_ANALYTICS': {
           const a = await this.getFileAnalytics(args.fileType);
           return `${a.totalFiles} files · ${this.formatFileSize(a.totalSize)} used`;
         }
-        case 'COUNT_FILES': {
+        case 'COUNT_FILES_BY_EXTENSION': {
           const n = await this.countFilesByExtension(String(args.extension || ''));
           return `${n} file${n === 1 ? '' : 's'} with extension .${args.extension}`;
         }
         case 'SEARCH_FILES': {
           const r = await this.searchFiles(String(args.query || ''), !!args.searchContent);
           return `${r.totalResults} result${r.totalResults === 1 ? '' : 's'} for “${args.query}”`;
+        }
+        case 'GET_FILES_IN_FOLDER': {
+          const r = await this.getFilesInFolder(args.folderPath || '');
+          return `Found ${Array.isArray(r) ? r.length : 0} file(s) in that folder`;
+        }
+        case 'GET_STORAGE_USED': {
+          const s = await this.getStorageUsed();
+          return `Storage used: ${this.formatFileSize(s.used)} of ${this.formatFileSize(s.total)} (${Math.round(s.percentage)}%)`;
+        }
+        case 'RENAME_FILE': {
+          const ok = await this.renameFile(args.fileId, args.newName);
+          return ok ? `Renamed to “${args.newName}”` : 'Could not rename that file';
+        }
+        case 'DELETE_FILE': {
+          const r = await this.deleteFile(args.fileId);
+          return r.success ? 'File deleted' : `Could not delete file: ${r.error || 'unknown'}`;
         }
         default:
           return `Unknown tool: ${name}`;

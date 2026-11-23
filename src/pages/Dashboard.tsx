@@ -58,6 +58,7 @@ import MobileNavHeader from '@/components/MobileNavHeader';
 import { SignalsBell } from '@/components/SignalsBell';
 import { FloatingDock, DropGlow, GlassSegment, UploadOrb, Icons as I } from '@/components/FloatingDock';
 import { CommandPalette } from '@/components/CommandPalette';
+import AIProgressSearch from '@/components/AIProgressSearch';
 import { backgroundUploadService } from '@/services/backgroundUpload';
 import { AppStartupBiometricCheck } from '@/components/AppStartupBiometricCheck';
 import DragDropUpload from '@/components/DragDropUpload';
@@ -1905,14 +1906,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                 </div>
                 <div className="flex items-center gap-1">
                   <SignalsBell className="h-9 w-9 rounded-full" iconClassName="h-[18px] w-[18px]" />
-                  <button
-                    onClick={() => setIsSpotlightOpen(true)}
-                    aria-label="Search"
-                    title={`Search (${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'})`}
-                    className="sq-press grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground"
-                  >
-                    <I.Search size={18} />
-                  </button>
+                  <AIProgressSearch onClick={() => setIsSpotlightOpen(true)} />
                 </div>
               </div>
             </div>
