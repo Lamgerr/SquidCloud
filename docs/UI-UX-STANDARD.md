@@ -199,6 +199,12 @@ a full-height panel and not a capsule with a background behind it:
 - Header has **no title** — one rounded search capsule + a dedicated circular close pill;
   the Radix default close is hidden so it never overlaps the input. Corners are 22px/14px
   (round), controls use the dock spring curve, selection uses a `layoutId` thumb.
+- The shipped component (`src/components/CommandPalette.tsx`) is the macOS-Tahoe / iOS-27
+  Siri-inspired build: glass search pill with a filter scope row (All / Commands / Folders /
+  Documents / Images / Code), ranked file results, an app-launcher Actions grid, and an
+  "Ask Squid AI" mode (Tab) with streaming answers. It self-contains its CSS and uses the
+  new optional props `aiContext`, `currentFolder` and `onActionComplete` (wired from
+  Dashboard so AI answers can act on the open file/folder and refresh the list).
 
 `src/components/CommandPalette.tsx` is the global search — same floating tier as the dock:
 - One `.spot-panel` capsule (near-black glass, hairline rim, 14px radius), spring pop-in.

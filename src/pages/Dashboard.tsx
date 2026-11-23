@@ -1704,6 +1704,13 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
             onSetViewMode={setViewMode}
             currentViewMode={viewMode}
             selectedFilesCount={selectedFiles.size}
+            currentFolder={currentFolder}
+            aiContext={previewFile ? {
+              fileName: previewFile.name,
+              fileType: previewFile.type,
+              filePath: previewFile.parent_folder || currentFolder,
+            } : undefined}
+            onActionComplete={fetchFiles}
           />
 
           <StorageProviderManager
@@ -2174,6 +2181,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
           onRefresh={fetchFiles}
           onSignOut={signOut}
           currentFolder={currentFolder}
+          aiContext={previewFile ? {
+            fileName: previewFile.name,
+            fileType: previewFile.type,
+            filePath: previewFile.parent_folder || currentFolder,
+          } : undefined}
+          onActionComplete={fetchFiles}
         />
 
         <StorageProviderManager

@@ -37,7 +37,8 @@ import {
   User,
   KeyRound,
   RefreshCw,
-  LogOut
+  LogOut,
+  Sparkles
 } from '@/lib/icon-map';
 import {
   Dialog,
@@ -46,65 +47,109 @@ import {
 import { BottomSheet, BottomSheetContent } from '@/components/ui/bottom-sheet';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { squidAI } from '@/services/squid-ai';
+import { SquidAITools } from '@/services/squid-ai-tools';
+import { useToast } from '@/hooks/use-toast';
 
-/* ── Spotlight styles: same floating dark-glass tier as the dock & sidebar.
-      One leading surface, hairline rules, mono micro-labels, no white fills. ── */
+/* ── Spotlight · macOS Tahoe liquid glass + iOS 27 "Siri AI" mode ── */
+const SPRING = 'linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1)';
+
 const SPOTLIGHT_CSS = `
-html.sq-app-root .spot-panel {
-  --sp-spring: linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1);
-  --sp-fill: color-mix(in srgb, var(--sa-bg-2, #141612) 88%, transparent);
-  --sp-line: rgba(232,231,225,0.09);
-  background: var(--sp-fill); border: 1px solid var(--sp-line); border-radius: 22px;
-  -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,0.1), 0 30px 70px -24px rgba(0,0,0,0.8);
-  color: var(--sa-text); font-family: var(--sa-f, inherit); overflow: hidden;
-}
-/* clean input bar: one rounded search capsule, nothing inside competes */
-html.sq-app-root .spot-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--sp-line); }
-html.sq-app-root .spot-searchbar { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; height: 42px; padding: 0 14px;
-  border-radius: 999px; border: 1px solid var(--sp-line); background: rgba(13,14,13,0.6);
-  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
-html.sq-app-root .spot-searchbar > svg { flex: none; color: var(--sa-mute); }
-html.sq-app-root .spot-input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--sa-text);
-  font: 400 15px/1.4 var(--sa-f, inherit); }
-html.sq-app-root .spot-input::placeholder { color: var(--sa-mute); }
-html.sq-app-root .spot-input:focus-visible { outline: none; }
-html.sq-app-root .spot-clear { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border: 0; border-radius: 999px;
-  background: rgba(232,231,225,0.07); color: var(--sa-mute); cursor: pointer; transition: all 0.2s var(--sp-spring); }
-html.sq-app-root .spot-clear:hover { color: var(--sa-text); background: rgba(232,231,225,0.14); }
-html.sq-app-root .spot-clear:active { transform: scale(0.88); }
-html.sq-app-root .spot-close { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 999px;
-  border: 1px solid var(--sp-line); background: rgba(13,14,13,0.6); color: var(--sa-mute); cursor: pointer; transition: all 0.2s var(--sp-spring); }
-html.sq-app-root .spot-close:hover { color: var(--sa-text); background: rgba(232,231,225,0.1); }
-html.sq-app-root .spot-close:active { transform: scale(0.9); }
-html.sq-app-root .spot-list { overflow-y: auto; min-height: 0; }
-html.sq-app-root .spot-group-label { font: 500 10px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--sa-mute); padding: 14px 18px 8px; }
-html.sq-app-root .spot-row { position: relative; display: flex; align-items: center; gap: 12px; margin: 2px 10px; padding: 10px 12px;
-  border-radius: 14px; cursor: pointer; color: var(--sa-text-2, var(--sa-text)); list-style: none; transition: color 0.2s var(--sp-spring); }
-html.sq-app-root .spot-row[data-selected="true"] { color: var(--sa-text); }
-html.sq-app-root .spot-row-thumb { position: absolute; inset: 0; border-radius: 14px; background: rgba(232,231,225,0.09);
-  border: 1px solid rgba(232,231,225,0.08); box-shadow: inset 0 1px 0 rgba(232,231,225,0.08); }
-html.sq-app-root .spot-ico { position: relative; z-index: 1; display: grid; place-items: center; width: 38px; height: 38px; flex: none;
-  border-radius: 12px; border: 1px solid var(--sp-line); background: rgba(232,231,225,0.05); color: var(--sa-text); }
-html.sq-app-root .spot-main { position: relative; z-index: 1; flex: 1; min-width: 0; }
-html.sq-app-root .spot-label { font-size: 13.5px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html.sq-app-root .spot-desc { font-size: 11.5px; color: var(--sa-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-html.sq-app-root .spot-kbd { position: relative; z-index: 1; font: 400 10.5px/1 var(--sa-mono, ui-monospace, monospace);
-  padding: 4px 7px; border-radius: 6px; border: 1px solid var(--sp-line); background: rgba(232,231,225,0.04); color: var(--sa-mute); }
-html.sq-app-root .spot-enter { position: relative; z-index: 1; color: var(--sa-mute); }
-html.sq-app-root .spot-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 48px 24px; color: var(--sa-mute); }
-html.sq-app-root .spot-empty p { font-size: 13.5px; color: var(--sa-text-2, var(--sa-text)); }
-html.sq-app-root .spot-empty span { font-size: 12px; margin-top: 6px; }
-html.sq-app-root .spot-foot { display: flex; align-items: center; gap: 16px; padding: 12px 18px; border-top: 1px solid var(--sp-line);
-  background: rgba(232,231,225,0.02); font-size: 11px; color: var(--sa-mute); }
-html.sq-app-root .spot-foot > span { display: inline-flex; align-items: center; gap: 6px; }
-html.sq-app-root .spot-foot kbd { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); padding: 3px 6px; border-radius: 5px;
-  border: 1px solid var(--sp-line); background: rgba(232,231,225,0.05); color: var(--sa-text-2, var(--sa-text)); }
-@media (prefers-reduced-motion: reduce) { html.sq-app-root .spot-row, html.sq-app-root .spot-row-thumb, html.sq-app-root .spot-clear, html.sq-app-root .spot-close { transition-duration: 0.01ms !important; } }
+.spot-shell.spot-shell { top: 16vh !important; left: 50% !important; translate: -50% 0 !important; transform: none !important; max-width: 680px; width: calc(100% - 32px);
+  background: transparent !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  animation: none !important; border-radius: 0 !important; padding: 0 !important; overflow: visible !important; }
+.spot-shell > button { display: none !important; }
+.spot-root { --ink: var(--sa-text, #f5f5f7); --mute: color-mix(in srgb, var(--ink) 58%, transparent); --glass: rgba(38,40,50,.52); --hi: rgba(255,255,255,.1); --line: rgba(255,255,255,.13); --rim: rgba(255,255,255,.34);
+  display: flex; flex-direction: column; gap: 12px; color: var(--ink); font-family: var(--sa-f, -apple-system, 'SF Pro Text', system-ui, sans-serif); }
+html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #1c1c1e; --glass: rgba(255,255,255,.58); --hi: rgba(255,255,255,.72); --line: rgba(0,0,0,.08); --rim: rgba(255,255,255,.95); }
+.spot-root[data-mobile="true"] { flex: 1; min-height: 0; gap: 0; padding: 18px 14px 0; }
+.spot-top { display: flex; align-items: center; gap: 10px; }
+.spot-orbs { display: flex; gap: 8px; }
+
+.spot-glass { position: relative; isolation: isolate; background: linear-gradient(180deg, var(--hi), var(--glass)); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(38px) saturate(2); backdrop-filter: blur(38px) saturate(2);
+  box-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 rgba(255,255,255,.05), 0 28px 70px -22px rgba(0,0,0,.55), 0 3px 12px rgba(0,0,0,.2); }
+.spot-pill { flex: 1; min-width: 0; height: 54px; border-radius: 999px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 16px; }
+.spot-root[data-mobile="true"] .spot-pill { height: 46px; background: rgba(128,128,140,.16); box-shadow: inset 0 1px 0 var(--rim); }
+.spot-round { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); cursor: pointer; transition: scale .6s ${SPRING}, background-color .2s; }
+.spot-round:hover { scale: 1.06; } .spot-round:active { scale: .92; transition-duration: .12s; }
+.spot-round[data-on="true"] { background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.14)); }
+.spot-lead { display: grid; place-items: center; color: var(--mute); width: 22px; flex: none; }
+.spot-input.spot-input.spot-input { all: unset; flex: 1; min-width: 0; font-size: 20px; letter-spacing: -.01em; color: var(--ink); caret-color: #8fa4ff; background: none !important; border: 0 !important; box-shadow: none !important; }
+.spot-input::placeholder { color: var(--mute); }
+.spot-clear, .spot-close { display: grid; place-items: center; flex: none; border-radius: 50%; color: var(--mute); cursor: pointer; border: 0; background: transparent; }
+.spot-clear { width: 24px; height: 24px; } .spot-clear:hover, .spot-close:hover { color: var(--ink); background: var(--hi); }
+.spot-close { width: 40px; height: 40px; }
+.spot-token { flex: none; font-size: 14px; padding: 4px 11px; border-radius: 999px; background: color-mix(in srgb, #8fa4ff 24%, transparent); border: 1px solid color-mix(in srgb, #8fa4ff 40%, transparent); color: var(--ink); cursor: pointer; }
+.spot-hint, .spot-go { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+.spot-root kbd { font: 500 11px/1 var(--sa-f, system-ui); padding: 3px 6px; border-radius: 6px; background: var(--hi); border: 1px solid var(--line); color: var(--mute); }
+
+/* Siri AI: dark island glass, soft drifting colour, thin edge glow */
+.spot-pill::before, .spot-ai::before, .spot-pill::after, .spot-ai::after { content: ''; position: absolute; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .7s ease; }
+.spot-pill::before, .spot-ai::before { inset: 0; z-index: -1; background-size: 220% 220%; }
+.spot-pill::after, .spot-ai::after { inset: -1px; z-index: 1; border: 1px solid rgba(255,255,255,.5); box-shadow: 0 0 22px rgba(140,150,255,.32), 0 0 2px rgba(255,255,255,.55), inset 0 0 18px rgba(170,160,255,.16); }
+.spot-pill[data-ai="true"] { --ink: #fff; --mute: rgba(255,255,255,.58); background: linear-gradient(180deg, rgba(34,36,52,.8), rgba(10,11,20,.88)); border-color: rgba(255,255,255,.16);
+  animation: spot-swell .8s ${SPRING} both; box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 28px 70px -22px rgba(90,100,200,.45); }
+.spot-pill[data-ai="true"]::before { opacity: 1; animation: spot-drift 7s ease-in-out infinite alternate; background-image:
+  radial-gradient(48% 90% at 18% 110%, rgba(122,142,255,.6), transparent 70%), radial-gradient(44% 90% at 52% 120%, rgba(176,140,255,.5), transparent 70%),
+  radial-gradient(40% 80% at 84% 115%, rgba(244,164,200,.45), transparent 70%), radial-gradient(30% 70% at 66% -20%, rgba(255,206,160,.28), transparent 70%); }
+.spot-pill[data-ai="true"]::after, .spot-ai[data-on="true"]::after { opacity: .9; animation: spot-glow 3.4s ease-in-out infinite; }
+.spot-ai[data-on="true"]::before { opacity: 1; background-image: radial-gradient(70% 90% at 20% 110%, rgba(122,142,255,.6), transparent 70%), radial-gradient(60% 90% at 85% 110%, rgba(244,164,200,.5), transparent 70%); }
+.spot-pill[data-busy="true"]::before { animation-duration: 2.2s; } .spot-pill[data-busy="true"]::after { animation-duration: 1.4s; }
+.spot-orb { display: block; width: 20px; height: 20px; border-radius: 50%; flex: none; background-color: #1a1c2c; background-size: 220% 220%;
+  background-image: radial-gradient(circle at 28% 24%, rgba(255,255,255,.75), transparent 34%), radial-gradient(circle at 25% 80%, #7a8eff, transparent 60%), radial-gradient(circle at 80% 75%, #f4a4c8, transparent 58%), radial-gradient(circle at 70% 20%, #b08cff, transparent 60%);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.6), 0 0 14px rgba(150,150,255,.5); animation: spot-drift 5s ease-in-out infinite alternate; }
+.spot-orb[data-busy="true"] { animation-duration: 1.6s; } .spot-orb.big { width: 56px; height: 56px; box-shadow: inset 0 2px 3px rgba(255,255,255,.6), 0 0 36px rgba(150,150,255,.45); }
+
+/* panel */
+.spot-panel { border-radius: 30px; display: grid; grid-template-rows: 0fr; opacity: 0; translate: 0 -10px; scale: .97; transform-origin: top center; pointer-events: none;
+  transition: grid-template-rows .7s ${SPRING}, opacity .25s ease, translate .7s ${SPRING}, scale .7s ${SPRING}; }
+.spot-panel[data-open="true"] { grid-template-rows: 1fr; opacity: 1; translate: 0 0; scale: 1; pointer-events: auto; }
+.spot-panel[data-ai="true"] { background: linear-gradient(180deg, rgba(255,255,255,.3), var(--glass)); }
+.spot-panel > * { min-height: 0; } .spot-panel > .spot-clip { overflow: hidden; border-radius: 30px 30px 0 0; display: flex; flex-direction: column; }
+.spot-panel > .spot-foot { overflow: hidden; }
+.spot-root[data-mobile="true"] .spot-panel { flex: 1; grid-template-rows: 1fr; opacity: 1; translate: none; scale: 1; pointer-events: auto; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.spot-root[data-mobile="true"] .spot-panel > .spot-clip { border-radius: 0; }
+.spot-chips { display: flex; gap: 8px; padding: 14px 16px 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.spot-chips button { flex: none; padding: 6px 14px; border-radius: 999px; font-size: 13.5px; color: var(--mute); background: transparent; border: 1px solid var(--line); cursor: pointer; transition: background-color .2s, color .2s; }
+.spot-chips button:hover { background: var(--hi); color: var(--ink); }
+.spot-chips button[data-on="true"] { background: var(--ink); color: #111; border-color: transparent; }
+.spot-list { overflow-y: auto; min-height: 0; padding: 6px 10px 10px; scrollbar-width: thin; max-height: min(400px, 50vh); }
+.spot-root[data-mobile="true"] .spot-list { max-height: none; flex: 1; }
+.spot-group-label { font-size: 12.5px; font-weight: 500; color: var(--mute); padding: 10px 12px 6px; }
+.spot-row.spot-row { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 16px; cursor: pointer; color: var(--ink); list-style: none; background: transparent !important; }
+.spot-row-thumb { position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.1)); box-shadow: inset 0 1px 0 var(--rim); }
+.spot-ico { position: relative; z-index: 1; width: 38px; height: 38px; flex: none; border-radius: 11px; display: grid; place-items: center; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 10px -4px rgba(0,0,0,.45); }
+.spot-ico.spot-ico-ai { background: rgba(20,20,28,.6); }
+.spot-main { position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.spot-label { font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .spot-label b { font-weight: 700; }
+.spot-desc { font-size: 12.5px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spot-kbd, .spot-enter { position: relative; z-index: 1; } .spot-enter { color: var(--mute); }
+.spot-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 40px 24px; color: var(--mute); gap: 6px; font-size: 13.5px; }
+.spot-empty p { margin: 0; font-size: 15px; color: var(--ink); }
+
+/* ask */
+.spot-ask { padding: 22px 26px 24px; min-height: 120px; max-height: min(420px, 55vh); overflow-y: auto; flex: 1; }
+.spot-ask-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; color: var(--mute); padding: 8px 0; }
+.spot-ask-empty p { margin: 0; font-size: 15px; }
+.spot-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.spot-suggest button { padding: 7px 14px; border-radius: 999px; font-size: 13.5px; color: var(--ink); background: var(--hi); border: 1px solid var(--line); cursor: pointer; }
+.spot-answer { margin: 0; font-size: 20px; line-height: 1.42; font-weight: 450; letter-spacing: -.012em; white-space: pre-wrap; animation: spot-rise .6s ${SPRING} both; } .spot-answer b { font-weight: 700; }
+.spot-searching { display: inline-block; font-size: 18px; font-weight: 500; padding: 4px 0 10px; color: transparent; background: linear-gradient(100deg, var(--mute) 30%, var(--ink) 50%, var(--mute) 70%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; animation: spot-shimmer 1.6s linear infinite; text-shadow: 0 0 18px rgba(150,160,255,.35); }
+.spot-foot { display: flex; gap: 18px; padding: 10px 20px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mute); white-space: nowrap; overflow-x: auto; }
+.spot-foot > span { display: inline-flex; align-items: center; gap: 6px; }
+
+.spot-root button:focus-visible { outline: 2px solid #8fa4ff; outline-offset: 2px; }
+@keyframes spot-drift { from { background-position: 0% 40%; } to { background-position: 100% 60%; } }
+@keyframes spot-glow { 50% { opacity: .45; } }
+@keyframes spot-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@keyframes spot-swell { 0% { scale: .9 .8; } 100% { scale: 1; } }
+@keyframes spot-rise { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .spot-root *, .spot-root *::before, .spot-root *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 `;
 
-type CommandCategory = 'files' | 'navigation' | 'actions' | 'view' | 'create' | 'recent';
+type CommandCategory = 'files' | 'navigation' | 'actions' | 'view' | 'create' | 'recent' | 'ai';
+type Scope = 'all' | 'commands' | 'folder' | 'doc' | 'image' | 'code';
 
 interface CommandItem {
   id: string;
@@ -115,6 +160,7 @@ interface CommandItem {
   shortcut?: string;
   action: () => void;
   keywords?: string[];
+  kind?: 'folder' | 'doc' | 'image' | 'code' | 'other';
 }
 
 // File item interface for search
@@ -168,6 +214,11 @@ interface CommandPaletteProps {
   files?: SearchableFile[];
   folders?: Array<{ id: string; name: string; path: string }>;
   onOpenFile?: (file: SearchableFile) => void;
+
+  // Squid AI (Tab, or the "Ask Squid AI" row)
+  aiContext?: { fileName?: string; fileType?: string; filePath?: string; fileContent?: string };
+  currentFolder?: string;
+  onActionComplete?: () => void;
 }
 
 const categoryLabels: Record<CommandCategory, string> = {
@@ -177,9 +228,10 @@ const categoryLabels: Record<CommandCategory, string> = {
   actions: 'Actions',
   view: 'View',
   create: 'Create',
+  ai: 'Squid AI',
 };
 
-const categoryOrder: CommandCategory[] = ['files', 'recent', 'navigation', 'actions', 'view', 'create'];
+const categoryOrder: CommandCategory[] = ['files', 'recent', 'navigation', 'actions', 'view', 'create', 'ai'];
 
 const scoreTextMatch = (text: string, query: string): number => {
   const target = text.toLowerCase();
@@ -217,6 +269,27 @@ const getFileIcon = (type: string, name: string) => {
   return <File className="w-4 h-4 text-muted-foreground" />;
 };
 
+const CODE_EXT = ['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'go', 'rs', 'rb', 'php', 'swift', 'kt', 'json', 'html', 'css', 'sql', 'sh'];
+const getKind = (type: string, name: string): 'doc' | 'image' | 'code' | 'other' => {
+  const m = (type || '').toLowerCase();
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+  if (m.startsWith('image/')) return 'image';
+  if (CODE_EXT.includes(ext) || /javascript|typescript|json|html|css/.test(m)) return 'code';
+  if (m === 'application/pdf' || m.startsWith('text/') || /spreadsheet|presentation|word/.test(m) || ['pdf', 'txt', 'md', 'rtf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx'].includes(ext)) return 'doc';
+  return 'other';
+};
+const TINT: Record<string, string> = {
+  folder: 'linear-gradient(160deg,#6cc6ff,#2f8cff)', image: 'linear-gradient(160deg,#ff9bd0,#ff6a5c)', doc: 'linear-gradient(160deg,#ffd27a,#ff9a3d)',
+  code: 'linear-gradient(160deg,#9f8bff,#5a63ff)', other: 'linear-gradient(160deg,#b9c0cc,#7b8494)',
+  navigation: 'linear-gradient(160deg,#7db4ff,#3c6df0)', actions: 'linear-gradient(160deg,#ffb25c,#ff6a3d)', view: 'linear-gradient(160deg,#b79bff,#6a5cff)',
+  create: 'linear-gradient(160deg,#7be3a1,#1fae6a)', recent: 'linear-gradient(160deg,#c3c9d4,#7b8494)', danger: 'linear-gradient(160deg,#ff8a8a,#e5484d)',
+};
+const DANGER = ['action-delete', 'action-signout', 'nav-trash'];
+const SCOPES: { id: Scope; label: string }[] = [
+  { id: 'all', label: 'All' }, { id: 'commands', label: 'Commands' }, { id: 'folder', label: 'Folders' },
+  { id: 'doc', label: 'Documents' }, { id: 'image', label: 'Images' }, { id: 'code', label: 'Code' },
+];
+
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
   open,
   onOpenChange,
@@ -247,6 +320,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   files = [],
   folders = [],
   onOpenFile,
+  aiContext,
+  currentFolder = '',
+  onActionComplete,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -256,6 +332,76 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const reduce = !!useReducedMotion();
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase();
+  const [scope, setScope] = useState<Scope>('all');
+  const [mode, setMode] = useState<'search' | 'ask'>('search');
+  const [response, setResponse] = useState('');
+  const [shown, setShown] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const aiReady = useRef(false);
+  const askRef = useRef<(q?: string) => void>(() => {});
+  const { toast } = useToast();
+
+  const finish = (title: string, description: string, ms: number) => {
+    toast({ title, description });
+    onActionComplete?.();
+    setTimeout(() => onOpenChange(false), ms);
+  };
+
+  const runAIAction = async (action: any) => {
+    try {
+      switch (action.action) {
+        case 'ORGANIZE_FILES': {
+          const r = await SquidAITools.organizeFilesByType(files as any[], currentFolder);
+          finish('Files organized', r.summary, 2000);
+          break;
+        }
+        case 'CREATE_FOLDER': {
+          const ok = await SquidAITools.createFolder(action.parameters.folderName, action.parameters.parentPath || currentFolder);
+          if (ok) finish('Folder created', `Created “${action.parameters.folderName}”`, 1500);
+          break;
+        }
+        case 'MOVE_FILES': {
+          const n = await SquidAITools.moveFilesToFolder(action.parameters.fileIds, action.parameters.targetFolder);
+          finish('Files moved', `Moved ${n} files`, 1500);
+          break;
+        }
+      }
+    } catch (error: any) {
+      toast({ title: 'Action failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const ask = async (raw?: string) => {
+    const query = (raw ?? searchQuery).trim();
+    if (!query || isLoading) return;
+    setMode('ask'); setSearchQuery(query); setIsLoading(true); setResponse('');
+    try {
+      if (!aiReady.current) aiReady.current = await squidAI.initialize();
+      if (!aiReady.current) {
+        setResponse('Squid AI isn’t set up yet. Add GEMINI_API_KEY to your Supabase secrets.');
+        return;
+      }
+      const result = await squidAI.chat(query, aiContext);
+      setResponse(result.message);
+      if (result.action) await runAIAction(result.action);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setResponse('Something went wrong. Try asking again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  askRef.current = ask;
+
+  // answer types in word by word
+  useEffect(() => {
+    if (!response) { setShown(''); return; }
+    if (reduce) { setShown(response); return; }
+    const w = response.split(/(\s+)/);
+    let i = 0;
+    const id = setInterval(() => { i += 2; setShown(w.slice(0, i).join('')); if (i >= w.length) clearInterval(id); }, 28);
+    return () => clearInterval(id);
+  }, [response, reduce]);
 
   // Build command list
   const commands = useMemo((): CommandItem[] => {
@@ -681,13 +827,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   // Search files and folders when query exists
   const fileSearchResults = useMemo((): CommandItem[] => {
-    if (!normalizedSearchQuery || normalizedSearchQuery.length < 2) return [];
+    const browse = !normalizedSearchQuery && ['folder', 'doc', 'image', 'code'].includes(scope);
+    if ((!normalizedSearchQuery || normalizedSearchQuery.length < 2) && !browse) return [];
+    if (scope === 'commands') return [];
 
     const query = normalizedSearchQuery;
+    const hit = (name: string) => (browse ? 0 : scoreTextMatch(name, query));
     const results: CommandItem[] = [];
 
-    const folderMatches = folders
-      .map(folder => ({ folder, score: scoreTextMatch(folder.name, query) }))
+    const folderMatches = (scope === 'all' || scope === 'folder' ? folders : ([] as typeof folders))
+      .map(folder => ({ folder, score: hit(folder.name) }))
       .filter(item => Number.isFinite(item.score))
       .sort((a, b) => (a.score - b.score) || a.folder.name.length - b.folder.name.length)
       .slice(0, 6);
@@ -696,7 +845,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         results.push({
           id: `folder-${folder.id}`,
           label: folder.name,
-          description: folder.path ? `📁 ${folder.path}` : '📁 Root folder',
+          description: folder.path ? `Folder  ·  ${folder.path}` : 'Folder  ·  Root',
+          kind: 'folder',
           icon: <FolderOpen className="w-4 h-4 text-primary" />,
           category: 'files',
           action: () => {
@@ -707,9 +857,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         });
       });
 
-    const fileMatches = files
-      .filter(file => !file.is_folder)
-      .map(file => ({ file, score: scoreTextMatch(file.name, query) }))
+    const fileMatches = (scope === 'folder' ? ([] as typeof files) : files)
+      .filter(file => !file.is_folder && (scope === 'all' || getKind(file.type, file.name) === scope))
+      .map(file => ({ file, score: hit(file.name) }))
       .filter(item => Number.isFinite(item.score))
       .sort((a, b) => (a.score - b.score) || a.file.name.length - b.file.name.length)
       .slice(0, 14);
@@ -719,7 +869,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         results.push({
           id: `file-${file.id}`,
           label: file.name,
-          description: `${formatSize(file.size)}${folderPath ? ` • ${folderPath}` : ''}`,
+          description: `${formatSize(file.size)}${folderPath ? `  ·  ${folderPath}` : ''}`,
+          kind: getKind(file.type, file.name),
           icon: getFileIcon(file.type, file.name),
           category: 'files',
           action: () => {
@@ -733,7 +884,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       });
 
     return results;
-  }, [normalizedSearchQuery, files, folders, onNavigateToFolder, onOpenFile, onOpenChange]);
+  }, [normalizedSearchQuery, scope, files, folders, onNavigateToFolder, onOpenFile, onOpenChange]);
 
   const commandSearchIndex = useMemo(() => {
     return commands.map(cmd => ({
@@ -742,26 +893,35 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }));
   }, [commands]);
 
-  // Filter commands based on search
-  const filteredCommands = useMemo(() => {
-    // Always include file search results at the top when searching
-    const fileResults = fileSearchResults;
-
-    if (!normalizedSearchQuery) return commands;
-
-    const commandResults = commandSearchIndex
-      .filter(item => item.blob.includes(normalizedSearchQuery))
-      .map(item => item.cmd);
-
-    // Combine file results with command results
-    return [...fileResults, ...commandResults].slice(0, 80);
-  }, [commands, normalizedSearchQuery, fileSearchResults, commandSearchIndex]);
+  // Filter commands based on search + scope, then append the Squid AI row
+  const flatCommands = useMemo((): CommandItem[] => {
+    const q = normalizedSearchQuery;
+    const showCmds = scope === 'all' || scope === 'commands';
+    let list: CommandItem[];
+    if (!q) {
+      list = scope === 'commands' || (isMobile && scope === 'all') ? commands : fileSearchResults;
+    } else {
+      const cmdResults = showCmds ? commandSearchIndex.filter(item => item.blob.includes(q)).map(item => item.cmd) : [];
+      list = [...fileSearchResults, ...cmdResults].slice(0, 80);
+    }
+    if (q) {
+      list = [...list, {
+        id: 'ask-ai',
+        label: `Ask Squid AI “${deferredSearchQuery.trim()}”`,
+        description: list.length ? 'Get an answer, or let Squid do it for you' : 'Nothing matches. Squid can help instead',
+        icon: <Sparkles className="w-4 h-4" />,
+        category: 'ai',
+        action: () => askRef.current(deferredSearchQuery),
+      }];
+    }
+    return list;
+  }, [commands, normalizedSearchQuery, deferredSearchQuery, scope, isMobile, fileSearchResults, commandSearchIndex]);
 
   // Group filtered commands by category
   const groupedCommands = useMemo(() => {
     const groups = new Map<CommandCategory, CommandItem[]>();
     
-    filteredCommands.forEach(cmd => {
+    flatCommands.forEach(cmd => {
       if (!groups.has(cmd.category)) {
         groups.set(cmd.category, []);
       }
@@ -775,30 +935,37 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         label: categoryLabels[cat],
         items: groups.get(cat)!,
       }));
-  }, [filteredCommands]);
+  }, [flatCommands]);
 
-  // Flatten for keyboard navigation
-  const flatCommands = filteredCommands;
 
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
-      setSearchQuery('');
-      setSelectedIndex(0);
+      setSearchQuery(''); setSelectedIndex(0); setScope('all'); setMode('search'); setResponse(''); setShown('');
       const frame = requestAnimationFrame(() => inputRef.current?.focus());
       return () => cancelAnimationFrame(frame);
     }
   }, [open]);
+
+  useEffect(() => setSelectedIndex(0), [scope]);
 
   // Keyboard navigation
   useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
+      if (mode === 'ask') {
+        if (e.key === 'Enter') { e.preventDefault(); askRef.current(); }
+        else if (e.key === 'Tab') { e.preventDefault(); setMode('search'); setResponse(''); }
+        else if (e.key === 'Escape') onOpenChange(false);
+        return;
+      }
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedIndex(prev => Math.min(prev + 1, flatCommands.length - 1));
+          if (!flatCommands.length && !searchQuery && scope === 'all') setScope('commands');
+          else setSelectedIndex(prev => Math.min(prev + 1, flatCommands.length - 1));
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -806,9 +973,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           break;
         case 'Enter':
           e.preventDefault();
-          if (flatCommands[selectedIndex]) {
-            flatCommands[selectedIndex].action();
-          }
+          flatCommands[selectedIndex]?.action();
+          break;
+        case 'Tab':
+          e.preventDefault();
+          if (searchQuery.trim()) askRef.current(); else setMode('ask');
+          break;
+        case 'Backspace':
+          if (!searchQuery && scope !== 'all') setScope('all');
           break;
         case 'Escape':
           onOpenChange(false);
@@ -818,7 +990,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, flatCommands, selectedIndex, onOpenChange]);
+  }, [open, flatCommands, selectedIndex, onOpenChange, mode, scope, searchQuery]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -839,122 +1011,186 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   }, [flatCommands.length, selectedIndex]);
 
   let currentIndex = 0;
+  const aiOn = mode === 'ask';
+  const panelOpen = isMobile || aiOn || flatCommands.length > 0 || scope !== 'all';
+  const tintFor = (cmd: CommandItem) => (DANGER.includes(cmd.id) ? TINT.danger : TINT[cmd.kind || cmd.category]);
+  const labelWithMatch = (text: string) => {
+    const q = normalizedSearchQuery;
+    const i = q ? text.toLowerCase().indexOf(q) : -1;
+    return i < 0 ? text : <>{text.slice(0, i)}<b>{text.slice(i, i + q.length)}</b>{text.slice(i + q.length)}</>;
+  };
+  const pickScope = (s: Scope) => { setMode('search'); setScope(prev => (prev === s && s !== 'all' ? 'all' : s)); inputRef.current?.focus(); };
 
   // Shared content for both mobile and desktop
   const commandContent = (
-    <>
+    <div className="spot-root" data-mobile={isMobile}>
       <style>{SPOTLIGHT_CSS}</style>
 
-      {/* Search header — one clean rounded input bar + own close pill */}
-      <div className="spot-head">
-        <div className="spot-searchbar">
-          <Search className="w-[17px] h-[17px] shrink-0" />
+      {/* Pill + round glass buttons (Commands / Files / Folders / Ask AI) */}
+      <div className="spot-top">
+        <div className="spot-glass spot-pill" data-ai={aiOn} data-busy={isLoading}>
+          <span className="spot-lead">{aiOn ? <i className="spot-orb" data-busy={isLoading} /> : <Search className="w-5 h-5" />}</span>
+          {scope !== 'all' && !aiOn && (
+            <button type="button" className="spot-token" onClick={() => setScope('all')} aria-label="Clear filter">
+              {SCOPES.find(s => s.id === scope)?.label}
+            </button>
+          )}
           <input
             ref={inputRef}
             type="text"
-            placeholder={isMobile ? "Search files, folders or commands…" : "Search files, folders, or type a command…"}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder={aiOn ? 'Ask Squid AI…' : isMobile ? 'Search or ask…' : 'Spotlight Search'}
             value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setSelectedIndex(0); }}
+            onChange={(e) => { setSearchQuery(e.target.value); setSelectedIndex(0); if (mode === 'ask') { setMode('search'); setResponse(''); } }}
             className="spot-input"
-            aria-label="Search files and commands"
+            aria-label="Search files and commands, or ask Squid AI"
           />
           {searchQuery && (
             <button type="button" className="spot-clear" aria-label="Clear search"
-              onClick={() => { setSearchQuery(''); setSelectedIndex(0); inputRef.current?.focus(); }}>
-              <X className="w-3.5 h-3.5" />
+              onClick={() => { setSearchQuery(''); setSelectedIndex(0); setResponse(''); setMode('search'); inputRef.current?.focus(); }}>
+              <X className="w-4 h-4" />
             </button>
           )}
+          {!isMobile && !!searchQuery && !aiOn && <span className="spot-hint">Ask <kbd>tab</kbd></span>}
         </div>
-        <button type="button" className="spot-close" aria-label="Close search"
-          onClick={() => onOpenChange(false)}>
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Results — grouped, one sliding selection thumb */}
-      <div ref={listRef} className={cn("spot-list", isMobile ? "flex-1" : "max-h-[380px]")}>
-        {groupedCommands.map((group) => (
-          <div key={group.category}>
-            <div className="spot-group-label">{group.label}</div>
-            {group.items.map((cmd) => {
-              const itemIndex = currentIndex++;
-              const isSelected = !isMobile && itemIndex === selectedIndex;
-              return (
-                <motion.div
-                  key={cmd.id}
-                  data-index={itemIndex}
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={cmd.action}
-                  onMouseEnter={() => !isMobile && setSelectedIndex(itemIndex)}
-                  whileTap={reduce ? undefined : { scale: 0.985 }}
-                  className="spot-row"
-                  data-selected={isSelected}
-                >
-                  {isSelected && (
-                    <motion.span
-                      layoutId="spotlight-selected"
-                      className="spot-row-thumb"
-                      transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 34, mass: 0.9 }}
-                    />
-                  )}
-                  <span className="spot-ico">
-                    {React.cloneElement(cmd.icon as React.ReactElement, { className: "w-[17px] h-[17px]" })}
-                  </span>
-                  <span className="spot-main">
-                    <span className="spot-label">{cmd.label}</span>
-                    {cmd.description && <span className="spot-desc" style={{ display: 'block' }}>{cmd.description}</span>}
-                  </span>
-                  {!isMobile && cmd.shortcut && <kbd className="spot-kbd">{cmd.shortcut}</kbd>}
-                  {!isMobile && isSelected && <CornerDownLeft className="spot-enter w-4 h-4 shrink-0" />}
-                  {isMobile && <ArrowRight className="spot-enter w-4 h-4 shrink-0" />}
-                </motion.div>
-              );
-            })}
+        {!isMobile ? (
+          <div className="spot-orbs">
+            <button type="button" className="spot-glass spot-round" data-on={scope === 'commands'} onClick={() => pickScope('commands')} aria-label="Commands" title="Commands"><Command className="w-5 h-5" /></button>
+            <button type="button" className="spot-glass spot-round" data-on={scope === 'doc'} onClick={() => pickScope('doc')} aria-label="Files" title="Files"><FileText className="w-5 h-5" /></button>
+            <button type="button" className="spot-glass spot-round" data-on={scope === 'folder'} onClick={() => pickScope('folder')} aria-label="Folders" title="Folders"><Folder className="w-5 h-5" /></button>
+            <button type="button" className="spot-glass spot-round spot-ai" data-on={aiOn} onClick={() => { setMode(aiOn ? 'search' : 'ask'); inputRef.current?.focus(); }} aria-label="Ask Squid AI" title="Ask Squid AI"><Sparkles className="w-5 h-5" /></button>
           </div>
-        ))}
-
-        {flatCommands.length === 0 && (
-          <div className="spot-empty" role="status">
-            <Search className="w-8 h-8 mb-3 opacity-40" />
-            <p>{searchQuery.length > 0 ? "No files or commands found" : "No commands found"}</p>
-            <span>{searchQuery.length > 0 ? "Try a different search term" : "Start typing to search"}</span>
-          </div>
+        ) : (
+          <button type="button" className="spot-close" aria-label="Close search" onClick={() => onOpenChange(false)}><X className="w-5 h-5" /></button>
         )}
       </div>
 
-      {/* Footer hints — desktop only */}
-      {!isMobile && (
-        <div className="spot-foot">
-          <span><kbd>↑↓</kbd> Navigate</span>
-          <span><kbd>↵</kbd> Run</span>
-          <span><kbd>esc</kbd> Close</span>
+      <div className="spot-glass spot-panel" data-open={panelOpen} data-ai={aiOn}>
+        <div className="spot-clip">
+          {!aiOn && (
+            <>
+              <div className="spot-chips" role="tablist">
+                {SCOPES.map(s => (
+                  <button key={s.id} type="button" role="tab" aria-selected={scope === s.id} data-on={scope === s.id}
+                    onClick={() => { setScope(s.id); inputRef.current?.focus(); }}>{s.label}</button>
+                ))}
+              </div>
+
+              {/* Results: grouped, one sliding selection thumb */}
+              <div ref={listRef} className="spot-list">
+                {groupedCommands.map((group) => (
+                  <div key={group.category}>
+                    {group.category !== 'ai' && <div className="spot-group-label">{group.label}</div>}
+                    {group.items.map((cmd) => {
+                      const itemIndex = currentIndex++;
+                      const isSelected = !isMobile && itemIndex === selectedIndex;
+                      return (
+                        <motion.div
+                          key={cmd.id}
+                          data-index={itemIndex}
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={cmd.action}
+                          onMouseEnter={() => !isMobile && setSelectedIndex(itemIndex)}
+                          whileTap={reduce ? undefined : { scale: 0.985 }}
+                          className="spot-row"
+                          data-selected={isSelected}
+                        >
+                          {isSelected && (
+                            <motion.span
+                              layoutId="spotlight-selected"
+                              className="spot-row-thumb"
+                              transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 34, mass: 0.9 }}
+                            />
+                          )}
+                          {cmd.category === 'ai' ? (
+                            <span className="spot-ico spot-ico-ai"><i className="spot-orb" /></span>
+                          ) : (
+                            <span className="spot-ico" style={{ background: tintFor(cmd) }}>
+                              {React.cloneElement(cmd.icon as React.ReactElement, { className: 'w-[19px] h-[19px] text-white' })}
+                            </span>
+                          )}
+                          <span className="spot-main">
+                            <span className="spot-label">{labelWithMatch(cmd.label)}</span>
+                            {cmd.description && <span className="spot-desc">{cmd.description}</span>}
+                          </span>
+                          {!isMobile && cmd.shortcut && <kbd className="spot-kbd">{cmd.shortcut}</kbd>}
+                          {!isMobile && isSelected && (cmd.category === 'ai'
+                            ? <span className="spot-go">Ask <CornerDownLeft className="w-3.5 h-3.5" /></span>
+                            : <CornerDownLeft className="spot-enter w-4 h-4 shrink-0" />)}
+                          {isMobile && <ArrowRight className="spot-enter w-4 h-4 shrink-0" />}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                ))}
+
+                {flatCommands.length === 0 && (
+                  <div className="spot-empty" role="status">
+                    <Search className="w-8 h-8 opacity-40" />
+                    <p>Nothing here yet</p>
+                    <span>{scope === 'all' ? 'Start typing to search' : 'Type to narrow down this filter'}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {aiOn && (
+            <div className="spot-ask" role="status" aria-live="polite">
+              {!response && !isLoading && (
+                <div className="spot-ask-empty">
+                  <i className="spot-orb big" />
+                  <p>Ask about your files, or tell Squid what to do.</p>
+                  <div className="spot-suggest">
+                    {['Organize my files', 'Create a new folder', 'Generate README'].map(p => (
+                      <button key={p} type="button" onClick={() => ask(p)}>{p}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {isLoading && <div className="spot-searching">Searching…</div>}
+              {shown && <p className="spot-answer">{shown.split(/\*\*(.+?)\*\*/g).map((t, i) => (i % 2 ? <b key={i}>{t}</b> : t))}</p>}
+            </div>
+          )}
         </div>
-      )}
-    </>
+
+        {/* Footer hints — desktop only */}
+        {!isMobile && (
+          <div className="spot-foot">
+            <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+            <span><kbd>↵</kbd> {aiOn ? 'Send' : 'Run'}</span>
+            <span><kbd>tab</kbd> {aiOn ? 'Back to search' : 'Ask Squid AI'}</span>
+            <span><kbd>esc</kbd> Close</span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 
-  // Mobile: full-screen sheet from bottom, same surface language
+  // Mobile: sheet from bottom, same glass language
   if (isMobile) {
     return (
       <BottomSheet open={open} onOpenChange={onOpenChange}>
-        <BottomSheetContent className="spot-panel flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 rounded-t-[22px]">
+        <BottomSheetContent className="flex h-[85dvh] max-h-[85dvh] min-h-0 flex-col p-0 overflow-hidden">
           {commandContent}
         </BottomSheetContent>
       </BottomSheet>
     );
   }
 
-  // Desktop: centered floating panel with a spring pop-in
+  // Desktop: the Spotlight emerges from a small pill at the top, with a springy overshoot
   return (
     <AnimatePresence>
       {open && (
         <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="spot-panel max-w-[600px] w-full p-0 gap-0 [&>[data-slot='dialog-close']]:hidden">
+          <DialogContent className="spot-shell p-0 gap-0 [&>[data-slot='dialog-close']]:hidden">
             <motion.div
-              initial={reduce ? false : { opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 30, mass: 0.9 }}
+              style={{ transformOrigin: 'top center' }}
+              initial={reduce ? false : { opacity: 0, scaleX: 0.4, scaleY: 0.55, y: -24, filter: 'blur(12px)' }}
+              animate={{ opacity: 1, scaleX: 1, scaleY: 1, y: 0, filter: 'blur(0px)' }}
+              transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 20, mass: 0.9 }}
             >
               {commandContent}
             </motion.div>
