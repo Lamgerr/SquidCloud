@@ -239,16 +239,20 @@ a full-height panel and not a capsule with a background behind it:
 - Full-screen frame, **zero on-screen chrome**. The only visible control is ONE
   floating dock in the bottom-right corner: grainy, translucent, springy, containing
   exactly two circular buttons — **minimize** and **close**.
-- The dock is fully visible for 2s on open, then snaps/submerges into the corner with
-  a spring, leaving a part visible. Hovering the corner hot-zone or dragging the dock
-  back out reveals it; leaving re-submerges it.
+- The dock is a "jelly" driven by underdamped springs on width / height / per-corner
+  radius: visible for 2s on open, then thrown into the corner, squashed flat against
+  both walls with a visible sliver. It is magnetic (bulges toward an approaching
+  cursor), pops open on hover, and can be pulled like a tethered gel — past the
+  threshold it springs open, otherwise it snaps back and wobbles.
+- Minimize keeps the tab in the stack; the dock's X removes it entirely — two distinct
+  intents, two distinct store paths (`previewTabs.minimize()` vs `previewTabs.close(id)`).
 - All file types render in the same frame via a type-aware body: PDF, image, video,
   audio, text/code, markdown, EPUB, spreadsheet, font, archive, 3D, generic fallback.
-- Minimize turns a viewer into a floating "picking card" in a right-center deck
-  (`PreviewTabStack.tsx`): glassy grain-textured cards in a tight fan; hovering fans
-  them apart with spring physics, each showing its label, type glyph and close; drag a
-  card out to dismiss it, click to restore. Close-all / hide-all live in a quiet pill
-  that appears on hover; hidden tabs leave a small restore badge.
+- Minimize turns a viewer into a floating "picking card" in a right-center deck.
+  `MinimizedPreviewStack.tsx` is the presentational card deck (fanned, springy, drag to
+  maximize/close, hide-all / close-all, hidden handle); `PreviewTabStack.tsx` is the
+  thin store-connected wrapper that maps `previewTabs` state onto it. Shared nano-grain
+  / frosted-glass tokens live in `src/components/grain.ts`.
 - Command palette (`CommandPalette.tsx`) uses a dense, more-opaque frosted surface with
   a two-frequency nano-texture grain (mid fractal + fine high-frequency), a hairline
   rim and deep shadow — premium and translucent, never a thin see-through sheet.
