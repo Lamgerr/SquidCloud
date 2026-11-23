@@ -2,6 +2,32 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateEncryptionKey, encryptData, decryptData } from '@/lib/encryption';
 import { emitWebhookEvent } from '@/lib/webhook-events';
 
+/* File keys are held in the server-side key vault, NEVER in files.encryption_key
+   (a DB trigger hashes that column). These helpers use the same edge functions
+   as the rest of the app so AI-created files are readable. */
+async function storeFileKey(fileId: string, key: string): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const { error } = await supabase.functions.invoke('store-file-key', {
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+      body: { fileId, key },
+    });
+    if (error) throw error;
+    return true;
+  } catch (e) { console.warn('[squid-ai] store-file-key failed', e); return false; }
+}
+async function fetchFileKey(fileId: string): Promise<string | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke('file-key', {
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+      body: { fileId },
+    });
+    if (error || !data?.key) return null;
+    return data.key as string;
+  } catch { return null; }
+}
+
 export interface FileOrganizationResult {
   foldersCreated: string[];
   filesMoved: { from: string; to: string }[];
@@ -209,12 +235,17 @@ export class SquidAITools {
           storage_path: uploadData.path,
           parent_folder: parentFolder || null,
           is_deleted: false,
-          encryption_key: encryptionKey // Database trigger will hash this
+          encrypted: true
+          // NOTE: never write the plaintext key here — a trigger hashes the column.
         })
         .select()
         .single();
 
       if (dbError) throw dbError;
+
+      // Escrow the real key in the server-side vault so read/update can decrypt.
+      const keyStored = await storeFileKey(fileRecord.id, encryptionKey);
+      if (!keyStored) return { success: false, error: 'File uploaded but key escrow failed' };
 
       return { success: true, fileId: fileRecord.id };
     } catch (error: any) {
@@ -246,10 +277,14 @@ export class SquidAITools {
 
     if (downloadError) throw downloadError;
 
+    // Fetch the real key from the server-side vault, not the hashed column
+    const key = await fetchFileKey(fileId);
+    if (!key) throw new Error('File key unavailable — this file may predate the key vault');
+
     // Decrypt the file content
     const encryptedText = await encryptedContent.text();
-    const decryptedBuffer = await decryptData(encryptedText, file.encryption_key);
-    
+    const decryptedBuffer = await decryptData(encryptedText, key);
+
     // Convert ArrayBuffer to text
     const decoder = new TextDecoder();
     return decoder.decode(decryptedBuffer);
@@ -279,8 +314,8 @@ export class SquidAITools {
       const encoder = new TextEncoder();
       const contentBuffer = encoder.encode(newContent).buffer;
 
-      // Use existing encryption key or generate new one
-      const encryptionKey = file.encryption_key || generateEncryptionKey();
+      // Prefer the real key from the vault (files.encryption_key is only a hash)
+      const encryptionKey = (await fetchFileKey(fileId)) || generateEncryptionKey();
 
       // Encrypt the new content
       const encryptedData = await encryptData(contentBuffer, encryptionKey);
@@ -297,13 +332,13 @@ export class SquidAITools {
 
       if (uploadError) throw uploadError;
 
-      // Update metadata in database
+      // Ensure the key is in the vault when we generated a fresh one
+      await storeFileKey(fileId, encryptionKey);
       await supabase
         .from('files')
-        .update({ 
+        .update({
           size: newContent.length, // Original size
-          encrypted_size: encryptedBlob.size,
-          encryption_key: encryptionKey // Update if new
+          encrypted_size: encryptedBlob.size
         })
         .eq('id', fileId);
 

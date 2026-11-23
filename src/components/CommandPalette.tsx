@@ -161,9 +161,8 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-answer blockquote { margin: 10px 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--mute); }
 .spot-answer hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 .spot-steps { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 16px; }
-.spot-step { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 11px; border: 1px solid var(--line);
-  background: rgba(232,231,225,.035); font-size: 12.5px; color: var(--mute); }
-.spot-step[data-kind="tool"] { border-color: rgba(183,166,255,.2); background: rgba(183,166,255,.05); }
+.spot-step { display: flex; align-items: center; gap: 9px; padding: 6px 4px; border-radius: 8px; border: 0;
+  background: transparent; font-size: 12.5px; color: var(--mute); }
 .spot-step[data-kind="tool"] b { color: var(--ink); font-weight: 500; }
 .spot-step .spot-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mute); flex: none; }
 .spot-step[data-status="running"] .spot-dot { background: #b7a6ff; animation: spot-glow 1s ease-in-out infinite; }

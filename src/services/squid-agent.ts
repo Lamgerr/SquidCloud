@@ -106,14 +106,22 @@ class SquidAgent {
           const name = tc.function?.name || tc.name || 'tool';
           let args: any = {};
           try { args = typeof tc.function?.arguments === 'string' ? JSON.parse(tc.function.arguments) : (tc.function?.arguments || {}); } catch { args = {}; }
-          steps.push({ kind: 'tool', name, label: LABELS[name] || name, detail: Object.values(args).filter(Boolean).slice(0, 2).join(' · '), status: 'running' });
+          // One compact step per tool. Short argument hint only — never the full
+          // generated file body (that's what made the UI look like gibberish).
+          const hint = Object.entries(args)
+            .filter(([, v]) => typeof v === 'string' && (v as string).length < 60)
+            .slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(' · ');
+          const step: AgentStep = { kind: 'tool', name, label: LABELS[name] || name, detail: hint, status: 'running' };
+          steps.push(step);
           let verdict: string;
           try {
             verdict = await SquidAITools.runTool(name, { ...args, folder: args.folder || context?.currentFolder || '' });
           } catch (e: any) {
             verdict = `${name} failed: ${e?.message || 'unknown error'}`;
           }
-          steps.push({ kind: 'result', name, label: verdict, status: verdict.includes('failed') ? 'failed' : 'done' });
+          // Mark THIS step finished — no second "result" row, no full dump.
+          step.status = verdict.includes('failed') ? 'failed' : 'done';
+          step.detail = verdict.length > 70 ? verdict.slice(0, 70) + '…' : verdict;
           messages.push({ role: 'tool', tool_call_id: tc.id || `tc_${turn}_${name}`, name, content: verdict });
           this.history.push({ role: 'tool', tool_call_id: tc.id || `tc_${turn}_${name}`, name, content: verdict });
         }
