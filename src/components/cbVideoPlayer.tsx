@@ -31,9 +31,9 @@ type LoadPhase = 'connecting' | 'decrypting' | 'buffering' | 'ready' | 'error';
 type MenuPage = 'root' | 'speed' | 'audio' | 'subs' | 'quality';
 type Track = { index: number; language: string; label: string };
 
-const JELLY = { type: 'spring' as const, stiffness: 520, damping: 15, mass: 0.8 };   // same feel as the dashboard dock
-const POP = { type: 'spring' as const, stiffness: 380, damping: 17, mass: 0.9 };
-const SOFT = { type: 'spring' as const, stiffness: 300, damping: 26, mass: 0.9 };
+const JELLY = { type: 'spring' as const, stiffness: 300, damping: 30, mass: 1 };
+const POP = { type: 'spring' as const, stiffness: 300, damping: 28, mass: 1 };
+const SOFT = { type: 'spring' as const, stiffness: 260, damping: 30, mass: 1 };
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const QUALITIES = ['Auto', '1080p', '720p', '480p', '360p'] as const;
 type Quality = typeof QUALITIES[number];
@@ -104,7 +104,7 @@ const JellySlider: React.FC<SliderProps> = ({ value, onChange, label, thick, hit
   const [hot, setHot] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
   const vel = useMotionValue(0);
-  const stretch = useSpring(useTransform(vel, (v) => 1 + Math.min(Math.abs(v) / 1600, 0.85)), { stiffness: 260, damping: 12 });
+  const stretch = useSpring(useTransform(vel, (v) => 1 + Math.min(Math.abs(v) / 2200, 0.35)), { stiffness: 260, damping: 24 });
   const squash = useTransform(stretch, (s) => 1 / Math.sqrt(s));
   const left = useTransform(value, (v) => `${clamp01(v) * 100}%`);
   const fill = useTransform(value, clamp01);
@@ -170,7 +170,7 @@ const Btn: React.FC<{ label: string; onClick: (e: React.MouseEvent) => void; siz
   ({ label, onClick, size = 40, reduce, on, children }) => (
     <motion.button type="button" className="cbp-btn" data-on={on} aria-label={label} title={label}
       style={{ width: size, height: size }} onClick={(e) => { e.stopPropagation(); onClick(e); }} onDoubleClick={stop}
-      whileHover={reduce ? undefined : { scale: 1.1 }} whileTap={reduce ? undefined : { scaleX: 0.88, scaleY: 0.8 }}
+      whileHover={reduce ? undefined : { scale: 1.04 }} whileTap={reduce ? undefined : { scaleX: 0.96, scaleY: 0.93 }}
       transition={reduce ? { duration: 0.01 } : JELLY}>
       {children}
     </motion.button>
@@ -965,7 +965,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
                 <motion.span variants={{ h: { scale: 0.6, opacity: 0 }, s: { scale: 1, opacity: 1 } }} transition={T}>
                   <motion.button type="button" className="cbp-bigplay cbp-glass" aria-label={playing ? 'Pause' : 'Play'} onPointerMove={onHudMove}
                     onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                    whileTap={reduce ? undefined : { scaleX: 0.9, scaleY: 0.82 }} transition={T}>{playGlyph(34)}</motion.button>
+                    whileTap={reduce ? undefined : { scaleX: 0.96, scaleY: 0.94 }} transition={T}>{playGlyph(34)}</motion.button>
                 </motion.span>
                 <motion.span variants={{ h: { x: -18, opacity: 0 }, s: { x: 0, opacity: 1 } }} transition={T}><Btn reduce={reduce} size={56} label="Forward 10 seconds" onClick={() => seekBy(10)}><Ic.Fwd size={34} /></Btn></motion.span>
               </motion.div>
@@ -978,8 +978,8 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       <AnimatePresence>
         {ui && (
           <motion.div className="cbp-bottom" data-cbp-ui onClick={stop} onDoubleClick={stop}
-            initial={reduce ? false : { opacity: 0, y: 30, scaleX: 0.94, scaleY: 0.8 }} animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
-            exit={{ opacity: 0, y: 22, scaleX: 0.96, scaleY: 0.88 }} transition={T} style={{ transformOrigin: '50% 100%' }}>
+            initial={reduce ? false : { opacity: 0, y: 16, scaleX: 0.98, scaleY: 0.94 }} animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
+            exit={{ opacity: 0, y: 12, scaleX: 0.98, scaleY: 0.95 }} transition={T} style={{ transformOrigin: '50% 100%' }}>
             <div className="cbp-stack">
               {!compact && <AnimatePresence>{menuEl}</AnimatePresence>}
               {compact && <div className="cbp-title">{title}</div>}
