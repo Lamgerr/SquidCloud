@@ -46,6 +46,8 @@ import { SettingsCard, SettingsDivider } from '@/components/SettingsRow';
 import FileItem from '@/components/FileItem';
 import FileInfoModal from '@/components/FileInfoModal';
 import EnhancedInstantPreviewModal from '@/components/EnhancedInstantPreviewModal';
+import PreviewTabStack from '@/components/PreviewTabStack';
+import { previewTabs } from '@/services/preview-tabs';
 import DeepReadCatalog from '@/components/DeepReadCatalog';
 import DeepReadReader from '@/components/DeepReadReader';
 // Transfer feedback lives in the FloatingDock sheet only (no duplicate panel/toasts).
@@ -264,6 +266,14 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [previewFile, setPreviewFile]   = useState<FileItemType | null>(null);
+
+  // Restoring a minimized preview tab reopens its file in the viewer
+  useEffect(() => {
+    return previewTabs.subscribe(() => {
+      const active = previewTabs.active;
+      if (active && !active.minimized) setPreviewFile(active.file as FileItemType);
+    });
+  }, []);
   const [readingFile, setReadingFile]   = useState<FileItemType | null>(null);
   const [readingSource, setReadingSource] = useState<'local' | 'remote'>('local');
   const [fileInfoFile, setFileInfoFile] = useState<FileItemType | null>(null);
@@ -1659,6 +1669,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
           </div>
 
           {/* ── Mobile Modals ── */}
+          <PreviewTabStack />
           {previewFile && (
             <EnhancedInstantPreviewModal
               file={previewFile}
@@ -2102,6 +2113,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
         </div>
 
             {/* ── Modals ── */}
+        <PreviewTabStack />
         {previewFile && (
           <EnhancedInstantPreviewModal
             file={previewFile}

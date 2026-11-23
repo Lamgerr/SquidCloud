@@ -1,417 +1,349 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
-import { Button } from '@/components/ui/button';
 import {
-  AlertCircle, ChevronLeft, ChevronRight, Download, FileText,
-  Image as ImageIcon, Lock, Music, Share2, Video, X, Box,
-  Maximize, Minimize,
+  AlertCircle, ChevronLeft, ChevronRight, Download, FileText, Share2,
+  Maximize, Minimize, X, Info, Layers,
 } from '@/lib/icon-map';
 import { cn, formatFileSize } from '@/lib/utils';
-import { downloadFileWithRes54, downloadFilePreview } from '@/lib/res54';
-import { smartDownload } from '@/lib/api';
+import { downloadFilePreview } from '@/lib/res54';
+import { smartDownload, createFileShare } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
+import { useIsMobile } from '@/hooks/use-mobile';
+
+// Viewers — one frame, type-specific body
 import CBVideoPlayer from './cbVideoPlayer';
 import MobileVideoPlayer from './MobileVideoPlayer';
+import AudioPlayer from './AudioPlayer';
 import EnhancedTextEditor from './EnhancedTextEditor';
 import AdvancedImageViewer from '@/components/AdvancedImageViewer';
 import SpreadsheetViewer from '@/components/spreadsheet/SpreadsheetViewer';
-import { useIsMobile } from '@/hooks/use-mobile';
 import OptimizedPDFViewer from '@/components/OptimizedPDFViewer';
 import ModelViewer from '@/components/ModelViewer';
 import FontPreviewer from '@/components/FontPreviewer';
 import ArchiveViewerModal from '@/components/ArchiveViewerModal';
-import { createFileShare } from '@/lib/api';
+import EnhancedMarkdownPreview from './EnhancedMarkdownPreview';
+import DeepReadReader from './DeepReadReader';
+import { previewTabs, detectKind, type PreviewKind } from '@/services/preview-tabs';
 
 const decryptedBlobCache = new Map<string, { blob: Blob; url: string; timestamp: number }>();
 const MAX_CACHE_ITEMS = 15;
 
-/* ── Preview chrome: the floating-dock language, applied to a full-screen
-      surface. One near-black tier, circular pill controls, spring physics. ── */
+const SPRING = { type: 'spring' as const, stiffness: 360, damping: 28, mass: 0.8 };
+
+/* ── Full-screen preview frame: floating dock language, zero decoration.
+      One circular X, minimize, type-aware tools, minimal on-screen UI. ── */
 const PREVIEW_CSS = `
-.pv-root { --pv-line: rgba(232,231,225,0.10); --pv-fill: rgba(13,14,13,0.86); color: #e8e7e1; }
-.pv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  height: 56px; padding: 0 16px; border-bottom: 1px solid var(--pv-line);
-  background: linear-gradient(180deg, rgba(13,14,13,0.9), rgba(13,14,13,0.7));
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); flex: none; }
-.pv-name { font-size: 13px; font-weight: 400; letter-spacing: -0.01em; color: #e8e7e1;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pv-meta { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,0.45); margin-top: 4px; }
-.pv-tools { display: flex; align-items: center; gap: 8px; flex: none; }
-.pv-pill { display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  height: 38px; min-width: 38px; padding: 0 14px; border-radius: 999px;
+.pv-root { --pv-line: rgba(232,231,225,.10); --pv-fill: rgba(13,14,13,.86); color: #e8e7e1; }
+.pv-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--sa-bg, #0c0d09); }
+.pv-chrome { position: absolute; inset: 0; z-index: 80; pointer-events: none; }
+.pv-top { position: absolute; top: 18px; left: 18px; right: 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.pv-id { min-width: 0; padding: 10px 16px; border-radius: 16px; pointer-events: auto;
   border: 1px solid var(--pv-line); background: var(--pv-fill);
   -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,0.12), 0 8px 20px -10px rgba(0,0,0,0.6);
-  color: #e8e7e1; font-size: 12.5px; cursor: pointer; }
-.pv-pill:hover { border-color: rgba(232,231,225,0.2); }
-.pv-pill:focus-visible { outline: 2px solid rgba(232,231,225,0.8); outline-offset: 3px; }
-.pv-icon { width: 38px; padding: 0; }
-.pv-count { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,0.5); padding: 0 4px; }
-.pv-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--sa-bg, #0c0d09); }
-.pv-float { position: absolute; z-index: 80; display: flex; gap: 8px; }
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.7); }
+.pv-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 38vw; }
+.pv-meta { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,.5); margin-top: 5px; }
+.pv-tools { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+/* every control is a true circle — no rectangles */
+.pv-pill { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border-radius: 999px;
+  border: 1px solid var(--pv-line); background: var(--pv-fill); color: #e8e7e1; cursor: pointer;
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.7); }
+.pv-pill:hover { border-color: rgba(232,231,225,.24); }
+.pv-pill:focus-visible { outline: 2px solid rgba(232,231,225,.8); outline-offset: 3px; }
+.pv-pill[data-on="true"] { background: rgba(232,231,225,.16); }
+.pv-pill[data-close="true"] { background: rgba(217,128,128,.14); border-color: rgba(217,128,128,.3); color: #e8a0a0; }
+.pv-pill[data-close="true"]:hover { background: rgba(217,128,128,.24); }
+.pv-nav { display: flex; align-items: center; gap: 6px; }
+.pv-hint { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,.4); padding: 0 4px; }
+.pv-foot { position: absolute; bottom: 18px; left: 50%; translate: -50% 0; display: flex; gap: 8px; pointer-events: auto; }
+.pv-info { position: absolute; bottom: 18px; right: 18px; pointer-events: auto; max-width: 250px; padding: 12px 14px;
+  border-radius: 16px; border: 1px solid var(--pv-line); background: var(--pv-fill);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.7);
+  font: 400 11px/1.6 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,.65); }
+.pv-info b { color: #e8e7e1; font-weight: 400; }
+.pv-loading { display: grid; place-items: center; gap: 14px; height: 100%; color: rgba(232,231,225,.5); font: 400 11px/1 var(--sa-mono, ui-monospace, monospace); }
+.pv-error { display: grid; place-items: center; gap: 10px; height: 100%; text-align: center; padding: 24px; }
+.pv-generic { display: grid; place-items: center; gap: 16px; height: 100%; text-align: center; }
+.pv-generic-ico { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 999px;
+  border: 1px solid var(--pv-line); background: var(--pv-fill); color: #e8e7e1; }
+@media (max-width: 640px) { .pv-name { max-width: 46vw; } .pv-top { top: 12px; left: 12px; right: 12px; } .pv-pill { width: 38px; height: 38px; } }
 @media (prefers-reduced-motion: reduce) { .pv-pill { transition-duration: 0.01ms !important; } }
 `;
+
+const KIND_LABEL: Record<PreviewKind, string> = {
+  pdf: 'PDF', image: 'Image', video: 'Video', audio: 'Audio', text: 'Text', epub: 'Book',
+  spreadsheet: 'Sheet', font: 'Font', archive: 'Archive', model: '3D', markdown: 'Markdown', other: 'File',
+};
 
 const CustomDialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Popup>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Popup>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="z-[60] bg-background sm:bg-background/95 sm:backdrop-blur-2xl transition-opacity duration-200 ease-out" />
-    <DialogPrimitive.Popup
-      ref={ref}
-      className={cn(
-        'pv-root fixed inset-0 z-[60] flex flex-col w-screen h-screen max-w-none rounded-none border-0 bg-background text-foreground shadow-2xl overflow-hidden',
-        'data-[open]:opacity-100 data-[closed]:opacity-0',
-        'transition-all duration-200 ease-out will-change-transform',
-        className
-      )}
-    >
+    <DialogOverlay className="z-[90] bg-background transition-opacity duration-200" />
+    <DialogPrimitive.Popup ref={ref} className={cn('pv-root fixed inset-0 z-[90] flex flex-col w-screen h-screen max-w-none rounded-none border-0 bg-background text-foreground overflow-hidden', className)} {...props}>
       {children}
     </DialogPrimitive.Popup>
   </DialogPortal>
 ));
 CustomDialogContent.displayName = 'CustomDialogContent';
 
-interface CarouselFile { id: string; name: string; type: string; size?: number; }
-
 interface EnhancedInstantPreviewModalProps {
   file: any; isOpen: boolean; onClose: () => void;
   onDownload?: () => void; onShare?: () => void; onNext?: () => void;
   onPrevious?: () => void; hasNext?: boolean; hasPrevious?: boolean;
   currentIndex?: number; totalFiles?: number; shareId?: string;
-  onOpenEpubReader?: (file: any) => void;
-  onShareChange?: () => void;
+  onOpenEpubReader?: (file: any) => void; onShareChange?: () => void;
+  siblingFiles?: any[]; onNavigateToFile?: (file: any) => void;
 }
-
-const getFileTypeLabel = (file: any) => {
-  if (!file) return 'File';
-  if (file.type?.startsWith('image/')) return 'Image';
-  if (file.type?.startsWith('video/')) return 'Video';
-  if (file.type?.startsWith('audio/')) return 'Audio';
-  if (file.type === 'application/pdf') return 'PDF';
-  if (file.type?.includes('spreadsheet') || file.name?.match(/\.(xlsx?|csv|ods)$/i)) return 'Sheet';
-  if (file.type?.startsWith('text/') || file.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|html|css|yml|yaml|sqd)$/i)) return 'Text';
-  return 'File';
-};
 
 const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = ({
   file, isOpen, onClose, onDownload, onShare, onNext, onPrevious,
   hasNext = false, hasPrevious = false, currentIndex, totalFiles, shareId,
-  onOpenEpubReader, onShareChange,
+  onOpenEpubReader, onShareChange, siblingFiles, onNavigateToFile,
 }) => {
+  const reduce = !!useReducedMotion();
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decodedBlob, setDecodedBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
-
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
-  const reduce = !!useReducedMotion();
-  const pillTap = reduce ? undefined : { scale: 0.92 };
-  const loadGenRef = useRef(0);
-  const isClosingRef = useRef(false);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [showInfo, setShowInfo] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const loadGen = useRef(0);
+  const closing = useRef(false);
+  const kind: PreviewKind = file ? detectKind(file) : 'other';
 
-  // Keep the toggle icon in sync with real fullscreen state (incl. ESC / OS exit).
+  // Register the open file as a tab when the modal opens
   useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+    if (isOpen && file) previewTabs.open(file, kind, file.name || 'Preview');
+  }, [isOpen, file?.id, kind]);
 
+  // Fullscreen sync
+  useEffect(() => {
+    const onFs = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
   const toggleFullscreen = useCallback(() => {
     const el = contentRef.current;
     if (!el) return;
-    if (!document.fullscreenElement) {
-      const req: any = (el as any).requestFullscreen?.();
-      if (req && typeof req.catch === 'function') req.catch(() => {});
-    } else {
-      (document as any).exitFullscreen?.();
-    }
+    if (!document.fullscreenElement) (el as any).requestFullscreen?.()?.catch?.(() => {});
+    else (document as any).exitFullscreen?.();
   }, []);
 
-
-  const is3DModel = file?.name?.match(/\.(glb|gltf|stl|obj)$/i);
-  const isArchive = file?.name?.match(/\.(zip|rar|7z|tar\.gz|tgz)$/i);
-  const isFont = file?.name?.match(/\.(ttf|otf|woff|woff2)$/i);
-  const isStreamingVideo = file?.type?.startsWith('video/') && file?.encrypted && file?.storage_path === 'res54_distributed';
-  const canProgressiveLoad = !isArchive && !isStreamingVideo && (
-    file?.type?.startsWith('text/') || file?.type === 'application/json' ||
-    file?.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|py|html|css|scss|yml|yaml|xml|sql|log|sqd)$/i)
-  );
-
-  // 🚀 FOOLPROOF CLOSE HANDLER: Instantly closes UI & safely unpops history
-  const handleClose = useCallback(() => {
-    if (isClosingRef.current) return;
-    isClosingRef.current = true;
-
-     // Immediately trigger React state close
-     onClose();
-     // Exit OS fullscreen if it was engaged
-     if (document.fullscreenElement) (document as any).exitFullscreen?.();
-
-    // Clean up mobile history state silently without double-firing popstate
-    if (window.history.state?.previewModal) {
-      window.history.back();
-    }
+  // History / ESC
+  const close = useCallback(() => {
+    if (closing.current) return;
+    closing.current = true;
+    previewTabs.minimize();
+    if (document.fullscreenElement) (document as any).exitFullscreen?.();
+    if (window.history.state?.previewModal) window.history.back();
+    onClose();
   }, [onClose]);
-
-  // Handle hardware navigation & ESC key
   useEffect(() => {
-    if (!isOpen) {
-      isClosingRef.current = false;
-      return;
-    }
-
-    // Push virtual history entry
+    if (!isOpen) { closing.current = false; return; }
     window.history.pushState({ previewModal: true }, '');
-
-    const handlePopState = () => {
-      // If user presses physical phone back button or swipes back
-      if (!isClosingRef.current) {
-        isClosingRef.current = true;
-        onClose();
-      }
+    const onPop = () => { if (!closing.current) { closing.current = true; onClose(); } };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      if (e.key === 'ArrowRight' && hasNext) onNext?.();
+      if (e.key === 'ArrowLeft' && hasPrevious) onPrevious?.();
     };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('keydown', onKey); };
+  }, [isOpen, close, onClose, hasNext, hasPrevious, onNext, onPrevious]);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        handleClose();
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose, handleClose]);
-
+  // Decrypt (skip for streaming video/3D handled by their own loaders)
   useEffect(() => {
     if (!isOpen || !file?.id) return;
-    const gen = ++loadGenRef.current;
-
-    if (isArchive) { setLoading(false); return; }
-    if (isStreamingVideo) {
-      setBlobUrl('virtual-hls-stream');
-      setDecodedBlob(new Blob(['streaming'], { type: file.type }));
-      setLoading(false);
-      return;
+    const gen = ++loadGen.current;
+    if (kind === 'video' && file?.encrypted && file?.storage_path === 'res54_distributed') {
+      setBlobUrl('virtual-hls-stream'); setLoading(false); return;
     }
-
+    if (kind === 'model') { setLoading(false); return; }
     const cached = decryptedBlobCache.get(file.id);
-    if (cached) {
-      setDecodedBlob(cached.blob);
-      setBlobUrl(cached.url);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    if (canProgressiveLoad) {
-      const loadProgressive = async () => {
-        setLoading(true); setError(null);
-        try {
-          const preview = await downloadFilePreview(file.id, 3, { shareId });
-          if (loadGenRef.current !== gen) return;
-          const partialUrl = URL.createObjectURL(preview.blob);
-          setDecodedBlob(preview.blob); setBlobUrl(partialUrl);
-          setLoading(false);
-
-          if (preview.isPartial) {
-            smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId }).then((fullBlob) => {
-              if (loadGenRef.current !== gen) return;
-              const fullUrl = URL.createObjectURL(fullBlob);
-              
-              if (decryptedBlobCache.size >= MAX_CACHE_ITEMS) {
-                const oldestKey = decryptedBlobCache.keys().next().value;
-                if (oldestKey) {
-                  URL.revokeObjectURL(decryptedBlobCache.get(oldestKey)!.url);
-                  decryptedBlobCache.delete(oldestKey);
-                }
-              }
-              decryptedBlobCache.set(file.id, { blob: fullBlob, url: fullUrl, timestamp: Date.now() });
-
-              setDecodedBlob(fullBlob); setBlobUrl(fullUrl);
-            }).catch(() => {});
-          }
-        } catch (err: any) {
-          if (loadGenRef.current === gen) {
-            setError(err?.message || 'Unable to load preview');
-            setLoading(false);
-          }
-        }
-      };
-      loadProgressive();
-      return;
-    }
-
-    const load = async () => {
-      setLoading(true); setError(null);
+    if (cached) { setDecodedBlob(cached.blob); setBlobUrl(cached.url); setLoading(false); return; }
+    setLoading(true); setError(null);
+    (async () => {
       try {
-        const blob = await smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId });
-        if (loadGenRef.current !== gen) return;
-        const nextUrl = URL.createObjectURL(blob);
-        
-        if (decryptedBlobCache.size >= MAX_CACHE_ITEMS) {
-          const oldestKey = decryptedBlobCache.keys().next().value;
-          if (oldestKey) {
-            URL.revokeObjectURL(decryptedBlobCache.get(oldestKey)!.url);
-            decryptedBlobCache.delete(oldestKey);
+        const quick = kind === 'text' || kind === 'markdown' || kind === 'image';
+        let blob: Blob;
+        if (quick) {
+          const p = await downloadFilePreview(file.id, 3, { shareId });
+          blob = p.blob;
+          if (p.isPartial) {
+            smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId })
+              .then(full => {
+                if (loadGen.current !== gen) return;
+                const url = URL.createObjectURL(full);
+                if (decryptedBlobCache.size >= MAX_CACHE_ITEMS) {
+                  const k = decryptedBlobCache.keys().next().value;
+                  if (k) { URL.revokeObjectURL(decryptedBlobCache.get(k)!.url); decryptedBlobCache.delete(k); }
+                }
+                decryptedBlobCache.set(file.id, { blob: full, url, timestamp: Date.now() });
+                setDecodedBlob(full); setBlobUrl(url);
+              }).catch(() => {});
           }
+        } else {
+          blob = await smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId });
         }
-        decryptedBlobCache.set(file.id, { blob, url: nextUrl, timestamp: Date.now() });
-
-        setDecodedBlob(blob); setBlobUrl(nextUrl);
-      } catch (err: any) {
-        if (loadGenRef.current === gen) setError(err?.message || 'Unable to load preview');
-      } finally {
-        if (loadGenRef.current === gen) setLoading(false);
+        if (loadGen.current !== gen) return;
+        const url = URL.createObjectURL(blob);
+        if (decryptedBlobCache.size >= MAX_CACHE_ITEMS) {
+          const k = decryptedBlobCache.keys().next().value;
+          if (k) { URL.revokeObjectURL(decryptedBlobCache.get(k)!.url); decryptedBlobCache.delete(k); }
+        }
+        decryptedBlobCache.set(file.id, { blob, url, timestamp: Date.now() });
+        setDecodedBlob(blob); setBlobUrl(url); setLoading(false);
+      } catch (e: any) {
+        if (loadGen.current === gen) { setError(e?.message || 'Unable to load preview'); setLoading(false); }
       }
-    };
-    load();
-  }, [isOpen, file?.id]);
-
-  // Auto-handoff: if file is EPUB, close this modal and open DeepReadReader
-  const isEpub = file?.name?.toLowerCase().endsWith('.epub') || file?.type === 'application/epub+zip';
-  useEffect(() => {
-    if (isOpen && isEpub && onOpenEpubReader) {
-      onOpenEpubReader(file);
-      onClose();
-    }
-  }, [isOpen, isEpub, file, onOpenEpubReader, onClose]);
+    })();
+  }, [isOpen, file?.id, kind, shareId]);
 
   const handleDownload = useCallback(async () => {
     if (onDownload) { onDownload(); return; }
-    if (!decodedBlob && file?.id) {
-      try {
-        const blob = await smartDownload(file.id, { reason: 'download', fileName: file.name, shareId });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = file.name;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      } catch (err: any) {
-        toast({ title: 'Download failed', description: err?.message, variant: 'destructive' });
-      }
-      return;
-    }
-    if (!decodedBlob || !file?.name) return;
-    const downloadUrl = URL.createObjectURL(decodedBlob);
-    const a = document.createElement('a'); a.href = downloadUrl; a.download = file.name;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  }, [decodedBlob, file?.name, file?.id, onDownload, toast]);
+    try {
+      const blob = decodedBlob || await smartDownload(file.id, { reason: 'download', fileName: file.name, shareId });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e: any) { toast({ title: 'Download failed', description: e?.message, variant: 'destructive' }); }
+  }, [onDownload, decodedBlob, file?.id, file?.name, shareId, toast]);
 
   const handleShare = useCallback(async () => {
     if (onShare) { await onShare(); onShareChange?.(); return; }
-    try {
-      const { shareUrl } = await createFileShare(file.id);
-      await navigator.clipboard.writeText(shareUrl);
-      toast({ title: 'Share Link Copied' });
-      onShareChange?.();
-    } catch (error: any) {
-      toast({ title: 'Share failed', description: error.message, variant: "destructive" });
-    }
-  }, [file?.id, onShare, onShareChange, toast]);
+    try { const { shareUrl } = await createFileShare(file.id); await navigator.clipboard.writeText(shareUrl); toast({ title: 'Share link copied' }); onShareChange?.(); }
+    catch (e: any) { toast({ title: 'Share failed', description: e?.message, variant: 'destructive' }); }
+  }, [onShare, file?.id, onShareChange, toast]);
 
   if (!file) return null;
 
-  const isImage = file.type?.startsWith('image/');
-  const isVideo = file.type?.startsWith('video/');
-  const isPDF = file.type === 'application/pdf';
-  const isSpreadsheet = file.type?.includes('spreadsheet') || file.type === 'text/csv' || file.name?.match(/\.(xlsx?|csv|ods)$/i);
-  const isText = file.type?.startsWith('text/') || file.type === 'application/json' || file.name?.match(/\.(txt|md|json|js|ts|tsx|jsx|py|html|css|scss|yml|yaml|xml|sql|log|sqd)$/i);
-
-  const renderPreview = () => {
-    if (isArchive) {
-      return (
-        <div className="flex h-full items-center justify-center bg-muted">
-          <div className="text-center space-y-4 max-w-sm p-8 rounded-2xl bg-card border border-border">
-            <Box className="h-12 w-12 mx-auto text-foreground/60" />
-            <h3 className="text-base font-semibold text-foreground">{file.name}</h3>
-            <Button onClick={() => setArchiveOpen(true)} className="w-full">Browse Archive</Button>
-            <ArchiveViewerModal open={archiveOpen} onClose={() => setArchiveOpen(false)} file={{ id: file.id, name: file.name, url: blobUrl || undefined }} onDownload={handleDownload} />
-          </div>
-        </div>
-      );
+  const renderBody = () => {
+    if (kind === 'video') {
+      if (file?.encrypted && file?.storage_path === 'res54_distributed') return <CBVideoPlayer file={file} autoPlay className="h-full w-full" shareId={shareId} />;
+      if (!blobUrl) return <Loading />;
+      return isMobile
+        ? <MobileVideoPlayer file={file} blobUrl={blobUrl} onClose={close} />
+        : <div className="h-full w-full grid place-items-center"><video src={blobUrl} controls className="max-h-full max-w-full" /></div>;
     }
-    if (isEpub) return (
-      <div className="grid h-full w-full place-items-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <Loader size="lg" />
-          <p className="text-xs font-mono text-muted-foreground animate-pulse">Opening reader…</p>
-        </div>
-      </div>
-    );
-    if (isStreamingVideo) return <div className="h-full w-full bg-black"><CBVideoPlayer file={file} shareId={shareId} autoPlay className="h-full w-full" /></div>;
-    if (loading) return <div className="grid h-full w-full place-items-center bg-background"><div className="flex flex-col items-center gap-3"><Loader size="lg" /><p className="text-xs font-mono text-muted-foreground animate-pulse">Decrypting file stream...</p></div></div>;
-    if (error) return <div className="flex h-full items-center justify-center px-6 bg-background"><div className="p-6 rounded-2xl bg-card border border-border text-center max-w-sm space-y-2"><p className="text-sm font-semibold text-destructive">Failed to render preview</p><p className="text-xs text-muted-foreground">{error}</p></div></div>;
-    if (!decodedBlob || !blobUrl) return <div className="flex h-full items-center justify-center text-muted-foreground bg-background"><FileText className="h-6 w-6" /></div>;
+    if (kind === 'audio') return blobUrl ? <AudioPlayer file={file} src={blobUrl} open onClose={close} onDownload={handleDownload} onShare={handleShare} /> : <Loading />;
+    if (kind === 'epub') return <DeepReadReader file={file} source="local" isOpen onClose={close} />;
+    if (loading) return <Loading />;
+    if (error) return <div className="pv-error"><AlertCircle size={28} /><p className="text-sm">{error}</p></div>;
+    if (!blobUrl && kind !== 'model') return <Loading />;
 
-    if (is3DModel) return <ModelViewer src={blobUrl} fileName={file.name} fileType={file.type} />;
-    if (isFont) return <FontPreviewer src={blobUrl} fileName={file.name} />;
-    if (isPDF) return <div className="h-full w-full bg-background overflow-hidden"><OptimizedPDFViewer file={file} blobUrl={blobUrl} pdfBlob={decodedBlob} onClose={handleClose} onDownload={handleDownload} /></div>;
-    if (isImage) return <AdvancedImageViewer src={blobUrl} alt={file.name} file={{ name: file.name, size: file.size, type: file.type }} onDownload={handleDownload} onShare={handleShare} />;
-    if (isVideo) return isMobile ? <div className="h-full w-full bg-black"><MobileVideoPlayer file={file} blobUrl={blobUrl} onClose={handleClose} /></div> : <div className="h-full w-full bg-black flex items-center justify-center"><video src={blobUrl} controls className="max-h-full max-w-full" /></div>;
-    if (isSpreadsheet) return <SpreadsheetViewer src={blobUrl} fileName={file.name} onClose={handleClose} onDownload={handleDownload} />;
-    if (isText) return <div className="relative h-full w-full overflow-hidden bg-muted"><EnhancedTextEditor file={file} decodedBlob={decodedBlob} onSave={async () => {}} onDownload={handleDownload} onShare={handleShare} readonly={false} /></div>;
-
-    return <div className="flex h-full items-center justify-center bg-background"><p className="text-sm text-muted-foreground">Preview not supported</p></div>;
+    switch (kind) {
+      case 'pdf': return <OptimizedPDFViewer file={file} blobUrl={blobUrl!} pdfBlob={decodedBlob!} onClose={close} onDownload={handleDownload} />;
+      case 'image': return <AdvancedImageViewer src={blobUrl!} alt={file.name} file={{ name: file.name, size: file.size, type: file.type }} onDownload={handleDownload} onShare={handleShare} />;
+      case 'text': return <EnhancedTextEditor file={file} decodedBlob={decodedBlob!} onSave={async () => {}} onDownload={handleDownload} onShare={handleShare} readonly={false} />;
+      case 'markdown': return <MarkdownBody blob={decodedBlob} />;
+      case 'spreadsheet': return <SpreadsheetViewer src={blobUrl!} fileName={file.name} onDownload={handleDownload} onClose={close} />;
+      case 'font': return <FontPreviewer src={blobUrl!} fileName={file.name} />;
+      case 'archive': return <div className="pv-generic"><div className="pv-generic-ico"><Layers size={28} /></div><button className="pv-pill" onClick={() => setArchiveOpen(true)}>Browse</button><ArchiveViewerModal open={archiveOpen} onClose={() => setArchiveOpen(false)} file={{ id: file.id, name: file.name, url: blobUrl! }} onDownload={handleDownload} /></div>;
+      case 'model': return <ModelViewer src={blobUrl || file.url || ''} fileName={file.name} fileType={file.type} />;
+      default: return <div className="pv-generic"><div className="pv-generic-ico"><FileText size={28} /></div><p className="text-sm text-muted-foreground">No inline preview — download to open.</p><button className="pv-pill" onClick={handleDownload}><Download size={17} /></button></div>;
+    }
   };
 
-  const Pill: React.FC<{ label: string; onClick: () => void; children: React.ReactNode; wide?: boolean }> =
-    ({ label, onClick, children, wide }) => (
-      <motion.button type="button" onClick={onClick} aria-label={label} title={label}
-        className={cn('pv-pill', !wide && 'pv-icon')} whileTap={pillTap}>
+  const Pill: React.FC<{ label: string; onClick: () => void; children: React.ReactNode; on?: boolean; danger?: boolean }> =
+    ({ label, onClick, children, on, danger }) => (
+      <motion.button type="button" className="pv-pill" aria-label={label} title={label} onClick={onClick}
+        data-on={on ? 'true' : undefined} data-close={danger ? 'true' : undefined}
+        whileHover={reduce ? undefined : { scale: 1.06 }} whileTap={reduce ? undefined : { scale: 0.9 }} transition={SPRING}>
         {children}
       </motion.button>
     );
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
+    <Dialog open={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
       <CustomDialogContent ref={contentRef}>
         <style>{PREVIEW_CSS}</style>
-        <DialogPrimitive.Title className="sr-only">Preview {file?.name || 'file'}</DialogPrimitive.Title>
-        <DialogPrimitive.Description className="sr-only">Full-screen document preview.</DialogPrimitive.Description>
-
-        <header className="pv-head">
-          <div className="min-w-0">
-            <motion.h2 key={file.name} className="pv-name"
-              initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}>
-              {file.name}
-            </motion.h2>
-            <div className="pv-meta">{getFileTypeLabel(file)} · {formatFileSize(file.size || 0)}{currentIndex != null && totalFiles ? ` · ${currentIndex + 1}/${totalFiles}` : ''}</div>
-          </div>
-
-          <div className="pv-tools">
-            {totalFiles && totalFiles > 1 && (
-              <span className="pv-count">{hasPrevious ? 'prev' : ''}{hasPrevious && hasNext ? ' · ' : ''}{hasNext ? 'next' : ''}</span>
-            )}
-            {hasPrevious && <Pill label="Previous" onClick={onPrevious!}><ChevronLeft className="h-[18px] w-[18px]" /></Pill>}
-            {hasNext && <Pill label="Next" onClick={onNext!}><ChevronRight className="h-[18px] w-[18px]" /></Pill>}
-            <Pill label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={toggleFullscreen}>
-              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-            </Pill>
-            <Pill label="Share" onClick={handleShare}><Share2 className="h-4 w-4" /></Pill>
-            {!isArchive && <Pill label="Download" onClick={handleDownload}><Download className="h-4 w-4" /></Pill>}
-            <Pill label="Close" onClick={handleClose}><X className="h-[18px] w-[18px]" /></Pill>
-          </div>
-        </header>
-
-        <motion.div className="pv-stage" initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }}>
-          {renderPreview()}
+        <DialogPrimitive.Title className="sr-only">Preview {file.name}</DialogPrimitive.Title>
+        <DialogPrimitive.Description className="sr-only">Full-screen file preview.</DialogPrimitive.Description>
+        <motion.div className="pv-stage" initial={reduce ? false : { opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} transition={SPRING}>
+          {renderBody()}
         </motion.div>
+
+        {/* Floating chrome — circles only, minimal on-screen UI */}
+        <div className="pv-chrome">
+          <div className="pv-top">
+            <div className="pv-id">
+              <div className="pv-name">{file.name}</div>
+              <div className="pv-meta">{KIND_LABEL[kind]} · {formatFileSize(file.size || 0)}{currentIndex != null && totalFiles ? ` · ${currentIndex + 1}/${totalFiles}` : ''}</div>
+            </div>
+            <div className="pv-tools">
+              {(hasNext || hasPrevious) && (
+                <div className="pv-nav">
+                  {hasPrevious && <Pill label="Previous" onClick={() => onPrevious?.()}><ChevronLeft size={18} /></Pill>}
+                  {hasNext && <Pill label="Next" onClick={() => onNext?.()}><ChevronRight size={18} /></Pill>}
+                </div>
+              )}
+              <Pill label={showInfo ? 'Hide info' : 'Info'} onClick={() => setShowInfo(v => !v)} on={showInfo}><Info size={17} /></Pill>
+              <Pill label="Share" onClick={handleShare}><Share2 size={17} /></Pill>
+              <Pill label="Download" onClick={handleDownload}><Download size={17} /></Pill>
+              <Pill label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={toggleFullscreen}><Maximize size={17} /></Pill>
+              <Pill label="Minimize" onClick={close}><Minimize size={17} /></Pill>
+              <Pill label="Close" onClick={close} danger><X size={19} /></Pill>
+            </div>
+          </div>
+
+          {/* Open-file strip — floating dots, no box */}
+          {siblingFiles && siblingFiles.length > 1 && (
+            <div className="pv-foot">
+              {siblingFiles.slice(0, 12).map((sf, i) => (
+                <motion.button key={sf.id || i} type="button"
+                  aria-label={sf.name} title={sf.name}
+                  onClick={() => onNavigateToFile?.(sf)}
+                  className="pv-pill"
+                  data-on={sf.id === file.id ? 'true' : undefined}
+                  whileHover={reduce ? undefined : { scale: 1.1 }} whileTap={reduce ? undefined : { scale: 0.9 }}
+                  transition={SPRING}>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--sa-mono, monospace)' }}>{i + 1}</span>
+                </motion.button>
+              ))}
+            </div>
+          )}
+
+          <AnimatePresence>
+            {showInfo && (
+              <motion.div className="pv-info" initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.96 }} transition={SPRING}>
+                <div><b>{file.name}</b></div>
+                <div>{KIND_LABEL[kind]} · {formatFileSize(file.size || 0)}</div>
+                <div>{file.encrypted ? 'End-to-end encrypted' : 'Unencrypted'}</div>
+                {file.created_at && <div>Added {new Date(file.created_at).toLocaleDateString()}</div>}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </CustomDialogContent>
     </Dialog>
   );
+};
+
+const Loading: React.FC = () => (
+  <div className="pv-loading"><Loader size="lg" /><span>Decrypting preview…</span></div>
+);
+
+/** Text body read asynchronously — keeps the render path sync. */
+const MarkdownBody: React.FC<{ blob: Blob | null }> = ({ blob }) => {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    let alive = true;
+    if (blob) blob.text().then(t => { if (alive) setText(t); }).catch(() => {});
+    return () => { alive = false; };
+  }, [blob]);
+  return <div className="h-full overflow-auto p-8"><EnhancedMarkdownPreview content={text} /></div>;
 };
 
 export default EnhancedInstantPreviewModal;

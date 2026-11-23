@@ -234,6 +234,18 @@ a full-height panel and not a capsule with a background behind it:
   rendering/annotation/engine logic is deliberately untouched; these are presentation skins
   that can be refined without risking document rendering.
 
+### 5.4d Instant preview (`EnhancedInstantPreviewModal.tsx`)
+
+- Full-screen frame, zero decoration. Floating chrome only: one circular X (close),
+  minimize, fullscreen, info, share, download, prev/next — all true circles on the
+  dock glass tier with spring press.
+- All file types render in the same frame via a type-aware body: PDF, image, video,
+  audio, text/code, markdown, EPUB, spreadsheet, font, archive, 3D, generic fallback.
+- Minimize turns a viewer into a floating "picking card" in a right-center stack
+  (`PreviewTabStack.tsx`): fanned cards, spring pull on hover, per-card close, and
+  close-all / hide-all controls. Clicking a card restores the viewer.
+- Spec: `docs/research/macos-preview-reference.md`.
+
 ### 5.5 Toasts
 
 - Global toast (`src/styles/toast.css` + `toast.tsx`) uses the floating-dock tier: one
