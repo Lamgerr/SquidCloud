@@ -1,20 +1,21 @@
 {
-  "goal": "Integrate the newest cbVideoPlayer.tsx from Downloads into the preview system.",
+  "goal": "Fix cbVideoPlayer per screenshot review: remove white tint, add full options menu, proper touch/keyboard gestures, and real audio support.",
   "goal_source": "interactive query from human (not from backlog)",
   "last_actions": [
-    "2026-11-23: Found new cbVideoPlayer.tsx (16:30, 986 lines) in /storage/emulated/0/Download; copied over src/components/cbVideoPlayer.tsx.",
-    "Reviewed: self-contained rewrite with QuickTime-style floating glass HUD for video+audio, spring controls, liquid scrubber thumb, springy menus, ambient artwork stage for audio. Streaming/decryption logic preserved.",
-    "Verified imports only from @/lib/utils and @/lib/videoStreamer (StreamDecryptorService.initListener + seedFileMeta both exist). Props interface identical to old one - no call-site changes needed.",
-    "Confirmed all three call sites unchanged: EnhancedInstantPreviewModal, MobilePreviewModal, StreamingVideoDemo (extra props there were already present pre-change).",
-    "Committed e26b5f1b; Vercel READY."
+    "2026-11-23: Reviewed screenshot Screenshot_20261123-165534.jpg (HUD looked good but had a white sheen).",
+    "Neutralized .cbp-glass: removed white gradient + brightness(1.06) + pointer specular; added nano grain via GRAIN_BG from ./grain; neutralized slider/track/thumb/pill/button hovers and the greenish audio orb.",
+    "Menu: always shows Quality / Audio Track / Subtitles / Speed; added quality page with detected source resolution and stream ?q= param with position restore; external .srt/.vtt loading via addTextTrack + VTTCue; Default audio option.",
+    "Input: replaced click-based touch with pointer gestures (swipe scrub, brightness left half, volume right half, pinch zoom, tap/double-tap); added keyboard shortcuts c/i/p/[/]/0-9/Home/End; added data-cbp-ui guards so controls don't start gestures.",
+    "Audio: NOW PLAYING live indicator, neutral orb, always-on HUD. Committed 73b42a1c; Vercel READY."
   ],
   "key_numbers": {
-    "commit": "e26b5f1b",
-    "deploy_url": "https://cloudbliss-storage-8tvdricc5-sqc.vercel.app",
+    "commit": "73b42a1c",
+    "deploy_url": "https://cloudbliss-storage-gabhk45hb-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
-    "No local tsc; Vercel cloud build authoritative (build passed)."
+    "No local tsc; Vercel cloud build authoritative (build passed).",
+    "Quality is a preference/stream-param hook: the SW serves a single progressive stream (no renditions), so selecting a lower tier does not transcode - source resolution is detected and shown honestly."
   ],
-  "next": "Await visual verification of the new video/audio HUD; tune HUD sizing or scrubber feel from screenshots if needed."
+  "next": "Await visual/gesture verification on a real touch device; tune gesture thresholds, HUD sizing or grain intensity from screenshots."
 }
