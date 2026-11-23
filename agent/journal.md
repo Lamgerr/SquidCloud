@@ -1,3 +1,10 @@
+## 2026-11-23 - Remove player grain + center spinner (interactive query)
+- Screenshot Screenshot_20261123-172814.jpg showed the HUD drowned in heavy static-noise grain and the buffering spinner off-center and partly hidden behind the HUD.
+- Grain root cause: I had interpolated GRAIN_BG (an SVG with fully opaque noise) directly into .cbp-glass background-image with no opacity control. Removed the import and the layer entirely; clean neutral frosted gradient restored.
+- Spinner root cause: Framer Motion animates `scale` via an inline `transform`, which overrides the CSS `transform: translate(-50%,-50%)` used for centering. Fixed by passing x:'-50%', y:'-50%' in initial/animate/exit for .cbp-wait; applied the same fix to .cbp-gesture and the mobile .cbp-center transport (same latent bug), and removed the now-redundant CSS transforms.
+- Committed 2d523c4c; `vercel --prod --yes` READY.
+- Next: await visual confirmation.
+
 ## 2026-11-23 - Remove NOW PLAYING label (interactive query)
 - Human said the NOW PLAYING label + live pulse added in the previous player pass was unnecessary and should go.
 - Removed the `.cbp-now` div from the audio meta JSX (title + type/size meta remain), the `.cbp-now*` CSS rules and the `@keyframes cbp-live` block.

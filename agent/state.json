@@ -1,18 +1,19 @@
 {
-  "goal": "Remove the unnecessary NOW PLAYING label and live pulse from the audio player HUD.",
+  "goal": "Fix the video player per the latest screenshot: remove awful grain from the HUD and center the buffering spinner.",
   "goal_source": "interactive query from human (not from backlog)",
   "last_actions": [
-    "2026-11-23: Removed the <div className=\"cbp-now\"> NOW PLAYING element from the audio meta block in cbVideoPlayer.tsx.",
-    "Removed the associated .cbp-now CSS rules and @keyframes cbp-live (5 lines total). Title and file meta remain.",
-    "Verified no leftover references and syntax balance; committed 37fd0cb0; Vercel READY."
+    "2026-11-23: Reviewed screenshot Screenshot_20261123-172814.jpg: HUD covered in heavy static-noise grain and buffering spinner visibly off-center/partly behind the HUD.",
+    "Removed GRAIN_BG import and all grain from .cbp-glass; restored a clean neutral frosted gradient with no texture.",
+    "Root cause of off-center spinner: Framer Motion writes an inline transform for scale, overriding the CSS translate(-50%,-50%). Moved centering into motion x/y props for .cbp-wait, .cbp-gesture and .cbp-center, and removed the redundant CSS transforms.",
+    "Committed 2d523c4c; Vercel READY."
   ],
   "key_numbers": {
-    "commit": "37fd0cb0",
-    "deploy_url": "https://cloudbliss-storage-f2a89oc7d-sqc.vercel.app",
+    "commit": "2d523c4c",
+    "deploy_url": "https://cloudbliss-storage-kotauy2bt-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
     "No local tsc; Vercel cloud build authoritative (build passed)."
   ],
-  "next": "Await further design feedback from the human on the player / preview UX."
+  "next": "Await visual confirmation that the HUD is clean and the spinner is centered."
 }
