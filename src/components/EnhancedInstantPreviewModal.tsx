@@ -3,7 +3,7 @@ import { animate, motion, useMotionValue, useReducedMotion, useSpring, useTransf
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import {
-  AlertCircle, Download, FileText, Minimize, X, Layers,
+  AlertCircle, Download, FileText, Layers,
 } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import { downloadFilePreview } from '@/lib/res54';
@@ -27,6 +27,7 @@ import EnhancedMarkdownPreview from './EnhancedMarkdownPreview';
 import DeepReadReader from './DeepReadReader';
 import { previewTabs, detectKind, type PreviewKind } from '@/services/preview-tabs';
 import { GRAIN_CSS } from './grain';
+import { DOCK_CSS, Icons } from '@/components/FloatingDock';   // the dashboard dock's own tokens + icons: identical look, zero drift
 
 const decryptedBlobCache = new Map<string, { blob: Blob; url: string; timestamp: number }>();
 const MAX_CACHE_ITEMS = 15;
@@ -40,18 +41,13 @@ const PREVIEW_CSS = `${GRAIN_CSS}
 
 /* The dock is the only hit-target: when submerged just its visible sliver catches the pointer,
    so the viewer underneath keeps every pixel of the corner. */
-.pv-dock { position: absolute; overflow: hidden; pointer-events: auto; touch-action: none; cursor: pointer;
-  background: linear-gradient(180deg, rgba(36,37,33,.6), rgba(14,15,12,.72));
-  -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,.18), inset 0 -1px 0 rgba(0,0,0,.4), 0 18px 40px -16px rgba(0,0,0,.75); }
-/* buttons keep their own size and stay pinned to the corner; the jelly shell grows/shrinks around them */
-.pv-dock-row { position: absolute; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 6px; transform-origin: 100% 100%; }
-.pv-dock-btn { position: relative; z-index: 1; display: grid; place-items: center; width: 46px; height: 46px; padding: 0;
-  border: 0; border-radius: 999px; cursor: pointer; color: #e8e7e1; background: rgba(232,231,225,.07);
-  transition: background .2s, color .2s; }
-.pv-dock-btn:hover { background: rgba(232,231,225,.17); }
-.pv-dock-btn[data-close="true"]:hover { background: rgba(217,128,128,.3); color: #ffd2d2; }
-.pv-dock-btn:focus-visible { outline: 2px solid rgba(232,231,225,.85); outline-offset: 1px; }
+/* Dock visuals come from DOCK_CSS (.sq-face / .sq-round / .sq-hit): the exact faces of the dashboard dock.
+   Only placement + the jelly shell live here. Open position === dashboard dock position. */
+.pv-dock.sq-orb-slot { position: absolute; display: block; pointer-events: auto; touch-action: none; cursor: pointer;
+  --pv-sr: max(20px, env(safe-area-inset-right));
+  --pv-sb: calc(20px + env(safe-area-inset-bottom) + var(--sq-dock-lift, 0px)); }
+.pv-blob { position: absolute; inset: 0; height: auto; border-radius: inherit; pointer-events: none; }
+.pv-dock-row { position: absolute; display: flex; gap: 10px; }
 
 .pv-pill { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border-radius: 999px;
   border: 1px solid var(--pv-line); background: rgba(13,14,13,.86); color: #e8e7e1; cursor: pointer; }
@@ -60,8 +56,6 @@ const PREVIEW_CSS = `${GRAIN_CSS}
 .pv-generic { display: grid; place-items: center; gap: 16px; height: 100%; text-align: center; }
 .pv-generic-ico { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 999px;
   border: 1px solid var(--pv-line); background: rgba(13,14,13,.86); color: #e8e7e1; }
-@media (max-width: 640px) { .pv-dock-btn { width: 42px; height: 42px; } }
-@media (prefers-reduced-motion: reduce) { .pv-dock-btn { transition-duration: 0.01ms !important; } }
 `;
 
 const CustomDialogContent = React.forwardRef<
@@ -101,6 +95,8 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const loadGen = useRef(0);
   const closing = useRef(false);
   const kind: PreviewKind = file ? detectKind(file) : 'other';
+  // CBVideoPlayer owns the bottom edge with its controls → the dock parks on the right-centre wall instead
+  const isCbVideo = kind === 'video' && !!file?.encrypted && file?.storage_path === 'res54_distributed';
 
 
   // Register the open file as a tab when the modal opens
@@ -230,6 +226,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
       <CustomDialogContent>
+        <style>{DOCK_CSS}</style>
         <style>{PREVIEW_CSS}</style>
         <DialogPrimitive.Title className="sr-only">Preview {file.name}</DialogPrimitive.Title>
         <DialogPrimitive.Description className="sr-only">Full-screen file preview.</DialogPrimitive.Description>
@@ -238,112 +235,141 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
         </motion.div>
 
         <div className="pv-chrome">
-          <FloatingDock reduce={reduce} compact={isMobile} resetKey={file.id} onMinimize={close} onClose={() => leave(true)} />
+          <FloatingDock reduce={reduce} side={isCbVideo ? 'edge' : 'corner'} resetKey={file.id} onMinimize={close} onClose={() => leave(true)} />
         </div>
       </CustomDialogContent>
     </Dialog>
   );
 };
 
-/* ── The one floating dock, as jelly. It never leaves the screen: after 2s it is thrown into the
-      bottom-right corner, squashes flat against both walls (square corners where it touches, round
-      where it is free) and wobbles to rest. Magnetic: the blob bulges toward an approaching cursor,
-      pops open on contact, and can be pulled like a tethered gel, release past the threshold and it
-      springs open, otherwise it snaps back. Shape is driven by underdamped springs on width / height /
-      per-corner radius; height gets an opposite starting velocity so volume feels conserved. ── */
-const DOCK = { w: 58, h: 54 };
+/* ── The one floating dock. Looks and sits exactly like the dashboard dock (two 52px faces, 10px gap,
+      20px from the corner), so opening/closing a preview never shifts the UI.
+      After 2s it is thrown into the wall as jelly: square where it touches, round where it is free,
+      wobbling to rest. Magnetic: bulges toward an approaching cursor, pops open on contact, can be pulled
+      like tethered gel. 'edge' mode (CBVideoPlayer) parks it on the right-centre wall, away from the
+      player's controls. ── */
+type DockSide = 'corner' | 'edge';
+const GEO = {
+  corner: { open: { w: 114, h: 52 }, dock: { w: 58, h: 54 }, r: [28, 8, 0, 8] },   // radii: TL TR BR BL
+  edge:   { open: { w: 52, h: 114 }, dock: { w: 34, h: 68 }, r: [17, 0, 0, 17] },
+} as const;
+const OPEN_R = 26;
 const spring = (stiffness: number, damping: number, extra: object = {}) => ({ type: 'spring' as const, stiffness, damping, mass: 1, ...extra });
 const rubber = (d: number) => (d > 0 ? 96 * (1 - Math.exp(-d / 120)) : 0);   // soft-capped stretch
+const faceSpring = { type: 'spring' as const, stiffness: 520, damping: 15, mass: 0.8 };   // same as the dashboard dock
 
-const FloatingDock: React.FC<{ reduce: boolean; compact: boolean; resetKey: unknown; onMinimize: () => void; onClose: () => void }> = ({ reduce, compact, resetKey, onMinimize, onClose }) => {
-  const btn = compact ? 42 : 46;
-  const OPEN = { w: btn * 2 + 20, h: btn + 14, m: compact ? 14 : 20 };
-  const geo = useRef(OPEN); geo.current = OPEN;
+const MinimizeGlyph: React.FC<{ size?: number }> = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9 4.5V9H4.5M15 4.5V9h4.5M9 19.5V15H4.5M15 19.5V15h4.5" />
+  </svg>
+);
 
-  const w = useMotionValue(OPEN.w), h = useMotionValue(OPEN.h), m = useMotionValue(OPEN.m);
-  const rTL = useMotionValue(OPEN.h / 2), rTR = useMotionValue(OPEN.h / 2), rBR = useMotionValue(OPEN.h / 2), rBL = useMotionValue(OPEN.h / 2);
-  const mw = useSpring(0, { stiffness: 190, damping: 13, mass: 0.8 });   // magnetic / pull stretch, x
-  const mh = useSpring(0, { stiffness: 190, damping: 13, mass: 0.8 });   // magnetic / pull stretch, y
+const FloatingDock: React.FC<{ reduce: boolean; side: DockSide; resetKey: unknown; onMinimize: () => void; onClose: () => void }> = ({ reduce, side, resetKey, onMinimize, onClose }) => {
+  const edge = side === 'edge';
+  const g = GEO[side];
+  const geo = useRef<typeof GEO[DockSide]>(g); geo.current = g;
+
+  const w = useMotionValue<number>(g.open.w), h = useMotionValue<number>(g.open.h), m = useMotionValue(1);   // m: 0 = flush to wall, 1 = dashboard offset
+  const rTL = useMotionValue(OPEN_R), rTR = useMotionValue(OPEN_R), rBR = useMotionValue(OPEN_R), rBL = useMotionValue(OPEN_R);
+  const mw = useSpring(0, { stiffness: 190, damping: 13, mass: 0.8 });   // magnetic / pull stretch
+  const mh = useSpring(0, { stiffness: 190, damping: 13, mass: 0.8 });
   const width = useTransform([w, mw], ([a, b]: number[]) => Math.max(24, a + b));
   const height = useTransform([h, mh], ([a, b]: number[]) => Math.max(24, a + b));
   const radius = useTransform([rTL, rTR, rBR, rBL], (v: number[]) => v.map((n) => `${Math.max(0, n)}px`).join(' '));
-  const rowOpacity = useTransform(w, [DOCK.w + 16, OPEN.w - 12], [0, 1], { clamp: true });
-  const rowScale = useTransform(w, [DOCK.w, OPEN.w], [0.5, 1], { clamp: true });
+  const right = useTransform(m, (v) => `calc(var(--pv-sr) * ${Math.max(0, v)})`);
+  const bottom = useTransform(m, (v) => `calc(var(--pv-sb) * ${Math.max(0, v)})`);
+  const y = useTransform(height, (v) => (geo.current === GEO.edge ? -v / 2 : 0));
+  const rowOpacity = useTransform([w, h], ([a, b]: number[]) => {   // 0 = jelly blob, 1 = open faces
+    const G = geo.current, e = G === GEO.edge, v = e ? b : a, lo = e ? G.dock.h : G.dock.w, hi = e ? G.open.h : G.open.w;
+    return Math.min(1, Math.max(0, (v - lo - 6) / (hi - lo - 18)));
+  });
+  const rowScale = useTransform(rowOpacity, (o) => 0.55 + 0.45 * o);
   const rowEvents = useTransform(rowOpacity, (o) => (o > 0.6 ? 'auto' : 'none'));
+  const blobOpacity = useTransform(rowOpacity, (o) => 1 - Math.min(1, o * 1.15));
 
   const isOpen = useRef(true), panning = useRef(false), timer = useRef<number>();
 
   const settle = useCallback((open: boolean) => {
     isOpen.current = open;
-    const g = geo.current, r = g.h / 2;
+    const G = geo.current;
     if (open) { mw.set(0); mh.set(0); }
     if (reduce) {
-      w.set(open ? g.w : DOCK.w); h.set(open ? g.h : DOCK.h); m.set(open ? g.m : 0);
-      [rTL, rTR, rBR, rBL].forEach((v, i) => v.set(open ? r : [28, 8, 0, 8][i]));
+      w.set(open ? G.open.w : G.dock.w); h.set(open ? G.open.h : G.dock.h); m.set(open ? 1 : 0);
+      [rTL, rTR, rBR, rBL].forEach((v, i) => v.set(open ? OPEN_R : G.r[i]));
       return;
     }
-    if (open) {            // pop out of the corner: overshoot, settle
-      animate(m, g.m, spring(320, 17));
-      animate(w, g.w, spring(300, 12));
-      animate(h, g.h, spring(320, 13, { velocity: -140 }));
-      [rTL, rTR, rBR, rBL].forEach((v) => animate(v, r, spring(260, 15)));
-    } else {               // thrown into the corner: slam, flatten against the walls, wobble
+    if (open) {            // pop out of the wall: overshoot, settle
+      animate(m, 1, spring(320, 17));
+      animate(w, G.open.w, spring(300, 12));
+      animate(h, G.open.h, spring(320, 13, { velocity: edge ? 140 : -140 }));
+      [rTL, rTR, rBR, rBL].forEach((v) => animate(v, OPEN_R, spring(260, 15)));
+    } else {               // thrown at the wall: slam, flatten, wobble
       animate(m, 0, spring(520, 26));
-      animate(w, DOCK.w, spring(210, 9));
-      animate(h, DOCK.h, spring(240, 10, { velocity: 260 }));   // squashed wide → bulges tall
-      animate(rTL, 28, spring(300, 16)); animate(rTR, 8, spring(300, 12));
-      animate(rBL, 8, spring(300, 12));  animate(rBR, 0, spring(700, 40));  // wall-touching corner goes square instantly
+      animate(w, G.dock.w, spring(210, 9));
+      animate(h, G.dock.h, spring(240, 10, { velocity: 260 }));    // squashed wide → bulges tall
+      [rTL, rTR, rBR, rBL].forEach((v, i) => animate(v, G.r[i], i === 2 ? spring(700, 40) : spring(300, i === 0 ? 16 : 12)));
     }
-  }, [reduce, w, h, m, rTL, rTR, rBR, rBL, mw, mh]);
+  }, [reduce, edge, w, h, m, rTL, rTR, rBR, rBL, mw, mh]);
   const settleRef = useRef(settle); settleRef.current = settle;
 
   const hold = () => window.clearTimeout(timer.current);
   const hideIn = (ms: number) => { hold(); timer.current = window.setTimeout(() => settleRef.current(false), ms); };
   const reveal = (autoHide?: number) => { hold(); if (!isOpen.current) settleRef.current(true); if (autoHide) hideIn(autoHide); };
 
-  useEffect(() => { reveal(2000); return hold; }, [resetKey]);   // new file → show 2s, then throw into the corner
+  useEffect(() => { reveal(2000); return hold; }, [resetKey]);          // new file → show 2s, then throw into the wall
+  useEffect(() => { settleRef.current(isOpen.current); }, [side]);       // moved to another wall → re-shape
 
-  // magnetism: the blob leans toward the cursor as it approaches the corner
-  useEffect(() => {
+  useEffect(() => {   // magnetism: lean toward the cursor
     if (reduce) return;
     const move = (e: PointerEvent) => {
       if (isOpen.current || panning.current || e.pointerType !== 'mouse') return;
-      const dx = window.innerWidth - e.clientX, dy = window.innerHeight - e.clientY;
+      const ed = geo.current === GEO.edge;
+      const dx = window.innerWidth - e.clientX;
+      const dy = ed ? Math.abs(e.clientY - window.innerHeight / 2) : window.innerHeight - e.clientY;
       const d = Math.hypot(dx, dy) || 1, R = 240;
       if (d >= R) { mw.set(0); mh.set(0); return; }
       const pull = Math.pow(1 - d / R, 2) * 46;
-      mw.set((pull * dx) / d); mh.set((pull * dy) / d);
+      mw.set((pull * dx) / d); mh.set(((ed ? 0.7 : 1) * pull * dy) / d);
     };
     window.addEventListener('pointermove', move);
     return () => window.removeEventListener('pointermove', move);
   }, [reduce, mw, mh]);
 
+  const stretchY = (oy: number) => (edge ? rubber(Math.abs(oy)) * 0.5 : rubber(-oy));
+  const press = reduce ? undefined : { scaleX: 0.93, scaleY: 0.86 };
+  const hoverFx = reduce ? undefined : { scale: 1.045 };
+  const rowStyle: React.CSSProperties = edge
+    ? { right: 0, top: '50%', marginTop: -57, width: 52, height: 114, flexDirection: 'column', transformOrigin: '100% 50%' }
+    : { right: 0, bottom: 0, width: 114, height: 52, flexDirection: 'row', transformOrigin: '100% 100%' };
+
   return (
-    <motion.div className="pv-dock" role="toolbar" aria-label="Preview controls"
-      style={{ right: m, bottom: m, width, height, borderRadius: radius }}
+    <motion.div className="pv-dock sq-orb-slot" role="toolbar" aria-label="Preview controls"
+      style={{ right, bottom: edge ? 'auto' : bottom, top: edge ? '50%' : 'auto', y, width, height, borderRadius: radius }}
       onPanStart={() => { panning.current = true; hold(); }}
-      onPan={(_, i) => { if (!isOpen.current) { mw.set(rubber(-i.offset.x)); mh.set(rubber(-i.offset.y)); } }}
+      onPan={(_, i) => { if (!isOpen.current) { mw.set(rubber(-i.offset.x)); mh.set(stretchY(i.offset.y)); } }}
       onPanEnd={(_, i) => {
         window.setTimeout(() => { panning.current = false; }, 0);
         if (isOpen.current) return;
-        const pulled = Math.hypot(rubber(-i.offset.x), rubber(-i.offset.y));
-        if (pulled > 40 || i.velocity.x < -300 || i.velocity.y < -300) reveal(3000);
-        else { mw.set(0); mh.set(0); }                                  // let go early: gel snaps back and wobbles
+        const pulled = Math.hypot(rubber(-i.offset.x), stretchY(i.offset.y));
+        if (pulled > 40 || i.velocity.x < -300) reveal(3000);
+        else { mw.set(0); mh.set(0); }                                   // let go early: gel snaps back and wobbles
       }}
       onClick={() => { if (!panning.current && !isOpen.current) reveal(3000); }}
       onPointerEnter={(e) => { if (e.pointerType === 'mouse') reveal(); }}
       onPointerLeave={(e) => { if (e.pointerType === 'mouse') hideIn(650); }}
       onFocusCapture={() => reveal()} onBlurCapture={() => hideIn(1200)}>
-      <span className="pv-grain" />
-      <motion.div className="pv-dock-row" style={{ width: OPEN.w, height: OPEN.h, opacity: rowOpacity, scale: rowScale, pointerEvents: rowEvents }}>
-        <motion.button type="button" className="pv-dock-btn" aria-label="Minimize" title="Minimize" onClick={onMinimize}
-          whileHover={reduce ? undefined : { scale: 1.08 }} whileTap={reduce ? undefined : { scale: 0.9 }} transition={SPRING}>
-          <Minimize size={18} />
-        </motion.button>
-        <motion.button type="button" className="pv-dock-btn" data-close="true" aria-label="Close" title="Close" onClick={onClose}
-          whileHover={reduce ? undefined : { scale: 1.08 }} whileTap={reduce ? undefined : { scale: 0.9 }} transition={SPRING}>
-          <X size={19} />
-        </motion.button>
+      <motion.span className="sq-face pv-blob" style={{ opacity: blobOpacity }} />
+      <motion.div className="pv-dock-row" style={{ ...rowStyle, opacity: rowOpacity, scale: rowScale, pointerEvents: rowEvents }}>
+        <button type="button" className="sq-hit" aria-label="Minimize" title="Minimize" onClick={onMinimize}>
+          <motion.span className="sq-face sq-round" whileHover={hoverFx} whileTap={press} transition={reduce ? { duration: 0.01 } : faceSpring}>
+            <MinimizeGlyph size={20} />
+          </motion.span>
+        </button>
+        <button type="button" className="sq-hit" aria-label="Close" title="Close" onClick={onClose}>
+          <motion.span className="sq-face sq-round" whileHover={hoverFx} whileTap={press} transition={reduce ? { duration: 0.01 } : faceSpring}>
+            <Icons.X size={22} />
+          </motion.span>
+        </button>
       </motion.div>
     </motion.div>
   );

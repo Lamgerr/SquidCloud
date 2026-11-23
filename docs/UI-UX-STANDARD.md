@@ -253,9 +253,14 @@ a full-height panel and not a capsule with a background behind it:
   maximize/close, hide-all / close-all, hidden handle); `PreviewTabStack.tsx` is the
   thin store-connected wrapper that maps `previewTabs` state onto it. Shared nano-grain
   / frosted-glass tokens live in `src/components/grain.ts`.
-- Command palette (`CommandPalette.tsx`) uses a dense, more-opaque frosted surface with
-  a two-frequency nano-texture grain (mid fractal + fine high-frequency), a hairline
-  rim and deep shadow — premium and translucent, never a thin see-through sheet.
+- Command palette (`CommandPalette.tsx`) uses a dense frosted surface with a
+  two-frequency nano-texture grain (mid fractal + fine high-frequency), a hairline rim
+  and deep shadow. The scope card that opens below the search (files / commands / AI)
+  gets the same translucent frosted body + grain via `.spot-panel.spot-glass`, with a
+  grain veil on its clip so it never renders as a flat opaque box.
+- AI mode shows a **live context strip** (current file / type / folder / selection with
+  a pulsing live dot), and the answer streams word-by-word in an animated blue gradient
+  with a glowing caret while loading (`data-streaming` + `spot-stream-blue`).
 - Spec: `docs/research/macos-preview-reference.md`.
 
 ### 5.5 Toasts

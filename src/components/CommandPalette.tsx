@@ -119,8 +119,23 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-panel { border-radius: 30px; display: grid; grid-template-rows: 0fr; opacity: 0; translate: 0 -10px; scale: .97; transform-origin: top center; pointer-events: none;
   transition: grid-template-rows .7s ${SPRING}, opacity .25s ease, translate .7s ${SPRING}, scale .7s ${SPRING}; }
 .spot-panel[data-open="true"] { grid-template-rows: 1fr; opacity: 1; translate: 0 0; scale: 1; pointer-events: auto; }
-.spot-panel[data-ai="true"] { background: linear-gradient(180deg, rgba(255,255,255,.3), var(--glass)); }
-.spot-panel > * { min-height: 0; } .spot-panel > .spot-clip { overflow: hidden; border-radius: 30px 30px 0 0; display: flex; flex-direction: column; }
+/* The scope card below the search: its own denser-but-translucent frosted body
+   with the same two-frequency nano grain as the pill. Never a flat opaque box. */
+.spot-panel.spot-glass { background-color: rgba(16,17,18,.86);
+  background-image: ${NANO_GRAIN}, ${NANO_TEXTURE}, linear-gradient(180deg, var(--fog), transparent 58%);
+  background-size: 120px 120px, 200px 200px, auto;
+  border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(46px) saturate(1.5); backdrop-filter: blur(46px) saturate(1.5);
+  box-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 rgba(0,0,0,.4), 0 24px 56px -20px rgba(0,0,0,.9); }
+.spot-panel[data-ai="true"] { background-color: rgba(16,17,26,.88);
+  background-image: ${NANO_GRAIN}, ${NANO_TEXTURE}, linear-gradient(180deg, rgba(72,92,168,.34), rgba(12,13,24,.94));
+  background-size: 120px 120px, 200px 200px, auto;
+  border-color: rgba(150,174,255,.22); }
+.spot-panel > * { min-height: 0; position: relative; z-index: 1; }
+.spot-panel > .spot-clip { overflow: hidden; border-radius: 30px 30px 0 0; display: flex; flex-direction: column; position: relative; }
+.spot-panel > .spot-clip::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0; border-radius: inherit;
+  background-image: ${NANO_GRAIN}; background-size: 120px 120px; opacity: .55; mix-blend-mode: overlay; }
+.spot-panel > .spot-clip > * { position: relative; z-index: 1; }
 .spot-panel > .spot-foot { overflow: hidden; }
 .spot-root[data-mobile="true"] .spot-panel { flex: 1; grid-template-rows: 1fr; opacity: 1; translate: none; scale: 1; pointer-events: auto; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .spot-root[data-mobile="true"] .spot-panel > .spot-clip { border-radius: 0; }
@@ -146,11 +161,28 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 
 /* ask */
 .spot-ask { padding: 20px 24px 22px; min-height: 120px; max-height: min(420px, 55vh); overflow-y: auto; flex: 1; }
+/* Live context strip — shows exactly what Squid can see right now */
+.spot-ctx { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; padding: 8px 12px;
+  border-radius: 999px; font: 500 10.5px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,.6);
+  background: rgba(120,150,255,.08); border: 1px solid rgba(120,150,255,.18); }
+.spot-ctx-live { width: 6px; height: 6px; border-radius: 999px; flex: none; background: #7ea2ff;
+  box-shadow: 0 0 10px #7ea2ff; animation: spot-live 1.6s ease-in-out infinite; }
+.spot-ctx b { color: #d3e0ff; font-weight: 500; }
+.spot-ctx-sep { opacity: .32; }
+@keyframes spot-live { 50% { opacity: .35; box-shadow: 0 0 3px #7ea2ff; } }
 .spot-ask-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; color: var(--mute); padding: 8px 0; }
 .spot-ask-empty p { margin: 0; font-size: 15px; }
 .spot-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .spot-suggest button { padding: 7px 14px; border-radius: 999px; font-size: 13.5px; color: var(--ink); background: var(--hi); border: 1px solid var(--line); cursor: pointer; }
 .spot-answer { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink); animation: spot-rise .6s ${SPRING} both; }
+/* while the answer streams: a living blue gradient that slides across the glyphs */
+.spot-answer[data-streaming="true"] { background: linear-gradient(100deg, #cfe0ff 0%, #6f9dff 26%, #b7c6ff 50%, #6f9dff 74%, #cfe0ff 100%) 0 0 / 240% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: spot-rise .6s ${SPRING} both, spot-stream-blue 1.9s linear infinite; }
+@keyframes spot-stream-blue { to { background-position: -240% 0; } }
+.spot-caret { display: inline-block; width: 2px; height: 1em; margin-left: 3px; vertical-align: -2px; border-radius: 2px;
+  background: #8fb0ff; box-shadow: 0 0 8px #8fb0ff; animation: spot-caret 1s steps(1) infinite; }
+@keyframes spot-caret { 50% { opacity: 0; } }
 .spot-answer p { margin: 0 0 10px; } .spot-answer p:last-child { margin-bottom: 0; }
 .spot-answer strong { color: var(--ink); font-weight: 600; }
 .spot-answer ul, .spot-answer ol { margin: 8px 0; padding-left: 20px; } .spot-answer li { margin: 4px 0; }
@@ -1141,6 +1173,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
           {aiOn && (
             <div className="spot-ask" role="status" aria-live="polite">
+              <div className="spot-ctx" aria-label="Live context">
+                <span className="spot-ctx-live" />
+                <span>LIVE CONTEXT</span>
+                <span className="spot-ctx-sep">/</span>
+                {aiContext?.fileName ? <b>{aiContext.fileName}</b> : <span>workspace</span>}
+                {aiContext?.fileType && <><span className="spot-ctx-sep">/</span><span>{aiContext.fileType}</span></>}
+                {(currentFolder || aiContext?.filePath) && <><span className="spot-ctx-sep">/</span><span>{currentFolder || aiContext?.filePath || 'Root'}</span></>}
+                {selectedFilesCount > 0 && <><span className="spot-ctx-sep">/</span><span>{selectedFilesCount} selected</span></>}
+                <span className="spot-ctx-sep">/</span>
+                <span>Squid AI</span>
+              </div>
               {!response && !isLoading && (
                 <div className="spot-ask-empty">
                   <i className="spot-orb big" />
@@ -1171,7 +1214,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                 </div>
               )}
               {isLoading && <div className="spot-searching">Searching…</div>}
-              {shown && <div className="spot-answer"><ReactMarkdown>{shown}</ReactMarkdown></div>}
+              {shown && (
+                <div className="spot-answer" data-streaming={isLoading ? 'true' : undefined}>
+                  <ReactMarkdown>{shown}</ReactMarkdown>
+                  {isLoading && <span className="spot-caret" aria-hidden="true" />}
+                </div>
+              )}
             </div>
           )}
         </div>
