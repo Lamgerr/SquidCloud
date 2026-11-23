@@ -1,23 +1,16 @@
 # What happened while you were away
 
 ## Done
-- Integrated your three newest files from `/storage/emulated/0/Download` into the repo:
-  - `src/components/grain.ts` — shared nano-grain / frosted-glass tokens.
-  - `src/components/EnhancedInstantPreviewModal.tsx` — the new **spring-driven "jelly" dock**: magnetic cursor bulge, 2s auto-throw into the corner squashed against both walls, hover pop, tethered pull-to-reveal. Minimize keeps the tab; X removes it.
-  - `src/components/MinimizedPreviewStack.tsx` — the presentational **card deck** (fanned spring cards, drag-left to maximize / drag-right to close, hide-all / close-all, hidden handle).
-- `src/components/PreviewTabStack.tsx` is now a thin store-connected wrapper mapping `previewTabs` state onto the new deck — Dashboard needed no changes.
-- Updated `docs/UI-UX-STANDARD.md`. Committed `29fcacea`. Deployed — **READY** at `https://cloudbliss-storage-5e9w964zi-sqc.vercel.app`.
-
-## Intentionally not changed
-- **CommandPalette.tsx**: the copy in Downloads is an *older* transparent-glass version (`rgba(38,40,50,.52)`, no nano-grain). Your current premium nano-grain palette was kept.
-- Other older `.tsx` files in Downloads (FloatingDock, Dashboard, App, etc., Nov 16–19) were left alone.
+- **Instant preview modal** — replaced with your newest file (`EnhancedInstantPreviewModal.tsx-new`, 15:27). The dock now reuses the dashboard dock's own `DOCK_CSS` / `Icons` so it looks and sits identically (two 52px faces, 10px gap, 20px from the corner), with a new `edge` mode that parks it right-centre for encrypted video so it avoids the player controls. Jelly physics, magnetism, 2s throw into the wall all retained.
+- **Command palette scope card** — the card that opens below the search (files / commands / AI) now has real translucency + nano grain. Root cause: the AI `background` shorthand was wiping the grain layers from `.spot-glass`. Fixed with explicit translucent frosted body + a grain veil on the clip.
+- **AI** — added a **live context strip** (pulsing dot, current file / type / folder / selection) and the answer now **streams word-by-word in an animated blue gradient** with a glowing caret while loading.
+- Updated `docs/UI-UX-STANDARD.md`. Committed `84371f49`. Deployed — **READY** at `https://cloudbliss-storage-ock0qowz2-sqc.vercel.app`.
 
 ## In progress
 - Nothing actively being edited. Awaiting your visual verification.
 
 ## Blocked / needs a decision
-- No local `tsc` in this environment; Vercel's cloud build is the verification authority (build passed).
-- If you actually meant to replace the Command palette too, say so and I'll port the older file's structure onto the newer grain system.
+- No local `tsc` here; Vercel's cloud build passed and is the verification authority.
 
 ## Queued next
-- Tune jelly-dock spring constants / peek sliver / pull threshold and card-deck drag thresholds from screenshots if the feel is off.
+- Tune the blue gradient intensity / caret, or the dock's edge placement, from screenshots if the feel is off.
