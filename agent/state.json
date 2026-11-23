@@ -1,20 +1,20 @@
 {
-  "goal": "Integrate the newest instant preview modal file and finish command-palette scope-card + AI streaming polish.",
+  "goal": "Integrate the newest cbVideoPlayer.tsx from Downloads into the preview system.",
   "goal_source": "interactive query from human (not from backlog)",
   "last_actions": [
-    "2026-11-23: Found EnhancedInstantPreviewModal.tsx-new (15:27) in /storage/emulated/0/Download; copied over src/components/EnhancedInstantPreviewModal.tsx.",
-    "Verified its new imports resolve: DOCK_CSS + Icons.X exist in src/components/FloatingDock.tsx, plus sq-face/sq-round/sq-hit/sq-orb-slot in DOCK_CSS. New dock reuses dashboard dock faces with corner/edge modes (edge for CBVideoPlayer).",
-    "CommandPalette: fixed scope card below search losing translucency+grain (.spot-panel[data-ai] background shorthand was wiping grain); added .spot-panel.spot-glass frosted body + grain veil on clip.",
-    "AI: added live context strip (file/type/folder/selection, pulsing dot) and word-by-word streaming answer in animated blue gradient with glowing caret (data-streaming + spot-stream-blue keyframes).",
-    "Updated docs/UI-UX-STANDARD.md; committed 84371f49; Vercel READY."
+    "2026-11-23: Found new cbVideoPlayer.tsx (16:30, 986 lines) in /storage/emulated/0/Download; copied over src/components/cbVideoPlayer.tsx.",
+    "Reviewed: self-contained rewrite with QuickTime-style floating glass HUD for video+audio, spring controls, liquid scrubber thumb, springy menus, ambient artwork stage for audio. Streaming/decryption logic preserved.",
+    "Verified imports only from @/lib/utils and @/lib/videoStreamer (StreamDecryptorService.initListener + seedFileMeta both exist). Props interface identical to old one - no call-site changes needed.",
+    "Confirmed all three call sites unchanged: EnhancedInstantPreviewModal, MobilePreviewModal, StreamingVideoDemo (extra props there were already present pre-change).",
+    "Committed e26b5f1b; Vercel READY."
   ],
   "key_numbers": {
-    "commit": "84371f49",
-    "deploy_url": "https://cloudbliss-storage-ock0qowz2-sqc.vercel.app",
+    "commit": "e26b5f1b",
+    "deploy_url": "https://cloudbliss-storage-8tvdricc5-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
     "No local tsc; Vercel cloud build authoritative (build passed)."
   ],
-  "next": "Await visual verification of the dashboard-matched dock, grainy scope card, and blue streaming effect; tune gradients/spring constants from screenshots if needed."
+  "next": "Await visual verification of the new video/audio HUD; tune HUD sizing or scrubber feel from screenshots if needed."
 }

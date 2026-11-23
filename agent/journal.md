@@ -1,3 +1,11 @@
+## 2026-11-23 - Integrate new cbVideoPlayer (interactive query)
+- Newest download: `cbVideoPlayer.tsx` (16:30, 986 lines vs old 897). Replaced src/components/cbVideoPlayer.tsx verbatim.
+- New player is self-contained: only imports framer-motion, @/lib/utils, @/lib/videoStreamer. Uses StreamDecryptorService.initListener + seedFileMeta (both verified present). Streaming/decryption logic carried over.
+- Props interface byte-identical to old (file/poster/autoPlay/className/shareId), so the three call sites needed zero edits: EnhancedInstantPreviewModal, MobilePreviewModal, StreamingVideoDemo. The extra props at the latter two (src/muted/onDownload/useStreaming/etc.) were already there pre-change - not a regression; tsconfig has strictNullChecks/noUnusedLocals off.
+- Design: QuickTime-style floating glass HUD centred on desktop, mobile controls over the picture, spring driven (JELLY/POP/SOFT), liquid scrubber thumb stretches with pointer velocity, menus pop from anchor, audio files get an ambient artwork stage.
+- Verified brace/paren/template balance; committed e26b5f1b; `vercel --prod --yes` READY.
+- Next: human visual verification of the HUD; tune sizing/scrubber feel if needed.
+
 ## 2026-11-23 - New dock file + palette scope-card/AI polish (interactive query)
 - Newest download was `EnhancedInstantPreviewModal.tsx-new` (15:27) — copied into src/components/EnhancedInstantPreviewModal.tsx. Its key change: dock now imports DOCK_CSS + Icons from the repo's FloatingDock.tsx so the preview dock reuses the exact dashboard dock faces (.sq-face/.sq-round/.sq-hit/.sq-orb-slot), with a new `side` prop ('corner' | 'edge'); edge mode parks the dock right-centre for CBVideoPlayer so it avoids the player controls. Verified Icons.X and all CSS classes exist before integrating.
 - CommandPalette scope card: root cause of "no translucent/grain" was `.spot-panel[data-ai="true"] { background: linear-gradient(...) }` — the `background` shorthand overrode `.spot-glass` background-image/color and killed the grain. Replaced with background-color + background-image preserving both NANO layers, added `.spot-panel.spot-glass` translucent frosted body (rgba(16,17,18,.86), blur 46px saturate 1.5) and a grain veil on `.spot-clip::before`. Fixed z-index so content stays above the veil without breaking the 0fr→1fr grid animation.
