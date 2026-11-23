@@ -1,3 +1,10 @@
+## 2026-11-23 - Revert Folio PDF viewer (interactive query)
+- User: "i think our own previous pdf viewer was far better". Reverted the PDF part of commit 8a681899 only.
+- EnhancedInstantPreviewModal imports/renders OptimizedPDFViewer again; deleted FolioPdfViewer.tsx (verified no other references); reverted the UI-UX-STANDARD.md note.
+- Kept the non-PDF improvements from that commit: calmer spring constants / no gloss in the preview dock and video player, and the plain-CSS corner anchoring that fixed the wide-screen dock visibility.
+- Committed 184cef53; `vercel --prod --yes` READY.
+- Next: do not retry the Folio port unless explicitly asked.
+
 ## 2026-11-23 - Folio PDF engine + calm motion + wide-screen dock (interactive query)
 - User asked to replace OptimizedPDFViewer with Folio from GitHub, personalise the UI to SquidCloud (floating grouped docks), remove gloss, tone down jelly physics, and fix the preview dock being invisible on wide screens until 125% zoom.
 - Brainstorming skill was loaded per the rules, but its question/approval gate conflicts with AGENTS.md (unattended, decide and act, user instructions outrank skills) — proceeded autonomously and logged the rationale.

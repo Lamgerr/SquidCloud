@@ -1,23 +1,19 @@
 {
-  "goal": "Replace OptimizedPDFViewer with a SquidCloud-styled Folio PDF engine, tone down motion/gloss, and fix the preview dock on wide screens.",
-  "goal_source": "interactive query from human (not from backlog)",
+  "goal": "Revert the Folio PDF experiment and restore the project's own OptimizedPDFViewer.",
+  "goal_source": "interactive query from human ('our own previous pdf viewer was far better')",
   "last_actions": [
-    "2026-11-23: Researched Folio on GitHub (owenpkent/folio, MIT, React + pdfjs-dist + zustand + Tauri). It is a full desktop app, not an npm library, so the portable part is its page engine.",
-    "Added src/components/FolioPdfViewer.tsx: Folio's architecture (pre-measured page layout boxes, IntersectionObserver-gated canvas rendering with DPR cap, separate PDF.js text layer, page dimensions cache, fit width/page/custom, rotation, page tracking from scroll, lazy thumbnails) with SquidCloud chrome: floating grouped top/bottom docks, neutral glass, CSS eased transitions only.",
-    "Switched EnhancedInstantPreviewModal to FolioPdfViewer for PDFs (kept OptimizedPDFViewer for DeepReadReader).",
-    "Fixed wide-screen dock: anchored with plain CSS corner values plus !important and data-edge variant instead of animated inline right/bottom; removed the m motion value entirely.",
-    "Calmed motion: modal/player springs now stiffness ~300 damping ~28-34, rubber stretch 96->44, press scales softened, removed velocity overshoot and the glossy conic rim on the preview dock.",
-    "Committed 8a681899; Vercel READY."
+    "2026-11-23: Switched EnhancedInstantPreviewModal back to importing/rendering OptimizedPDFViewer for PDFs.",
+    "Deleted src/components/FolioPdfViewer.tsx (no remaining references) and reverted the UI-UX-STANDARD.md note.",
+    "Kept the good parts of the previous commit: calmer springs/no gloss in the preview dock and video player, and the plain-CSS corner anchoring that fixed the wide-screen dock.",
+    "Committed 184cef53; Vercel READY."
   ],
   "key_numbers": {
-    "commit": "8a681899",
-    "folio_source": "github.com/owenpkent/folio (MIT)",
-    "deploy_url": "https://cloudbliss-storage-jnl6j8zsx-sqc.vercel.app",
+    "commit": "184cef53",
+    "deploy_url": "https://cloudbliss-storage-cwsn0pve4-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
-    "No local tsc; Vercel cloud build authoritative (build passed).",
-    "Folio's full editor feature set (annotations, signatures, OCR, Tauri integrations) was intentionally not ported - only its page engine and viewer behaviours."
+    "No local tsc; Vercel cloud build authoritative (build passed)."
   ],
-  "next": "Await visual verification of PDF page rendering/text layer, dock visibility on wide screens, and calmer motion."
+  "next": "Await further feedback; do not re-attempt the Folio port unless explicitly asked."
 }
