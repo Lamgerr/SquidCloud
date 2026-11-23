@@ -1,3 +1,9 @@
+## 2026-11-23 - Remove NOW PLAYING label (interactive query)
+- Human said the NOW PLAYING label + live pulse added in the previous player pass was unnecessary and should go.
+- Removed the `.cbp-now` div from the audio meta JSX (title + type/size meta remain), the `.cbp-now*` CSS rules and the `@keyframes cbp-live` block.
+- Verified zero leftover references and brace/paren/template balance; committed 37fd0cb0; `vercel --prod --yes` READY.
+- Next: await further design feedback.
+
 ## 2026-11-23 - cbVideoPlayer fixes from screenshot review (interactive query)
 - Screenshot Screenshot_20261123-165534.jpg showed the new glass HUD but with a visible white sheen. Root causes: .cbp-glass white gradient overlay, `backdrop-filter: ... brightness(1.06)`, white inset rim, and a pointer-following white radial ::before. Replaced all with neutral dock glass + GRAIN_BG nano grain; neutralized slider fill/thumb, button hovers, pills, tips and the sage/green audio orb (user had explicitly rejected green accents earlier).
 - Options menu had speed/audio/subs but rows were conditionally hidden and there was no quality. Rebuilt root menu to always show Quality / Audio Track / Subtitles / Speed with icons + current values. Added quality page with source resolution detected from videoWidth/Height (qualityOf helper), passed ?q= to the virtual-stream URL, and preserved playback position via a resumeAt ref so switching quality doesn't restart. Note: SW serves one progressive stream (no renditions) - quality is an honest preference hook, displayed as such.
