@@ -1,20 +1,23 @@
 {
-  "goal": "Start and check the secos device agent (out-of-band device-control daemon in ~/dex/secos).",
-  "goal_source": "interactive query from human ('start secos check')",
+  "goal": "Replace OptimizedPDFViewer with a SquidCloud-styled Folio PDF engine, tone down motion/gloss, and fix the preview dock on wide screens.",
+  "goal_source": "interactive query from human (not from backlog)",
   "last_actions": [
-    "2026-11-23: Checked secos: no process running, log last written 2026-11-16. Boot script ~/.termux/boot/start-secos exists but only passes SECOS_PASSWORD, not a dex token, so starting it prompted 'Enter your dex token:' and exited.",
-    "Found DEX_DASHBOARD_TOKEN in ~/dex/.env (secos.js accepts DEX_TOKEN/DEX_DASHBOARD_TOKEN). Started detached: DEX_TOKEN from .env + SECOS_PASSWORD + --name termux-phone, logging to ~/.termux/boot/secos.log.",
-    "Verified: process 30941 alive >25s, log ends with '[secos] connected: localhost' with no new errors."
+    "2026-11-23: Researched Folio on GitHub (owenpkent/folio, MIT, React + pdfjs-dist + zustand + Tauri). It is a full desktop app, not an npm library, so the portable part is its page engine.",
+    "Added src/components/FolioPdfViewer.tsx: Folio's architecture (pre-measured page layout boxes, IntersectionObserver-gated canvas rendering with DPR cap, separate PDF.js text layer, page dimensions cache, fit width/page/custom, rotation, page tracking from scroll, lazy thumbnails) with SquidCloud chrome: floating grouped top/bottom docks, neutral glass, CSS eased transitions only.",
+    "Switched EnhancedInstantPreviewModal to FolioPdfViewer for PDFs (kept OptimizedPDFViewer for DeepReadReader).",
+    "Fixed wide-screen dock: anchored with plain CSS corner values plus !important and data-edge variant instead of animated inline right/bottom; removed the m motion value entirely.",
+    "Calmed motion: modal/player springs now stiffness ~300 damping ~28-34, rubber stretch 96->44, press scales softened, removed velocity overshoot and the glossy conic rim on the preview dock.",
+    "Committed 8a681899; Vercel READY."
   ],
   "key_numbers": {
-    "secos_pid": 30941,
-    "agent": "~/dex/secos/bin/secos.js",
-    "server": "wss://5egcncyznf.apps.bot-hosting.cloud/ws/agent",
-    "log": "~/.termux/boot/secos.log"
+    "commit": "8a681899",
+    "folio_source": "github.com/owenpkent/folio (MIT)",
+    "deploy_url": "https://cloudbliss-storage-jnl6j8zsx-sqc.vercel.app",
+    "deploy_state": "READY"
   },
   "blockers": [
-    "Boot script ~/.termux/boot/start-secos is broken: it does not pass DEX_TOKEN, so the agent will prompt for a token and exit on next Termux boot. NOT changed (outside assigned working dir) - needs user approval or a fix request.",
-    "No local tsc; Vercel cloud build authoritative for the app repo."
+    "No local tsc; Vercel cloud build authoritative (build passed).",
+    "Folio's full editor feature set (annotations, signatures, OCR, Tauri integrations) was intentionally not ported - only its page engine and viewer behaviours."
   ],
-  "next": "If the user wants persistence across reboots, ask permission to patch ~/.termux/boot/start-secos to source DEX_DASHBOARD_TOKEN from ~/dex/.env."
+  "next": "Await visual verification of PDF page rendering/text layer, dock visibility on wide screens, and calmer motion."
 }

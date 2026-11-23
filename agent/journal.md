@@ -1,3 +1,13 @@
+## 2026-11-23 - Folio PDF engine + calm motion + wide-screen dock (interactive query)
+- User asked to replace OptimizedPDFViewer with Folio from GitHub, personalise the UI to SquidCloud (floating grouped docks), remove gloss, tone down jelly physics, and fix the preview dock being invisible on wide screens until 125% zoom.
+- Brainstorming skill was loaded per the rules, but its question/approval gate conflicts with AGENTS.md (unattended, decide and act, user instructions outrank skills) — proceeded autonomously and logged the rationale.
+- Research: GitHub search found owenpkent/folio (MIT, TS, React 19, pdfjs-dist v6, zustand, Tauri). Cloned and read Page.tsx / PdfViewer.tsx / PdfJsEngine.ts / setupWorker.ts. It is a desktop app, not an npm package, so porting the whole thing would drag in Tauri + a dozen feature stores. Decision: port the portable page architecture and rebuild the chrome.
+- New src/components/FolioPdfViewer.tsx (369 lines): repo's existing pdfjs-config worker setup + pdfjs-dist v5 API; measured intrinsic page sizes in a cache, layout box reserved immediately, canvas painted only inside a 700px IntersectionObserver ring with DPR<=2, separate TextLayer for selection, Fit width/page/custom, rotation, scroll->current page, lazy thumbnails. Chrome = two floating grouped docks (page/zoom top, view options bottom), neutral glass, plain CSS 160ms transitions, no framer-motion/gloss/spring. Focus mode hides docks.
+- Modal switched to FolioPdfViewer; OptimizedPDFViewer retained for DeepReadReader.
+- Dock bug: position was driven by an animated `m` motion value writing inline right/bottom; on wide viewports it could land offscreen. Removed `m`, anchored with plain CSS (with !important + a data-edge variant) so it is always in the corner. Jelly springs softened (stiffness ~300, damping 28-34), rubber 96->44, press/hover scales reduced, velocity overshoots removed, conic gloss rim disabled on the preview dock. Video player JELLY/POP/SOFT springs and scrubber stretch similarly calmed.
+- Updated docs/UI-UX-STANDARD.md; committed 8a681899; `vercel --prod --yes` READY.
+- Next: visual verification of PDF rendering/text layer, wide-screen dock, and calmer motion.
+
 ## 2026-11-23 - Start + check secos daemon (interactive query)
 - User asked "start secos check". secos is the dex outbound-only device agent at ~/dex/secos (outside this repo but part of the user's environment).
 - Found no running process; log stale since 2026-11-16. Ran ~/.termux/boot/start-secos -> agent printed "Enter your dex token:" and exited because the boot script passes only SECOS_PASSWORD, not a token.
