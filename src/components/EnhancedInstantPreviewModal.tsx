@@ -19,7 +19,7 @@ import AudioPlayer from './AudioPlayer';
 import EnhancedTextEditor from './EnhancedTextEditor';
 import AdvancedImageViewer from '@/components/AdvancedImageViewer';
 import SpreadsheetViewer from '@/components/spreadsheet/SpreadsheetViewer';
-import FolioPdfViewer from '@/components/FolioPdfViewer';
+import OptimizedPDFViewer from '@/components/OptimizedPDFViewer';
 import ModelViewer from '@/components/ModelViewer';
 import FontPreviewer from '@/components/FontPreviewer';
 import ArchiveViewerModal from '@/components/ArchiveViewerModal';
@@ -216,7 +216,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     if (!blobUrl && kind !== 'model') return <Loading />;
 
     switch (kind) {
-      case 'pdf': return <FolioPdfViewer file={file} blobUrl={blobUrl!} pdfBlob={decodedBlob!} onClose={close} onDownload={handleDownload} />;
+      case 'pdf': return <OptimizedPDFViewer file={file} blobUrl={blobUrl!} pdfBlob={decodedBlob!} onClose={close} onDownload={handleDownload} />;
       case 'image': return <AdvancedImageViewer src={blobUrl!} alt={file.name} file={{ name: file.name, size: file.size, type: file.type }} onDownload={handleDownload} onShare={handleShare} />;
       case 'text': return <EnhancedTextEditor file={file} decodedBlob={decodedBlob!} onSave={async () => {}} onDownload={handleDownload} onShare={handleShare} readonly={false} />;
       case 'markdown': return <MarkdownBody blob={decodedBlob} />;

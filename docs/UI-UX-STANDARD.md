@@ -248,10 +248,8 @@ a full-height panel and not a capsule with a background behind it:
   intents, two distinct store paths (`previewTabs.minimize()` vs `previewTabs.close(id)`).
 - All file types render in the same frame via a type-aware body: PDF, image, video,
   audio, text/code, markdown, EPUB, spreadsheet, font, archive, 3D, generic fallback.
-- PDFs use `FolioPdfViewer.tsx`: Folio's PDF.js page architecture (measured page
-  boxes, viewport-gated canvas painting, separate selectable text layer, thumbnails,
-  fit/zoom/rotation, page tracking) with SquidCloud chrome — two floating grouped
-  option docks, neutral glass, short eased transitions. No gloss, no spring wobble.
+- PDFs use `OptimizedPDFViewer.tsx` (the project's own viewer, reinstated after a
+  Folio-based experiment proved worse in practice).
 - Minimize turns a viewer into a floating "picking card" in a right-center deck.
   `MinimizedPreviewStack.tsx` is the presentational card deck (fanned, springy, drag to
   maximize/close, hide-all / close-all, hidden handle); `PreviewTabStack.tsx` is the
