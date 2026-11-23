@@ -51,29 +51,29 @@ import { squidAI } from '@/services/squid-ai';
 import { SquidAITools } from '@/services/squid-ai-tools';
 import { useToast } from '@/hooks/use-toast';
 
-/* ── Spotlight · macOS Tahoe liquid glass + iOS 27 "Siri AI" mode ── */
+/* ── Squid Search · floating-dock glass + Squid AI mode ── */
 const SPRING = 'linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1)';
 
-const SPOTLIGHT_CSS = `
+const SQUID_CSS = `
 .spot-shell.spot-shell { top: 16vh !important; left: 50% !important; translate: -50% 0 !important; transform: none !important; max-width: 680px; width: calc(100% - 32px);
   background: transparent !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
   animation: none !important; border-radius: 0 !important; padding: 0 !important; overflow: visible !important; }
 .spot-shell > button { display: none !important; }
-.spot-root { --ink: var(--sa-text, #f5f5f7); --mute: color-mix(in srgb, var(--ink) 58%, transparent); --glass: rgba(38,40,50,.52); --hi: rgba(255,255,255,.1); --line: rgba(255,255,255,.13); --rim: rgba(255,255,255,.34);
+.spot-root { --ink: #e8e7e1; --mute: rgba(232,231,225,.55); --glass: rgba(13,14,13,.9); --hi: rgba(232,231,225,.05); --line: rgba(232,231,225,.1); --rim: rgba(232,231,225,.14);
   display: flex; flex-direction: column; gap: 12px; color: var(--ink); font-family: var(--sa-f, -apple-system, 'SF Pro Text', system-ui, sans-serif); }
-html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #1c1c1e; --glass: rgba(255,255,255,.58); --hi: rgba(255,255,255,.72); --line: rgba(0,0,0,.08); --rim: rgba(255,255,255,.95); }
+html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --glass: rgba(13,14,13,.9); --hi: rgba(232,231,225,.05); --line: rgba(232,231,225,.1); --rim: rgba(232,231,225,.14); }
 .spot-root[data-mobile="true"] { flex: 1; min-height: 0; gap: 0; padding: 18px 14px 0; }
 .spot-top { display: flex; align-items: center; gap: 10px; }
 .spot-orbs { display: flex; gap: 8px; }
 
-.spot-glass { position: relative; isolation: isolate; background: linear-gradient(180deg, var(--hi), var(--glass)); border: 1px solid var(--line);
-  -webkit-backdrop-filter: blur(38px) saturate(2); backdrop-filter: blur(38px) saturate(2);
-  box-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 rgba(255,255,255,.05), 0 28px 70px -22px rgba(0,0,0,.55), 0 3px 12px rgba(0,0,0,.2); }
+.spot-glass { position: relative; isolation: isolate; background: var(--glass); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 var(--rim), 0 12px 28px -14px rgba(0,0,0,.75); }
 .spot-pill { flex: 1; min-width: 0; height: 54px; border-radius: 999px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 16px; }
 .spot-root[data-mobile="true"] .spot-pill { height: 46px; background: rgba(128,128,140,.16); box-shadow: inset 0 1px 0 var(--rim); }
-.spot-round { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); cursor: pointer; transition: scale .6s ${SPRING}, background-color .2s; }
+.spot-round { width: 52px; height: 52px; min-width: 52px; min-height: 52px; aspect-ratio: 1 / 1; border-radius: 9999px !important; display: grid; place-items: center; color: var(--ink); cursor: pointer; transition: scale .6s ${SPRING}, background-color .2s; }
 .spot-round:hover { scale: 1.06; } .spot-round:active { scale: .92; transition-duration: .12s; }
-.spot-round[data-on="true"] { background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.14)); }
+.spot-round[data-on="true"] { background: rgba(232,231,225,.14); box-shadow: inset 0 0 0 1px rgba(232,231,225,.22); }
 .spot-lead { display: grid; place-items: center; color: var(--mute); width: 22px; flex: none; }
 .spot-input.spot-input.spot-input { all: unset; flex: 1; min-width: 0; font-size: 20px; letter-spacing: -.01em; color: var(--ink); caret-color: #8fa4ff; background: none !important; border: 0 !important; box-shadow: none !important; }
 .spot-input::placeholder { color: var(--mute); }
@@ -84,23 +84,17 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #1c1c1e; --g
 .spot-hint, .spot-go { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
 .spot-root kbd { font: 500 11px/1 var(--sa-f, system-ui); padding: 3px 6px; border-radius: 6px; background: var(--hi); border: 1px solid var(--line); color: var(--mute); }
 
-/* Siri AI: dark island glass, soft drifting colour, thin edge glow */
+/* Squid AI mode: same dock glass, one quiet neutral rim — no color soup */
 .spot-pill::before, .spot-ai::before, .spot-pill::after, .spot-ai::after { content: ''; position: absolute; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .7s ease; }
-.spot-pill::before, .spot-ai::before { inset: 0; z-index: -1; background-size: 220% 220%; }
-.spot-pill::after, .spot-ai::after { inset: -1px; z-index: 1; border: 1px solid rgba(255,255,255,.5); box-shadow: 0 0 22px rgba(140,150,255,.32), 0 0 2px rgba(255,255,255,.55), inset 0 0 18px rgba(170,160,255,.16); }
-.spot-pill[data-ai="true"] { --ink: #fff; --mute: rgba(255,255,255,.58); background: linear-gradient(180deg, rgba(34,36,52,.8), rgba(10,11,20,.88)); border-color: rgba(255,255,255,.16);
-  animation: spot-swell .8s ${SPRING} both; box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 28px 70px -22px rgba(90,100,200,.45); }
-.spot-pill[data-ai="true"]::before { opacity: 1; animation: spot-drift 7s ease-in-out infinite alternate; background-image:
-  radial-gradient(48% 90% at 18% 110%, rgba(122,142,255,.6), transparent 70%), radial-gradient(44% 90% at 52% 120%, rgba(176,140,255,.5), transparent 70%),
-  radial-gradient(40% 80% at 84% 115%, rgba(244,164,200,.45), transparent 70%), radial-gradient(30% 70% at 66% -20%, rgba(255,206,160,.28), transparent 70%); }
-.spot-pill[data-ai="true"]::after, .spot-ai[data-on="true"]::after { opacity: .9; animation: spot-glow 3.4s ease-in-out infinite; }
-.spot-ai[data-on="true"]::before { opacity: 1; background-image: radial-gradient(70% 90% at 20% 110%, rgba(122,142,255,.6), transparent 70%), radial-gradient(60% 90% at 85% 110%, rgba(244,164,200,.5), transparent 70%); }
-.spot-pill[data-busy="true"]::before { animation-duration: 2.2s; } .spot-pill[data-busy="true"]::after { animation-duration: 1.4s; }
-.spot-orb { display: block; width: 20px; height: 20px; border-radius: 50%; flex: none; background-color: #1a1c2c; background-size: 220% 220%;
-  background-image: radial-gradient(circle at 28% 24%, rgba(255,255,255,.75), transparent 34%), radial-gradient(circle at 25% 80%, #7a8eff, transparent 60%), radial-gradient(circle at 80% 75%, #f4a4c8, transparent 58%), radial-gradient(circle at 70% 20%, #b08cff, transparent 60%);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.6), 0 0 14px rgba(150,150,255,.5); animation: spot-drift 5s ease-in-out infinite alternate; }
-.spot-orb[data-busy="true"] { animation-duration: 1.6s; } .spot-orb.big { width: 56px; height: 56px; box-shadow: inset 0 2px 3px rgba(255,255,255,.6), 0 0 36px rgba(150,150,255,.45); }
-
+.spot-pill::before, .spot-ai::before { inset: 0; z-index: -1; }
+.spot-pill::after, .spot-ai::after { inset: -1px; z-index: 1; border: 1px solid rgba(232,231,225,.18); box-shadow: inset 0 1px 0 rgba(232,231,225,.12); }
+.spot-pill[data-ai="true"] { --ink: #e8e7e1; --mute: rgba(232,231,225,.55); background: rgba(13,14,13,.94); border-color: rgba(232,231,225,.16);
+  animation: spot-swell .8s ${SPRING} both; box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.75); }
+.spot-pill[data-ai="true"]::after, .spot-ai[data-on="true"]::after { opacity: .9; }
+.spot-orb { display: block; width: 18px; height: 18px; border-radius: 50%; flex: none;
+  background: var(--ink); box-shadow: inset 0 1px 1px rgba(0,0,0,.25), 0 0 10px rgba(232,231,225,.25); }
+.spot-orb[data-busy="true"] { animation: spot-shimmer 1.6s linear infinite; }
+.spot-orb.big { width: 40px; height: 40px; }
 /* panel */
 .spot-panel { border-radius: 30px; display: grid; grid-template-rows: 0fr; opacity: 0; translate: 0 -10px; scale: .97; transform-origin: top center; pointer-events: none;
   transition: grid-template-rows .7s ${SPRING}, opacity .25s ease, translate .7s ${SPRING}, scale .7s ${SPRING}; }
@@ -348,27 +342,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   };
 
   const runAIAction = async (action: any) => {
-    try {
-      switch (action.action) {
-        case 'ORGANIZE_FILES': {
-          const r = await SquidAITools.organizeFilesByType(files as any[], currentFolder);
-          finish('Files organized', r.summary, 2000);
-          break;
-        }
-        case 'CREATE_FOLDER': {
-          const ok = await SquidAITools.createFolder(action.parameters.folderName, action.parameters.parentPath || currentFolder);
-          if (ok) finish('Folder created', `Created “${action.parameters.folderName}”`, 1500);
-          break;
-        }
-        case 'MOVE_FILES': {
-          const n = await SquidAITools.moveFilesToFolder(action.parameters.fileIds, action.parameters.targetFolder);
-          finish('Files moved', `Moved ${n} files`, 1500);
-          break;
-        }
-      }
-    } catch (error: any) {
-      toast({ title: 'Action failed', description: error.message, variant: 'destructive' });
-    }
+    // dex-style: every automation goes through one dispatcher that returns a
+    // short verdict string. SquidAITools.runTool is the SquidCloud bench.
+    const args = {
+      ...(action.parameters || {}),
+      files,
+      folder: currentFolder,
+    };
+    const verdict = await SquidAITools.runTool(action.action, args);
+    toast({ title: 'Squid AI', description: verdict });
+    finish('Done', verdict, 1500);
   };
 
   const ask = async (raw?: string) => {
@@ -1024,7 +1007,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   // Shared content for both mobile and desktop
   const commandContent = (
     <div className="spot-root" data-mobile={isMobile}>
-      <style>{SPOTLIGHT_CSS}</style>
+      <style>{SQUID_CSS}</style>
 
       {/* Pill + round glass buttons (Commands / Files / Folders / Ask AI) */}
       <div className="spot-top">
@@ -1040,7 +1023,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             type="text"
             spellCheck={false}
             autoComplete="off"
-            placeholder={aiOn ? 'Ask Squid AI…' : isMobile ? 'Search or ask…' : 'Spotlight Search'}
+            placeholder={aiOn ? 'Ask Squid AI…' : isMobile ? 'Search or ask…' : 'Search SquidCloud'}
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setSelectedIndex(0); if (mode === 'ask') { setMode('search'); setResponse(''); } }}
             className="spot-input"
@@ -1099,7 +1082,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                         >
                           {isSelected && (
                             <motion.span
-                              layoutId="spotlight-selected"
+                              layoutId="sq-selected"
                               className="spot-row-thumb"
                               transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 34, mass: 0.9 }}
                             />
@@ -1180,7 +1163,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     );
   }
 
-  // Desktop: the Spotlight emerges from a small pill at the top, with a springy overshoot
+  // Desktop: the search emerges from a small pill at the top, with a springy overshoot
   return (
     <AnimatePresence>
       {open && (

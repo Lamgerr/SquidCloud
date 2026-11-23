@@ -630,6 +630,59 @@ export class SquidAITools {
   /**
    * Format file size
    */
+  /**
+   * dex-style tool dispatcher. One entry point: tool(name, args) -> short string.
+   * Mirrors dex's `tasks.tool()` / `run_tool()` contract — the AI calls tools by
+   * name with a typed args object and gets a short, human-readable verdict back
+   * (never a raw exception). Tools here are SquidCloud file operations.
+   */
+  static async runTool(name: string, args: Record<string, any> = {}): Promise<string> {
+    try {
+      switch (name) {
+        case 'ORGANIZE_FILES': {
+          const r = await this.organizeFilesByType((args.files || []) as any[], args.folder || '');
+          return `Organized: ${r.summary}`;
+        }
+        case 'CREATE_FOLDER': {
+          const ok = await this.createFolder(String(args.folderName || ''), args.parentPath || '');
+          return ok ? `Created folder “${args.folderName}”` : 'Could not create that folder';
+        }
+        case 'MOVE_FILES': {
+          const n = await this.moveFilesToFolder(args.fileIds || [], args.targetFolder || '');
+          return `Moved ${n} file${n === 1 ? '' : 's'}`;
+        }
+        case 'GET_ANALYTICS': {
+          const a = await this.getFileAnalytics(args.fileType);
+          return `${a.totalFiles} files · ${this.formatFileSize(a.totalSize)} used`;
+        }
+        case 'COUNT_FILES': {
+          const n = await this.countFilesByExtension(String(args.extension || ''));
+          return `${n} file${n === 1 ? '' : 's'} with extension .${args.extension}`;
+        }
+        case 'SEARCH_FILES': {
+          const r = await this.searchFiles(String(args.query || ''), !!args.searchContent);
+          return `${r.totalResults} result${r.totalResults === 1 ? '' : 's'} for “${args.query}”`;
+        }
+        default:
+          return `Unknown tool: ${name}`;
+      }
+    } catch (error: any) {
+      return `Tool ${name} failed: ${error?.message || 'unknown error'}`;
+    }
+  }
+
+  /** dex-style capability list for progressive disclosure in the AI UI. */
+  static listTools(): Array<{ name: string; description: string }> {
+    return [
+      { name: 'ORGANIZE_FILES', description: 'Group files into folders by type' },
+      { name: 'CREATE_FOLDER', description: 'Create a new folder' },
+      { name: 'MOVE_FILES', description: 'Move files into a folder' },
+      { name: 'GET_ANALYTICS', description: 'Count files and storage used' },
+      { name: 'COUNT_FILES', description: 'Count files of a type' },
+      { name: 'SEARCH_FILES', description: 'Find files or folders by name' },
+    ];
+  }
+
   static formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
