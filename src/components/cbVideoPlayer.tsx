@@ -637,9 +637,14 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   const showGesture = (kind: string, value: string) => setGesture({ kind, value, id: ++fxId.current });
   const clearGesture = () => window.setTimeout(() => setGesture(null), 700);
   const pendingSeek = useRef(0);
+  const uiAtDown = useRef(false);
 
   const onTouchDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' || onControl(e.target) || menuOpen) return;
+    // Remember whether the chrome was already up BEFORE wakeControls flips it —
+    // the tap handler uses this to decide show vs hide. Reading uiRef later
+    // (after the state update) always sees "visible" and made the HUD flash.
+    uiAtDown.current = uiRef.current;
     wakeControls();
     const t = touch.current, r = e.currentTarget.getBoundingClientRect();
     const px = e.clientX - r.left, py = e.clientY - r.top;
@@ -696,7 +701,12 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       return;
     }
     lastTap.current = now;
-    tapTimer.current = setTimeout(() => { if (uiRef.current && playing) setControlsVisible(false); else wakeControls(); }, 300);
+    if (uiAtDown.current && playing) {
+      clearTimeout(hideTimerRef.current);
+      setControlsVisible(false);
+    } else {
+      wakeControls();
+    }
   };
 
   useEffect(() => { if (!flash) return; const t = setTimeout(() => setFlash(null), 650); return () => clearTimeout(t); }, [flash]);
