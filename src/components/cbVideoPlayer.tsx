@@ -18,7 +18,6 @@ import {
 } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { StreamDecryptorService } from '@/lib/videoStreamer';
-import { GRAIN_BG } from './grain';
 
 interface CBVideoPlayerProps {
   file: { id: string; name: string; type: string; size: number };
@@ -866,7 +865,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       <AnimatePresence>
         {gesture && (
           <motion.div key={gesture.id} className="cbp-gesture cbp-glass" data-kind={gesture.kind}
-            initial={{ opacity: 0, scale: 0.82, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} transition={POP}>
+            initial={{ opacity: 0, scale: 0.82, x: '-50%', y: '-50%' }} animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }} exit={{ opacity: 0, scale: 0.9, x: '-50%', y: '-50%' }} transition={POP}>
             {gesture.kind === 'seek' && <Ic.Wave size={17} />}
             {gesture.kind === 'volume' && <Ic.Vol level={3} size={18} />}
             {gesture.kind === 'brightness' && <Ic.Sun size={18} />}
@@ -881,7 +880,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       {/* buffering: a small glass droplet with a ring */}
       <AnimatePresence>
         {buffering && (
-          <motion.div className="cbp-wait" initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.7 }} transition={T}>
+          <motion.div className="cbp-wait" initial={{ opacity: 0, scale: 0.6, x: '-50%', y: '-50%' }} animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }} exit={{ opacity: 0, scale: 0.7, x: '-50%', y: '-50%' }} transition={T}>
             <span className="cbp-spin cbp-glass"><svg viewBox="0 0 40 40" width="40" height="40"><circle cx="20" cy="20" r="14" /></svg></span>
             {isLargeFile && loadPhase !== 'ready' && (
               <span className="cbp-waitlab">
@@ -951,7 +950,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
           <AnimatePresence>
             {ui && !buffering && (
               <motion.div className="cbp-center" data-cbp-ui onClick={stop} onDoubleClick={stop} initial="h" animate="s" exit="h"
-                variants={{ h: { opacity: 0, scale: 0.7 }, s: { opacity: 1, scale: 1, transition: { staggerChildren: 0.04 } } }} transition={T}>
+                variants={{ h: { opacity: 0, scale: 0.7, x: '-50%', y: '-50%' }, s: { opacity: 1, scale: 1, x: '-50%', y: '-50%', transition: { staggerChildren: 0.04 } } }} transition={T}>
                 <motion.span variants={{ h: { x: 18, opacity: 0 }, s: { x: 0, opacity: 1 } }} transition={T}><Btn reduce={reduce} size={56} label="Back 10 seconds" onClick={() => seekBy(-10)}><Ic.Back size={34} /></Btn></motion.span>
                 <motion.span variants={{ h: { scale: 0.6, opacity: 0 }, s: { scale: 1, opacity: 1 } }} transition={T}>
                   <motion.button type="button" className="cbp-bigplay cbp-glass" aria-label={playing ? 'Pause' : 'Play'} onPointerMove={onHudMove}
@@ -1031,10 +1030,9 @@ const CSS = `
 .cbp-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
 .cbp-audio { background: radial-gradient(120% 90% at 50% 0%, #1b1d18 0%, #0b0c0a 70%); }
 
-/* neutral dock glass: no white sheen, no brightness boost — nano grain instead */
+/* neutral dock glass: clean frosted surface, no sheen and no grain */
 .cbp-glass { position: relative; isolation: isolate;
-  background-image: ${GRAIN_BG}, linear-gradient(180deg, rgba(38,39,35,.76), rgba(14,15,12,.84));
-  background-size: 160px 160px, auto; background-color: rgba(18,19,16,.68);
+  background: linear-gradient(180deg, rgba(38,39,35,.8), rgba(14,15,12,.88));
   -webkit-backdrop-filter: blur(30px) saturate(150%); backdrop-filter: blur(30px) saturate(150%);
   box-shadow: inset 0 1px 0 rgba(232,231,225,.12), inset 0 -1px 0 rgba(0,0,0,.4), inset 0 0 0 1px rgba(232,231,225,.06),
     0 20px 50px -18px rgba(0,0,0,.78), 0 2px 8px rgba(0,0,0,.3); }
@@ -1099,12 +1097,12 @@ const CSS = `
 /* mobile chrome */
 .cbp-top { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .cbp-topbar { display: flex; gap: 2px; padding: 4px; border-radius: 999px; }
-.cbp-center { position: absolute; left: 50%; top: 50%; z-index: 15; display: flex; align-items: center; gap: 22px; transform: translate(-50%, -50%); }
+.cbp-center { position: absolute; left: 50%; top: 50%; z-index: 15; display: flex; align-items: center; gap: 22px; }
 .cbp-center > span { display: grid; }
 .cbp-bigplay { display: grid; place-items: center; width: 76px; height: 76px; padding: 0; border: 0; border-radius: 999px; color: var(--ink); cursor: pointer; }
 
 /* feedback */
-.cbp-wait { position: absolute; left: 50%; top: 50%; z-index: 12; display: grid; justify-items: center; gap: 12px; transform: translate(-50%, -50%); pointer-events: none; }
+.cbp-wait { position: absolute; left: 50%; top: 50%; z-index: 12; display: grid; justify-items: center; gap: 12px; pointer-events: none; }
 .cbp-spin { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 999px; }
 .cbp-spin svg { animation: cbp-rot 1s linear infinite; }
 .cbp-spin circle { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 56 88; }
@@ -1115,7 +1113,7 @@ const CSS = `
 .cbp-seekfx[data-side="left"] { left: 14%; } .cbp-seekfx[data-side="right"] { right: 14%; }
 .cbp-bright { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: #000; transition: opacity .08s linear; }
 .cbp-gesture { position: absolute; left: 50%; top: 24%; z-index: 26; display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px; border-radius: 999px; transform: translateX(-50%); pointer-events: none;
+  padding: 10px 16px; border-radius: 999px; pointer-events: none;
   font: 500 13px/1 var(--sa-f, system-ui, sans-serif); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cbp-gesture svg { opacity: .8; }
 .cbp-file { display: none; }
