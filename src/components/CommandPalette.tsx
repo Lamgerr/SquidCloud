@@ -54,18 +54,20 @@ import { useToast } from '@/hooks/use-toast';
 /* ── Squid Search · floating-dock glass + Squid AI mode ── */
 const SPRING = 'linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1)';
 
-/* Fine fractal grain — the "nano texture" that makes the glass read frosted
-   instead of flat/see-through. Alpha is baked low into the SVG itself. */
-const NANO_TEXTURE = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='.055'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")";
+/* Two-layer nano texture: a mid-frequency fractal grain gives the frosted
+   body, a finer high-frequency pass adds the tight "nano" tooth. Alpha is
+   baked low into each SVG so the glass stays dense, not see-through. */
+const NANO_TEXTURE = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='.085'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")";
+const NANO_GRAIN = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='1.7' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='.05'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>\")";
 
 const SQUID_CSS = `
 .spot-shell.spot-shell { top: 16vh !important; left: 50% !important; translate: -50% 0 !important; transform: none !important; max-width: 680px; width: calc(100% - 32px);
   background: transparent !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
   animation: none !important; border-radius: 0 !important; padding: 0 !important; overflow: visible !important; }
 .spot-shell > button { display: none !important; }
-.spot-root { --ink: #e8e7e1; --mute: rgba(232,231,225,.55); --glass: rgba(16,17,18,.94); --fog: rgba(50,54,72,.34); --hi: rgba(232,231,225,.05); --line: rgba(232,231,225,.1); --rim: rgba(232,231,225,.16);
+.spot-root { --ink: #e8e7e1; --mute: rgba(232,231,225,.58); --glass: rgba(14,15,16,.968); --fog: rgba(52,56,74,.42); --hi: rgba(232,231,225,.06); --line: rgba(232,231,225,.12); --rim: rgba(232,231,225,.2);
   display: flex; flex-direction: column; gap: 12px; color: var(--ink); font-family: var(--sa-f, -apple-system, 'SF Pro Text', system-ui, sans-serif); }
-html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --glass: rgba(16,17,18,.94); --fog: rgba(50,54,72,.34); --hi: rgba(232,231,225,.05); --line: rgba(232,231,225,.1); --rim: rgba(232,231,225,.16); }
+html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --glass: rgba(14,15,16,.968); --fog: rgba(52,56,74,.42); --hi: rgba(232,231,225,.06); --line: rgba(232,231,225,.12); --rim: rgba(232,231,225,.2); }
 .spot-root[data-mobile="true"] { flex: 1; min-height: 0; gap: 0; padding: 18px 14px 0; }
 .spot-top { display: flex; align-items: center; gap: 10px; }
 .spot-orbs { display: flex; gap: 8px; }
@@ -74,13 +76,13 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
    Grain is a background layer (not a pseudo-element) so the AI colour layer
    on ::before stays free. */
 .spot-glass { position: relative; isolation: isolate;
-  background-image: ${NANO_TEXTURE}, linear-gradient(180deg, var(--fog), transparent 55%);
-  background-color: var(--glass); background-size: 180px 180px, auto;
+  background-image: ${NANO_GRAIN}, ${NANO_TEXTURE}, linear-gradient(180deg, var(--fog), transparent 58%);
+  background-color: var(--glass); background-size: 120px 120px, 200px 200px, auto;
   border: 1px solid var(--line);
-  -webkit-backdrop-filter: blur(30px) saturate(1.3); backdrop-filter: blur(30px) saturate(1.3);
-  box-shadow: inset 0 1px 0 var(--rim), 0 16px 38px -16px rgba(0,0,0,.8); }
+  -webkit-backdrop-filter: blur(38px) saturate(1.35); backdrop-filter: blur(38px) saturate(1.35);
+  box-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 rgba(0,0,0,.42), 0 20px 48px -18px rgba(0,0,0,.88); }
 .spot-pill { flex: 1; min-width: 0; height: 54px; border-radius: 999px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 16px; }
-.spot-root[data-mobile="true"] .spot-pill { height: 46px; background-color: var(--glass); background-image: ${NANO_TEXTURE}, linear-gradient(180deg, var(--fog), transparent 55%); background-size: 180px 180px, auto; box-shadow: inset 0 1px 0 var(--rim); }
+.spot-root[data-mobile="true"] .spot-pill { height: 46px; background-color: var(--glass); background-image: ${NANO_GRAIN}, ${NANO_TEXTURE}, linear-gradient(180deg, var(--fog), transparent 58%); background-size: 120px 120px, 200px 200px, auto; box-shadow: inset 0 1px 0 var(--rim); }
 .spot-round { width: 52px; height: 52px; min-width: 52px; min-height: 52px; aspect-ratio: 1 / 1; border-radius: 9999px !important; display: grid; place-items: center; color: var(--ink); cursor: pointer; transition: scale .6s ${SPRING}, background-color .2s; }
 .spot-round:hover { scale: 1.06; } .spot-round:active { scale: .92; transition-duration: .12s; }
 .spot-round[data-on="true"] { background: rgba(232,231,225,.14); box-shadow: inset 0 0 0 1px rgba(232,231,225,.22); }
@@ -98,8 +100,9 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-pill::before, .spot-ai::before, .spot-pill::after, .spot-ai::after { content: ''; position: absolute; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .7s ease; }
 .spot-pill::before, .spot-ai::before { inset: 0; z-index: -1; background-size: 220% 220%; }
 .spot-pill::after, .spot-ai::after { inset: -1px; z-index: 1; border: 1px solid rgba(255,255,255,.34); box-shadow: 0 0 22px rgba(140,150,255,.3), 0 0 2px rgba(255,255,255,.5), inset 0 0 18px rgba(170,160,255,.14); }
-.spot-pill[data-ai="true"] { --ink: #fff; --mute: rgba(255,255,255,.62); background-color: rgba(14,15,24,.95);
-  background-image: ${NANO_TEXTURE}, linear-gradient(180deg, rgba(34,36,52,.9), rgba(10,11,20,.97));
+.spot-pill[data-ai="true"] { --ink: #fff; --mute: rgba(255,255,255,.62); background-color: rgba(14,15,24,.97);
+  background-image: ${NANO_GRAIN}, ${NANO_TEXTURE}, linear-gradient(180deg, rgba(34,36,52,.92), rgba(10,11,20,.98));
+  background-size: 120px 120px, 200px 200px, auto;
   border-color: rgba(255,255,255,.16);
   animation: spot-swell .8s ${SPRING} both; box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 28px 70px -22px rgba(90,100,200,.45); }
 .spot-pill[data-ai="true"]::before { opacity: 1; animation: spot-drift 7s ease-in-out infinite alternate; background-image:

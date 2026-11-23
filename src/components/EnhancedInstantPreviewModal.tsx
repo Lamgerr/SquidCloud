@@ -3,10 +3,9 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import {
-  AlertCircle, ChevronLeft, ChevronRight, Download, FileText, Share2,
-  Maximize, Minimize, X, Info, Layers,
+  AlertCircle, Download, FileText, Minimize, X, Layers,
 } from '@/lib/icon-map';
-import { cn, formatFileSize } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { downloadFilePreview } from '@/lib/res54';
 import { smartDownload, createFileShare } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -33,52 +32,56 @@ const MAX_CACHE_ITEMS = 15;
 
 const SPRING = { type: 'spring' as const, stiffness: 360, damping: 28, mass: 0.8 };
 
-/* ── Full-screen preview frame: floating dock language, zero decoration.
-      One circular X, minimize, type-aware tools, minimal on-screen UI. ── */
+/* ── Full-screen preview frame: ONE floating dock, nothing else on screen.
+      Grainy + translucent + springy. Visible 2s → submerges into corner;
+      hover the corner or pull the dock to reveal minimize + close. ── */
+const GRAIN_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
+
 const PREVIEW_CSS = `
-.pv-root { --pv-line: rgba(232,231,225,.10); --pv-fill: rgba(13,14,13,.86); color: #e8e7e1; }
+.pv-root { --pv-line: rgba(232,231,225,.10); color: #e8e7e1; }
 .pv-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--sa-bg, #0c0d09); }
 .pv-chrome { position: absolute; inset: 0; z-index: 80; pointer-events: none; }
-.pv-top { position: absolute; top: 18px; left: 18px; right: 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.pv-id { min-width: 0; padding: 10px 16px; border-radius: 16px; pointer-events: auto;
-  border: 1px solid var(--pv-line); background: var(--pv-fill);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.7); }
-.pv-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 38vw; }
-.pv-meta { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,.5); margin-top: 5px; }
-.pv-tools { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
-/* every control is a true circle — no rectangles */
+
+/* nano-texture grain overlay — reused by dock + palette + tabs */
+.pv-grain, .sq-grain { position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background-image: ${GRAIN_BG}; background-size: 160px 160px;
+  opacity: .14; mix-blend-mode: overlay; }
+
+/* corner hot-zone: stationary so hover never flickers while the dock moves */
+.pv-dock-zone { position: fixed; right: 0; bottom: 0; width: 210px; height: 128px;
+  z-index: 95; pointer-events: auto; touch-action: none; }
+.pv-dock-shell { position: absolute; right: 22px; bottom: 22px; pointer-events: auto;
+  filter: drop-shadow(0 20px 34px rgba(0,0,0,.55)); will-change: transform; }
+.pv-dock { position: relative; display: flex; align-items: center; gap: 8px; padding: 9px 12px 9px 10px;
+  border-radius: 999px; overflow: hidden; cursor: grab;
+  border: 1px solid rgba(232,231,225,.13);
+  background: linear-gradient(180deg, rgba(30,31,28,.74), rgba(12,13,11,.8));
+  -webkit-backdrop-filter: blur(26px) saturate(160%); backdrop-filter: blur(26px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.16), inset 0 -1px 0 rgba(0,0,0,.45), 0 10px 30px -14px rgba(0,0,0,.8); }
+.pv-dock:active { cursor: grabbing; }
+.pv-dock-grip { position: relative; z-index: 1; width: 8px; height: 30px; flex: none; margin-right: 2px;
+  border-radius: 999px; background: rgba(232,231,225,.16); }
+.pv-dock-grip::after { content: ''; position: absolute; inset: 9px 2px; border-radius: 999px;
+  background: rgba(232,231,225,.5); }
+.pv-dock-btn { position: relative; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px;
+  padding: 0; border-radius: 999px; cursor: pointer; color: #e8e7e1;
+  border: 1px solid rgba(232,231,225,.09); background: rgba(232,231,225,.05);
+  transition: background .2s, border-color .2s, color .2s; }
+.pv-dock-btn:hover { background: rgba(232,231,225,.14); border-color: rgba(232,231,225,.2); }
+.pv-dock-btn:focus-visible { outline: 2px solid rgba(232,231,225,.85); outline-offset: 2px; }
+.pv-dock-btn[data-close="true"] { background: rgba(217,128,128,.12); border-color: rgba(217,128,128,.26); color: #e8a0a0; }
+.pv-dock-btn[data-close="true"]:hover { background: rgba(217,128,128,.22); }
+
 .pv-pill { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border-radius: 999px;
-  border: 1px solid var(--pv-line); background: var(--pv-fill); color: #e8e7e1; cursor: pointer;
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.7); }
-.pv-pill:hover { border-color: rgba(232,231,225,.24); }
-.pv-pill:focus-visible { outline: 2px solid rgba(232,231,225,.8); outline-offset: 3px; }
-.pv-pill[data-on="true"] { background: rgba(232,231,225,.16); }
-.pv-pill[data-close="true"] { background: rgba(217,128,128,.14); border-color: rgba(217,128,128,.3); color: #e8a0a0; }
-.pv-pill[data-close="true"]:hover { background: rgba(217,128,128,.24); }
-.pv-nav { display: flex; align-items: center; gap: 6px; }
-.pv-hint { font: 400 10px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,.4); padding: 0 4px; }
-.pv-foot { position: absolute; bottom: 18px; left: 50%; translate: -50% 0; display: flex; gap: 8px; pointer-events: auto; }
-.pv-info { position: absolute; bottom: 18px; right: 18px; pointer-events: auto; max-width: 250px; padding: 12px 14px;
-  border-radius: 16px; border: 1px solid var(--pv-line); background: var(--pv-fill);
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.7);
-  font: 400 11px/1.6 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,.65); }
-.pv-info b { color: #e8e7e1; font-weight: 400; }
+  border: 1px solid var(--pv-line); background: rgba(13,14,13,.86); color: #e8e7e1; cursor: pointer; }
 .pv-loading { display: grid; place-items: center; gap: 14px; height: 100%; color: rgba(232,231,225,.5); font: 400 11px/1 var(--sa-mono, ui-monospace, monospace); }
 .pv-error { display: grid; place-items: center; gap: 10px; height: 100%; text-align: center; padding: 24px; }
 .pv-generic { display: grid; place-items: center; gap: 16px; height: 100%; text-align: center; }
 .pv-generic-ico { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 999px;
-  border: 1px solid var(--pv-line); background: var(--pv-fill); color: #e8e7e1; }
-@media (max-width: 640px) { .pv-name { max-width: 46vw; } .pv-top { top: 12px; left: 12px; right: 12px; } .pv-pill { width: 38px; height: 38px; } }
-@media (prefers-reduced-motion: reduce) { .pv-pill { transition-duration: 0.01ms !important; } }
+  border: 1px solid var(--pv-line); background: rgba(13,14,13,.86); color: #e8e7e1; }
+@media (max-width: 640px) { .pv-dock-zone { width: 172px; height: 112px; } .pv-dock-shell { right: 16px; bottom: 16px; } .pv-dock-btn { width: 40px; height: 40px; } }
+@media (prefers-reduced-motion: reduce) { .pv-dock-btn { transition-duration: 0.01ms !important; } }
 `;
-
-const KIND_LABEL: Record<PreviewKind, string> = {
-  pdf: 'PDF', image: 'Image', video: 'Video', audio: 'Audio', text: 'Text', epub: 'Book',
-  spreadsheet: 'Sheet', font: 'Font', archive: 'Archive', model: '3D', markdown: 'Markdown', other: 'File',
-};
 
 const CustomDialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Popup>,
@@ -104,8 +107,7 @@ interface EnhancedInstantPreviewModalProps {
 
 const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = ({
   file, isOpen, onClose, onDownload, onShare, onNext, onPrevious,
-  hasNext = false, hasPrevious = false, currentIndex, totalFiles, shareId,
-  onOpenEpubReader, onShareChange, siblingFiles, onNavigateToFile,
+  hasNext = false, hasPrevious = false, shareId, onShareChange,
 }) => {
   const reduce = !!useReducedMotion();
   const isMobile = useIsMobile();
@@ -115,30 +117,31 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const [decodedBlob, setDecodedBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
+  // The single dock starts expanded for 2s, then submerges into the corner.
+  // Hovering the corner hot-zone or dragging the dock back out reveals it.
+  const [dockOpen, setDockOpen] = useState(true);
+  const [dockHover, setDockHover] = useState(false);
+  const [dockPulled, setDockPulled] = useState(false);
   const loadGen = useRef(0);
   const closing = useRef(false);
   const kind: PreviewKind = file ? detectKind(file) : 'other';
+
+  // Auto-submerge: dock is fully visible for 2s on open, then snaps into the corner.
+  useEffect(() => {
+    if (!isOpen) return;
+    setDockOpen(true);
+    setDockPulled(false);
+    setDockHover(false);
+    const t = window.setTimeout(() => setDockOpen(false), 2000);
+    return () => window.clearTimeout(t);
+  }, [isOpen, file?.id]);
+
+  const dockRevealed = dockOpen || dockHover || dockPulled;
 
   // Register the open file as a tab when the modal opens
   useEffect(() => {
     if (isOpen && file) previewTabs.open(file, kind, file.name || 'Preview');
   }, [isOpen, file?.id, kind]);
-
-  // Fullscreen sync
-  useEffect(() => {
-    const onFs = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onFs);
-    return () => document.removeEventListener('fullscreenchange', onFs);
-  }, []);
-  const toggleFullscreen = useCallback(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) (el as any).requestFullscreen?.()?.catch?.(() => {});
-    else (document as any).exitFullscreen?.();
-  }, []);
 
   // History / ESC
   const close = useCallback(() => {
@@ -256,18 +259,9 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     }
   };
 
-  const Pill: React.FC<{ label: string; onClick: () => void; children: React.ReactNode; on?: boolean; danger?: boolean }> =
-    ({ label, onClick, children, on, danger }) => (
-      <motion.button type="button" className="pv-pill" aria-label={label} title={label} onClick={onClick}
-        data-on={on ? 'true' : undefined} data-close={danger ? 'true' : undefined}
-        whileHover={reduce ? undefined : { scale: 1.06 }} whileTap={reduce ? undefined : { scale: 0.9 }} transition={SPRING}>
-        {children}
-      </motion.button>
-    );
-
   return (
     <Dialog open={isOpen} onOpenChange={(o) => { if (!o) close(); }}>
-      <CustomDialogContent ref={contentRef}>
+      <CustomDialogContent>
         <style>{PREVIEW_CSS}</style>
         <DialogPrimitive.Title className="sr-only">Preview {file.name}</DialogPrimitive.Title>
         <DialogPrimitive.Description className="sr-only">Full-screen file preview.</DialogPrimitive.Description>
@@ -275,56 +269,37 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
           {renderBody()}
         </motion.div>
 
-        {/* Floating chrome — circles only, minimal on-screen UI */}
+        {/* ONE floating dock. Grainy + translucent + springy. Visible 2s, then
+            submerges into the corner; hover the corner or pull to reveal. */}
         <div className="pv-chrome">
-          <div className="pv-top">
-            <div className="pv-id">
-              <div className="pv-name">{file.name}</div>
-              <div className="pv-meta">{KIND_LABEL[kind]} · {formatFileSize(file.size || 0)}{currentIndex != null && totalFiles ? ` · ${currentIndex + 1}/${totalFiles}` : ''}</div>
-            </div>
-            <div className="pv-tools">
-              {(hasNext || hasPrevious) && (
-                <div className="pv-nav">
-                  {hasPrevious && <Pill label="Previous" onClick={() => onPrevious?.()}><ChevronLeft size={18} /></Pill>}
-                  {hasNext && <Pill label="Next" onClick={() => onNext?.()}><ChevronRight size={18} /></Pill>}
-                </div>
-              )}
-              <Pill label={showInfo ? 'Hide info' : 'Info'} onClick={() => setShowInfo(v => !v)} on={showInfo}><Info size={17} /></Pill>
-              <Pill label="Share" onClick={handleShare}><Share2 size={17} /></Pill>
-              <Pill label="Download" onClick={handleDownload}><Download size={17} /></Pill>
-              <Pill label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={toggleFullscreen}><Maximize size={17} /></Pill>
-              <Pill label="Minimize" onClick={close}><Minimize size={17} /></Pill>
-              <Pill label="Close" onClick={close} danger><X size={19} /></Pill>
-            </div>
-          </div>
-
-          {/* Open-file strip — floating dots, no box */}
-          {siblingFiles && siblingFiles.length > 1 && (
-            <div className="pv-foot">
-              {siblingFiles.slice(0, 12).map((sf, i) => (
-                <motion.button key={sf.id || i} type="button"
-                  aria-label={sf.name} title={sf.name}
-                  onClick={() => onNavigateToFile?.(sf)}
-                  className="pv-pill"
-                  data-on={sf.id === file.id ? 'true' : undefined}
-                  whileHover={reduce ? undefined : { scale: 1.1 }} whileTap={reduce ? undefined : { scale: 0.9 }}
-                  transition={SPRING}>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--sa-mono, monospace)' }}>{i + 1}</span>
+          <div className="pv-dock-zone"
+            onPointerEnter={() => setDockHover(true)}
+            onPointerLeave={() => { setDockHover(false); setDockPulled(false); }}>
+            <motion.div className="pv-dock-shell"
+              animate={{ x: dockRevealed ? '0%' : '74%', y: dockRevealed ? '0%' : '62%', scale: dockRevealed ? 1 : 0.9, opacity: 1 }}
+              transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 240, damping: 17, mass: 0.9 }}>
+              <motion.div className="pv-dock"
+                drag={reduce ? false : true}
+                dragConstraints={{ top: -52, bottom: 6, left: -70, right: 26 }}
+                dragElastic={0.16}
+                dragSnapToOrigin
+                onDragStart={() => setDockPulled(true)}
+                whileDrag={reduce ? undefined : { scale: 1.04 }}>
+                <span className="pv-grain" />
+                <span className="pv-dock-grip" aria-hidden="true" />
+                <motion.button type="button" className="pv-dock-btn" aria-label="Minimize" title="Minimize"
+                  onClick={close}
+                  whileHover={reduce ? undefined : { scale: 1.08 }} whileTap={reduce ? undefined : { scale: 0.9 }} transition={SPRING}>
+                  <Minimize size={18} />
                 </motion.button>
-              ))}
-            </div>
-          )}
-
-          <AnimatePresence>
-            {showInfo && (
-              <motion.div className="pv-info" initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.96 }} transition={SPRING}>
-                <div><b>{file.name}</b></div>
-                <div>{KIND_LABEL[kind]} · {formatFileSize(file.size || 0)}</div>
-                <div>{file.encrypted ? 'End-to-end encrypted' : 'Unencrypted'}</div>
-                {file.created_at && <div>Added {new Date(file.created_at).toLocaleDateString()}</div>}
+                <motion.button type="button" className="pv-dock-btn" data-close="true" aria-label="Close" title="Close"
+                  onClick={close}
+                  whileHover={reduce ? undefined : { scale: 1.08 }} whileTap={reduce ? undefined : { scale: 0.9 }} transition={SPRING}>
+                  <X size={19} />
+                </motion.button>
               </motion.div>
-            )}
-          </AnimatePresence>
+            </motion.div>
+          </div>
         </div>
       </CustomDialogContent>
     </Dialog>

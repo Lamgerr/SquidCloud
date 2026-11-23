@@ -236,14 +236,22 @@ a full-height panel and not a capsule with a background behind it:
 
 ### 5.4d Instant preview (`EnhancedInstantPreviewModal.tsx`)
 
-- Full-screen frame, zero decoration. Floating chrome only: one circular X (close),
-  minimize, fullscreen, info, share, download, prev/next — all true circles on the
-  dock glass tier with spring press.
+- Full-screen frame, **zero on-screen chrome**. The only visible control is ONE
+  floating dock in the bottom-right corner: grainy, translucent, springy, containing
+  exactly two circular buttons — **minimize** and **close**.
+- The dock is fully visible for 2s on open, then snaps/submerges into the corner with
+  a spring, leaving a part visible. Hovering the corner hot-zone or dragging the dock
+  back out reveals it; leaving re-submerges it.
 - All file types render in the same frame via a type-aware body: PDF, image, video,
   audio, text/code, markdown, EPUB, spreadsheet, font, archive, 3D, generic fallback.
-- Minimize turns a viewer into a floating "picking card" in a right-center stack
-  (`PreviewTabStack.tsx`): fanned cards, spring pull on hover, per-card close, and
-  close-all / hide-all controls. Clicking a card restores the viewer.
+- Minimize turns a viewer into a floating "picking card" in a right-center deck
+  (`PreviewTabStack.tsx`): glassy grain-textured cards in a tight fan; hovering fans
+  them apart with spring physics, each showing its label, type glyph and close; drag a
+  card out to dismiss it, click to restore. Close-all / hide-all live in a quiet pill
+  that appears on hover; hidden tabs leave a small restore badge.
+- Command palette (`CommandPalette.tsx`) uses a dense, more-opaque frosted surface with
+  a two-frequency nano-texture grain (mid fractal + fine high-frequency), a hairline
+  rim and deep shadow — premium and translucent, never a thin see-through sheet.
 - Spec: `docs/research/macos-preview-reference.md`.
 
 ### 5.5 Toasts
