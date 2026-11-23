@@ -1,18 +1,19 @@
 {
-  "goal": "Fix the HUD flash/glitch when tapping a playing video to reveal controls.",
+  "goal": "Polish command palette UI/UX and remove the AI live context strip.",
   "goal_source": "interactive query from human (not from backlog)",
   "last_actions": [
-    "2026-11-23: Diagnosed the glitch: in onTouchUp the tap branch read uiRef.current AFTER onTouchDown's wakeControls() had set controlsVisible=true, so a tap that revealed the chrome scheduled setControlsVisible(false) 300ms later. The HUD flashed then vanished; touching the HUD itself skipped the gesture path (data-cbp-ui) so it stayed.",
-    "Fix: added uiAtDown ref capturing uiRef.current on pointer-down before wakeControls(); the tap branch now uses that pre-tap state to decide show vs hide, with no delayed hide timer. Double-tap zone seek and mouse click/dblclick untouched.",
-    "Verified syntax; committed 0a409c46; Vercel READY."
+    "2026-11-23: Removed the LIVE CONTEXT bar from AI mode (JSX, .spot-ctx CSS and spot-live keyframes); aiContext/currentFolder still passed to squidAgent.ask().",
+    "Polished palette: subtler .spot-clip grain veil (.55 -> .3), neutral non-white selected-row surface and icon highlight, 56px search pill, hairline active scope chips + divider, refined group labels, styled scrollbars, roomier rows, refined empty state / suggestion hover / footer, stronger focus rings.",
+    "Updated docs/UI-UX-STANDARD.md. Committed 09b8c4ff. First vercel deploy returned 'Not authorized'; immediate retry succeeded with READY."
   ],
   "key_numbers": {
-    "commit": "0a409c46",
-    "deploy_url": "https://cloudbliss-storage-rnu7haho2-sqc.vercel.app",
+    "commit": "09b8c4ff",
+    "deploy_url": "https://cloudbliss-storage-12gjmgunl-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
-    "No local tsc; Vercel cloud build authoritative (build passed)."
+    "No local tsc; Vercel cloud build authoritative (build passed).",
+    "Vercel CLI intermittently returns 'Not authorized' on first attempt; a retry has worked each time."
   ],
-  "next": "Await confirmation that tapping a playing video now reveals a stable HUD."
+  "next": "Await visual feedback on the polished palette."
 }

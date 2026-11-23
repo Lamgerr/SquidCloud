@@ -1,14 +1,16 @@
 # What happened while you were away
 
 ## Done
-- **Fixed the HUD flash/glitch.** When you tapped a playing video, `onTouchDown` immediately revealed the chrome, and the follow-up tap handler then read the *already-flipped* visibility state — so it scheduled a hide 300ms later. The HUD flashed and vanished; touching the HUD itself skipped that path, which is why it only stabilized then. The handler now captures visibility *before* the state change and acts on that, with no delayed hide. Double-tap seeking and mouse click/double-click are unchanged.
-- Committed `0a409c46`. Deployed — **READY** at `https://cloudbliss-storage-rnu7haho2-sqc.vercel.app`.
+- **Removed the AI live context bar** — no more LIVE CONTEXT strip or pulsing dot. The same context is still passed to the agent internally, so answers are unchanged.
+- **Palette polish** — subtler grain on the scope card, neutral (non-white) selected-row and icon surfaces, refined search pill and scope chips with hairline active states, quieter group labels, styled scrollbars, roomier rows, and refined empty state, suggestion hover, footer hints and focus rings.
+- Updated `docs/UI-UX-STANDARD.md`. Committed `09b8c4ff`. Deployed — **READY** at `https://cloudbliss-storage-12gjmgunl-sqc.vercel.app`.
 
 ## In progress
-- Nothing actively being edited. Awaiting confirmation on your device.
+- Nothing actively being edited. Awaiting your visual feedback.
 
 ## Blocked / needs a decision
 - No local `tsc` here; Vercel's cloud build passed and is the verification authority.
+- Vercel CLI first attempt returned "Not authorized"; an immediate retry deployed successfully.
 
 ## Queued next
-- Any further player / preview UX tuning.
+- Any further palette or player UX tuning.

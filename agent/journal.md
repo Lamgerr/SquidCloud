@@ -1,3 +1,10 @@
+## 2026-11-23 - Palette polish + remove AI live context (interactive query)
+- Human: live context bar looked AI-ish, remove it; also make the command palette more polished overall.
+- Removed the `.spot-ctx` JSX block, its CSS rules and @keyframes spot-live. aiContext/currentFolder are still forwarded to squidAgent.ask(), so behaviour is unchanged.
+- Polish pass: reduced .spot-clip::before grain veil opacity .55 -> .3 (user had reacted badly to heavy grain elsewhere); neutralized .spot-row-thumb and .spot-ico from white to rgba(232,231,225,..); 54 -> 56px pill; scope chips with hairline active state and a bottom divider; refined group labels, list/foot scrollbars, row padding, empty state, suggestion hover lift, footer and focus rings.
+- Updated UI-UX-STANDARD.md accordingly. Committed 09b8c4ff. First `vercel --prod --yes` returned "Not authorized" (status error); an immediate retry succeeded READY at cloudbliss-storage-12gjmgunl-sqc.vercel.app.
+- Next: await visual feedback.
+
 ## 2026-11-23 - Fix HUD flash on tap (interactive query)
 - Report: while playing, tapping the video makes the HUD glitch/flash until the HUD itself is touched.
 - Root cause: `onTouchDown` calls wakeControls() (sets controlsVisible=true) immediately; then the delayed tap handler in `onTouchUp` read `uiRef.current` — already true — and scheduled `setControlsVisible(false)` 300ms later. So the chrome appeared then disappeared. Touching the HUD has `data-cbp-ui`, so onTouchDown returns early and no hide is scheduled — hence "stable once I tap the HUD".
