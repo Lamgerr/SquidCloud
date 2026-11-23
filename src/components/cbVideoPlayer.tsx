@@ -18,6 +18,7 @@ import {
 } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { StreamDecryptorService } from '@/lib/videoStreamer';
+import { GRAIN_BG } from './grain';
 
 interface CBVideoPlayerProps {
   file: { id: string; name: string; type: string; size: number };
@@ -28,14 +29,21 @@ interface CBVideoPlayerProps {
 }
 
 type LoadPhase = 'connecting' | 'decrypting' | 'buffering' | 'ready' | 'error';
-type MenuPage = 'root' | 'speed' | 'audio' | 'subs';
+type MenuPage = 'root' | 'speed' | 'audio' | 'subs' | 'quality';
 type Track = { index: number; language: string; label: string };
 
 const JELLY = { type: 'spring' as const, stiffness: 520, damping: 15, mass: 0.8 };   // same feel as the dashboard dock
 const POP = { type: 'spring' as const, stiffness: 380, damping: 17, mass: 0.9 };
 const SOFT = { type: 'spring' as const, stiffness: 300, damping: 26, mass: 0.9 };
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const QUALITIES = ['Auto', '1080p', '720p', '480p', '360p'] as const;
+type Quality = typeof QUALITIES[number];
 const AUDIO_RE = /\.(mp3|m4a|aac|flac|wav|ogg|oga|opus|weba|wma|aiff?)$/i;
+const qualityOf = (w: number, h: number) => {
+  if (!w || !h) return 'Source';
+  const q = Math.min(w, h);
+  return q >= 2160 ? '4K' : q >= 1080 ? '1080p' : q >= 720 ? '720p' : q >= 480 ? '480p' : 'SD';
+};
 
 const fmt = (s: number) => {
   if (!Number.isFinite(s) || s < 0) s = 0;
@@ -75,6 +83,12 @@ const Ic = {
   Alert: (p: IP) => <Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 8v4.5M12 15.8h.01" /></Svg>,
   Chip: (p: IP) => <Svg {...p}><rect x="6.5" y="6.5" width="11" height="11" rx="2.5" /><path d="M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3" /></Svg>,
   Retry: (p: IP) => <Svg {...p}><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" /><path d="M19.5 4.5v4h-4" /></Svg>,
+  Cc: (p: IP) => <Svg {...p}><rect x="2.8" y="5.5" width="18.4" height="13" rx="3" /><path d="M10 10.2a2.6 2.6 0 1 0 0 3.6M18 10.2a2.6 2.6 0 1 0 0 3.6" /></Svg>,
+  Wave: (p: IP) => <Svg {...p}><path d="M4 10v4M8 7v10M12 4.5v15M16 8v8M20 10.5v3" /></Svg>,
+  Gauge: (p: IP) => <Svg {...p}><path d="M4 17a8 8 0 1 1 16 0" /><path d="m12 17 4-5" /><circle cx="12" cy="17" r="1.2" fill="currentColor" stroke="none" /></Svg>,
+  Sun: (p: IP) => <Svg {...p}><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" /></Svg>,
+  Zoom: (p: IP) => <Svg {...p}><circle cx="10.5" cy="10.5" r="6" /><path d="m15 15 5 5M10.5 8v5M8 10.5h5" /></Svg>,
+  FileUp: (p: IP) => <Svg {...p}><path d="M12 16V5M8 9l4-4 4 4" /><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" /></Svg>,
 };
 
 /* ── Liquid slider: used for the scrubber and the volume. The thumb is a droplet: it stretches with
@@ -167,24 +181,26 @@ const Btn: React.FC<{ label: string; onClick: (e: React.MouseEvent) => void; siz
 interface MenuProps {
   page: MenuPage; dir: number; go: (p: MenuPage) => void; compact: boolean; reduce: boolean;
   speed: number; setSpeed: (n: number) => void;
+  quality: Quality; setQuality: (q: Quality) => void; sourceQuality: string;
   audioTracks: Track[]; activeAudio: number; setAudio: (i: number) => void;
-  textTracks: Track[]; activeText: number; setText: (i: number) => void;
+  textTracks: Track[]; activeText: number; setText: (i: number) => void; onLoadSubs: () => void;
   canPip: boolean; onPip: () => void; stats: boolean; toggleStats: () => void;
 }
-const Row: React.FC<{ label: string; value?: string; checked?: boolean; slot?: boolean; chevron?: boolean; onClick: () => void }> =
-  ({ label, value, checked, slot, chevron, onClick }) => (
+const Row: React.FC<{ label: string; value?: string; checked?: boolean; slot?: boolean; chevron?: boolean; icon?: React.ReactNode; onClick: () => void }> =
+  ({ label, value, checked, slot, chevron, icon, onClick }) => (
     <button type="button" role="menuitem" className="cbp-row" onClick={onClick}>
       {slot && <span className="cbp-rowchk">{checked && <Ic.Check size={16} />}</span>}
+      {icon && !slot && <span className="cbp-rowico">{icon}</span>}
       <span className="cbp-rowlab">{label}</span>
       {value && <span className="cbp-rowval">{value}</span>}
       {chevron && <Ic.ChevR size={15} />}
     </button>
   );
+const MENU_TITLE: Record<MenuPage, string> = { root: 'Options', speed: 'Playback Speed', audio: 'Audio Track', subs: 'Subtitles', quality: 'Quality' };
 const Menu: React.FC<MenuProps> = (m) => {
   const T = m.reduce ? { duration: 0.01 } : { type: 'spring' as const, stiffness: 520, damping: 34 };
-  const title = m.page === 'speed' ? 'Playback Speed' : m.page === 'audio' ? 'Audio' : 'Subtitles';
   return (
-    <motion.div layout className="cbp-menu cbp-glass" data-cbp-menu role="menu" data-compact={m.compact}
+    <motion.div layout className="cbp-menu cbp-glass" data-cbp-menu role="menu" data-compact={m.compact} data-cbp-ui
       initial={m.reduce ? false : { opacity: 0, scale: 0.84, y: m.compact ? -10 : 12 }}
       animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: m.compact ? -6 : 8 }}
       transition={m.reduce ? { duration: 0.01 } : POP}
@@ -194,22 +210,32 @@ const Menu: React.FC<MenuProps> = (m) => {
         <motion.div key={m.page} initial={{ opacity: 0, x: 14 * m.dir }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 * m.dir }} transition={T}>
           {m.page === 'root' ? (
             <>
-              <Row label="Playback Speed" value={m.speed === 1 ? 'Normal' : `${m.speed}×`} chevron onClick={() => m.go('speed')} />
-              {m.audioTracks.length > 1 && <Row label="Audio" value={m.audioTracks.find((t) => t.index === m.activeAudio)?.label || 'Default'} chevron onClick={() => m.go('audio')} />}
-              {m.textTracks.length > 0 && <Row label="Subtitles" value={m.activeText >= 0 ? m.textTracks.find((t) => t.index === m.activeText)?.label : 'Off'} chevron onClick={() => m.go('subs')} />}
+              <Row icon={<Ic.Gauge size={16} />} label="Quality" value={m.quality === 'Auto' ? `Auto · ${m.sourceQuality}` : m.quality} chevron onClick={() => m.go('quality')} />
+              <Row icon={<Ic.Wave size={16} />} label="Audio Track" value={m.audioTracks.length > 1 ? (m.audioTracks.find((t) => t.index === m.activeAudio)?.label || 'Default') : 'Default'} chevron onClick={() => m.go('audio')} />
+              <Row icon={<Ic.Cc size={16} />} label="Subtitles" value={m.activeText >= 0 ? (m.textTracks.find((t) => t.index === m.activeText)?.label || 'On') : 'Off'} chevron onClick={() => m.go('subs')} />
+              <Row icon={<Svg size={16}><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></Svg>} label="Playback Speed" value={m.speed === 1 ? 'Normal' : `${m.speed}×`} chevron onClick={() => m.go('speed')} />
               <div className="cbp-sep" />
-              {m.canPip && <Row label="Picture in Picture" onClick={m.onPip} />}
-              <Row label="Playback Info" checked={m.stats} onClick={m.toggleStats} value={m.stats ? 'On' : undefined} />
+              {m.canPip && <Row icon={<Ic.Pip size={16} />} label="Picture in Picture" onClick={m.onPip} />}
+              <Row icon={<Ic.Chip size={16} />} label="Playback Info" checked={m.stats} onClick={m.toggleStats} value={m.stats ? 'On' : undefined} />
             </>
           ) : (
             <>
-              <button type="button" className="cbp-row cbp-back" onClick={() => m.go('root')}><Ic.ChevL size={15} /><span className="cbp-rowlab">{title}</span></button>
+              <button type="button" className="cbp-row cbp-back" onClick={() => m.go('root')}><Ic.ChevL size={15} /><span className="cbp-rowlab">{MENU_TITLE[m.page]}</span></button>
               <div className="cbp-sep" />
               {m.page === 'speed' && SPEEDS.map((s) => <Row key={s} slot label={s === 1 ? '1× (Normal)' : `${s}×`} checked={m.speed === s} onClick={() => m.setSpeed(s)} />)}
-              {m.page === 'audio' && m.audioTracks.map((t) => <Row key={t.index} slot label={t.label} checked={m.activeAudio === t.index} onClick={() => m.setAudio(t.index)} />)}
+              {m.page === 'quality' && (<>
+                <div className="cbp-note">Source · {m.sourceQuality}{m.quality === 'Auto' ? '' : ` · playing as ${m.quality}`}</div>
+                {QUALITIES.map((q) => <Row key={q} slot label={q === 'Auto' ? `Auto (${m.sourceQuality})` : q} checked={m.quality === q} onClick={() => m.setQuality(q)} />)}
+              </>)}
+              {m.page === 'audio' && (<>
+                <Row slot label="Default" checked={m.activeAudio < 0} onClick={() => m.setAudio(-1)} />
+                {m.audioTracks.map((t) => <Row key={t.index} slot label={t.label} checked={m.activeAudio === t.index} onClick={() => m.setAudio(t.index)} />)}
+              </>)}
               {m.page === 'subs' && (<>
                 <Row slot label="Off" checked={m.activeText < 0} onClick={() => m.setText(-1)} />
                 {m.textTracks.map((t) => <Row key={t.index} slot label={t.label} checked={m.activeText === t.index} onClick={() => m.setText(t.index)} />)}
+                <div className="cbp-sep" />
+                <Row icon={<Ic.FileUp size={16} />} label="Load subtitle file…" onClick={m.onLoadSubs} />
               </>)}
             </>
           )}
@@ -242,6 +268,9 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   const scrubRef = useRef(false);
   const lastSeek = useRef(0);
   const fxId = useRef(0);
+  const touch = useRef({ id: -1, x: 0, y: 0, startX: 0, startY: 0, t: 0, mode: '' as 'none' | 'seek' | 'volume' | 'brightness' | 'pinch', startVol: 1, startBright: 1, startSec: 0, moved: false, pinch: 0, pinchStart: 1 });
+  const subsInput = useRef<HTMLInputElement>(null);
+  const resumeAt = useRef(0);
 
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -264,6 +293,10 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [quality, setQualityState] = useState<Quality>('Auto');
+  const [brightness, setBrightness] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [gesture, setGesture] = useState<{ kind: string; value: string; id: number } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPage, setMenuPage] = useState<MenuPage>('root');
   const menuDir = useRef(1);
@@ -274,7 +307,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   const [audioTracks, setAudioTracks] = useState<Track[]>([]);
   const [textTracks, setTextTracks] = useState<Track[]>([]);
   const [chapters] = useState<{ time: number; label: string }[]>([]);
-  const [stats, setStats] = useState({ resolution: '', dropped: 0 });
+  const [stats, setStats] = useState({ resolution: '', dropped: 0, width: 0, height: 0 });
   const [cue, setCue] = useState('');
   const [showTotal, setShowTotal] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
@@ -385,7 +418,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
     setHasErrorTracked(false); setBuffering(true); setLoadPhase('connecting'); setRetryCount((r) => r + 1);
   };
 
-  const activeVideoSource = !streamReady ? null : isUnsupportedContainer ? transcodedUrl : `/virtual-stream/${file.id}?retry=${retryCount}`;
+  const activeVideoSource = !streamReady ? null : isUnsupportedContainer ? transcodedUrl : `/virtual-stream/${file.id}?retry=${retryCount}&q=${encodeURIComponent(quality)}`;
 
   /* ── transport ── */
   const ui = isAudio || controlsVisible || !playing || menuOpen || scrubbing;
@@ -446,9 +479,50 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
     setMenuOpen(false);
   };
   const setAudio = (i: number) => {
-    const v: any = videoRef.current; if (!v?.audioTracks) return;
-    for (let k = 0; k < v.audioTracks.length; k++) v.audioTracks[k].enabled = k === i;
+    const v: any = videoRef.current;
+    if (v?.audioTracks) for (let k = 0; k < v.audioTracks.length; k++) v.audioTracks[k].enabled = i < 0 ? k === 0 : k === i;
     setActiveAudioTrack(i);
+  };
+  const setQuality = (q: Quality) => {
+    resumeAt.current = videoRef.current?.currentTime || 0;
+    setQualityState(q);
+    setGesture({ kind: 'quality', value: q, id: ++fxId.current });
+    go('root');
+  };
+  const sourceQuality = qualityOf(stats.resolution.width, stats.resolution.height);
+
+  /* load an external .srt / .vtt into a real text track (cues are rendered by us) */
+  const loadSubtitles = async (fileList: FileList | null) => {
+    const f = fileList?.[0]; if (!f) return;
+    const v = videoRef.current; if (!v) return;
+    try {
+      const raw = await f.text();
+      const stamp = (s: string) => {
+        const p = s.trim().replace(',', '.').split(':');
+        if (p.length === 3) return parseInt(p[0], 10) * 3600 + parseInt(p[1], 10) * 60 + parseFloat(p[2]);
+        return 0;
+      };
+      const cues: { start: number; end: number; text: string }[] = [];
+      const blocks = raw.replace(/^\uFEFF/, '').split(/\r?\n\r?\n/);
+      blocks.forEach((b) => {
+        const lines = b.split(/\r?\n/);
+        const n = lines.findIndex((l) => l.includes('-->'));
+        if (n < 0) return;
+        const [a, z] = lines[n].split('-->');
+        cues.push({ start: stamp(a), end: stamp(z?.split(/\s/)[0] || ''), text: lines.slice(n + 1).join('\n') });
+      });
+      const tr = v.addTextTrack('subtitles', f.name.replace(/\.(srt|vtt)$/i, ''), 'und');
+      cues.forEach(({ start, end, text }) => {
+        try { tr.addCue(new (window as any).VTTCue(start, end, text)); } catch { /* older browser */ }
+      });
+      tr.mode = 'hidden';
+      tr.addEventListener('cuechange', updateCue);
+      const idx = v.textTracks.length - 1;
+      setTextTracks((list) => [...list, { index: idx, language: 'und', label: f.name.replace(/\.(srt|vtt)$/i, '') }]);
+      setText(idx);
+      setGesture({ kind: 'subs', value: f.name, id: ++fxId.current });
+    } catch { setGesture({ kind: 'subs', value: 'Could not read file', id: ++fxId.current }); }
+    if (subsInput.current) subsInput.current.value = '';
   };
   const updateCue = useCallback(() => {
     const v = videoRef.current; const i = activeTextRef.current;
@@ -523,33 +597,107 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       else if (k === 'arrowdown') { e.preventDefault(); setVol(clamp01((videoRef.current?.volume ?? 1) - 0.05)); }
       else if (k === 'm') toggleMute();
       else if (k === 'f' && !isAudio) toggleFs();
+      else if (k === 'c') { e.preventDefault(); setText(activeTextRef.current >= 0 ? -1 : (textTracks[0]?.index ?? -1)); }
+      else if (k === 'i') { e.preventDefault(); setShowStats((s) => !s); }
+      else if (k === 'p' && canPip) { e.preventDefault(); togglePiP(); }
+      else if (k === '[' || k === '<') { e.preventDefault(); setSpeed(SPEEDS[Math.max(0, SPEEDS.indexOf(playbackSpeed) - 1)]); }
+      else if (k === ']' || k === '>') { e.preventDefault(); setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(playbackSpeed) + 1)]); }
+      else if (k === 'home') { e.preventDefault(); if (videoRef.current) videoRef.current.currentTime = 0; }
+      else if (k === 'end') { e.preventDefault(); if (videoRef.current?.duration) videoRef.current.currentTime = videoRef.current.duration; }
+      else if (/^[0-9]$/.test(k) && videoRef.current?.duration) { e.preventDefault(); videoRef.current.currentTime = (Number(k) / 10) * videoRef.current.duration; }
     };
     window.addEventListener('keydown', onKey, true);   // capture: lets an open menu swallow Esc before the modal sees it
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [wakeControls, togglePlay, seekBy, setVol, toggleMute, toggleFs, transcodeState, isUnsupportedContainer, isAudio]);
+  }, [wakeControls, togglePlay, seekBy, setVol, toggleMute, toggleFs, transcodeState, isUnsupportedContainer, isAudio, textTracks, playbackSpeed, canPip]);
 
-  /* click / tap model: mouse → click plays, double-click seeks by third; touch → tap toggles UI, double-tap seeks */
-  const zoneAction = (x: number, w: number) => { if (x < w / 3) seekBy(-10); else if (x > (w * 2) / 3) seekBy(10); else if (!isAudio) toggleFs(); };
+  /* ── Surface input ──
+     mouse: click = play/pause, double-click = zone seek.
+     touch: tap = UI, double-tap = zone seek / play, horizontal drag = scrub,
+            vertical drag left = brightness / right = volume, pinch = zoom. */
+  const zoneAction = (x: number, w: number) => {
+    if (x < w / 3) seekBy(-10);
+    else if (x > (w * 2) / 3) seekBy(10);
+    else if (isAudio) togglePlay(true);
+    else toggleFs();
+  };
   const onSurfaceClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const pt = (e.nativeEvent as PointerEvent).pointerType;
+    if (pt === 'touch' || pt === 'pen') return;
     if (menuOpen) { setMenuOpen(false); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const touch = (e.nativeEvent as PointerEvent).pointerType === 'touch' || (e.nativeEvent as PointerEvent).pointerType === 'pen';
-    if (touch) {
-      const now = performance.now();
-      if (now - lastTap.current < 300) { clearTimeout(tapTimer.current); lastTap.current = 0; zoneAction(x, rect.width); return; }
-      lastTap.current = now;
-      tapTimer.current = setTimeout(() => { if (uiRef.current && playing) setControlsVisible(false); else wakeControls(); }, 300);
-    } else {
-      clearTimeout(tapTimer.current);
-      tapTimer.current = setTimeout(() => togglePlay(true), 210);
-    }
+    clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(() => togglePlay(true), 210);
   };
   const onSurfaceDouble = (e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.nativeEvent as PointerEvent).pointerType === 'touch') return;
+    const pt = (e.nativeEvent as PointerEvent).pointerType;
+    if (pt === 'touch' || pt === 'pen') return;
     clearTimeout(tapTimer.current);
-    const rect = e.currentTarget.getBoundingClientRect();
-    zoneAction(e.clientX - rect.left, rect.width);
+    const r = e.currentTarget.getBoundingClientRect();
+    zoneAction(e.clientX - r.left, r.width);
+  };
+  const onControl = (t: EventTarget | null) => !!(t as HTMLElement)?.closest?.('button, [role="slider"], [role="menuitem"], [data-cbp-ui]');
+  const showGesture = (kind: string, value: string) => setGesture({ kind, value, id: ++fxId.current });
+  const clearGesture = () => window.setTimeout(() => setGesture(null), 700);
+  const pendingSeek = useRef(0);
+
+  const onTouchDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' || onControl(e.target) || menuOpen) return;
+    wakeControls();
+    const t = touch.current, r = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    if (t.id !== -1) {                               // second finger → pinch
+      t.mode = 'pinch'; t.pinch = Math.max(20, Math.hypot(px - t.x, py - t.y)); t.pinchStart = zoom;
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+      return;
+    }
+    t.id = e.pointerId; t.startX = t.x = px; t.startY = t.y = py; t.t = performance.now();
+    t.mode = 'none'; t.moved = false; t.startVol = volume; t.startBright = brightness;
+    t.startSec = videoRef.current?.currentTime || 0;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+  };
+  const onTouchMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const t = touch.current; if (t.id === -1 || e.pointerType === 'mouse') return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    if (t.mode === 'pinch') {
+      const z = Math.min(3, Math.max(1, (Math.hypot(px - t.x, py - t.y) / t.pinch) * t.pinchStart));
+      setZoom(z); showGesture('zoom', `${z.toFixed(1)}×`); return;
+    }
+    const dx = px - t.startX, dy = py - t.startY;
+    if (!t.moved && Math.hypot(dx, dy) > 14) {
+      t.moved = true;
+      t.mode = Math.abs(dx) > Math.abs(dy) * 1.1 ? 'seek' : (t.startX < r.width / 2 ? 'brightness' : 'volume');
+    }
+    if (t.mode === 'seek') {
+      const target = Math.max(0, Math.min(duration || 0, t.startSec + (dx / r.width) * (duration || 0) * 1.5));
+      pendingSeek.current = target; showGesture('seek', `${fmt(target)} / ${fmt(duration)}`);
+    } else if (t.mode === 'volume') {
+      const v = Math.max(0, Math.min(1, t.startVol - dy / 180));
+      setVol(v); showGesture('volume', `${Math.round(v * 100)}%`);
+    } else if (t.mode === 'brightness') {
+      const b = Math.max(0.2, Math.min(1, t.startBright - dy / 220));
+      setBrightness(b); showGesture('brightness', `${Math.round(b * 100)}%`);
+    }
+  };
+  const onTouchUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const t = touch.current; if (t.id === -1 || e.pointerType === 'mouse') return;
+    const r = e.currentTarget.getBoundingClientRect();
+    if (t.mode === 'pinch') { if (zoom < 1.4) setZoom(1); clearGesture(); t.id = -1; return; }
+    if (t.moved) {
+      if (t.mode === 'seek' && pendingSeek.current) {
+        const v = videoRef.current; if (v) v.currentTime = pendingSeek.current;
+        showGesture('seek', fmt(pendingSeek.current)); pendingSeek.current = 0;
+      }
+      clearGesture(); t.id = -1; return;
+    }
+    t.id = -1;
+    const x = e.clientX - r.left, now = performance.now();
+    if (now - lastTap.current < 300) {
+      clearTimeout(tapTimer.current); lastTap.current = 0;
+      if (zoom > 1.4) setZoom(1); else zoneAction(x, r.width);
+      return;
+    }
+    lastTap.current = now;
+    tapTimer.current = setTimeout(() => { if (uiRef.current && playing) setControlsVisible(false); else wakeControls(); }, 300);
   };
 
   useEffect(() => { if (!flash) return; const t = setTimeout(() => setFlash(null), 650); return () => clearTimeout(t); }, [flash]);
@@ -613,8 +761,9 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   const menuEl = menuOpen && (
     <Menu page={menuPage} dir={menuDir.current} go={go} compact={compact} reduce={reduce}
       speed={playbackSpeed} setSpeed={(s) => { setSpeed(s); go('root'); }}
+      quality={quality} setQuality={setQuality} sourceQuality={sourceQuality}
       audioTracks={audioTracks} activeAudio={activeAudioTrack} setAudio={(i) => { setAudio(i); go('root'); }}
-      textTracks={textTracks} activeText={activeTextTrack} setText={(i) => { setText(i); go('root'); }}
+      textTracks={textTracks} activeText={activeTextTrack} setText={(i) => { setText(i); go('root'); }} onLoadSubs={() => subsInput.current?.click()}
       canPip={canPip} onPip={togglePiP} stats={showStats} toggleStats={() => setShowStats((s) => !s)} />
   );
   const playGlyph = (size: number) => (
@@ -629,11 +778,15 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
     <div ref={setRoot}
       className={cn('cbp-root', isAudio && 'cbp-audio', !ui && playing && 'cbp-idle', className)}
       data-compact={compact} onPointerMove={(e) => { if (e.pointerType === 'mouse') wakeControls(); }}
-      onTouchStart={wakeControls} onClick={onSurfaceClick} onDoubleClick={onSurfaceDouble}>
+      onPointerDown={onTouchDown} onPointerMoveCapture={onTouchMove} onPointerUp={onTouchUp} onPointerCancel={onTouchUp}
+      onClick={onSurfaceClick} onDoubleClick={onSurfaceDouble}>
       <style>{CSS}</style>
+      <input ref={subsInput} type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" className="cbp-file" tabIndex={-1}
+        onChange={(e) => loadSubtitles(e.target.files)} />
 
       {activeVideoSource && (
-        <video key={activeVideoSource} ref={videoRef} src={activeVideoSource} className="cbp-video" style={isAudio ? { opacity: 0 } : undefined}
+        <video key={activeVideoSource} ref={videoRef} src={activeVideoSource} className="cbp-video"
+          style={{ ...(isAudio ? { opacity: 0 } : {}), transform: `scale(${zoom})` }}
           poster={isAudio ? undefined : poster} playsInline preload="auto" autoPlay={autoPlay}
           onError={(e) => {
             console.error('Video playback error:', e);
@@ -647,6 +800,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
           onLoadedMetadata={() => {
             const v = videoRef.current; if (!v) return;
             setDuration(v.duration || 0);
+            if (resumeAt.current > 0) { try { v.currentTime = resumeAt.current; } catch { /* not seekable yet */ } resumeAt.current = 0; }
             if (v.readyState >= 2) { setBuffering(false); setLoadPhase('ready'); }
             const at: Track[] = []; const a: any = (v as any).audioTracks;
             for (let i = 0; i < (a?.length || 0); i++) at.push({ index: i, language: a[i].language || 'und', label: a[i].label || a[i].language || `Track ${i + 1}` });
@@ -658,7 +812,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
               t.mode = 'hidden'; t.addEventListener('cuechange', updateCue);
             }
             setTextTracks(tt);
-            setStats((s) => ({ ...s, resolution: v.videoWidth && v.videoHeight ? `${v.videoWidth}×${v.videoHeight}` : 'N/A' }));
+            setStats((s) => ({ ...s, resolution: v.videoWidth && v.videoHeight ? `${v.videoWidth}×${v.videoHeight}` : 'N/A', width: v.videoWidth || 0, height: v.videoHeight || 0 }));
           }}
           onLoadedData={() => { setBuffering(false); setLoadPhase('ready'); }}
           onCanPlay={() => { setBuffering(false); setLoadPhase('ready'); }}
@@ -698,6 +852,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       )}
       {isAudio && (
         <div className="cbp-meta">
+          <div className="cbp-now"><span data-live={playing} />NOW PLAYING</div>
           <motion.h2 key={title} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={SOFT}>{title}</motion.h2>
           <p>{(file.type?.split('/')[1] || file.name.split('.').pop() || 'audio').toUpperCase()} · {fmtSize(file.size)}</p>
         </div>
@@ -705,6 +860,24 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
 
       {/* soft scrim so the glass stays legible over bright frames */}
       {!isAudio && <motion.div className="cbp-scrim" initial={false} animate={{ opacity: ui ? 1 : 0 }} transition={{ duration: 0.35 }} />}
+      {/* brightness veil — vertical swipe on the left half */}
+      {brightness < 1 && <div className="cbp-bright" style={{ opacity: 1 - brightness }} />}
+
+      {/* gesture readout */}
+      <AnimatePresence>
+        {gesture && (
+          <motion.div key={gesture.id} className="cbp-gesture cbp-glass" data-kind={gesture.kind}
+            initial={{ opacity: 0, scale: 0.82, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} transition={POP}>
+            {gesture.kind === 'seek' && <Ic.Wave size={17} />}
+            {gesture.kind === 'volume' && <Ic.Vol level={3} size={18} />}
+            {gesture.kind === 'brightness' && <Ic.Sun size={18} />}
+            {gesture.kind === 'zoom' && <Ic.Zoom size={18} />}
+            {gesture.kind === 'quality' && <Ic.Gauge size={18} />}
+            {gesture.kind === 'subs' && <Ic.Cc size={18} />}
+            <span>{gesture.value}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* buffering: a small glass droplet with a ring */}
       <AnimatePresence>
@@ -766,9 +939,9 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
         <>
           <AnimatePresence>
             {ui && (
-              <motion.div className="cbp-top" onClick={stop} onDoubleClick={stop}
+              <motion.div className="cbp-top" data-cbp-ui onClick={stop} onDoubleClick={stop}
                 initial={reduce ? false : { opacity: 0, y: -14, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.94 }} transition={T}>
-                <div className="cbp-topbar cbp-glass" onPointerMove={onHudMove}>
+                <div className="cbp-topbar cbp-glass" data-cbp-ui onPointerMove={onHudMove}>
                   {!isAudio && <Btn reduce={reduce} label={fullscreen ? 'Exit full screen' : 'Full screen'} onClick={toggleFs}>{fullscreen ? <Ic.Exit size={20} /> : <Ic.Full size={20} />}</Btn>}
                   <span data-cbp-more><Btn reduce={reduce} label="More" on={menuOpen} onClick={toggleMenu}><Ic.More size={20} /></Btn></span>
                 </div>
@@ -778,7 +951,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
           </AnimatePresence>
           <AnimatePresence>
             {ui && !buffering && (
-              <motion.div className="cbp-center" onClick={stop} onDoubleClick={stop} initial="h" animate="s" exit="h"
+              <motion.div className="cbp-center" data-cbp-ui onClick={stop} onDoubleClick={stop} initial="h" animate="s" exit="h"
                 variants={{ h: { opacity: 0, scale: 0.7 }, s: { opacity: 1, scale: 1, transition: { staggerChildren: 0.04 } } }} transition={T}>
                 <motion.span variants={{ h: { x: 18, opacity: 0 }, s: { x: 0, opacity: 1 } }} transition={T}><Btn reduce={reduce} size={56} label="Back 10 seconds" onClick={() => seekBy(-10)}><Ic.Back size={34} /></Btn></motion.span>
                 <motion.span variants={{ h: { scale: 0.6, opacity: 0 }, s: { scale: 1, opacity: 1 } }} transition={T}>
@@ -796,13 +969,13 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       {/* ── bottom: QuickTime HUD (desktop) / scrubber capsule (mobile) ── */}
       <AnimatePresence>
         {ui && (
-          <motion.div className="cbp-bottom" onClick={stop} onDoubleClick={stop}
+          <motion.div className="cbp-bottom" data-cbp-ui onClick={stop} onDoubleClick={stop}
             initial={reduce ? false : { opacity: 0, y: 30, scaleX: 0.94, scaleY: 0.8 }} animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }}
             exit={{ opacity: 0, y: 22, scaleX: 0.96, scaleY: 0.88 }} transition={T} style={{ transformOrigin: '50% 100%' }}>
             <div className="cbp-stack">
               {!compact && <AnimatePresence>{menuEl}</AnimatePresence>}
               {compact && <div className="cbp-title">{title}</div>}
-              <div className="cbp-hud cbp-glass" onPointerMove={onHudMove}>
+              <div className="cbp-hud cbp-glass" data-cbp-ui onPointerMove={onHudMove}>
                 {!compact && (
                   <div className="cbp-row1">
                     <div className="cbp-left">
@@ -851,22 +1024,22 @@ function useCompact(el: HTMLElement | null) {
 
 /* ── Styles: liquid glass = translucent fill + heavy blur/saturation + inner highlights + pointer specular ── */
 const CSS = `
-.cbp-root { --ink: #f4f3ee; --ink-dim: rgba(244,243,238,.62); position: relative; width: 100%; height: 100%; overflow: hidden; background: #000;
+.cbp-root { --ink: #e8e7e1; --ink-dim: rgba(232,231,225,.58); position: relative; width: 100%; height: 100%; overflow: hidden; background: #000;
   color: var(--ink); font-family: var(--sa-f, 'Hanken Grotesk', system-ui, -apple-system, sans-serif); -webkit-font-smoothing: antialiased;
-  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
 .cbp-root.cbp-idle { cursor: none; }
 .cbp-stage { display: grid; place-items: center; padding: 24px; background: var(--sa-bg, #0b0c0a); }
 .cbp-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
 .cbp-audio { background: radial-gradient(120% 90% at 50% 0%, #1b1d18 0%, #0b0c0a 70%); }
 
+/* neutral dock glass: no white sheen, no brightness boost — nano grain instead */
 .cbp-glass { position: relative; isolation: isolate;
-  background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04) 55%), rgba(28,29,26,.46);
-  -webkit-backdrop-filter: blur(30px) saturate(190%) brightness(1.06); backdrop-filter: blur(30px) saturate(190%) brightness(1.06);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(255,255,255,.05), inset 0 0 0 1px rgba(255,255,255,.07),
-    0 20px 50px -18px rgba(0,0,0,.7), 0 2px 8px rgba(0,0,0,.25); }
-.cbp-glass::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
-  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,.2), transparent 62%); opacity: .7; }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .cbp-glass { background: rgba(24,25,22,.92); } }
+  background-image: ${GRAIN_BG}, linear-gradient(180deg, rgba(38,39,35,.76), rgba(14,15,12,.84));
+  background-size: 160px 160px, auto; background-color: rgba(18,19,16,.68);
+  -webkit-backdrop-filter: blur(30px) saturate(150%); backdrop-filter: blur(30px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.12), inset 0 -1px 0 rgba(0,0,0,.4), inset 0 0 0 1px rgba(232,231,225,.06),
+    0 20px 50px -18px rgba(0,0,0,.78), 0 2px 8px rgba(0,0,0,.3); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .cbp-glass { background: rgba(18,19,16,.94); } }
 
 .cbp-scrim { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(0deg, rgba(0,0,0,.5), transparent 38%), linear-gradient(180deg, rgba(0,0,0,.28), transparent 22%); }
 .cbp-root[data-compact="true"] .cbp-scrim { background: rgba(0,0,0,.3); }
@@ -890,21 +1063,21 @@ const CSS = `
 /* buttons */
 .cbp-btn { display: grid; place-items: center; flex: none; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--ink); cursor: pointer;
   transition: background .2s, color .2s; scale: none; }
-.cbp-btn:hover { background: rgba(255,255,255,.12); }
-.cbp-btn[data-on="true"] { background: rgba(255,255,255,.2); }
-.cbp-btn:focus-visible, .cbp-row:focus-visible, .cbp-pill:focus-visible, .cbp-slider:focus-visible, .cbp-remain:focus-visible, .cbp-bigplay:focus-visible { outline: 2px solid rgba(255,255,255,.85); outline-offset: 2px; }
+.cbp-btn:hover { background: rgba(232,231,225,.11); }
+.cbp-btn[data-on="true"] { background: rgba(232,231,225,.17); }
+.cbp-btn:focus-visible, .cbp-row:focus-visible, .cbp-pill:focus-visible, .cbp-slider:focus-visible, .cbp-remain:focus-visible, .cbp-bigplay:focus-visible { outline: 2px solid rgba(232,231,225,.85); outline-offset: 2px; }
 
 /* slider */
 .cbp-slider { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; cursor: pointer; touch-action: none; outline: none; }
-.cbp-track { position: relative; width: 100%; border-radius: 999px; background: rgba(255,255,255,.22); overflow: hidden; }
-.cbp-buf { position: absolute; inset: 0 auto 0 0; background: rgba(255,255,255,.2); }
-.cbp-fill { position: absolute; inset: 0; transform-origin: left; background: rgba(255,255,255,.95); border-radius: inherit; }
+.cbp-track { position: relative; width: 100%; border-radius: 999px; background: rgba(232,231,225,.18); overflow: hidden; }
+.cbp-buf { position: absolute; inset: 0 auto 0 0; background: rgba(232,231,225,.16); }
+.cbp-fill { position: absolute; inset: 0; transform-origin: left; background: rgba(232,231,225,.82); border-radius: inherit; }
 .cbp-tick { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(0,0,0,.45); }
 .cbp-thumbpos { position: absolute; top: 50%; width: 0; height: 0; }
-.cbp-thumb { display: block; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 999px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.45), inset 0 -1px 2px rgba(0,0,0,.12); }
+.cbp-thumb { display: block; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 999px; background: #e8e7e1; box-shadow: 0 2px 8px rgba(0,0,0,.45), inset 0 -1px 2px rgba(0,0,0,.12); }
 .cbp-root[data-compact="true"] .cbp-thumb { width: 20px; height: 20px; margin: -10px 0 0 -10px; }
 .cbp-tip { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 6px 10px; border-radius: 999px; white-space: nowrap; pointer-events: none;
-  font: 500 12px/1 var(--sa-f, system-ui, sans-serif); font-variant-numeric: tabular-nums; background: rgba(26,27,24,.9); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 8px 20px -8px rgba(0,0,0,.7); }
+  font: 500 12px/1 var(--sa-f, system-ui, sans-serif); font-variant-numeric: tabular-nums; background: rgba(26,27,24,.92); box-shadow: inset 0 1px 0 rgba(232,231,225,.14), 0 8px 20px -8px rgba(0,0,0,.7); }
 
 /* menu */
 .cbp-menu { position: absolute; z-index: 5; min-width: 232px; padding: 6px; border-radius: 18px; }
@@ -912,15 +1085,17 @@ const CSS = `
 .cbp-menu[data-compact="true"] { position: relative; min-width: 224px; }
 .cbp-row { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px 0 8px; border: 0; border-radius: 11px; background: none; color: var(--ink); font: 500 13.5px/1 inherit; text-align: left; cursor: pointer; transition: background .15s; }
 .cbp-root[data-compact="true"] .cbp-row { height: 44px; font-size: 15px; }
-.cbp-row:hover { background: rgba(255,255,255,.14); }
+.cbp-row:hover { background: rgba(232,231,225,.11); }
 .cbp-rowchk { display: grid; place-items: center; width: 18px; flex: none; }
+.cbp-rowico { display: grid; place-items: center; width: 20px; flex: none; color: var(--ink-dim); }
 .cbp-rowlab { flex: 1; padding-left: 4px; }
 .cbp-rowchk + .cbp-rowlab { padding-left: 0; }
 .cbp-rowval { color: var(--ink-dim); font-size: 12.5px; }
-.cbp-row svg { flex: none; opacity: .75; }
+.cbp-row svg { flex: none; opacity: .8; }
+.cbp-note { padding: 4px 10px 6px; font: 400 10.5px/1.4 var(--sa-mono, ui-monospace, monospace); color: var(--ink-dim); }
 .cbp-back { font-weight: 600; }
 .cbp-back .cbp-rowlab { padding-left: 2px; }
-.cbp-sep { height: 1px; margin: 5px 8px; background: rgba(255,255,255,.12); }
+.cbp-sep { height: 1px; margin: 5px 8px; background: rgba(232,231,225,.1); }
 
 /* mobile chrome */
 .cbp-top { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
@@ -939,6 +1114,12 @@ const CSS = `
 .cbp-flash { position: absolute; left: 50%; top: 50%; z-index: 14; display: grid; place-items: center; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 999px; pointer-events: none; }
 .cbp-seekfx { position: absolute; top: 50%; z-index: 14; display: grid; place-items: center; width: 84px; height: 84px; margin-top: -42px; border-radius: 999px; pointer-events: none; }
 .cbp-seekfx[data-side="left"] { left: 14%; } .cbp-seekfx[data-side="right"] { right: 14%; }
+.cbp-bright { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: #000; transition: opacity .08s linear; }
+.cbp-gesture { position: absolute; left: 50%; top: 24%; z-index: 26; display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-radius: 999px; transform: translateX(-50%); pointer-events: none;
+  font: 500 13px/1 var(--sa-f, system-ui, sans-serif); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cbp-gesture svg { opacity: .8; }
+.cbp-file { display: none; }
 .cbp-cue { position: absolute; left: 0; right: 0; z-index: 10; display: flex; justify-content: center; padding: 0 6%; pointer-events: none; }
 .cbp-cue span { max-width: 880px; text-align: center; white-space: pre-line; font: 600 clamp(16px, 2.3vw, 26px)/1.3 inherit; color: #fff;
   text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 2px 14px rgba(0,0,0,.75); }
@@ -949,15 +1130,19 @@ const CSS = `
 
 /* audio stage */
 .cbp-art { position: absolute; inset: 0; display: grid; place-items: center; padding-bottom: 12%; pointer-events: none; }
-.cbp-orb { position: relative; width: min(46vmin, 340px); aspect-ratio: 1; border-radius: 32%; overflow: hidden; background: #151612;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 40px 90px -30px rgba(0,0,0,.9), 0 0 120px -30px rgba(190,205,170,.28); }
-.cbp-orb-a, .cbp-orb-b { position: absolute; inset: -30%; border-radius: 50%; filter: blur(38px); opacity: .85; }
-.cbp-orb-a { background: radial-gradient(circle at 30% 30%, #8fa37e 0, transparent 55%), radial-gradient(circle at 75% 70%, #c9b68a 0, transparent 50%); animation: cbp-drift 14s ease-in-out infinite alternate paused; }
-.cbp-orb-b { background: radial-gradient(circle at 70% 25%, #6f8aa0 0, transparent 50%), radial-gradient(circle at 25% 80%, #a58aa6 0, transparent 52%); mix-blend-mode: screen; opacity: .55; animation: cbp-drift 19s ease-in-out infinite alternate-reverse paused; }
+.cbp-orb { position: relative; width: min(46vmin, 340px); aspect-ratio: 1; border-radius: 32%; overflow: hidden; background: #151613;
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.16), 0 40px 90px -30px rgba(0,0,0,.9), 0 0 120px -34px rgba(190,195,205,.22); }
+.cbp-orb-a, .cbp-orb-b { position: absolute; inset: -30%; border-radius: 50%; filter: blur(38px); opacity: .8; }
+.cbp-orb-a { background: radial-gradient(circle at 30% 30%, #92958e 0, transparent 55%), radial-gradient(circle at 75% 70%, #b8b5ad 0, transparent 50%); animation: cbp-drift 14s ease-in-out infinite alternate paused; }
+.cbp-orb-b { background: radial-gradient(circle at 70% 25%, #6f7580 0, transparent 50%), radial-gradient(circle at 25% 80%, #9a939c 0, transparent 52%); mix-blend-mode: screen; opacity: .5; animation: cbp-drift 19s ease-in-out infinite alternate-reverse paused; }
 .cbp-orb[data-playing="true"] .cbp-orb-a, .cbp-orb[data-playing="true"] .cbp-orb-b { animation-play-state: running; }
 .cbp-orb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 @keyframes cbp-drift { from { transform: translate(-6%, -4%) rotate(0deg) scale(1); } to { transform: translate(7%, 5%) rotate(40deg) scale(1.18); } }
 .cbp-meta { position: absolute; left: 0; right: 0; top: calc(50% + min(23vmin, 170px) + 22px); padding: 0 24px; text-align: center; pointer-events: none; }
+.cbp-now { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px; font: 500 9.5px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: .17em; color: var(--ink-dim); }
+.cbp-now span { width: 6px; height: 6px; border-radius: 999px; background: var(--ink-dim); }
+.cbp-now span[data-live="true"] { background: #9fb3ff; box-shadow: 0 0 10px #9fb3ff; animation: cbp-live 1.6s ease-in-out infinite; }
+@keyframes cbp-live { 50% { opacity: .35; box-shadow: 0 0 3px #9fb3ff; } }
 .cbp-meta h2 { margin: 0; font: 600 clamp(18px, 2.6vw, 26px)/1.2 inherit; letter-spacing: -.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cbp-meta p { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-dim); letter-spacing: .04em; }
 .cbp-root[data-compact="true"].cbp-audio .cbp-center { top: 62%; }
@@ -968,17 +1153,17 @@ const CSS = `
 .cbp-card p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-dim); }
 .cbp-card p b { color: var(--ink); font-weight: 600; }
 .cbp-dim { font-size: 11.5px !important; opacity: .75; }
-.cbp-card-ico { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 999px; background: rgba(255,255,255,.1); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+.cbp-card-ico { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 999px; background: rgba(232,231,225,.08); box-shadow: inset 0 1px 0 rgba(232,231,225,.16); }
 .cbp-actions { display: flex; gap: 10px; margin-top: 6px; }
-.cbp-pill { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: rgba(255,255,255,.92); color: #121310; font: 600 14px/1 inherit; cursor: pointer;
+.cbp-pill { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 22px; border: 1px solid rgba(232,231,225,.12); border-radius: 999px; background: rgba(232,231,225,.88); color: #10110f; font: 600 14px/1 inherit; cursor: pointer;
   transition: transform .5s cubic-bezier(.34,1.56,.64,1), background .2s; }
 .cbp-pill:hover { transform: scale(1.04); } .cbp-pill:active { transform: scale(.94, .88); }
-.cbp-pill.cbp-quiet { background: rgba(255,255,255,.12); color: var(--ink); }
+.cbp-pill.cbp-quiet { background: rgba(232,231,225,.1); color: var(--ink); }
 .cbp-prog { width: 100%; display: grid; gap: 10px; margin-top: 6px; }
 .cbp-prog-top { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--ink-dim); } .cbp-prog-top b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .cbp-prog-top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cbp-prog-bar { height: 5px; border-radius: 999px; background: rgba(255,255,255,.16); overflow: hidden; }
-.cbp-prog-bar span { display: block; height: 100%; transform-origin: left; background: #fff; border-radius: inherit; }
+.cbp-prog-bar { height: 5px; border-radius: 999px; background: rgba(232,231,225,.14); overflow: hidden; }
+.cbp-prog-bar span { display: block; height: 100%; transform-origin: left; background: #e8e7e1; border-radius: inherit; }
 
 @media (prefers-reduced-motion: reduce) { .cbp-spin svg, .cbp-orb-a, .cbp-orb-b { animation: none !important; } .cbp-pill { transition-duration: .01ms; } }
 `;
