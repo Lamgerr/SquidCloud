@@ -1,21 +1,21 @@
 {
-  "goal": "Refine the SquidCloud instant-preview UX per the human's screenshot review: single submerging grainy dock, redesigned minimized viewer tabs, premium translucent command palette.",
+  "goal": "Integrate the user's newly authored tsx files from /storage/emulated/0/Download into the SquidCloud preview system.",
   "goal_source": "interactive query from human (not from backlog)",
   "last_actions": [
-    "2026-11-23: Reviewed latest screenshots in ~/Downloads and ~/storage/shared/Pictures/Screenshot.",
-    "EnhancedInstantPreviewModal: removed all on-screen chrome; added ONE grainy/translucent springy floating dock (minimize + close only) that is visible 2s then submerges into the corner, revealable by hover or drag.",
-    "PreviewTabStack: replaced fanned circles with a glassy grain-textured card deck; hover fans cards with spring, drag to dismiss, click to restore, hide/close-all pill, hidden-tab restore badge.",
-    "CommandPalette: denser frosted glass, two-frequency nano-texture grain, hairline rim, deep shadow.",
-    "Updated docs/UI-UX-STANDARD.md contracts; committed 79ae2745; deployed Vercel READY."
+    "2026-11-23: Located new files in /storage/emulated/0/Download (latest 14:55): EnhancedInstantPreviewModal.tsx, MinimizedPreviewStack.tsx, grain.ts.",
+    "Reviewed each: new modal is a spring-driven 'jelly' dock (useMotionValue/useSpring/useTransform/animate, magnetic cursor pull, 2s throw into corner, distinct minimize vs close store paths).",
+    "Confirmed downloaded CommandPalette.tsx (10:05) and other tsx files are OLDER versions — deliberately did NOT overwrite the current premium nano-grain palette.",
+    "Copied grain.ts + both new components into src/components/. Rewrote PreviewTabStack.tsx as a thin store-connected wrapper mapping previewTabs state onto the presentational MinimizedPreviewStack; Dashboard import unchanged.",
+    "Verified balance, store API compatibility (open/close/minimize/restore/closeAll/subscribe/activeTabId), framer-motion v12 APIs. Committed 29fcacea, deployed Vercel READY."
   ],
   "key_numbers": {
-    "commit": "79ae2745",
-    "deploy_url": "https://cloudbliss-storage-qzb1fg0lk-sqc.vercel.app",
+    "commit": "29fcacea",
+    "deploy_url": "https://cloudbliss-storage-5e9w964zi-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
-    "Local npx tsc --noEmit unavailable in this environment; Vercel cloud build is authoritative.",
-    "Old pre-key-vault AI-created files can still show base64 gibberish; new files use the fixed vault path."
+    "No local tsc available; Vercel cloud build is authoritative.",
+    "Downloaded CommandPalette.tsx is an older transparent-glass version; current premium palette retained intentionally."
   ],
-  "next": "Await human visual verification of dock submerge/reveal, card-deck pull-to-dismiss, and palette grain; tune spring values or peek amount from screenshots if needed."
+  "next": "Await visual verification of jelly dock physics and card-deck gestures; tune spring constants / peek sliver / drag thresholds from screenshots if needed."
 }

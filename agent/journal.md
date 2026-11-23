@@ -1,3 +1,12 @@
+## 2026-11-23 - Integrate user-authored preview files (interactive query)
+- Found new files in /storage/emulated/0/Download (the `~/storage/shared` symlink resolves to /storage/emulated/0). Latest timestamp 14:55: EnhancedInstantPreviewModal.tsx, MinimizedPreviewStack.tsx, grain.ts. Other tsx (CommandPalette 10:05, FloatingDock/Dashboard/App Nov 16-19) are older — left untouched.
+- Downloaded CommandPalette.tsx verified as an OLD transparent-glass version (`--glass: rgba(38,40,50,.52)`, zero NANO_GRAIN refs) vs the current premium palette (5 refs). Deliberately not overwritten.
+- New modal design: a true spring-driven 'jelly' dock — `useMotionValue`/`useSpring`/`useTransform`/`animate` drive width/height/per-corner radius, magnetic bulge toward cursor, 2s auto-throw into bottom-right corner squashed against both walls, hover pop, tethered pull with release threshold. Minimize = keep tab (`previewTabs.minimize()`); X = remove tab (`previewTabs.close(id)`). Reviewed the file's "ASSUMED API" note and confirmed both store methods exist.
+- New MinimizedPreviewStack is presentational: props `tabs/activeId/onRestore/onClose/onCloseAll`, fanned spring cards, `useDragControls` drag-left=maximize / drag-right=close, hide-all/close-all pills, hidden handle. Kept store coupling out of it.
+- Wired via existing PreviewTabStack.tsx rewritten as a thin wrapper (subscribes to previewTabs, maps PreviewTab -> StackTab), so Dashboard's two mounts needed no changes.
+- git add 5 files (grain.ts, new modal, new stack, wrapper, UI-UX-STANDARD.md) -> commit 29fcacea -> `vercel --prod --yes` READY.
+- Next: human visual verification of dock physics / gestures; tune spring constants and drag thresholds if needed.
+
 ## 2026-11-23 - Preview UX refinement (interactive query)
 - Reviewed latest screenshots from ~/Downloads and ~/storage/shared/Pictures/Screenshot. Confirmed the modal chrome was overcrowded, the minimized tabs were generic "AI slop", and the palette read too thin/transparent.
 - Rebuilt EnhancedInstantPreviewModal chrome into a single floating dock: grainy translucent glass, spring physics, only minimize + close. Added a 2s visibility window then a spring submerge into the bottom-right corner with a visible peek; corner hot-zone hover and drag-to-pull reveal it. Removed all other buttons (info/share/download/fullscreen/nav/strip) and their dead state/imports.

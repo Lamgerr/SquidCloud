@@ -1,19 +1,23 @@
 # What happened while you were away
 
 ## Done
-- **Instant preview modal** — all on-screen chrome removed. There is now a single floating dock (bottom-right) with just **minimize + close**, grainy + translucent + springy. On open it is visible for **2s**, then springs/submerges into the corner leaving a peek; hover the corner or drag the dock to pull it back out.
-- **Minimized preview tabs** — replaced the old fanned circles with a **deck of glassy, grain-textured picking cards**. Tight fan when idle; hover fans them apart with spring physics and reveals each card's type glyph, name and close. Drag a card out to dismiss it, click to restore. Quiet hide-all / close-all pill on hover, small restore badge when hidden.
-- **Command palette** — denser, more-opaque frosted glass with a two-frequency **nano-texture grain** (mid fractal + fine high-frequency), hairline rim and deep shadow. Reads premium and translucent, not a thin see-through sheet.
-- Updated `docs/UI-UX-STANDARD.md`. Committed as `79ae2745`. Deployed to Vercel — **READY** at `https://cloudbliss-storage-qzb1fg0lk-sqc.vercel.app`.
+- Integrated your three newest files from `/storage/emulated/0/Download` into the repo:
+  - `src/components/grain.ts` — shared nano-grain / frosted-glass tokens.
+  - `src/components/EnhancedInstantPreviewModal.tsx` — the new **spring-driven "jelly" dock**: magnetic cursor bulge, 2s auto-throw into the corner squashed against both walls, hover pop, tethered pull-to-reveal. Minimize keeps the tab; X removes it.
+  - `src/components/MinimizedPreviewStack.tsx` — the presentational **card deck** (fanned spring cards, drag-left to maximize / drag-right to close, hide-all / close-all, hidden handle).
+- `src/components/PreviewTabStack.tsx` is now a thin store-connected wrapper mapping `previewTabs` state onto the new deck — Dashboard needed no changes.
+- Updated `docs/UI-UX-STANDARD.md`. Committed `29fcacea`. Deployed — **READY** at `https://cloudbliss-storage-5e9w964zi-sqc.vercel.app`.
+
+## Intentionally not changed
+- **CommandPalette.tsx**: the copy in Downloads is an *older* transparent-glass version (`rgba(38,40,50,.52)`, no nano-grain). Your current premium nano-grain palette was kept.
+- Other older `.tsx` files in Downloads (FloatingDock, Dashboard, App, etc., Nov 16–19) were left alone.
 
 ## In progress
 - Nothing actively being edited. Awaiting your visual verification.
 
 ## Blocked / needs a decision
-- Local `npx tsc --noEmit` is unavailable here; Vercel's cloud build is the verification authority.
-- Old AI-created files made before the key-vault fix can still display base64 gibberish (new files use the fixed vault path).
-- The gibberish seen in `911_essay.md` is one of those pre-fix files, not a preview-renderer bug.
+- No local `tsc` in this environment; Vercel's cloud build is the verification authority (build passed).
+- If you actually meant to replace the Command palette too, say so and I'll port the older file's structure onto the newer grain system.
 
 ## Queued next
-- If the submerge peek is too small/large or the spring feels off, send a screenshot and tune `x/y` submerge % + spring stiffness in `EnhancedInstantPreviewModal.tsx`.
-- If the card deck feels cramped or the grain too strong, tune `pvs-card` height / grain opacity in `PreviewTabStack.tsx` and the NANO layer slopes in `CommandPalette.tsx`.
+- Tune jelly-dock spring constants / peek sliver / pull threshold and card-deck drag thresholds from screenshots if the feel is off.
