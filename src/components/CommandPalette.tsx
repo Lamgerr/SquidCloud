@@ -70,7 +70,7 @@ const SQUID_CSS = `
 html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --glass: rgba(14,15,16,.968); --fog: rgba(52,56,74,.42); --hi: rgba(232,231,225,.06); --line: rgba(232,231,225,.12); --rim: rgba(232,231,225,.2); }
 .spot-root[data-mobile="true"] { flex: 1; min-height: 0; gap: 0; padding: 18px 14px 0; }
 .spot-top { display: flex; align-items: center; gap: 10px; }
-.spot-orbs { display: flex; gap: 8px; }
+.spot-orbs { display: flex; gap: 6px; }
 
 /* Foggy frosted glass: dense tint + soft fog gradient + fine nano grain.
    Grain is a background layer (not a pseudo-element) so the AI colour layer
@@ -81,7 +81,7 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
   border: 1px solid var(--line);
   -webkit-backdrop-filter: blur(38px) saturate(1.35); backdrop-filter: blur(38px) saturate(1.35);
   box-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 rgba(0,0,0,.42), 0 20px 48px -18px rgba(0,0,0,.88); }
-.spot-pill { flex: 1; min-width: 0; height: 54px; border-radius: 999px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 16px; }
+.spot-pill { flex: 1; min-width: 0; height: 56px; border-radius: 999px; display: flex; align-items: center; gap: 11px; padding: 0 16px 0 18px; }
 .spot-root[data-mobile="true"] .spot-pill { height: 46px; background-color: var(--glass); background-image: ${NANO_GRAIN}, ${NANO_TEXTURE}, linear-gradient(180deg, var(--fog), transparent 58%); background-size: 120px 120px, 200px 200px, auto; box-shadow: inset 0 1px 0 var(--rim); }
 .spot-round { width: 52px; height: 52px; min-width: 52px; min-height: 52px; aspect-ratio: 1 / 1; border-radius: 9999px !important; display: grid; place-items: center; color: var(--ink); cursor: pointer; transition: scale .6s ${SPRING}, background-color .2s; }
 .spot-round:hover { scale: 1.06; } .spot-round:active { scale: .92; transition-duration: .12s; }
@@ -134,46 +134,44 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-panel > * { min-height: 0; position: relative; z-index: 1; }
 .spot-panel > .spot-clip { overflow: hidden; border-radius: 30px 30px 0 0; display: flex; flex-direction: column; position: relative; }
 .spot-panel > .spot-clip::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0; border-radius: inherit;
-  background-image: ${NANO_GRAIN}; background-size: 120px 120px; opacity: .55; mix-blend-mode: overlay; }
+  background-image: ${NANO_GRAIN}; background-size: 120px 120px; opacity: .3; mix-blend-mode: overlay; }
 .spot-panel > .spot-clip > * { position: relative; z-index: 1; }
 .spot-panel > .spot-foot { overflow: hidden; }
 .spot-root[data-mobile="true"] .spot-panel { flex: 1; grid-template-rows: 1fr; opacity: 1; translate: none; scale: 1; pointer-events: auto; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .spot-root[data-mobile="true"] .spot-panel > .spot-clip { border-radius: 0; }
-/* Scope chips — quiet dark segmented pills, never a white block */
-.spot-chips { display: flex; gap: 4px; padding: 12px 14px 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
-.spot-chips button { flex: none; padding: 5px 12px; border-radius: 999px; font-size: 12.5px; color: var(--mute);
-  background: transparent; border: 1px solid transparent; cursor: pointer; transition: background-color .2s ${SPRING}, color .2s; }
-.spot-chips button:hover { background: rgba(232,231,225,.06); color: var(--ink); }
-.spot-chips button[data-on="true"] { background: rgba(232,231,225,.11); color: var(--ink); border-color: var(--line); }
-.spot-list { overflow-y: auto; min-height: 0; padding: 4px 10px 10px; scrollbar-width: thin; max-height: min(400px, 50vh); }
+/* Scope chips — quiet segmented pills, hairline active state */
+.spot-chips { display: flex; gap: 4px; padding: 14px 16px 8px; overflow-x: auto; scrollbar-width: none; flex: none;
+  border-bottom: 1px solid rgba(232,231,225,.06); }
+.spot-chips::-webkit-scrollbar { display: none; }
+.spot-chips button { flex: none; padding: 6px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: var(--mute);
+  background: transparent; border: 1px solid transparent; cursor: pointer; transition: background-color .2s ${SPRING}, color .2s, border-color .2s; }
+.spot-chips button:hover { background: rgba(232,231,225,.07); color: var(--ink); }
+.spot-chips button[data-on="true"] { background: rgba(232,231,225,.1); color: var(--ink); border-color: rgba(232,231,225,.12); }
+.spot-list { overflow-y: auto; min-height: 0; padding: 8px 10px 12px; scrollbar-width: thin; scrollbar-color: rgba(232,231,225,.16) transparent; max-height: min(400px, 50vh); }
+.spot-list::-webkit-scrollbar { width: 6px; } .spot-list::-webkit-scrollbar-thumb { background: rgba(232,231,225,.16); border-radius: 999px; }
 .spot-root[data-mobile="true"] .spot-list { max-height: none; flex: 1; }
-.spot-group-label { font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--mute); padding: 10px 12px 5px; }
-.spot-row.spot-row { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 16px; cursor: pointer; color: var(--ink); list-style: none; background: transparent !important; }
-.spot-row-thumb { position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.1)); box-shadow: inset 0 1px 0 var(--rim); }
-.spot-ico { position: relative; z-index: 1; width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; color: var(--ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 10px -4px rgba(0,0,0,.45); }
+.spot-group-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--mute); padding: 12px 12px 6px; opacity: .8; }
+.spot-row.spot-row { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 14px; cursor: pointer; color: var(--ink); list-style: none; background: transparent !important; transition: background-color .16s ease; }
+.spot-row[data-selected="true"] { background: transparent !important; }
+.spot-row-thumb { position: absolute; inset: 0; border-radius: 14px; background: linear-gradient(180deg, rgba(232,231,225,.12), rgba(232,231,225,.06)); box-shadow: inset 0 1px 0 rgba(232,231,225,.14), inset 0 0 0 1px rgba(232,231,225,.07); }
+.spot-ico { position: relative; z-index: 1; width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; color: var(--ink); box-shadow: inset 0 1px 0 rgba(232,231,225,.16), 0 4px 10px -4px rgba(0,0,0,.45); }
 .spot-ico.spot-ico-ai { background: rgba(20,20,28,.6); }
 .spot-main { position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .spot-label { font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .spot-label b { font-weight: 700; }
 .spot-desc { font-size: 12.5px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .spot-kbd, .spot-enter { position: relative; z-index: 1; } .spot-enter { color: var(--mute); }
-.spot-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 40px 24px; color: var(--mute); gap: 6px; font-size: 13.5px; }
-.spot-empty p { margin: 0; font-size: 15px; color: var(--ink); }
+.spot-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 44px 24px; color: var(--mute); gap: 8px; font-size: 13px; }
+.spot-empty svg { opacity: .35; margin-bottom: 6px; }
+.spot-empty p { margin: 0; font-size: 15px; font-weight: 500; color: var(--ink); }
 
 /* ask */
 .spot-ask { padding: 20px 24px 22px; min-height: 120px; max-height: min(420px, 55vh); overflow-y: auto; flex: 1; }
-/* Live context strip — shows exactly what Squid can see right now */
-.spot-ctx { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; padding: 8px 12px;
-  border-radius: 999px; font: 500 10.5px/1 var(--sa-mono, ui-monospace, monospace); color: rgba(232,231,225,.6);
-  background: rgba(120,150,255,.08); border: 1px solid rgba(120,150,255,.18); }
-.spot-ctx-live { width: 6px; height: 6px; border-radius: 999px; flex: none; background: #7ea2ff;
-  box-shadow: 0 0 10px #7ea2ff; animation: spot-live 1.6s ease-in-out infinite; }
-.spot-ctx b { color: #d3e0ff; font-weight: 500; }
-.spot-ctx-sep { opacity: .32; }
-@keyframes spot-live { 50% { opacity: .35; box-shadow: 0 0 3px #7ea2ff; } }
 .spot-ask-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; color: var(--mute); padding: 8px 0; }
-.spot-ask-empty p { margin: 0; font-size: 15px; }
+.spot-ask-empty p { margin: 0; font-size: 15px; font-weight: 500; color: var(--ink); }
 .spot-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.spot-suggest button { padding: 7px 14px; border-radius: 999px; font-size: 13.5px; color: var(--ink); background: var(--hi); border: 1px solid var(--line); cursor: pointer; }
+.spot-suggest button { padding: 8px 15px; border-radius: 999px; font-size: 13px; color: var(--mute); background: var(--hi); border: 1px solid var(--line); cursor: pointer;
+  transition: background-color .2s, color .2s, transform .35s ${SPRING}; }
+.spot-suggest button:hover { background: rgba(232,231,225,.11); color: var(--ink); transform: translateY(-2px); }
 .spot-answer { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink); animation: spot-rise .6s ${SPRING} both; }
 /* while the answer streams: a living blue gradient that slides across the glyphs */
 .spot-answer[data-streaming="true"] { background: linear-gradient(100deg, #cfe0ff 0%, #6f9dff 26%, #b7c6ff 50%, #6f9dff 74%, #cfe0ff 100%) 0 0 / 240% 100%;
@@ -205,10 +203,11 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-step[data-status="failed"] .spot-dot { background: #d98080; }
 .spot-step-args { font: 400 10.5px/1 var(--sa-mono, ui-monospace, monospace); color: var(--mute); opacity: .8; }
 .spot-searching { display: inline-block; font-size: 18px; font-weight: 500; padding: 4px 0 10px; color: transparent; background: linear-gradient(100deg, var(--mute) 30%, var(--ink) 50%, var(--mute) 70%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; animation: spot-shimmer 1.6s linear infinite; text-shadow: 0 0 18px rgba(150,160,255,.35); }
-.spot-foot { display: flex; gap: 18px; padding: 10px 20px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mute); white-space: nowrap; overflow-x: auto; }
+.spot-foot { display: flex; gap: 18px; padding: 11px 20px; border-top: 1px solid rgba(232,231,225,.07); font-size: 12px; color: var(--mute); white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
+.spot-foot::-webkit-scrollbar { display: none; }
 .spot-foot > span { display: inline-flex; align-items: center; gap: 6px; }
-
-.spot-root button:focus-visible { outline: 2px solid #8fa4ff; outline-offset: 2px; }
+.spot-root kbd { transition: background-color .18s, border-color .18s; }
+.spot-root button:focus-visible, .spot-root [role="option"]:focus-visible { outline: 2px solid rgba(143,164,255,.9); outline-offset: 2px; }
 @keyframes spot-drift { from { background-position: 0% 40%; } to { background-position: 100% 60%; } }
 @keyframes spot-glow { 50% { opacity: .45; } }
 @keyframes spot-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
@@ -1173,17 +1172,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
           {aiOn && (
             <div className="spot-ask" role="status" aria-live="polite">
-              <div className="spot-ctx" aria-label="Live context">
-                <span className="spot-ctx-live" />
-                <span>LIVE CONTEXT</span>
-                <span className="spot-ctx-sep">/</span>
-                {aiContext?.fileName ? <b>{aiContext.fileName}</b> : <span>workspace</span>}
-                {aiContext?.fileType && <><span className="spot-ctx-sep">/</span><span>{aiContext.fileType}</span></>}
-                {(currentFolder || aiContext?.filePath) && <><span className="spot-ctx-sep">/</span><span>{currentFolder || aiContext?.filePath || 'Root'}</span></>}
-                {selectedFilesCount > 0 && <><span className="spot-ctx-sep">/</span><span>{selectedFilesCount} selected</span></>}
-                <span className="spot-ctx-sep">/</span>
-                <span>Squid AI</span>
-              </div>
               {!response && !isLoading && (
                 <div className="spot-ask-empty">
                   <i className="spot-orb big" />
