@@ -325,6 +325,25 @@ html.sq-app-root :is(.rounded-2xl, .rounded-xl):is(.border):is(.p-5, .p-6):has(>
 /* compact default section spacing across tabs */
 html.sq-app-root :is(.space-y-6, .space-y-5) > .sq-tab-enter { margin-bottom: 0; }
 
+/* ── Viewer chrome skin ───────────────────────────────────────────────────
+   Applies the floating-dock language to the toolbar clusters inside the
+   PDF / image / video viewers without rewriting their rendering logic.
+   Only toolbars are affected — document content is never restyled. */
+html.sq-app-root :is(.pdf-dock, .pv-root) :is(.bg-card\/90, .bg-card\/95, .bg-muted\/80):is(.rounded-xl, .rounded-2xl, .rounded-lg) {
+  background: rgba(13,14,13,.88) !important; border: 1px solid rgba(232,231,225,.1) !important;
+  border-radius: 999px !important; -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.12), 0 12px 28px -14px rgba(0,0,0,.7) !important;
+  padding: 4px !important;
+}
+html.sq-app-root :is(.pdf-dock, .pv-root) :is(.bg-card\/90, .bg-card\/95, .bg-muted\/80):is(.rounded-xl, .rounded-2xl, .rounded-lg) button {
+  border-radius: 999px !important; width: 34px !important; height: 34px !important;
+}
+html.sq-app-root .pdf-dock header, html.sq-app-root .pv-root header {
+  background: rgba(13,14,13,.9) !important; border-bottom: 1px solid rgba(232,231,225,.1) !important;
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: none !important;
+}
+html.sq-app-root .pdf-dock header button, html.sq-app-root .pv-root header button { border-radius: 999px !important; }
+
 /* ── Shared tab polish: one near-black tier, hairline rules, pill actions ──
    Applied to every sidebar tab so pages stay consistent without per-page CSS. */
 html.sq-app-root .sq-tab-enter { animation: sa-tab-in 0.42s cubic-bezier(0.2, 0, 0, 1) both; }
