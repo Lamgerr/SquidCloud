@@ -1,3 +1,10 @@
+## 2026-11-23 - Fix HUD flash on tap (interactive query)
+- Report: while playing, tapping the video makes the HUD glitch/flash until the HUD itself is touched.
+- Root cause: `onTouchDown` calls wakeControls() (sets controlsVisible=true) immediately; then the delayed tap handler in `onTouchUp` read `uiRef.current` — already true — and scheduled `setControlsVisible(false)` 300ms later. So the chrome appeared then disappeared. Touching the HUD has `data-cbp-ui`, so onTouchDown returns early and no hide is scheduled — hence "stable once I tap the HUD".
+- Fix: `uiAtDown` ref captures the pre-tap visibility on pointer-down; the tap branch uses it to choose hide-vs-show immediately with no timer. Double-tap zone seek and mouse click/dblclick behaviour preserved.
+- Committed 0a409c46; `vercel --prod --yes` READY.
+- Next: await confirmation on device.
+
 ## 2026-11-23 - Remove player grain + center spinner (interactive query)
 - Screenshot Screenshot_20261123-172814.jpg showed the HUD drowned in heavy static-noise grain and the buffering spinner off-center and partly hidden behind the HUD.
 - Grain root cause: I had interpolated GRAIN_BG (an SVG with fully opaque noise) directly into .cbp-glass background-image with no opacity control. Removed the import and the layer entirely; clean neutral frosted gradient restored.
