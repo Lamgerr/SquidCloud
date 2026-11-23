@@ -628,57 +628,118 @@ export class SquidAITools {
   }
 
   /**
-   * Format file size
-   */
-  /**
    * dex-style tool dispatcher. One entry point: tool(name, args) -> short string.
    * Mirrors dex's `tasks.tool()` / `run_tool()` contract — the AI calls tools by
    * name with a typed args object and gets a short, human-readable verdict back
-   * (never a raw exception). Tools here are SquidCloud file operations.
+   * (never a raw exception). Covers every SquidCloud file/storage operation.
    */
   static async runTool(name: string, args: Record<string, any> = {}): Promise<string> {
+    // Normalize camelCase / PascalCase / UPPER_SNAKE to UPPER_SNAKE.
+    // FIX: insert underscores on the ORIGINAL mixed-case name, then uppercase.
+    const key = String(name || '')
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .replace(/[\s-]+/g, '_')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+      .toUpperCase()
+      .replace(/^_+/, '');
+
+    const need = (field: string): string | null =>
+      args[field] === undefined || args[field] === null || args[field] === ''
+        ? `Missing required argument "${field}" for ${name}`
+        : null;
+
     try {
-      // Accept both the UI action names and the model's camelCase schema names
-      switch (name.toUpperCase().replace(/([A-Z])/g, '_$1').replace(/^_/, '')) {
+      switch (key) {
         case 'ORGANIZE_FILES': {
-          const r = await this.organizeFilesByType((args.files || []) as any[], args.currentPath || args.folder || '');
-          return `Organized: ${r.summary}`;
+          const files = Array.isArray(args.files) ? args.files : [];
+          if (!files.length) return 'No files supplied to organize';
+          const r = await this.organizeFilesByType(files, args.currentPath || args.folder || '');
+          return `Organized ${files.length} file(s): ${r.summary}`;
         }
         case 'CREATE_FOLDER': {
-          const ok = await this.createFolder(String(args.folderName || ''), args.parentPath || '');
+          const miss = need('folderName'); if (miss) return miss;
+          const ok = await this.createFolder(String(args.folderName), args.parentPath || '');
           return ok ? `Created folder “${args.folderName}”` : 'Could not create that folder';
         }
         case 'MOVE_FILES': {
-          const n = await this.moveFilesToFolder(args.fileIds || [], args.targetFolder || '');
-          return `Moved ${n} file${n === 1 ? '' : 's'}`;
+          const ids = Array.isArray(args.fileIds) ? args.fileIds : (args.fileId ? [args.fileId] : []);
+          if (!ids.length) return 'No files specified to move';
+          if (!args.targetFolder) return 'Missing target folder to move files into';
+          const n = await this.moveFilesToFolder(ids, args.targetFolder);
+          return `Moved ${n} file${n === 1 ? '' : 's'} to “${args.targetFolder}”`;
         }
-        case 'GET_FILE_ANALYTICS': {
+        case 'GET_FILE_ANALYTICS':
+        case 'GET_ANALYTICS': {
           const a = await this.getFileAnalytics(args.fileType);
-          return `${a.totalFiles} files · ${this.formatFileSize(a.totalSize)} used`;
+          const types = Object.entries(a.filesByType).sort((x, y) => y[1] - x[1]).slice(0, 5)
+            .map(([ext, n]) => `${ext}:${n}`).join(', ');
+          return `${a.totalFiles} file(s), ${this.formatFileSize(a.totalSize)} used${types ? ` — ${types}` : ''}`;
         }
-        case 'COUNT_FILES_BY_EXTENSION': {
-          const n = await this.countFilesByExtension(String(args.extension || ''));
-          return `${n} file${n === 1 ? '' : 's'} with extension .${args.extension}`;
+        case 'COUNT_FILES_BY_EXTENSION':
+        case 'COUNT_FILES': {
+          const miss = need('extension'); if (miss) return miss;
+          const n = await this.countFilesByExtension(String(args.extension).replace(/^\./, ''));
+          return `${n} file${n === 1 ? '' : 's'} with extension .${String(args.extension).replace(/^\./, '')}`;
         }
         case 'SEARCH_FILES': {
-          const r = await this.searchFiles(String(args.query || ''), !!args.searchContent);
-          return `${r.totalResults} result${r.totalResults === 1 ? '' : 's'} for “${args.query}”`;
+          const miss = need('query'); if (miss) return miss;
+          const r = await this.searchFiles(String(args.query), !!args.searchContent);
+          if (!r.totalResults) return `No matches for “${args.query}”`;
+          const names = [...r.files, ...r.folders].slice(0, 5).map((f: any) => f.name).join(', ');
+          return `${r.totalResults} result${r.totalResults === 1 ? '' : 's'} for “${args.query}”: ${names}`;
         }
         case 'GET_FILES_IN_FOLDER': {
           const r = await this.getFilesInFolder(args.folderPath || '');
-          return `Found ${Array.isArray(r) ? r.length : 0} file(s) in that folder`;
+          return r.length ? `Found ${r.length} file(s) in ${args.folderPath || 'root'}` : `No files in ${args.folderPath || 'root'}`;
         }
         case 'GET_STORAGE_USED': {
           const s = await this.getStorageUsed();
-          return `Storage used: ${this.formatFileSize(s.used)} of ${this.formatFileSize(s.total)} (${Math.round(s.percentage)}%)`;
+          return `Storage: ${this.formatFileSize(s.used)} of ${this.formatFileSize(s.total)} (${Math.round(s.percentage)}%)`;
+        }
+        case 'LIST_FOLDERS': {
+          const r = await this.listFolders(args.parentPath || '');
+          return r.length ? `${r.length} folder(s): ${r.slice(0, 8).map((f: any) => f.name).join(', ')}` : 'No folders yet';
+        }
+        case 'CREATE_FILE': {
+          const miss = need('fileName'); if (miss) return miss;
+          const r = await this.createFile(String(args.fileName), String(args.content ?? ''), args.parentFolder || '', args.fileType);
+          return r.success ? `Created file “${args.fileName}”` : `Could not create file: ${r.error || 'unknown'}`;
+        }
+        case 'READ_FILE_CONTENT': {
+          const miss = need('fileId'); if (miss) return miss;
+          const c = await this.readFileContent(args.fileId);
+          return c ? String(c).slice(0, 800) : 'File is empty or could not be read';
+        }
+        case 'UPDATE_FILE_CONTENT': {
+          const miss = need('fileId'); if (miss) return miss;
+          if (args.newContent === undefined) return 'Missing content to write';
+          const r = await this.updateFileContent(args.fileId, String(args.newContent));
+          return r.success ? 'File updated' : `Could not update file: ${r.error || 'unknown'}`;
         }
         case 'RENAME_FILE': {
-          const ok = await this.renameFile(args.fileId, args.newName);
+          const miss = need('fileId') || need('newName'); if (miss) return miss;
+          const ok = await this.renameFile(args.fileId, String(args.newName));
           return ok ? `Renamed to “${args.newName}”` : 'Could not rename that file';
         }
         case 'DELETE_FILE': {
+          const miss = need('fileId'); if (miss) return miss;
           const r = await this.deleteFile(args.fileId);
           return r.success ? 'File deleted' : `Could not delete file: ${r.error || 'unknown'}`;
+        }
+        case 'DELETE_FOLDER': {
+          const miss = need('folderPath'); if (miss) return miss;
+          const r = await this.deleteFolder(String(args.folderPath), !!args.deleteContents);
+          return r?.success !== false ? `Deleted folder “${args.folderPath}”` : `Could not delete folder: ${r?.error || 'unknown'}`;
+        }
+        case 'GENERATE_CONTENT_FROM_REFERENCE': {
+          const miss = need('referenceText') || need('instructions'); if (miss) return miss;
+          const r = await this.generateContentFromReference(String(args.referenceText), args.outputType || 'text', String(args.instructions));
+          return String(r).slice(0, 800);
+        }
+        case 'GENERATE_CODE': {
+          const miss = need('description'); if (miss) return miss;
+          const r = await this.generateCode(args.language || 'typescript', String(args.description), args.context);
+          return String(r).slice(0, 800);
         }
         default:
           return `Unknown tool: ${name}`;
@@ -691,20 +752,24 @@ export class SquidAITools {
   /** dex-style capability list for progressive disclosure in the AI UI. */
   static listTools(): Array<{ name: string; description: string }> {
     return [
-      { name: 'ORGANIZE_FILES', description: 'Group files into folders by type' },
-      { name: 'CREATE_FOLDER', description: 'Create a new folder' },
-      { name: 'MOVE_FILES', description: 'Move files into a folder' },
-      { name: 'GET_ANALYTICS', description: 'Count files and storage used' },
-      { name: 'COUNT_FILES', description: 'Count files of a type' },
-      { name: 'SEARCH_FILES', description: 'Find files or folders by name' },
+      { name: 'getFileAnalytics', description: 'Count files, size, type breakdown' },
+      { name: 'countFilesByExtension', description: 'Count files of a type' },
+      { name: 'searchFiles', description: 'Find files or folders by name' },
+      { name: 'getFilesInFolder', description: 'List files in a folder' },
+      { name: 'getStorageUsed', description: 'Check storage usage' },
+      { name: 'listFolders', description: 'List all folders' },
+      { name: 'createFolder', description: 'Create a folder' },
+      { name: 'createFile', description: 'Create a file with content' },
+      { name: 'readFileContent', description: 'Read a file’s text' },
+      { name: 'updateFileContent', description: 'Overwrite a file’s text' },
+      { name: 'renameFile', description: 'Rename a file' },
+      { name: 'moveFilesToFolder', description: 'Move files into a folder' },
+      { name: 'deleteFile', description: 'Delete a file' },
+      { name: 'deleteFolder', description: 'Delete a folder' },
+      { name: 'organizeFilesByType', description: 'Group files into type folders' },
+      { name: 'generateContentFromReference', description: 'Write content from a reference' },
+      { name: 'generateCode', description: 'Generate code' },
     ];
   }
 
-  static formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
 }

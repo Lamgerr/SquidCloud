@@ -31,6 +31,15 @@ export const useKeyboardShortcut = (
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      // Never fire a bare-letter shortcut while the user is typing in a field.
+      // Modifier combos (Cmd/Ctrl+K etc.) are still allowed.
+      const target = event.target as HTMLElement | null;
+      const isTyping = !!target && (
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
+        target.isContentEditable || target.closest('[contenteditable="true"]') !== null
+      );
+      if (isTyping && !event.ctrlKey && !event.metaKey) return;
+
       const keyMatch = event.key.toLowerCase() === key.toLowerCase();
       
       // For shortcuts like Cmd+K or Ctrl+K (either modifier works)

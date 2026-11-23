@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { 
   Search, 
@@ -120,10 +121,12 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-panel > .spot-foot { overflow: hidden; }
 .spot-root[data-mobile="true"] .spot-panel { flex: 1; grid-template-rows: 1fr; opacity: 1; translate: none; scale: 1; pointer-events: auto; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .spot-root[data-mobile="true"] .spot-panel > .spot-clip { border-radius: 0; }
-.spot-chips { display: flex; gap: 7px; padding: 10px 14px 4px; overflow-x: auto; scrollbar-width: none; flex: none; }
-.spot-chips button { flex: none; padding: 6px 14px; border-radius: 999px; font-size: 13.5px; color: var(--mute); background: transparent; border: 1px solid var(--line); cursor: pointer; transition: background-color .2s, color .2s; }
-.spot-chips button:hover { background: var(--hi); color: var(--ink); }
-.spot-chips button[data-on="true"] { background: var(--ink); color: #111; border-color: transparent; }
+/* Scope chips — quiet dark segmented pills, never a white block */
+.spot-chips { display: flex; gap: 4px; padding: 12px 14px 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.spot-chips button { flex: none; padding: 5px 12px; border-radius: 999px; font-size: 12.5px; color: var(--mute);
+  background: transparent; border: 1px solid transparent; cursor: pointer; transition: background-color .2s ${SPRING}, color .2s; }
+.spot-chips button:hover { background: rgba(232,231,225,.06); color: var(--ink); }
+.spot-chips button[data-on="true"] { background: rgba(232,231,225,.11); color: var(--ink); border-color: var(--line); }
 .spot-list { overflow-y: auto; min-height: 0; padding: 4px 10px 10px; scrollbar-width: thin; max-height: min(400px, 50vh); }
 .spot-root[data-mobile="true"] .spot-list { max-height: none; flex: 1; }
 .spot-group-label { font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--mute); padding: 10px 12px 5px; }
@@ -144,14 +147,29 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-ask-empty p { margin: 0; font-size: 15px; }
 .spot-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .spot-suggest button { padding: 7px 14px; border-radius: 999px; font-size: 13.5px; color: var(--ink); background: var(--hi); border: 1px solid var(--line); cursor: pointer; }
-.spot-answer { margin: 0; font-size: 20px; line-height: 1.42; font-weight: 450; letter-spacing: -.012em; white-space: pre-wrap; animation: spot-rise .6s ${SPRING} both; } .spot-answer b { font-weight: 700; }
-.spot-steps { display: flex; flex-direction: column; gap: 5px; margin: 4px 0 14px; }
-.spot-step { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: rgba(232,231,225,.03); font-size: 12.5px; color: var(--mute); }
+.spot-answer { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink); animation: spot-rise .6s ${SPRING} both; }
+.spot-answer p { margin: 0 0 10px; } .spot-answer p:last-child { margin-bottom: 0; }
+.spot-answer strong { color: var(--ink); font-weight: 600; }
+.spot-answer ul, .spot-answer ol { margin: 8px 0; padding-left: 20px; } .spot-answer li { margin: 4px 0; }
+.spot-answer code { font: 400 12.5px/1.5 var(--sa-mono, ui-monospace, monospace); padding: 2px 5px; border-radius: 5px;
+  background: rgba(232,231,225,.08); border: 1px solid var(--line); color: #c9b8ff; }
+.spot-answer pre { margin: 10px 0; padding: 12px 14px; border-radius: 10px; overflow-x: auto;
+  background: rgba(0,0,0,.4); border: 1px solid var(--line); }
+.spot-answer pre code { padding: 0; background: none; border: 0; color: var(--ink); }
+.spot-answer a { color: #b7a6ff; text-underline-offset: 3px; }
+.spot-answer h1, .spot-answer h2, .spot-answer h3 { font-size: 16px; font-weight: 600; margin: 14px 0 6px; }
+.spot-answer blockquote { margin: 10px 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--mute); }
+.spot-answer hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+.spot-steps { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 16px; }
+.spot-step { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 11px; border: 1px solid var(--line);
+  background: rgba(232,231,225,.035); font-size: 12.5px; color: var(--mute); }
+.spot-step[data-kind="tool"] { border-color: rgba(183,166,255,.2); background: rgba(183,166,255,.05); }
 .spot-step[data-kind="tool"] b { color: var(--ink); font-weight: 500; }
 .spot-step .spot-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mute); flex: none; }
-.spot-step[data-status="running"] .spot-dot { animation: spot-glow 1s ease-in-out infinite; }
+.spot-step[data-status="running"] .spot-dot { background: #b7a6ff; animation: spot-glow 1s ease-in-out infinite; }
 .spot-step[data-status="done"] .spot-dot { background: #8fc98f; }
 .spot-step[data-status="failed"] .spot-dot { background: #d98080; }
+.spot-step-args { font: 400 10.5px/1 var(--sa-mono, ui-monospace, monospace); color: var(--mute); opacity: .8; }
 .spot-searching { display: inline-block; font-size: 18px; font-weight: 500; padding: 4px 0 10px; color: transparent; background: linear-gradient(100deg, var(--mute) 30%, var(--ink) 50%, var(--mute) 70%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; animation: spot-shimmer 1.6s linear infinite; text-shadow: 0 0 18px rgba(150,160,255,.35); }
 .spot-foot { display: flex; gap: 18px; padding: 10px 20px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mute); white-space: nowrap; overflow-x: auto; }
 .spot-foot > span { display: inline-flex; align-items: center; gap: 6px; }
@@ -965,6 +983,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           if (searchQuery.trim()) askRef.current(); else setMode('ask');
           break;
         case 'Backspace':
+          // Only reset scope when the input is actually empty — never while typing
           if (!searchQuery && scope !== 'all') setScope('all');
           break;
         case 'Escape':
@@ -1015,11 +1034,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       <div className="spot-top">
         <div className="spot-glass spot-pill" data-ai={aiOn} data-busy={isLoading}>
           <span className="spot-lead">{aiOn ? <i className="spot-orb" data-busy={isLoading} /> : <Search className="w-5 h-5" />}</span>
-          {scope !== 'all' && !aiOn && (
-            <button type="button" className="spot-token" onClick={() => setScope('all')} aria-label="Clear filter">
-              {SCOPES.find(s => s.id === scope)?.label}
-            </button>
-          )}
+
           <input
             ref={inputRef}
             type="text"
@@ -1140,14 +1155,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                   {steps.map((s, i) => (
                     <div key={i} className="spot-step" data-kind={s.kind} data-status={s.status || 'running'}>
                       <span className="spot-dot" />
-                      <span>{s.kind === 'tool' ? <b>{s.label}</b> : s.label}</span>
-                      {s.detail && <span style={{ marginLeft: 'auto', opacity: .7 }}>{s.detail}</span>}
+                      {s.kind === 'tool' ? (
+                        <>
+                          <b>{s.label}</b>
+                          {s.name && <span className="spot-step-args">{s.name}()</span>}
+                          {s.detail && <span className="spot-step-args" style={{ marginLeft: 'auto' }}>{s.detail}</span>}
+                        </>
+                      ) : (
+                        <span>{s.label}</span>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
               {isLoading && <div className="spot-searching">Searching…</div>}
-              {shown && <p className="spot-answer">{shown.split(/\*\*(.+?)\*\*/g).map((t, i) => (i % 2 ? <b key={i}>{t}</b> : t))}</p>}
+              {shown && <div className="spot-answer"><ReactMarkdown>{shown}</ReactMarkdown></div>}
             </div>
           )}
         </div>

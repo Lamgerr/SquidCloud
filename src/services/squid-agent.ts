@@ -26,25 +26,39 @@ export interface AgentResult {
 type Msg = { role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; tool_calls?: any[]; tool_call_id?: string; name?: string };
 
 /** OpenAI-style tool schemas for the model (dex registry pattern). */
+const S = (name: string, description: string, properties: Record<string, unknown>, required: string[] = []) =>
+  ({ type: 'function', function: { name, description, parameters: { type: 'object', properties, ...(required.length ? { required } : {}) } } });
+
 export const SQUID_TOOL_SCHEMAS = [
-  { type: 'function', function: { name: 'getFileAnalytics', description: 'Count files, total size, type breakdown, largest and recent files', parameters: { type: 'object', properties: { fileType: { type: 'string' } } } } },
-  { type: 'function', function: { name: 'countFilesByExtension', description: 'Count files with a given extension', parameters: { type: 'object', properties: { extension: { type: 'string' } }, required: ['extension'] } } },
-  { type: 'function', function: { name: 'searchFiles', description: 'Find files or folders by name', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } },
-  { type: 'function', function: { name: 'getFilesInFolder', description: 'List files in a folder', parameters: { type: 'object', properties: { folderPath: { type: 'string' } } } } },
-  { type: 'function', function: { name: 'getStorageUsed', description: 'Get storage used/available', parameters: { type: 'object', properties: {} } } },
-  { type: 'function', function: { name: 'createFolder', description: 'Create a new folder', parameters: { type: 'object', properties: { folderName: { type: 'string' }, parentPath: { type: 'string' } }, required: ['folderName'] } } },
-  { type: 'function', function: { name: 'renameFile', description: 'Rename a file', parameters: { type: 'object', properties: { fileId: { type: 'string' }, newName: { type: 'string' } }, required: ['fileId', 'newName'] } } },
-  { type: 'function', function: { name: 'moveFilesToFolder', description: 'Move files into a folder', parameters: { type: 'object', properties: { fileIds: { type: 'array', items: { type: 'string' } }, targetFolder: { type: 'string' } }, required: ['fileIds', 'targetFolder'] } } },
-  { type: 'function', function: { name: 'organizeFilesByType', description: 'Group files into folders by type', parameters: { type: 'object', properties: { currentPath: { type: 'string' } } } } },
-  { type: 'function', function: { name: 'deleteFile', description: 'Delete a file (destructive — confirm intent first)', parameters: { type: 'object', properties: { fileId: { type: 'string' } }, required: ['fileId'] } } },
+  S('getFileAnalytics', 'Count files, total size, type breakdown, largest and recent files', { fileType: { type: 'string' } }),
+  S('countFilesByExtension', 'Count files with a given extension', { extension: { type: 'string' } }, ['extension']),
+  S('searchFiles', 'Find files or folders by name', { query: { type: 'string' }, searchContent: { type: 'boolean' } }, ['query']),
+  S('getFilesInFolder', 'List files in a folder', { folderPath: { type: 'string' } }),
+  S('listFolders', 'List all folders', { parentPath: { type: 'string' } }),
+  S('getStorageUsed', 'Get storage used/available', {}),
+  S('createFolder', 'Create a new folder', { folderName: { type: 'string' }, parentPath: { type: 'string' } }, ['folderName']),
+  S('createFile', 'Create a file with content', { fileName: { type: 'string' }, content: { type: 'string' }, parentFolder: { type: 'string' }, fileType: { type: 'string' } }, ['fileName']),
+  S('readFileContent', 'Read a file’s text content', { fileId: { type: 'string' } }, ['fileId']),
+  S('updateFileContent', 'Overwrite a file’s text content', { fileId: { type: 'string' }, newContent: { type: 'string' } }, ['fileId', 'newContent']),
+  S('renameFile', 'Rename a file', { fileId: { type: 'string' }, newName: { type: 'string' } }, ['fileId', 'newName']),
+  S('moveFilesToFolder', 'Move files into a folder', { fileIds: { type: 'array', items: { type: 'string' } }, targetFolder: { type: 'string' } }, ['fileIds', 'targetFolder']),
+  S('deleteFile', 'Delete a file (destructive — confirm intent first)', { fileId: { type: 'string' } }, ['fileId']),
+  S('deleteFolder', 'Delete a folder (destructive — confirm intent first)', { folderPath: { type: 'string' }, deleteContents: { type: 'boolean' } }, ['folderPath']),
+  S('organizeFilesByType', 'Group files into folders by type', { currentPath: { type: 'string' }, files: { type: 'array', items: { type: 'object' } } }),
+  S('generateContentFromReference', 'Write content based on a reference text', { referenceText: { type: 'string' }, outputType: { type: 'string', enum: ['markdown', 'code', 'text'] }, instructions: { type: 'string' } }, ['referenceText', 'instructions']),
+  S('generateCode', 'Generate code from a description', { language: { type: 'string' }, description: { type: 'string' }, context: { type: 'string' } }, ['description']),
 ];
 
 const LABELS: Record<string, string> = {
   getFileAnalytics: 'Reading file analytics', countFilesByExtension: 'Counting files',
   searchFiles: 'Searching your files', getFilesInFolder: 'Listing folder',
-  getStorageUsed: 'Checking storage', createFolder: 'Creating folder',
+  listFolders: 'Listing folders', getStorageUsed: 'Checking storage',
+  createFolder: 'Creating folder', createFile: 'Creating file',
+  readFileContent: 'Reading file', updateFileContent: 'Updating file',
   renameFile: 'Renaming file', moveFilesToFolder: 'Moving files',
-  organizeFilesByType: 'Organizing files', deleteFile: 'Deleting file',
+  deleteFile: 'Deleting file', deleteFolder: 'Deleting folder',
+  organizeFilesByType: 'Organizing files',
+  generateContentFromReference: 'Writing content', generateCode: 'Generating code',
 };
 
 class SquidAgent {
