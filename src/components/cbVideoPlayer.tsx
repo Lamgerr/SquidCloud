@@ -852,7 +852,6 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       )}
       {isAudio && (
         <div className="cbp-meta">
-          <div className="cbp-now"><span data-live={playing} />NOW PLAYING</div>
           <motion.h2 key={title} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={SOFT}>{title}</motion.h2>
           <p>{(file.type?.split('/')[1] || file.name.split('.').pop() || 'audio').toUpperCase()} · {fmtSize(file.size)}</p>
         </div>
@@ -1139,10 +1138,6 @@ const CSS = `
 .cbp-orb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 @keyframes cbp-drift { from { transform: translate(-6%, -4%) rotate(0deg) scale(1); } to { transform: translate(7%, 5%) rotate(40deg) scale(1.18); } }
 .cbp-meta { position: absolute; left: 0; right: 0; top: calc(50% + min(23vmin, 170px) + 22px); padding: 0 24px; text-align: center; pointer-events: none; }
-.cbp-now { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px; font: 500 9.5px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: .17em; color: var(--ink-dim); }
-.cbp-now span { width: 6px; height: 6px; border-radius: 999px; background: var(--ink-dim); }
-.cbp-now span[data-live="true"] { background: #9fb3ff; box-shadow: 0 0 10px #9fb3ff; animation: cbp-live 1.6s ease-in-out infinite; }
-@keyframes cbp-live { 50% { opacity: .35; box-shadow: 0 0 3px #9fb3ff; } }
 .cbp-meta h2 { margin: 0; font: 600 clamp(18px, 2.6vw, 26px)/1.2 inherit; letter-spacing: -.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cbp-meta p { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-dim); letter-spacing: .04em; }
 .cbp-root[data-compact="true"].cbp-audio .cbp-center { top: 62%; }
