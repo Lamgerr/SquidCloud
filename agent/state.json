@@ -1,23 +1,21 @@
 {
-  "goal": null,
+  "goal": "Refine the SquidCloud instant-preview UX per the human's screenshot review: single submerging grainy dock, redesigned minimized viewer tabs, premium translucent command palette.",
   "goal_source": "interactive query from human (not from backlog)",
   "last_actions": [
-    "2026-10-27: Counted lines of code for the human, excluding comments and markdown.",
-    "Used cloc 2.10 (downloaded Perl script from github.com/AlDanial/cloc tag v2.10, raw URL /v2.10/cloc) over git ls-files excluding *.md/*.mdx.",
-    "Verified totals arithmetically (language rows sum exactly to 249,950); diagnosed two outliers: a 17,194-line .har capture classified as JSON, and Cargo.lock (2,115 raw lines) silently skipped by cloc.",
-    "Residual throwaway script $TMPDIR/opencode/loc_count.py draft abandoned in favor of cloc (superseded, kept no role)."
+    "2026-11-23: Reviewed latest screenshots in ~/Downloads and ~/storage/shared/Pictures/Screenshot.",
+    "EnhancedInstantPreviewModal: removed all on-screen chrome; added ONE grainy/translucent springy floating dock (minimize + close only) that is visible 2s then submerges into the corner, revealable by hover or drag.",
+    "PreviewTabStack: replaced fanned circles with a glassy grain-textured card deck; hover fans cards with spring, drag to dismiss, click to restore, hide/close-all pill, hidden-tab restore badge.",
+    "CommandPalette: denser frosted glass, two-frequency nano-texture grain, hairline rim, deep shadow.",
+    "Updated docs/UI-UX-STANDARD.md contracts; committed 79ae2745; deployed Vercel READY."
   ],
   "key_numbers": {
-    "loc_nonmd_all_text_cloc": 249950,
-    "plus_cargo_lock_raw": 2115,
-    "har_data_capture": 17194,
-    "generated_lockfiles": 25880,
-    "comment_lines": 11754,
-    "blank_lines": 23576,
-    "md_files": 471,
-    "md_lines": 97673,
-    "primary_source_only_approx": 206640
+    "commit": "79ae2745",
+    "deploy_url": "https://cloudbliss-storage-qzb1fg0lk-sqc.vercel.app",
+    "deploy_state": "READY"
   },
-  "blockers": [],
-  "next": "backlog.md is empty (cold start) - no autonomous goal was picked for this interactive query; await next task"
+  "blockers": [
+    "Local npx tsc --noEmit unavailable in this environment; Vercel cloud build is authoritative.",
+    "Old pre-key-vault AI-created files can still show base64 gibberish; new files use the fixed vault path."
+  ],
+  "next": "Await human visual verification of dock submerge/reveal, card-deck pull-to-dismiss, and palette grain; tune spring values or peek amount from screenshots if needed."
 }

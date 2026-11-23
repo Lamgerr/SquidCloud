@@ -1,18 +1,19 @@
-# Summary
+# What happened while you were away
 
-## Done (2026-10-27)
-- LOC analysis for the workspace, excluding comments and markdown:
-  - All non-md tracked text files: **249,950 code lines** (code = non-comment-only, non-blank), 11,754 comment lines, 23,576 blank lines, 1,142 files.
-  - Bulk: TypeScript 796 files / 161,907 lines; then SQL 11,377, JS 5,380, CSS 5,296, HTML 4,627.
-  - Data/generated artifacts inside that total: HAR web capture 17,194; package-lock.json x4 + Cargo.lock 25,877; from repo's own src, ~(about) 206,600 lines.
-  - Markdown: 471 files / 97,673 lines excluded per request.
-- Rigor notes: cloc 2.10 (comment-aware, string-safe); totals verified by summing language rows; HAR misclassification and Cargo.lock skip discovered and corrected by hand.
+## Done
+- **Instant preview modal** — all on-screen chrome removed. There is now a single floating dock (bottom-right) with just **minimize + close**, grainy + translucent + springy. On open it is visible for **2s**, then springs/submerges into the corner leaving a peek; hover the corner or drag the dock to pull it back out.
+- **Minimized preview tabs** — replaced the old fanned circles with a **deck of glassy, grain-textured picking cards**. Tight fan when idle; hover fans them apart with spring physics and reveals each card's type glyph, name and close. Drag a card out to dismiss it, click to restore. Quiet hide-all / close-all pill on hover, small restore badge when hidden.
+- **Command palette** — denser, more-opaque frosted glass with a two-frequency **nano-texture grain** (mid fractal + fine high-frequency), hairline rim and deep shadow. Reads premium and translucent, not a thin see-through sheet.
+- Updated `docs/UI-UX-STANDARD.md`. Committed as `79ae2745`. Deployed to Vercel — **READY** at `https://cloudbliss-storage-qzb1fg0lk-sqc.vercel.app`.
 
 ## In progress
-- None.
+- Nothing actively being edited. Awaiting your visual verification.
 
-## Blocked - needs a decision
-- None.
+## Blocked / needs a decision
+- Local `npx tsc --noEmit` is unavailable here; Vercel's cloud build is the verification authority.
+- Old AI-created files made before the key-vault fix can still display base64 gibberish (new files use the fixed vault path).
+- The gibberish seen in `911_essay.md` is one of those pre-fix files, not a preview-renderer bug.
 
 ## Queued next
-- Nothing yet (cold start). Backlog generation not performed for this interactive query.
+- If the submerge peek is too small/large or the spring feels off, send a screenshot and tune `x/y` submerge % + spring stiffness in `EnhancedInstantPreviewModal.tsx`.
+- If the card deck feels cramped or the grain too strong, tune `pvs-card` height / grain opacity in `PreviewTabStack.tsx` and the NANO layer slopes in `CommandPalette.tsx`.
