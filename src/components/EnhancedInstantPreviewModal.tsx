@@ -13,6 +13,7 @@ import { Loader } from '@/components/ui/Loader';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { isVaultUnlocked, getVaultFileMeta, decryptVaultBytes } from '@/lib/zk-vault-session';
 import { supabase } from '@/integrations/supabase/client';
+import SealedPreview from './SealedPreview';
 
 // Viewers — one frame, type-specific body
 import CBVideoPlayer from './cbVideoPlayer';

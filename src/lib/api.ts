@@ -4,6 +4,7 @@ import { decryptData, encryptData, generateEncryptionKey } from "./encryption";
 import { buildPublicUrl } from "@/lib/appLinks";
 import { createSecureFileRecord, fetchFileEncryptionKey } from "@/lib/secure-file-metadata";
 import { emitWebhookEvent } from "@/lib/webhook-events";
+import { zkEncryptForUpload, zkSaveMeta } from "./zk-mode";
 
 const ACTIVE_WORKSPACE_STORAGE_KEY = 'squid_active_workspace_id';
 const ACTIVE_PROVIDER_TYPE_STORAGE_KEY = 'squid_active_provider_type';
@@ -811,7 +812,18 @@ export const uploadFile = async (
     }
 
     // Default SquidCloud route uses existing RES54 pipeline.
-    const { id } = await uploadFileWithRes54(file, onProgress);
+    // If the ZK vault is unlocked, encrypt the bytes before upload so the
+    // server only ever holds ciphertext it cannot decrypt.
+    let zkMeta: { salt: string; iv: string } | null = null;
+    let uploadSource = file;
+    if (authUser) {
+      const sealed = await zkEncryptForUpload(file, authUser.id);
+      if (sealed) { uploadSource = sealed.file; zkMeta = sealed.meta; }
+    }
+    const { id } = await uploadFileWithRes54(uploadSource, onProgress);
+    if (zkMeta && authUser) {
+      await zkSaveMeta(id, authUser.id, zkMeta.salt, zkMeta.iv).catch(() => {});
+    }
     
     // Update the file with parent folder information if provided
     if (folderPath || activeWorkspaceId || activeProviderType !== 'squidcloud') {
@@ -1108,6 +1120,10 @@ export async function smartDownload(
     .single();
   if (error || !row) throw new Error(error?.message || "File not found");
 
+  // NOTE: ZK decryption is intentionally NOT done here. This function returns
+  // the stored bytes as-is; the preview modal is the single decrypt boundary
+  // (see EnhancedInstantPreviewModal). Decrypting in both places would corrupt
+  // files by decrypting ciphertext twice.
   if (row.processor === "sde" || row.storage_path === "sde") {
     return downloadFile(fileId, opts?.onProgress);
   }

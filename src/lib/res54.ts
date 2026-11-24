@@ -1232,6 +1232,9 @@ export interface FilePreviewResult {
 }
 
 export const downloadFilePreview = async (fileId: string, maxChunks: number = 3, options?: { fileRecord?: Record<string, any>; shareId?: string }): Promise<FilePreviewResult> => {
+  // ZK files are decrypted at the caller (preview modal / api.smartDownload)
+  // through zk-mode; this function returns the stored bytes as-is.
+
   const file = options?.fileRecord || await (async () => {
     const { data: d, error } = await supabase.from('files').select('*').eq('id', fileId).single();
     if (error) {

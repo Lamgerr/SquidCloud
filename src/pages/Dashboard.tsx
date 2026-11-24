@@ -11,6 +11,7 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { zkDecryptDownload } from '@/lib/zk-mode';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -953,6 +954,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
           backgroundDownloadService.updateProgress(taskId, progress);
         });
       }
+      // ZK files are stored as ciphertext; decrypt before saving if this file
+      // has client-side encryption metadata.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) blob = await zkDecryptDownload(blob, file.id, user.id);
       await downloadAndSaveBlob(blob, file.name);
       backgroundDownloadService.completeTask(taskId);
       toast({ title: 'Download complete', description: 'Your file has been downloaded.' });
