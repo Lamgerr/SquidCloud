@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
   X, Sun, Moon, Type, Loader2, ChevronLeft, ChevronRight,
@@ -478,291 +478,296 @@ export default function DeepReadReader({ file, source, isOpen, onClose }: { file
 
   if (!isOpen) return null;
   const bookmarked = currentCfi ? bookmarks.some(b => b.cfi === currentCfi) : false;
+  const reduce = !!useReducedMotion();
+  const bookTitle = file?.bookTitle || file?.title || file?.name || 'Book';
+
+  const jumpToPercentage = (pct: number) => {
+    if (engineRef.current && epubReadyRef.current) engineRef.current.goToPercentage(Math.max(0, Math.min(100, pct)));
+  };
+
+  const DockBtn: React.FC<{ label: string; onClick: () => void; on?: boolean; disabled?: boolean; children: React.ReactNode }> =
+    ({ label, onClick, on, disabled, children }) => (
+      <motion.button type="button" className="rd-btn" data-on={on || undefined} aria-label={label} title={label} onClick={onClick} disabled={disabled}
+        whileHover={reduce ? undefined : { scale: 1.1 }} whileTap={reduce ? undefined : { scaleX: 0.88, scaleY: 0.8 }}
+        transition={reduce ? { duration: 0.01 } : JELLY}>{children}</motion.button>
+    );
+
+  const openPanel = (which: 'toc' | 'bookmarks' | 'search') => {
+    const val = which === 'toc' ? showToc : which === 'bookmarks' ? showBookmarks : showSearch;
+    setShowToc(false); setShowBookmarks(false); setShowSearch(false); setShowSettings(false);
+    if (which === 'toc') setShowToc(!val);
+    else if (which === 'bookmarks') setShowBookmarks(!val);
+    else setShowSearch(!val);
+  };
 
   return (
-    <div
-      ref={readerContainerRef}
-      className="rd-dock fixed inset-0 z-[200] flex flex-col overflow-hidden font-serif transition-colors duration-500"
-      style={{ backgroundColor: THEMES[theme].bg, color: THEMES[theme].fg }}
-    >
-      <style>{RD_DOCK_CSS}</style>
-      {/* ═══ HEADER ═══ */}
-      <AnimatePresence>
-        {showUI && (
-          <motion.header
-            initial={{ y: -100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -100, opacity: 0 }} transition={{ duration: 0.2 }}
-            className="absolute top-0 inset-x-0 h-16 bg-background/95 border-b border-border flex items-center justify-between px-4 sm:px-6 z-50 shadow-2xl"
-          >
-            <div className="flex items-center gap-2 sm:gap-4">
-              <button onClick={onClose} className="flex items-center gap-1 sm:gap-2 text-muted-foreground hover:text-foreground transition-colors p-1.5 sm:p-0 rounded-lg hover:bg-accent/60 sm:hover:bg-transparent">
-                <ChevronLeft className="w-6 h-6 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline text-sm font-sans font-bold uppercase tracking-wider">Library</span>
-              </button>
-            </div>
+    <div ref={readerContainerRef} className="rd fixed inset-0 z-[200] overflow-hidden"
+      style={{ backgroundColor: THEMES[theme].bg, color: THEMES[theme].fg }}>
+      <style>{RD_CSS}</style>
 
-            <div className="font-sans font-bold text-sm text-foreground/80 tracking-wide truncate px-4 flex-1 text-center max-w-[50%] sm:max-w-md">
-              {file?.title || file?.name}
-            </div>
-
-            <div className="flex items-center gap-1 sm:gap-2">
-              <button onClick={bookmarked && currentCfi ? () => removeBookmark(currentCfi) : addBookmark} className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                {bookmarked ? <BookmarkCheck className="w-5 h-5 text-yellow-500" /> : <BookmarkPlus className="w-5 h-5" />}
-              </button>
-              <button onClick={() => { setShowToc(!showToc); setShowBookmarks(false); setShowSearch(false); setShowSettings(false); }} className={cn("w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors", showToc ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent")}>
-                <List className="w-5 h-5" />
-              </button>
-              <button onClick={() => { setShowSearch(!showSearch); setShowToc(false); setShowBookmarks(false); setShowSettings(false); }} className={cn("w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors", showSearch ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent")}>
-                <Search className="w-5 h-5" />
-              </button>
-              <button onClick={() => { setShowSettings(!showSettings); setShowToc(false); setShowBookmarks(false); setShowSearch(false); }} className={cn("w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors", showSettings ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent")}>
-                <Type className="w-5 h-5" />
-              </button>
-              <button onClick={toggleFullscreen} className="flex w-9 h-9 sm:w-10 sm:h-10 rounded-xl items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                {isFullscreen ? <Shrink className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-              </button>
-              <button onClick={() => setIsAnnotating(!isAnnotating)} className={cn("hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-sans font-bold transition-all ml-2", isAnnotating ? "bg-emerald-500 text-black " : "bg-muted text-muted-foreground border border-border hover:text-foreground")}>
-                <PenTool className="w-4 h-4" /> Annotate
-              </button>
-            </div>
-          </motion.header>
-        )}
-      </AnimatePresence>
-
-      {/* ═══ SETTINGS PANEL ═══ */}
-      <AnimatePresence>
-        {showSettings && showUI && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            className="absolute top-16 right-0 sm:right-6 w-full sm:w-80 bg-card sm:border border-border sm:rounded-b-2xl shadow-2xl z-40 overflow-hidden font-sans text-foreground"
-          >
-            <div className="p-5 space-y-5">
-              <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground block mb-3">Theme</label>
-                <div className="flex gap-2">
-                  {(Object.keys(THEMES) as Array<ThemeKey>).map(t => {
-                    const ThemeIcon = THEMES[t].icon;
-                    return (
-                      <button key={t} title={THEMES[t].label} aria-label={`${THEMES[t].label} theme`} aria-pressed={theme === t} onClick={() => setTheme(t)} className={cn("w-10 h-10 rounded-xl border-2 transition-all duration-150 active:scale-95 flex items-center justify-center", theme === t ? "border-foreground scale-110" : "border-transparent opacity-60 hover:opacity-100")} style={{ backgroundColor: THEMES[t].bg, color: THEMES[t].fg }}>
-                        <ThemeIcon className="w-4 h-4" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="h-px bg-border" />
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-muted-foreground">Font Size</label>
-                <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                  <button onClick={() => setFontSize(prev => Math.max(12, prev - 2))} aria-label="Decrease font size" className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent active:scale-90 rounded-md transition-all duration-150"><Minus className="w-4 h-4" /></button>
-                  <span className="w-6 text-center text-sm font-bold tabular-nums">{fontSize}</span>
-                  <button onClick={() => setFontSize(prev => Math.min(36, prev + 2))} aria-label="Increase font size" className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent active:scale-90 rounded-md transition-all duration-150"><Plus className="w-4 h-4" /></button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-muted-foreground">Font</label>
-                <div className="flex gap-1 bg-muted rounded-lg p-1">
-                  <button onClick={() => setFontFamily('serif')} className={cn("px-4 py-1.5 rounded-md text-xs font-bold transition-all", fontFamily === 'serif' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Serif</button>
-                  <button onClick={() => setFontFamily('sans')} className={cn("px-4 py-1.5 rounded-md text-xs font-bold transition-all", fontFamily === 'sans' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Sans</button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ═══ SIDE PANEL ═══ */}
-      <AnimatePresence>
-        {(showToc || showSearch || showBookmarks) && showUI && (
-          <motion.div
-            initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: '100%', opacity: 0 }} transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="absolute top-16 right-0 bottom-0 w-[85vw] sm:w-96 bg-card border-l border-border shadow-2xl z-40 flex flex-col font-sans text-foreground overflow-hidden"
-          >
-            <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-sm uppercase tracking-wider">{showToc ? 'Contents' : showSearch ? 'Search' : 'Bookmarks'}</h3>
-              <button onClick={() => { setShowToc(false); setShowSearch(false); setShowBookmarks(false); }} aria-label="Close panel" className="p-1.5 -m-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-              {showSearch && (
-                <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="Search book..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && performSearch()} className="flex-1 min-w-0 bg-muted border border-border rounded-xl px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground/30 transition-colors" />
-                    <button onClick={performSearch} disabled={searching} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-bold text-sm disabled:opacity-50 hover:bg-primary/90 active:scale-[0.97] transition-all">{searching ? '...' : 'Go'}</button>
-                  </div>
-                  <div className="space-y-2">
-                    {searchResults.map((r, i) => (
-                      <button key={i} onClick={() => goToCfi(`#${r.sectionIndex}`)} className="w-full text-left p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors border border-border/60">
-                        <span className="text-xs font-bold text-muted-foreground block mb-1">Section {r.sectionIndex + 1}</span>
-                        <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">&hellip;{r.snippet}&hellip;</p>
-                      </button>
-                    ))}
-                    {searchQuery && !searching && searchResults.length === 0 && <p className="text-muted-foreground text-sm text-center py-4">No results found.</p>}
-                  </div>
-                </div>
-              )}
-
-              {showToc && (
-                <div className="space-y-1">
-                  {tocItems.length === 0 ? <p className="text-muted-foreground text-sm text-center py-4">No table of contents found.</p> : tocItems.map((item, i) => (
-                    <div key={i}>
-                      <button onClick={() => goToCfi(item.href)} className="w-full text-left px-4 py-3 rounded-xl hover:bg-accent transition-colors text-sm font-medium text-muted-foreground hover:text-foreground">{item.label}</button>
-                      {item.subitems?.map((sub, j) => (
-                        <button key={j} onClick={() => goToCfi(sub.href)} className="w-full text-left pl-8 pr-4 py-2 rounded-xl hover:bg-accent transition-colors text-xs text-muted-foreground/80 hover:text-muted-foreground">{sub.label}</button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {showBookmarks && (
-                <div className="space-y-2">
-                  {bookmarks.length === 0 ? <p className="text-muted-foreground text-sm text-center py-4">No bookmarks added yet.</p> : bookmarks.map((bm, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <button onClick={() => goToCfi(bm.cfi)} className="flex-1 min-w-0 text-left px-4 py-3 rounded-xl bg-muted hover:bg-accent transition-colors text-sm font-medium text-foreground flex items-center gap-3">
-                        <BookmarkCheck className="w-4 h-4 text-yellow-500 shrink-0" /> <span className="truncate">{bm.label}</span>
-                      </button>
-                      <button onClick={() => removeBookmark(bm.cfi)} aria-label="Remove bookmark" className="p-3 text-destructive hover:bg-destructive/10 rounded-xl transition-colors shrink-0"><X className="w-4 h-4" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ═══ STATE: LOADING ═══ */}
-      {loading && (
-        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4">
-          <Loader2 className="w-8 h-8 animate-spin" />
-          <span className="font-sans font-medium text-sm">Loading Book...</span>
-        </div>
-      )}
-
-      {/* ═══ STATE: ERROR ═══ */}
-      {error && !loading && (
-        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4 px-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-2">
-            <AlertCircle className="w-8 h-8" />
-          </div>
-          <h3 className="font-sans font-bold text-foreground text-lg">Error Loading Book</h3>
-          <p className="font-sans font-medium text-sm max-w-sm text-muted-foreground">{error}</p>
-          <button onClick={onClose} className="mt-4 px-6 py-2.5 bg-primary text-primary-foreground font-sans font-bold rounded-xl hover:bg-primary/90 active:scale-[0.99] transition-all">
-            Return to Library
-          </button>
-        </div>
-      )}
-
-      {/* ═══ PDF VIEWER ═══ */}
+      {/* ── PDF stays the PDF viewer's own design ── */}
       {isPDF && !loading && !error && (
-        <div className="flex-1 relative w-full h-full bg-background" onPointerDown={handleOuterTap}>
+        <div className="absolute inset-0">
           <OptimizedPDFViewer file={decryptedBlob || file.url} />
           <div className="absolute inset-0 z-40" style={{ pointerEvents: isAnnotating ? 'auto' : 'none' }}>
-            <InkCanvas active={isAnnotating} tool={isAnnotating ? 'pen' : 'off'} brush="pen" color={theme === 'dark' ? '#fff' : '#000'} size={3} penOnly={true} strokes={strokes} onStrokesChange={setStrokes} />
+            <InkCanvas active={isAnnotating} tool={isAnnotating ? 'pen' : 'off'} brush="pen" color={theme === 'dark' ? '#e8e7e1' : '#151613'} size={3} penOnly={true} strokes={strokes} onStrokesChange={setStrokes} />
           </div>
         </div>
       )}
 
-      {/* ═══ EPUB ENGINE LAYER ═══ */}
       {isEPUB && !loading && !error && (
-        <div
-          className="flex-1 relative flex items-center justify-center overflow-hidden"
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-        >
-          <div className="w-full h-full max-w-4xl mx-auto relative">
-            <div className="w-full h-full relative z-30 bg-transparent">
-              <div className="absolute inset-0 w-full h-full pb-20 sm:pb-24 pt-8">
-                 <div ref={viewerRef} className="w-full h-full" />
-              </div>
-
+        <>
+          {/* reading surface */}
+          <div className="absolute inset-0 flex items-center justify-center" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+            <div className="w-full h-full max-w-4xl mx-auto relative px-6 sm:px-10 pt-20 pb-28">
+              <div ref={viewerRef} className="w-full h-full" />
               <div className="absolute inset-0 z-50" style={{ pointerEvents: isAnnotating ? 'auto' : 'none' }}>
-                <InkCanvas active={isAnnotating} tool={isAnnotating ? 'pen' : 'off'} brush="pen" color={theme === 'dark' ? '#fff' : '#000'} size={3} penOnly={true} strokes={strokes} onStrokesChange={setStrokes} />
+                <InkCanvas active={isAnnotating} tool={isAnnotating ? 'pen' : 'off'} brush="pen" color={theme === 'dark' ? '#e8e7e1' : '#151613'} size={3} penOnly={true} strokes={strokes} onStrokesChange={setStrokes} />
               </div>
             </div>
           </div>
 
-          {/* ═══ BOTTOM PROGRESS BAR (auto-hide) ═══ */}
+          {/* ── top: three grouped docks, same as the PDF viewer ── */}
           <AnimatePresence>
             {showUI && (
-              <motion.div
-                initial={{ y: 60, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 60, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className={cn(
-                  "absolute bottom-0 inset-x-0 flex flex-col z-[45] pt-16 pb-6 px-4 sm:px-8 pointer-events-none",
-                  theme === 'dark' ? "bg-card" : "bg-card",
-                  isMobile && "pb-8"
-                )}
-              >
-                <div className="w-full max-w-xl mx-auto pointer-events-auto">
-                  <div className="flex items-center justify-between gap-4 mb-2">
-                    <button onClick={prev} className={cn("flex items-center justify-center sm:gap-1.5 h-9 sm:h-8 w-9 sm:w-auto sm:px-3 rounded-lg text-xs font-sans font-medium transition-all active:scale-95", theme === 'dark' ? "text-zinc-300 hover:bg-white/10" : "text-zinc-700 hover:bg-black/10")}>
-                      <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4" />
-                      <span className="hidden sm:inline">Prev</span>
-                    </button>
+              <motion.div className="rd-top" initial={{ y: -90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -90, opacity: 0 }} transition={reduce ? { duration: 0.01 } : SOFT}>
+                <div className="rd-anchor rd-a-l">
+                  <div className="rd-g rd-dock">
+                    <DockBtn label="Contents" on={showToc} onClick={() => openPanel('toc')}><List size={18} strokeWidth={1.7} /></DockBtn>
+                    <DockBtn label="Bookmarks" on={showBookmarks} onClick={() => openPanel('bookmarks')}><BookmarkPlus size={18} strokeWidth={1.7} /></DockBtn>
+                    <DockBtn label="Search" on={showSearch} onClick={() => openPanel('search')}><Search size={18} strokeWidth={1.7} /></DockBtn>
+                  </div>
+                </div>
 
-                    <div className="flex-1 flex flex-col items-center gap-2">
-                      <div className="w-full h-1 bg-black/20 dark:bg-white/10 rounded-full overflow-hidden">
-                        <div className={cn("h-full transition-all duration-300", theme === 'dark' ? "bg-white" : "bg-black")} style={{ width: `${progressPct}%` }} />
-                      </div>
-                    </div>
+                <div className="rd-a-c">
+                  <motion.div className="rd-g rd-dock rd-title" initial={reduce ? false : { opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} transition={reduce ? { duration: 0.01 } : POP}>
+                    <span className="rd-name" title={bookTitle}>{bookTitle}</span>
+                    <i className="rd-vsep" />
+                    <span className="rd-page">{currentPage || '—'} <i>/</i> {totalPages || '—'}</span>
+                  </motion.div>
+                </div>
 
-                    <button onClick={next} className={cn("flex items-center justify-center sm:gap-1.5 h-9 sm:h-8 w-9 sm:w-auto sm:px-3 rounded-lg text-xs font-sans font-medium transition-all active:scale-95", theme === 'dark' ? "text-zinc-300 hover:bg-white/10" : "text-zinc-700 hover:bg-black/10")}>
-                      <span className="hidden sm:inline">Next</span>
-                      <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4" />
-                    </button>
+                <div className="rd-anchor rd-a-r">
+                  <div className="rd-g rd-dock">
+                    <DockBtn label="Smaller text" onClick={() => setFontSize(v => Math.max(12, v - 2))}><Minus size={18} strokeWidth={1.7} /></DockBtn>
+                    <span className="rd-fsize" title="Font size">{fontSize}</span>
+                    <DockBtn label="Larger text" onClick={() => setFontSize(v => Math.min(36, v + 2))}><Plus size={18} strokeWidth={1.7} /></DockBtn>
+                    <i className="rd-vsep" />
+                    <DockBtn label="Reading settings" on={showSettings} onClick={() => { setShowSettings(v => !v); setShowToc(false); setShowBookmarks(false); setShowSearch(false); }}><Type size={18} strokeWidth={1.7} /></DockBtn>
+                    <DockBtn label={isAnnotating ? 'Stop annotating' : 'Annotate'} on={isAnnotating} onClick={() => setIsAnnotating(v => !v)}><PenTool size={18} strokeWidth={1.7} /></DockBtn>
+                    <DockBtn label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={toggleFullscreen}>{isFullscreen ? <Shrink size={18} strokeWidth={1.7} /> : <Maximize size={18} strokeWidth={1.7} />}</DockBtn>
+                    <DockBtn label={bookmarked ? 'Remove bookmark' : 'Bookmark page'} on={bookmarked} onClick={() => bookmarked && currentCfi ? removeBookmark(currentCfi) : addBookmark()}><BookmarkCheck size={18} strokeWidth={1.7} /></DockBtn>
                   </div>
 
-                  <div className="flex items-center justify-between mt-1 px-1">
-                    <span className={cn('tabular-nums font-sans font-bold opacity-60', isMobile ? 'text-[10px]' : 'text-xs')}>{currentPage > 0 ? currentPage : ''}</span>
-                    <span className={cn('tabular-nums font-sans font-bold', theme === 'dark' ? "text-zinc-400" : "text-zinc-500", isMobile ? 'text-[10px]' : 'text-xs')}>
-                      {progressPct}% READ{totalPages > 1 && currentPage < totalPages && (
-                        <> · ~{Math.max(1, Math.ceil((totalPages - currentPage) * 1.1))} min left</>
-                      )}
-                    </span>
-                    <span className={cn('tabular-nums font-sans font-bold opacity-60', isMobile ? 'text-[10px]' : 'text-xs')}>{totalPages > 0 ? totalPages : ''}</span>
-                  </div>
+                  <AnimatePresence>
+                    {showSettings && (
+                      <motion.div className="rd-g rd-pop rd-pop-r" data-rd-pop role="menu"
+                        initial={reduce ? false : { opacity: 0, scale: 0.84, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: -4 }}
+                        transition={reduce ? { duration: 0.01 } : POP}>
+                        <div className="rd-rowlabel">Theme</div>
+                        <div className="rd-themes">
+                          {(Object.keys(THEMES) as ThemeKey[]).map(t => (
+                            <button key={t} type="button" className="rd-theme" data-on={theme === t} title={THEMES[t].label} aria-label={`${THEMES[t].label} theme`}
+                              onClick={() => setTheme(t)} style={{ background: THEMES[t].bg, color: THEMES[t].fg }}>
+                              {THEMES[t].label.slice(0, 1)}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="rd-sep" />
+                        <div className="rd-rowlabel">Typeface</div>
+                        <div className="rd-seg">
+                          <button type="button" data-on={fontFamily === 'serif'} onClick={() => setFontFamily('serif')}>Serif</button>
+                          <button type="button" data-on={fontFamily === 'sans'} onClick={() => setFontFamily('sans')}>Sans</button>
+                        </div>
+                        <div className="rd-sep" />
+                        <div className="rd-rowlabel">Line spacing</div>
+                        <div className="rd-seg">
+                          <button type="button" aria-label="Tighter line spacing" onClick={() => setLineHeight(v => Math.max(1.2, Math.round((v - 0.1) * 10) / 10))}>Tight</button>
+                          <button type="button" aria-label="Wider line spacing" onClick={() => setLineHeight(v => Math.min(2.2, Math.round((v + 0.1) * 10) / 10))}>Wide</button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
+          {/* ── bottom navigation dock ── */}
+          <AnimatePresence>
+            {showUI && (
+              <motion.div className="rd-bot" initial={reduce ? false : { y: 34, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 26, opacity: 0 }} transition={reduce ? { duration: 0.01 } : SOFT}>
+                <div className="rd-g rd-dock rd-nav">
+                  <DockBtn label="Previous page" onClick={prev}><ChevronLeft size={19} strokeWidth={1.7} /></DockBtn>
+                  <div className="rd-prog" role="progressbar" aria-valuenow={Math.round(progressPct)} aria-label="Reading progress"
+                    onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); jumpToPercentage(((e.clientX - r.left) / r.width) * 100); }}>
+                    <span className="rd-fill" style={{ width: `${progressPct}%` }} />
+                  </div>
+                  <span className="rd-pct">{Math.round(progressPct)}%</span>
+                  <DockBtn label="Next page" onClick={next}><ChevronRight size={19} strokeWidth={1.7} /></DockBtn>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── floating sidebar island ── */}
+          <AnimatePresence>
+            {(showToc || showBookmarks || showSearch) && showUI && (
+              <motion.aside className="rd-g rd-side" data-rd-pop
+                initial={reduce ? false : { opacity: 0, x: -34, scale: 0.94 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -28, scale: 0.95 }}
+                transition={reduce ? { duration: 0.01 } : SOFT} style={{ transformOrigin: '0% 50%' }}>
+                <div className="rd-side-head">
+                  <span>{showToc ? 'Contents' : showSearch ? 'Search' : 'Bookmarks'}</span>
+                  <button type="button" aria-label="Close panel" onClick={() => { setShowToc(false); setShowSearch(false); setShowBookmarks(false); }}><X size={16} strokeWidth={1.7} /></button>
+                </div>
+
+                <div className="rd-side-body">
+                  {showSearch && (
+                    <div className="rd-stack">
+                      <div className="rd-searchrow">
+                        <input type="text" placeholder="Search book…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && performSearch()} />
+                        <button type="button" onClick={performSearch} disabled={searching}>{searching ? '…' : 'Go'}</button>
+                      </div>
+                      {searchResults.map((r, i) => (
+                        <button key={i} type="button" className="rd-result" onClick={() => goToCfi(`#${r.sectionIndex}`)}>
+                          <span>Section {r.sectionIndex + 1}</span>
+                          <p>…{r.snippet}…</p>
+                        </button>
+                      ))}
+                      {searchQuery && !searching && searchResults.length === 0 && <p className="rd-empty">No results found.</p>}
+                    </div>
+                  )}
+                  {showToc && (
+                    <div className="rd-stack">
+                      {tocItems.length === 0 ? <p className="rd-empty">No table of contents.</p> : tocItems.map((item, i) => (
+                        <div key={i}>
+                          <button type="button" className="rd-row" onClick={() => goToCfi(item.href)}>{item.label}</button>
+                          {item.subitems?.map((sub, j) => <button key={j} type="button" className="rd-row rd-sub" onClick={() => goToCfi(sub.href)}>{sub.label}</button>)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showBookmarks && (
+                    <div className="rd-stack">
+                      {bookmarks.length === 0 ? <p className="rd-empty">No bookmarks yet.</p> : bookmarks.map((bm, i) => (
+                        <div key={i} className="rd-bmrow">
+                          <button type="button" className="rd-row" onClick={() => goToCfi(bm.cfi)}><BookmarkCheck size={14} strokeWidth={1.7} />{bm.label}</button>
+                          <button type="button" className="rd-x" aria-label="Remove bookmark" onClick={() => removeBookmark(bm.cfi)}><X size={14} strokeWidth={1.7} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.aside>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
+      {/* ── loading / error, same glass cards as the PDF viewer ── */}
+      {loading && (
+        <div className="rd-state">
+          <div className="rd-g rd-card"><span className="rd-spinner" /><span>Loading book…</span></div>
+        </div>
+      )}
+      {error && !loading && (
+        <div className="rd-state">
+          <div className="rd-g rd-card">
+            <AlertCircle size={28} strokeWidth={1.7} />
+            <h3>Couldn't open this book</h3>
+            <p>{error}</p>
+            <button type="button" className="rd-cta" onClick={onClose}>Back to library</button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/* ── Reader chrome in the floating-dock visual language.
-      Scoped to .rd-dock; epub engine + reading logic untouched.
-      Circular pill controls, one dark glass tier, spring curves. ── */
-const RD_DOCK_CSS = `
-.rd-dock {
-  --rd-line: rgba(232,231,225,0.10);
-  --rd-glass: rgba(13,14,13,0.86);
-  --rd-spring: linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1);
+/* Reader chrome in the exact visual language of OptimizedPDFViewer: dense
+   neutral glass, grouped floating docks, hairline rims, lively springs. */
+const JELLY = { type: 'spring' as const, stiffness: 520, damping: 15, mass: 0.8 };
+const POP = { type: 'spring' as const, stiffness: 380, damping: 17, mass: 0.9 };
+const SOFT = { type: 'spring' as const, stiffness: 300, damping: 28, mass: 0.9 };
+
+const RD_CSS = `
+.rd { --ink: #e8e7e1; --dim: rgba(232,231,225,.58); --line: rgba(232,231,225,.10); --rim: rgba(232,231,225,.14);
+  font-family: var(--sa-f, system-ui, sans-serif); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+.rd-g { background: linear-gradient(180deg, rgba(32,33,29,.97), rgba(14,15,12,.985)); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.06), inset 0 -1px 0 rgba(0,0,0,.4), 0 18px 40px -18px rgba(0,0,0,.9); }
+.rd-dock { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; }
+.rd-btn { display: grid; place-items: center; flex: none; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 999px;
+  background: transparent; color: var(--dim); cursor: pointer; transition: background .2s, color .2s; }
+.rd-btn:hover { background: rgba(232,231,225,.1); color: var(--ink); }
+.rd-btn[data-on="true"] { background: rgba(232,231,225,.16); color: var(--ink); }
+.rd-btn:disabled { opacity: .3; pointer-events: none; }
+.rd-btn:focus-visible, .rd-cta:focus-visible, .rd-row:focus-visible, .rd-searchrow button:focus-visible { outline: 2px solid rgba(232,231,225,.8); outline-offset: 2px; }
+.rd-vsep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--line); }
+.rd-top { position: absolute; z-index: 30; left: 16px; right: 16px; top: max(14px, env(safe-area-inset-top));
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 12px; pointer-events: none; }
+.rd-anchor { position: relative; pointer-events: auto; } .rd-a-l { justify-self: start; } .rd-a-r { justify-self: end; }
+.rd-a-c { display: flex; justify-content: center; pointer-events: none; } .rd-a-c > * { pointer-events: auto; }
+.rd-title { height: 46px; padding: 4px 8px; max-width: min(46vw, 420px); }
+.rd-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; font-size: 13.5px; font-weight: 600; letter-spacing: -.005em; padding: 0 8px; }
+.rd-page { color: var(--dim); font: 500 13px/1 var(--sa-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 6px; }
+.rd-page i { font-style: normal; opacity: .35; margin: 0 2px; }
+.rd-fsize { min-width: 26px; text-align: center; font: 500 12.5px/1 var(--sa-mono, ui-monospace, monospace); color: var(--ink); font-variant-numeric: tabular-nums; }
+.rd-bot { position: absolute; z-index: 30; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); translate: -50% 0; }
+.rd-nav { gap: 8px; padding: 5px 8px; }
+.rd-prog { position: relative; width: 200px; height: 4px; border-radius: 999px; background: rgba(232,231,225,.16); cursor: pointer; overflow: hidden; }
+.rd-fill { display: block; height: 100%; background: rgba(232,231,225,.82); border-radius: inherit; transition: width .25s ease; }
+.rd-pct { min-width: 42px; text-align: center; font: 500 11px/1 var(--sa-mono, ui-monospace, monospace); color: var(--dim); font-variant-numeric: tabular-nums; }
+.rd-pop { position: absolute; z-index: 40; min-width: 224px; padding: 8px; border-radius: 18px; }
+.rd-pop-r { right: 0; top: calc(100% + 10px); }
+.rd-rowlabel { padding: 4px 8px 6px; font: 600 10px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.rd-themes { display: flex; gap: 6px; padding: 0 6px 4px; }
+.rd-theme { width: 34px; height: 34px; border: 1px solid rgba(232,231,225,.12); border-radius: 999px; cursor: pointer; font: 600 12px/1 inherit; }
+.rd-theme[data-on="true"] { box-shadow: 0 0 0 2px rgba(232,231,225,.55); }
+.rd-seg { display: flex; gap: 4px; padding: 0 6px 4px; }
+.rd-seg button { flex: 1; height: 30px; border: 1px solid transparent; border-radius: 999px; background: rgba(232,231,225,.05); color: var(--dim); cursor: pointer; font-size: 12px; }
+.rd-seg button[data-on="true"] { background: rgba(232,231,225,.16); color: var(--ink); border-color: rgba(232,231,225,.12); }
+.rd-sep { height: 1px; margin: 6px 8px; background: var(--line); }
+.rd-side { position: absolute; z-index: 25; left: 16px; top: calc(max(14px, env(safe-area-inset-top)) + 60px); bottom: 16px; width: 232px;
+  display: flex; flex-direction: column; overflow: hidden; border-radius: 22px; }
+.rd-side-head { display: flex; align-items: center; justify-content: space-between; flex: none; padding: 14px 14px 10px;
+  font: 600 11px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.rd-side-head button { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 999px; background: transparent; color: var(--dim); cursor: pointer; }
+.rd-side-head button:hover { background: rgba(232,231,225,.1); color: var(--ink); }
+.rd-side-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 14px; scrollbar-width: thin; scrollbar-color: rgba(232,231,225,.16) transparent; }
+.rd-stack { display: grid; gap: 4px; }
+.rd-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 8px 10px; border: 0; border-radius: 11px;
+  background: none; color: var(--ink); font-size: 13px; text-align: left; cursor: pointer; transition: background .15s; }
+.rd-row:hover { background: rgba(232,231,225,.1); }
+.rd-sub { padding-left: 22px; font-size: 12px; color: var(--dim); }
+.rd-bmrow { display: flex; align-items: center; gap: 4px; }
+.rd-bmrow .rd-row { flex: 1; min-width: 0; }
+.rd-x { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 999px; background: transparent; color: var(--dim); cursor: pointer; }
+.rd-x:hover { background: rgba(217,128,128,.2); color: #e8a0a0; }
+.rd-searchrow { display: flex; gap: 6px; margin-bottom: 8px; }
+.rd-searchrow input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(232,231,225,.06); color: var(--ink); font-size: 12.5px; outline: none; }
+.rd-searchrow button { height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: rgba(232,231,225,.1); color: var(--ink); cursor: pointer; font-size: 12px; }
+.rd-result { display: block; width: 100%; padding: 10px; border: 0; border-radius: 11px; background: rgba(232,231,225,.05); color: var(--ink); text-align: left; cursor: pointer; }
+.rd-result:hover { background: rgba(232,231,225,.11); }
+.rd-result span { display: block; font: 500 10px/1 var(--sa-mono, ui-monospace, monospace); color: var(--dim); margin-bottom: 6px; }
+.rd-result p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink); }
+.rd-empty { padding: 20px 8px; text-align: center; color: var(--dim); font-size: 12px; }
+.rd-state { position: absolute; inset: 0; display: grid; place-items: center; }
+.rd-card { display: grid; justify-items: center; gap: 12px; width: min(400px, 100%); padding: 28px 26px 24px; border-radius: 26px; text-align: center; }
+.rd-card h3 { margin: 0; font-size: 17px; font-weight: 600; } .rd-card p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--dim); }
+.rd-spinner { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(232,231,225,.16); border-top-color: rgba(232,231,225,.8); animation: rd-spin .9s linear infinite; }
+@keyframes rd-spin { to { transform: rotate(360deg); } }
+.rd-cta { height: 40px; padding: 0 20px; border: 1px solid var(--line); border-radius: 999px;
+  background: linear-gradient(180deg, rgba(36,37,33,.9), rgba(15,16,13,.94)); color: var(--ink); cursor: pointer; font-size: 13px; font-weight: 600; }
+.rd-cta:hover { background: linear-gradient(180deg, rgba(48,49,44,.92), rgba(20,21,18,.94)); }
+@media (max-width: 720px) {
+  .rd-top { grid-template-columns: 1fr; }
+  .rd-a-l, .rd-a-r { justify-self: center; }
+  .rd-a-c { display: none; }
+  .rd-side { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; height: 58%; }
+  .rd-prog { width: 130px; }
+  .rd-btn { width: 36px; height: 36px; }
 }
-.rd-dock header { background: var(--rd-glass) !important; border-bottom: 1px solid var(--rd-line) !important;
-  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: inset 0 1px 0 rgba(232,231,225,0.08) !important; }
-/* header icon buttons → circular dock pills */
-.rd-dock header button:is([class*="w-9"], [class*="w-10"], [class*="h-9"], [class*="h-10"]) {
-  width: 38px !important; height: 38px !important; border-radius: 999px !important;
-  background: rgba(232,231,225,0.05) !important; border: 1px solid var(--rd-line) !important;
-  color: rgba(232,231,225,0.65) !important;
-  transition: all 0.2s var(--rd-spring) !important; }
-.rd-dock header button:hover { background: rgba(232,231,225,0.11) !important; color: #e8e7e1 !important; }
-.rd-dock header button:active { transform: scale(0.9) !important; }
-.rd-dock header button[class*="bg-accent"] { background: rgba(232,231,225,0.12) !important; color: #e8e7e1 !important; }
-/* Annotate / labelled buttons → pills */
-.rd-dock header button[class*="px-4"] { border-radius: 999px !important; }
-.rd-dock header [class*="font-bold"] { font-weight: 400 !important; letter-spacing: 0.02em !important; }
-/* settings / toc / panels → dock glass with hairline rim */
-.rd-dock [class*="absolute"][class*="bg-card"], .rd-dock [class*="bg-background/95"] { background: var(--rd-glass) !important;
-  border: 1px solid var(--rd-line) !important; border-radius: 14px !important;
-  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
-  box-shadow: inset 0 1px 0 rgba(232,231,225,0.1), 0 24px 50px -20px rgba(0,0,0,0.75) !important; }
-.rd-dock [class*="animate-in"] { animation-timing-function: var(--rd-spring) !important; }
-@media (prefers-reduced-motion: reduce) { .rd-dock header button { transition-duration: 0.01ms !important; } .rd-dock [class*="animate-in"] { animation-duration: 0.01ms !important; } }
+@media (prefers-reduced-motion: reduce) { .rd-btn, .rd-fill { transition-duration: .01ms !important; } }
 `;
