@@ -2347,6 +2347,24 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
         workspaceId={activeWorkspaceId}
         onCloneComplete={fetchFiles}
       />
+      <VaultUnlockFor
+        pending={vaultUnlockFor}
+        userId={user?.id || ''}
+        onCancel={() => setVaultUnlockFor(null)}
+        onUnlocked={(p) => {
+          setVaultUnlockFor(null);
+          const f = filteredFiles?.find(x => x.id === p.id);
+          void saveDecrypted(f as FileItemType || { id: p.id, name: p.name } as FileItemType, p.blob, p.taskId);
+        }}
+      />
+      <VaultUnlockDialog open={vaultUploadOpen} userId={user?.id || ''}
+        reason="Unlock your vault to encrypt and upload files."
+        onClose={() => { setVaultUploadOpen(false); setVaultUploadQueue([]); }}
+        onUnlocked={() => {
+          setVaultUploadOpen(false);
+          const q = vaultUploadQueue; setVaultUploadQueue([]);
+          q.forEach(({ file, folder }) => void backgroundUploadService.addTask(file, folder));
+        }} />
     </AppStartupBiometricCheck>
     </FileViewInfoContext.Provider>
   );
@@ -2891,24 +2909,6 @@ const MobileFilesView: React.FC<any> = ({
         )}
       </section>
 
-      <VaultUnlockFor
-        pending={vaultUnlockFor}
-        userId={user?.id || ''}
-        onCancel={() => setVaultUnlockFor(null)}
-        onUnlocked={(p) => {
-          setVaultUnlockFor(null);
-          const f = filteredFiles?.find(x => x.id === p.id);
-          void saveDecrypted(f as FileItemType || { id: p.id, name: p.name } as FileItemType, p.blob, p.taskId);
-        }}
-      />
-      <VaultUnlockDialog open={vaultUploadOpen} userId={user?.id || ''}
-        reason="Unlock your vault to encrypt and upload files."
-        onClose={() => { setVaultUploadOpen(false); setVaultUploadQueue([]); }}
-        onUnlocked={() => {
-          setVaultUploadOpen(false);
-          const q = vaultUploadQueue; setVaultUploadQueue([]);
-          q.forEach(({ file, folder }) => void backgroundUploadService.addTask(file, folder));
-        }} />
     </div>
   );
 };
