@@ -1,3 +1,8 @@
+## 2026-11-24 - Merge all hardening plans into one (interactive query)
+- User: "merge all of the hardening plans u made so far".
+- Merged web isolation, sealed preview modal and Supabase backend hardening into the canonical full-e2e spec as a single v12 document (959 lines, §§1-21). Renumbered appended sections to 20.x/21.x with no duplicate headers. Rewrote the master implementation priority so backend hardening + Phase 0 and sealed preview come before crypto core/wider rollout. Marked the three standalone specs SUPERSEDED with pointers to §16/§20/§21. Committed ab6aefbc.
+- Next: await approval, then invoke writing-plans.
+
 ## 2026-11-24 - Integrate isolation into security plan (interactive query)
 - User: "integrate it into the previous security plan".
 - Merged `2026-11-24-web-isolation-design.md` into the canonical E2E design as section 16 with subsections 16.1-16.13 (origins, headers, sandbox, worker, storage, tabs, native fallback, DNS, verification, UX, risks, decision).
