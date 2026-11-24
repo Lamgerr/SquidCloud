@@ -11,6 +11,8 @@ import { smartDownload, createFileShare } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { isVaultUnlocked, getVaultFileMeta, decryptVaultBytes } from '@/lib/zk-vault-session';
+import { supabase } from '@/integrations/supabase/client';
 
 // Viewers — one frame, type-specific body
 import CBVideoPlayer from './cbVideoPlayer';
@@ -166,18 +168,44 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
           blob = p.blob;
           if (p.isPartial) {
             smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId })
-              .then(full => {
+              .then(async full => {
                 if (loadGen.current !== gen) return;
-                setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return URL.createObjectURL(full); });
-                setDecodedBlob(full);
+                const m = await getVaultFileMeta(file.id);
+                let out = full;
+                if (m) {
+                  if (!isVaultUnlocked()) return;
+                  const { data: { user } } = await supabase.auth.getUser();
+                  const plain = await decryptVaultBytes(await full.arrayBuffer(), user?.id || file.user_id || '', m.salt, m.iv);
+                  out = new Blob([plain], { type: file.type || 'application/octet-stream' });
+                }
+                setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return URL.createObjectURL(out); });
+                setDecodedBlob(out);
               }).catch(() => {});
           }
         } else {
           blob = await smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId });
         }
         if (loadGen.current !== gen) return;
-        setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return URL.createObjectURL(blob); });
-        setDecodedBlob(blob); setLoading(false);
+
+        // Vault files encrypted client-side must be decrypted before any viewer
+        // sees them. Legacy vault files have no metadata and keep the old path.
+        let finalBlob: Blob = blob;
+        const meta = await getVaultFileMeta(file.id);
+        if (meta) {
+          if (!isVaultUnlocked()) {
+            setError('Unlock the vault to view this file');
+            setLoading(false);
+            return;
+          }
+          const { data: { user } } = await supabase.auth.getUser();
+          const plain = await decryptVaultBytes(
+            await blob.arrayBuffer(), user?.id || file.user_id || '', meta.salt, meta.iv,
+          );
+          finalBlob = new Blob([plain], { type: file.type || 'application/octet-stream' });
+        }
+
+        setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return URL.createObjectURL(finalBlob); });
+        setDecodedBlob(finalBlob); setLoading(false);
       } catch (e: any) {
         if (loadGen.current === gen) { setError(e?.message || 'Unable to load preview'); setLoading(false); }
       }
@@ -188,7 +216,19 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     if (onDownload) { onDownload(); return; }
     try {
       const blob = decodedBlob || await smartDownload(file.id, { reason: 'download', fileName: file.name, shareId });
-      const url = URL.createObjectURL(blob);
+      // If this is a client-encrypted vault file, decryptedBlob already holds
+      // plaintext from the load path; only decrypt here when not already loaded.
+      let out = blob;
+      if (!decodedBlob) {
+        const m = await getVaultFileMeta(file.id);
+        if (m) {
+          if (!isVaultUnlocked()) throw new Error('Unlock the vault to download this file');
+          const { data: { user } } = await supabase.auth.getUser();
+          const plain = await decryptVaultBytes(await blob.arrayBuffer(), user?.id || file.user_id || '', m.salt, m.iv);
+          out = new Blob([plain], { type: file.type || 'application/octet-stream' });
+        }
+      }
+      const url = URL.createObjectURL(out);
       const a = document.createElement('a'); a.href = url; a.download = file.name;
       document.body.appendChild(a); a.click(); a.remove();
     } catch (e: any) { toast({ title: 'Download failed', description: e?.message, variant: 'destructive' }); }

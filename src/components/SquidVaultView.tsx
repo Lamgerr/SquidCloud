@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import EnhancedFileCard from './EnhancedFileCard';
 import { backgroundUploadService } from '@/services/backgroundUpload';
 import { BiometricProtectedContent } from './BiometricProtectedContent';
+import { isVaultUnlocked, encryptVaultBytes, saveVaultFileMeta } from '@/lib/zk-vault-session';
 
 interface SquidVaultViewProps {
   userId: string;
@@ -58,40 +59,51 @@ export default function SquidVaultView({ userId, onClose }: SquidVaultViewProps)
         description: `Uploading ${fileArray.length} file${fileArray.length > 1 ? 's' : ''} to vault...`
       });
 
-      // Upload files sequentially to vault
+      // Upload files sequentially to vault. When the vault key is in memory,
+      // encrypt client-side before upload; otherwise keep the legacy path so
+      // files are never left unreadable by a half-configured vault.
       for (const file of fileArray) {
         try {
-          // Use background upload service
-          const taskId = await backgroundUploadService.addTask(file, '');
-          
-          // Wait a bit for the upload to complete
+          let uploadFile: File = file;
+          let encMeta: { salt: string; iv: string } | null = null;
+
+          if (isVaultUnlocked()) {
+            const plain = await file.arrayBuffer();
+            const sealed = await encryptVaultBytes(plain, userId);
+            encMeta = { salt: sealed.salt, iv: sealed.iv };
+            uploadFile = new File([sealed.ciphertext], file.name, {
+              type: 'application/octet-stream', lastModified: file.lastModified,
+            });
+          }
+
+          await backgroundUploadService.addTask(uploadFile, '');
           await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Get the uploaded file and mark it as in vault
+
           const { data: uploadedFiles, error: findError } = await supabase
             .from('files')
             .select('*')
             .eq('user_id', userId)
-            .eq('name', file.name)
+            .eq('name', uploadFile.name)
             .order('created_at', { ascending: false })
             .limit(1);
 
           if (!findError && uploadedFiles && uploadedFiles.length > 0) {
             const fileId = uploadedFiles[0].id;
-            
-            // Mark file as in vault
+
+            // Persist encryption metadata BEFORE flagging as in-vault, so a
+            // failure leaves a normal file rather than an unreadable one.
+            if (encMeta) {
+              await saveVaultFileMeta(fileId, userId, encMeta.salt, encMeta.iv);
+              await supabase.from('files').update({ type: 'application/octet-stream' }).eq('id', fileId);
+            }
+
             const { error: updateError } = await supabase
               .from('files')
-              .update({ 
-                in_vault: true,
-                parent_folder: null  // Files in vault don't have parent folders
-              })
+              .update({ in_vault: true, parent_folder: null })
               .eq('id', fileId)
               .eq('user_id', userId);
 
-            if (!updateError) {
-              successCount++;
-            }
+            if (!updateError) successCount++;
           }
         } catch (fileError) {
           console.error(`Error uploading ${file.name}:`, fileError);
@@ -121,6 +133,9 @@ export default function SquidVaultView({ userId, onClose }: SquidVaultViewProps)
 
   const removeFromVault = async (fileId: string) => {
     try {
+      // Keep the encryption metadata: removing from the vault returns the file
+      // to the normal library and it must remain readable. Metadata is shredded
+      // only when the file itself is permanently deleted.
       const { error } = await supabase
         .from('files')
         .update({ in_vault: false, vault_previous_folder: null })

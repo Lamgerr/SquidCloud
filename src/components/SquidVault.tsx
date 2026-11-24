@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { backgroundUploadService } from '@/services/backgroundUpload';
+import { unlockVault, lockVault } from '@/lib/zk-vault-session';
 
 interface SquidVaultProps {
   userId: string;
@@ -266,18 +267,18 @@ const SquidVault: React.FC<SquidVaultProps> = ({ userId, onVaultOpen, onClose })
     setIsLoading(true);
 
     try {
-      // Verify password
+      // Verify password (and transparently upgrade legacy hashes)
       const { data, error } = await supabase
         .from('vaults')
-        .select('password_hash')
+        .select('id, password_hash')
         .eq('user_id', userId)
         .single();
 
       if (error) throw error;
 
-      const isValid = await verifyPassword(password, data.password_hash || '');
+      const result = await verifyPassword(password, data.password_hash || '');
       
-      if (!isValid) {
+      if (!result.valid) {
         toast({
           title: "Invalid password",
           description: "The password you entered is incorrect",
@@ -286,6 +287,17 @@ const SquidVault: React.FC<SquidVaultProps> = ({ userId, onVaultOpen, onClose })
         setIsLoading(false);
         return;
       }
+
+      if (result.needsRehash && data.id) {
+        try {
+          const upgraded = await hashPassword(password);
+          await supabase.from('vaults').update({ password_hash: upgraded }).eq('id', data.id);
+        } catch (_) { /* non-fatal: legacy hash still valid for now */ }
+      }
+
+      // Derive the in-memory vault key from the verified password. Only after
+      // this succeeds can new vault files be encrypted with a client-held key.
+      await unlockVault(password, userId);
 
       // Show opening animation
       setShowAnimation(true);
@@ -382,20 +394,38 @@ const SquidVault: React.FC<SquidVaultProps> = ({ userId, onVaultOpen, onClose })
     }
   };
 
-  // Helper functions (you'll need to implement these with proper crypto)
+  // Password hashing: PBKDF2-SHA256 (versioned). Legacy unsalted SHA-256 hex is
+  // still accepted for existing vaults and upgraded on successful unlock.
+  const toHex = (buf: ArrayBuffer) =>
+    Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  const toB64 = (bytes: Uint8Array) => {
+    let bin = ''; bytes.forEach(b => (bin += String.fromCharCode(b))); return btoa(bin);
+  };
+  const fromB64 = (b64: string) => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+
   const hashPassword = async (password: string): Promise<string> => {
-    // Implement proper password hashing (e.g., using bcrypt or crypto API)
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iterations = 310000;
+    const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, keyMaterial, 256);
+    return `pbkdf2$${iterations}$${toB64(salt)}$${toB64(new Uint8Array(bits))}`;
   };
 
-  const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
-    const inputHash = await hashPassword(password);
-    return inputHash === hash;
+  const verifyPassword = async (password: string, stored: string): Promise<{ valid: boolean; needsRehash: boolean }> => {
+    if (stored.startsWith('pbkdf2$')) {
+      const parts = stored.split('$');
+      if (parts.length !== 4) return { valid: false, needsRehash: false };
+      const iterations = parseInt(parts[1], 10) || 310000;
+      const salt = fromB64(parts[2]);
+      const expected = parts[3];
+      const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+      const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, keyMaterial, 256);
+      const actual = toB64(new Uint8Array(bits));
+      return { valid: actual === expected, needsRehash: iterations < 310000 };
+    }
+    // Legacy: unsalted SHA-256 hex
+    const legacy = toHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password)));
+    return { valid: legacy === stored, needsRehash: legacy === stored };
   };
 
   return (
@@ -541,7 +571,7 @@ const SquidVault: React.FC<SquidVaultProps> = ({ userId, onVaultOpen, onClose })
                   variant="ghost"
                   size="sm"
                   className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10"
-                  onClick={onClose}
+                  onClick={() => { lockVault(); onClose(); }}
                 >
                   <X className="w-4 h-4 text-muted-foreground hover:text-red-500" />
                 </Button>
