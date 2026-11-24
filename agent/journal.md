@@ -1,3 +1,11 @@
+## 2026-11-24 - Strip white tints (interactive query)
+- User: "remove that white tint from ui its looking trash".
+- Root cause for the PDF chrome: `.pdv-g` used translucent glass with `saturate(160%)` over a white PDF page, so the page bled through and made the docks look white. Changed to near-opaque neutral gradient + blur only (no saturate), with a neutral hairline rim and deeper shadow.
+- Neutralized remaining pure-white chrome: PDF dot/swatch/checkbox rims, focused textbox background, Light theme swatch; video spinner stroke and subtitle glyph; command palette AI pill borders/glow and orb highlight (blue accent kept).
+- PDF document pages intentionally remain white — that is content, not chrome.
+- Committed 5d106f9c; `vercel --prod --yes` READY.
+- Next: await visual confirmation.
+
 ## 2026-11-24 - Clean PDF chrome + restore glass/motion (interactive query)
 - User rejected the new PDF viewer's interface as AI slop and asked to restore animations and glass effects.
 - Audit: six floating surfaces at once (top-left dock, title chip, top-right 8-button dock, markup row, transient bottom page HUD, sidebar island) plus a white `.pdv-pill`. Crowded and generic.

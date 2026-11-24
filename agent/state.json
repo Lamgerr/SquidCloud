@@ -1,20 +1,20 @@
 {
-  "goal": "Clean up the new PDF viewer's UI/UX and restore glass effects + springy animations.",
-  "goal_source": "interactive query from human ('interface is trash ... no ai slop ... revert back animations and glass effects')",
+  "goal": "Remove remaining white tints from the viewer/palette UI.",
+  "goal_source": "interactive query from human ('remove that white tint from ui')",
   "last_actions": [
-    "2026-11-24: Reviewed the new OptimizedPDFViewer chrome: too many docks (top-left, title, top-right with 8 buttons, markup row, transient page HUD, sidebar island, mobile dock) and a white action pill.",
-    "Simplified: removed the duplicate bottom page HUD (prev/next moved into the title dock); top-right dock reduced to zoom + search + more, with bookmark/markup/search moved into the More menu; mobile dock reduced to pages/markup/more. Replaced the white pill with neutral glass.",
-    "Rebuilt .pdv-g glass: soft vertical falloff, hairline rim, deeper shadow, 22px saturate blur. Tightened the title dock spacing.",
-    "Restored the lively springs/squash in cbVideoPlayer and the preview dock (JELLY 520/15, POP 380/17, overshoot velocities, rubber 96, hover 1.045) while keeping the plain-CSS wide-screen dock anchoring fix.",
-    "Committed d3ffc34b; Vercel READY."
+    "2026-11-24: Diagnosed the PDF dock white tint as the white PDF page bleeding through the translucent saturate(160%) glass.",
+    "PDF .pdv-g changed to dense near-opaque neutral glass, blur only (no saturate); neutralized dot/swatch/checkbox rims, focused textbox, and the Light theme swatch.",
+    "Neutralized video spinner/subtitle glyphs and the command palette AI pill white borders/glow + orb highlight (blue accent retained).",
+    "Committed 5d106f9c; Vercel READY."
   ],
   "key_numbers": {
-    "commit": "d3ffc34b",
-    "deploy_url": "https://cloudbliss-storage-j5ijpg38i-sqc.vercel.app",
+    "commit": "5d106f9c",
+    "deploy_url": "https://cloudbliss-storage-b90rxrhhq-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
-    "No local tsc; Vercel cloud build authoritative (build passed)."
+    "No local tsc; Vercel cloud build authoritative (build passed).",
+    "PDF page backgrounds stay white by design (document content), only the chrome was neutralized."
   ],
-  "next": "Await visual feedback on the simplified PDF docks and restored motion."
+  "next": "Await visual confirmation; if a specific surface still looks white, identify it from a screenshot."
 }
