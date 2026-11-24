@@ -41,8 +41,9 @@ Files without it use the standard path.
 ## Backend hardening
 
 See [BACKEND-OPENSOURCE-PLAN.md](./BACKEND-OPENSOURCE-PLAN.md) for the live
-least-privilege work (function grants, bucket privacy, RLS enforcement) and
-the steps required when deploying your own instance.
+least-privilege work (function grants, bucket privacy, RLS enforcement) that
+contributors are expected to understand and preserve. SquidCloud is open
+source for transparency and community contribution, not as a self-hosting kit.
 
 ## Reporting
 

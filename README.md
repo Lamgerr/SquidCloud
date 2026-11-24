@@ -14,15 +14,21 @@
 
 ## What this is
 
-SquidCloud is a self-hostable cloud storage platform with a web app, CLI, and
+SquidCloud is a privacy-first cloud storage platform with a web app, CLI, and
 mobile/desktop targets. It stores files in encrypted chunks, supports large
 files, secure sharing, a developer API, and an AI assistant that runs within
 the user's own account.
 
-The project is open source under the [SquidCloud Public License](./LICENSE):
-you may run it, fork it, modify it, ship it commercially, and send upstream
-patches freely. The only hard limit is that it may not be used for unlawful
-activity (breaching, counterfeiting, malware, fraud, and similar harms).
+**Why this is open source.** SquidCloud was not open sourced to be a
+self-hosting kit. It was open sourced to welcome contributors and maintainers,
+and to give users full transparency that their data is in responsible hands —
+so anyone can audit the encryption, the storage layer, and the backend and see
+exactly how their files are handled.
+
+The [SquidCloud Public License](./LICENSE) grants broad freedom to study,
+improve, and contribute to the project. It exists to protect users, not to
+restrict builders: the only hard limit is that the software may not be used for
+unlawful activity (breaching, counterfeiting, malware, fraud, and similar harms).
 
 **Read the security model before trusting it with real data:**
 [docs/SECURITY-MODEL.md](./docs/SECURITY-MODEL.md) and [SECURITY.md](./SECURITY.md).
@@ -46,27 +52,30 @@ activity (breaching, counterfeiting, malware, fraud, and similar harms).
 
 ---
 
-## Quick start
+## Contributing / local development
+
+This section is for contributors working on SquidCloud, not for running a
+production service. To develop locally:
 
 ```bash
 git clone https://github.com/Lamgerr/SquidCloud.git
 cd SquidCloud
 npm install
-cp .env.example .env.local     # fill with your own Supabase + provider values
+cp .env.example .env.local     # local development values; never commit
 npm run dev
 ```
 
-To run against your own Supabase project:
+For backend work against a development Supabase project:
 
 ```bash
-supabase link --project-ref <your-project-ref>
+supabase link --project-ref <your-dev-project-ref>
 supabase db push
 supabase functions deploy --all
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full local setup and
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contributor setup and
 [docs/BACKEND-OPENSOURCE-PLAN.md](./docs/BACKEND-OPENSOURCE-PLAN.md) for the
-backend hardening requirements you should apply to your own instance.
+backend security model contributors are expected to understand and preserve.
 
 Requirements: Node 18+, npm, and optionally the Supabase CLI and Docker for
 local database work.
