@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import DOMPurify from 'dompurify';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 
@@ -22,35 +23,28 @@ const renderLatex = (text: string, displayMode: boolean = false): string => {
   }
 };
 
-const sanitizeHtml = (html: string): string => {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-
-  // Remove high-risk tags entirely.
-  doc
-    .querySelectorAll('script,iframe,object,embed,style,link,meta,base,form,input,button,textarea,select,option')
-    .forEach((node) => node.remove());
-
-  doc.querySelectorAll('*').forEach((el) => {
-    [...el.attributes].forEach((attr) => {
-      const name = attr.name.toLowerCase();
-      const value = attr.value.trim().toLowerCase();
-
-      if (name.startsWith('on')) {
-        el.removeAttribute(attr.name);
-        return;
-      }
-
-      if (['src', 'href', 'xlink:href'].includes(name)) {
-        if (value.startsWith('javascript:') || value.startsWith('data:text/html')) {
-          el.removeAttribute(attr.name);
-        }
-      }
-    });
-  });
-
-  return doc.body.innerHTML;
-};
+/**
+ * Allow-list sanitizer. The previous blocklist missed svg/animate/foreignObject,
+ * srcdoc, formaction and style-based vectors — all of which execute script in
+ * the app origin. DOMPurify with a strict tag/attribute allow-list closes those.
+ * KaTeX spans and MathML are explicitly allowed so formula rendering survives.
+ */
+const sanitizeHtml = (html: string): string =>
+  DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'p', 'br', 'strong', 'em', 'b', 'i', 'u', 's', 'del', 'code', 'pre', 'blockquote',
+      'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'img', 'hr',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'span', 'sup', 'sub',
+      'math', 'semantics', 'annotation', 'mrow', 'mi', 'mn', 'mo', 'ms', 'mtext',
+      'svg', 'g', 'path',
+    ],
+    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target', 'rel', 'aria-hidden'],
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: true,
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'style', 'link', 'meta', 'base', 'input', 'button', 'textarea', 'select'],
+    FORBID_ATTR: ['srcdoc', 'formaction', 'onerror', 'onload', 'onclick', 'onmouseover'],
+    RETURN_TRUSTED_TYPE: false,
+  }) as string;
 
 // Process code blocks with syntax highlighting
 const processCodeBlock = (code: string, language: string): string => {

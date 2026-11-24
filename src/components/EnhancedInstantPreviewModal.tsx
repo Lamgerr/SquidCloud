@@ -29,8 +29,10 @@ import { previewTabs, detectKind, type PreviewKind } from '@/services/preview-ta
 import { GRAIN_CSS } from './grain';
 import { DOCK_CSS, Icons } from '@/components/FloatingDock';   // the dashboard dock's own tokens + icons: identical look, zero drift
 
-const decryptedBlobCache = new Map<string, { blob: Blob; url: string; timestamp: number }>();
-const MAX_CACHE_ITEMS = 15;
+// SECURITY: no module-level plaintext cache. Decrypted files live only for the
+// lifetime of the open modal and are revoked/zeroed on close (see cleanup below).
+// A shared cache would leave up to N plaintext files reachable from any script
+// running in the app origin (XSS or a host-permission extension).
 
 const SPRING = { type: 'spring' as const, stiffness: 360, damping: 28, mass: 0.8 };
 
@@ -108,6 +110,18 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     if (isOpen && file) previewTabs.open(file, kind, file.name || 'Preview');
   }, [isOpen, file?.id, kind]);
 
+  // SECURITY: when the modal closes or unmounts, drop all plaintext references
+  // and revoke blob URLs immediately. No decrypted data survives the preview.
+  useEffect(() => {
+    if (isOpen) return;
+    setDecodedBlob(null);
+    setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return null; });
+  }, [isOpen]);
+  useEffect(() => () => {
+    setDecodedBlob(null);
+    setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return null; });
+  }, []);
+
   // Esc / viewers' own onClose / history-back → minimize (tab stays in the stack).
   // The dock's X → close (tab is removed). Two different intents, two different paths.
   const leave = useCallback((remove: boolean) => {
@@ -142,8 +156,6 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
       setBlobUrl('virtual-hls-stream'); setLoading(false); return;
     }
     if (kind === 'model') { setLoading(false); return; }
-    const cached = decryptedBlobCache.get(file.id);
-    if (cached) { setDecodedBlob(cached.blob); setBlobUrl(cached.url); setLoading(false); return; }
     setLoading(true); setError(null);
     (async () => {
       try {
@@ -156,26 +168,16 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
             smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId })
               .then(full => {
                 if (loadGen.current !== gen) return;
-                const url = URL.createObjectURL(full);
-                if (decryptedBlobCache.size >= MAX_CACHE_ITEMS) {
-                  const k = decryptedBlobCache.keys().next().value;
-                  if (k) { URL.revokeObjectURL(decryptedBlobCache.get(k)!.url); decryptedBlobCache.delete(k); }
-                }
-                decryptedBlobCache.set(file.id, { blob: full, url, timestamp: Date.now() });
-                setDecodedBlob(full); setBlobUrl(url);
+                setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return URL.createObjectURL(full); });
+                setDecodedBlob(full);
               }).catch(() => {});
           }
         } else {
           blob = await smartDownload(file.id, { reason: 'preview', fileName: file.name, shareId });
         }
         if (loadGen.current !== gen) return;
-        const url = URL.createObjectURL(blob);
-        if (decryptedBlobCache.size >= MAX_CACHE_ITEMS) {
-          const k = decryptedBlobCache.keys().next().value;
-          if (k) { URL.revokeObjectURL(decryptedBlobCache.get(k)!.url); decryptedBlobCache.delete(k); }
-        }
-        decryptedBlobCache.set(file.id, { blob, url, timestamp: Date.now() });
-        setDecodedBlob(blob); setBlobUrl(url); setLoading(false);
+        setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return URL.createObjectURL(blob); });
+        setDecodedBlob(blob); setLoading(false);
       } catch (e: any) {
         if (loadGen.current === gen) { setError(e?.message || 'Unable to load preview'); setLoading(false); }
       }
