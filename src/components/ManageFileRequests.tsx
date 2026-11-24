@@ -16,7 +16,6 @@ import { Inbox, Copy, ExternalLink, Trash2, Eye, Download, Move, Loader2, Calend
 import { formatDistanceToNow } from 'date-fns';
 import { formatBytes } from '@/lib/api';
 import EnhancedInstantPreviewModal from './EnhancedInstantPreviewModal';
-import DeepReadReader from './DeepReadReader';
 import { MoveToFolderDialog } from './MoveToFolderDialog';
 
 interface FileRequestItem {
@@ -317,14 +316,6 @@ export const ManageFileRequests: React.FC<ManageFileRequestsProps> = ({ refreshT
             }
           }}
           onOpenEpubReader={() => { setPreviewFile(null); setReadingEpubFile(previewFile); }}
-        />
-      )}
-      {readingEpubFile && (
-        <DeepReadReader
-          file={{ id: readingEpubFile.file_id, name: readingEpubFile.file_name, type: readingEpubFile.file?.type || '' }}
-          source="local"
-          isOpen={!!readingEpubFile}
-          onClose={() => setReadingEpubFile(null)}
         />
       )}
       <MoveToFolderDialog

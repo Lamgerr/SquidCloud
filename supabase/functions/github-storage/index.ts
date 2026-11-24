@@ -158,35 +158,45 @@ serve(async (req) => {
         }
       }
 
-      // Legacy GitHub Path
+      // Legacy GitHub Path — resolve the repo owner at read time (old metadata
+      // stored only a name + account index). Dedicated storage account first,
+      // then the user's own connection, then the indexed accounts, then public.
       if (repo && repo !== "b2") {
-        const GITHUB_TOKENS = [
-          Deno.env.get("GITHUB_TOKEN"),
-          Deno.env.get("GITHUB_TOKEN_2"),
-          Deno.env.get("GITHUB_TOKEN_3"),
+        const candidates: { token?: string; user?: string }[] = [
+          { token: Deno.env.get("LEGACY_STORAGE_GITHUB_TOKEN"), user: Deno.env.get("LEGACY_STORAGE_GITHUB_USERNAME") },
         ];
-        const GITHUB_USERS = [
-          Deno.env.get("GITHUB_USERNAME"),
-          Deno.env.get("GITHUB_USERNAME_2"),
-          Deno.env.get("GITHUB_USERNAME_3"),
-        ];
+        try {
+          const { data: conn } = await supabase
+            .from("github_connections")
+            .select("github_username, access_token")
+            .eq("user_id", userId)
+            .limit(1);
+          if (conn?.[0]?.github_username) candidates.push({ user: conn[0].github_username, token: conn[0].access_token });
+        } catch { /* optional extra route */ }
 
+        const GITHUB_TOKENS = [Deno.env.get("GITHUB_TOKEN"), Deno.env.get("GITHUB_TOKEN_2"), Deno.env.get("GITHUB_TOKEN_3")];
+        const GITHUB_USERS = [Deno.env.get("GITHUB_USERNAME"), Deno.env.get("GITHUB_USERNAME_2"), Deno.env.get("GITHUB_USERNAME_3")];
         const nodeIndex = Math.min(nodeId || 0, 2);
-        const token = GITHUB_TOKENS[nodeIndex] || GITHUB_TOKENS[0];
-        const user = GITHUB_USERS[nodeIndex] || GITHUB_USERS[0];
+        candidates.push({ token: GITHUB_TOKENS[nodeIndex] || GITHUB_TOKENS[0], user: GITHUB_USERS[nodeIndex] || GITHUB_USERS[0] });
+        for (let i = 0; i < 3; i++) candidates.push({ token: GITHUB_TOKENS[i], user: GITHUB_USERS[i] });
+        candidates.push({});
 
-        const fetchUrl = `https://api.github.com/repos/${user}/${repo}/contents/${path}`;
-        const response = await fetch(fetchUrl, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/vnd.github.v3+json",
-            "User-Agent": "Squidcloud",
-          },
-        });
-
-        if (!response.ok) return createErrorResponse("Legacy GitHub chunk not found", 404);
-        const data = await response.json();
-        return jsonResponse({ success: true, content: data.content, legacy: true });
+        let lastStatus = 404;
+        for (const c of candidates) {
+          if (!c.user) continue;
+          const fetchUrl = `https://api.github.com/repos/${encodeURIComponent(c.user)}/${encodeURIComponent(repo)}/contents/${path}`;
+          const headers: Record<string, string> = { Accept: "application/vnd.github.v3+json", "User-Agent": "Squidcloud" };
+          if (c.token) headers.Authorization = `Bearer ${c.token}`;
+          try {
+            const response = await fetch(fetchUrl, { headers });
+            lastStatus = response.status;
+            if (!response.ok) continue;
+            const data = await response.json();
+            if (!data?.content) continue;
+            return jsonResponse({ success: true, content: data.content, legacy: true });
+          } catch { /* next account */ }
+        }
+        return createErrorResponse(`Legacy GitHub chunk not found (last status ${lastStatus})`, 404);
       }
 
       // New Backblaze B2 Path (Presigned GET URL)

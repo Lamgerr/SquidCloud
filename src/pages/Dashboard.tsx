@@ -48,8 +48,6 @@ import FileInfoModal from '@/components/FileInfoModal';
 import EnhancedInstantPreviewModal from '@/components/EnhancedInstantPreviewModal';
 import PreviewTabStack from '@/components/PreviewTabStack';
 import { previewTabs } from '@/services/preview-tabs';
-import DeepReadCatalog from '@/components/DeepReadCatalog';
-import DeepReadReader from '@/components/DeepReadReader';
 // Transfer feedback lives in the FloatingDock sheet only (no duplicate panel/toasts).
 import TrashTab from '@/components/TrashTab';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
@@ -1448,16 +1446,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                 />
                 </div>
               )}
-              {activeTab === 'books' && (
-                <div className="sq-tab-enter">
-                <DeepReadCatalog
-                  files={files}
-                  onBookOpen={handleBookOpen}
-                  onSaved={fetchFiles}
-                />
-                </div>
-              )}
-
               {activeTab === 'settings' && (
                 <SettingsCard>
                   <button onClick={() => navigate('/settings/account')} className="flex w-full items-center gap-2.5 px-3 h-10 hover:bg-accent/50 text-left transition-colors group">
@@ -1513,7 +1501,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
                         { id: 'home', label: 'Home', icon: Home },
                         { id: 'files', label: 'Files', icon: FileStack },
                         { id: 'shared', label: 'Shared', icon: Users },
-                        { id: 'books', label: 'Books', icon: Book },
                         { id: 'trash', label: 'Trash', icon: Trash2 },
                         { id: 'file-requests', label: 'File Requests', icon: Inbox },
                       ].map((item) => {
@@ -1812,14 +1799,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
             onDismiss={dismissNotification}
           />
         ))}
-        {readingFile && (
-          <DeepReadReader
-            file={readingFile}
-            source={readingSource}
-            isOpen={true}
-            onClose={() => setReadingFile(null)}
-          />
-        )}
       </AppStartupBiometricCheck>
       </FileViewInfoContext.Provider>
     );
@@ -2029,16 +2008,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
               {activeTab === 'secrets'   && <div className="sq-tab-enter"><SquidVeilSecrets /></div>}
               {activeTab === 'storage'   && <div className="sq-tab-enter"><StorageTab /></div>}
               {activeTab === 'scripts'   && <div className="sq-tab-enter"><Scripts /></div>}
-              {activeTab === 'books' && (
-                <div className="sq-tab-enter">
-                <DeepReadCatalog
-                  files={files}
-                  onBookOpen={handleBookOpen}
-                  onSaved={fetchFiles}
-                />
-                </div>
-              )}
-
               {activeTab === 'file-requests' && (
                 profile?.is_premium ? (
                   <div className="sq-tab-enter space-y-5">
@@ -2321,15 +2290,6 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
           onDismiss={dismissNotification}
         />
       ))}
-      {readingFile && (
-        <DeepReadReader
-          file={readingFile}
-          source={readingSource}
-          isOpen={true}
-          onClose={() => setReadingFile(null)}
-        />
-      )}
-
       <GitHubRepoCloneDialog
         open={cloneDialogOpen}
         onOpenChange={setCloneDialogOpen}

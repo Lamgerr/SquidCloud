@@ -26,7 +26,6 @@ import EnhancedFileCard from '@/components/EnhancedFileCard';
 import DownloadManager from '@/components/DownloadManager';
 import TrashTab from '@/components/TrashTab';
 import EnhancedInstantPreviewModal from '@/components/EnhancedInstantPreviewModal';
-import DeepReadReader from '@/components/DeepReadReader';
 
 interface MobileEnhancedUIProps {
   files: any[];
@@ -297,14 +296,6 @@ const MobileEnhancedUI: React.FC<MobileEnhancedUIProps> = ({
           onDownload={() => onFileDownload(previewFile)}
           onShare={() => onFileShare(previewFile)}
           onOpenEpubReader={() => { setPreviewFile(null); setReadingEpubFile(previewFile); }}
-        />
-      )}
-      {readingEpubFile && (
-        <DeepReadReader
-          file={readingEpubFile}
-          source="local"
-          isOpen={!!readingEpubFile}
-          onClose={() => setReadingEpubFile(null)}
         />
       )}
     </div>

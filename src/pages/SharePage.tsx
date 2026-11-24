@@ -18,7 +18,6 @@ import { getFileInfoById, getFolderShareContents, logShareDecryptAttempt, checkS
 import { decryptData } from '@/lib/encryption';
 import { buildPublicUrl } from '@/lib/appLinks';
 import EnhancedInstantPreviewModal from '@/components/EnhancedInstantPreviewModal';
-import DeepReadReader from '@/components/DeepReadReader';
 import { backgroundDownloadService } from '@/services/backgroundDownload';
 
 interface SharedFileData {
@@ -715,14 +714,6 @@ const SharePage: React.FC = () => {
           onDownload={() => handleDownload()}
           shareId={actualShareId}
           onOpenEpubReader={() => { setPreviewOpen(false); setReadingEpubFile(fileData); }}
-        />
-      )}
-      {readingEpubFile && (
-        <DeepReadReader
-          file={{ id: readingEpubFile.file_id, name: readingEpubFile.file_name, type: readingEpubFile.file_type }}
-          source="local"
-          isOpen={!!readingEpubFile}
-          onClose={() => setReadingEpubFile(null)}
         />
       )}
     </div>
