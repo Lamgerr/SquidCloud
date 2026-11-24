@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -14,85 +15,610 @@ import CliDevicesSection from '@/components/settings/CliDevicesSection';
 import { WebhookManager } from '@/components/WebhookManager';
 import {
   User, Key, Shield, ShieldAlert, Fingerprint,
-  Plus, Lock, Settings, Trash2, HardDrive, Calendar, Code, Zap,
-  FolderOpen, FileArchive, RefreshCw, Crown, Briefcase, TrendingUp,
+  Plus, Lock, Settings, Trash2, Calendar, Code,
+  FolderOpen, FileArchive, RefreshCw, Crown,
   Repeat, Book, LogOut, Smartphone,
 } from '@/lib/icon-map';
 import { swkFetchNotices, swkAppealCase, SwkNotice } from '@/lib/swk-manifest';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import MigrationWizard from '@/components/MigrationWizard';
 import CancelSubscriptionFlow from '@/components/CancelSubscriptionFlow';
 import { emitSignal } from '@/lib/api';
 import { mfaService, MfaFactor } from '@/services/mfa-service';
 import {
-  AppShell, TopBar, Wrap, PageHead, Panel, Row, Pill, Dot, Meter, Note, Stat, Stats, KV,
-  Empty, Skel, SkelRows, Spinner, Ico, Field, UnderlineTabs, btn, useHashState, useDocTitle,
+  AppShell, Spinner, Ico, useHashState, useDocTitle,
 } from '@/components/custom/squid-app';
-import type { Tone } from '@/components/custom/squid-app';
-
-/* ═══════════════════════════════════════════════════════════════
-   ACCOUNT SETTINGS
-   One grammar for the whole page: a Panel is a topic, a Row is one
-   setting (what it is on the left, how to change it on the right).
-   Left rail groups the nine sections and the open one lives in the
-   URL (#section=security), so refresh and back-links land where you
-   were. ⌘/Ctrl+S saves the profile form. Every handler is unchanged.
-   Place at: src/pages/AccountSettings.tsx
-   ═══════════════════════════════════════════════════════════════ */
-
-import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
 import VaultUnlockDialog from '@/components/VaultUnlockDialog';
 import { isVaultUnlocked, lockVault } from '@/lib/zk-vault-session';
 
-const ST_CSS = `
-${ PAGES_POLISH }
-.st { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 48px; align-items: start; }
-.st-nav { position: sticky; top: 72px; }
-.st-main { min-width: 0; max-width: 780px; }
-.st-main > .sa-panel + .sa-panel, .st-main > .sa-panel + div, .st-main > div + .sa-panel { margin-top: 16px; }
-.st-bar { display: none; }
-@media (max-width: 860px) {
-  .st { grid-template-columns: 1fr; gap: 0; }
-  .st-nav { display: none; }
-  .st-bar { display: block; position: sticky; top: 48px; z-index: 30; padding: 0 var(--sa-gut); border-bottom: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg) 92%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-  .st-bar .sa-tabs { border-bottom: 0; }
+/* ═══════════════════════════════════════════════════════════════
+   SQUIDCLOUD · tvOS LIQUID GLASS ACCOUNT SETTINGS
+   Single-column stage, bottom floating dock, spring jelly motion,
+   deep obsidian glass, zero white tints.
+   Place at: src/pages/AccountSettings.tsx
+   ═══════════════════════════════════════════════════════════════ */
+
+const SPRING =
+  'linear(0, 0.03, 0.107, 0.214, 0.337, 0.464, 0.586, 0.699, 0.797, 0.881, 0.948, 0.999, 1.037, 1.062, 1.077, 1.083, 1.083, 1.078, 1.07, 1.06, 1.05, 1.039, 1.029, 1.02, 1.013, 1.007, 1.002, 0.998, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.995, 0.995, 0.996, 0.997, 1)';
+const JELLY =
+  'linear(0, 0.067, 0.235, 0.453, 0.681, 0.885, 1.047, 1.158, 1.218, 1.233, 1.215, 1.174, 1.122, 1.069, 1.022, 0.986, 0.961, 0.948, 0.946, 0.951, 0.961, 0.973, 0.985, 0.996, 1.004, 1.01, 1.012, 1.013, 1.011, 1.009, 1.006, 1.003, 1.001, 0.999, 0.998, 0.997, 0.997, 0.997, 1)';
+
+const RIM_MASK = `
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;`;
+
+const TV_CSS = `
+html.sq-app-root .tv-root {
+  --lq-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --lq-jelly: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --tv-bg: #070807;
+  --tv-glass: rgba(13, 14, 13, 0.88);
+  --tv-glass-hi: rgba(20, 22, 20, 0.94);
+  --tv-well: rgba(8, 9, 8, 0.72);
+  --tv-ink: #e8e7e1;
+  --tv-ink-2: #a7a8a2;
+  --tv-mute: #6c6e68;
+  --tv-line: rgba(232, 231, 225, 0.08);
+  --tv-rim: rgba(232, 231, 225, 0.15);
+  --tv-ok: #86c3a1;
+  --tv-warn: #d9ac62;
+  --tv-err: #e5796f;
+  position: relative;
+  min-height: calc(100vh / var(--sa-zoom, 1));
+  background:
+    radial-gradient(60% 45% at 50% -10%, rgba(28, 32, 29, 0.45), transparent 70%),
+    var(--tv-bg);
+  color: var(--tv-ink);
+  padding: 24px clamp(16px, 4vw, 40px) 132px;
+  font-family: var(--sa-f, 'Hanken Grotesk', system-ui, -apple-system, sans-serif);
 }
-.st-foot { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 16px; border-top: 1px solid var(--sa-line); }
-.st-p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--sa-text-2); }
-.st-form { display: grid; gap: 16px; }
-.st-form > *, .st-g2 > * { min-width: 0; }
-.st-g2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-@media (max-width: 640px) { .st-g2 { grid-template-columns: minmax(0, 1fr); } }
-.st-mfa { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 20px; padding: 16px; }
-@media (max-width: 640px) { .st-mfa { grid-template-columns: 1fr; } }
-.st-qr { width: 176px; height: 176px; padding: 8px; border-radius: 4px; background: #fff; }
-.st-qr svg, .st-qr img { display: block; width: 100%; height: 100%; }
-.st-select { height: 30px; padding: 0 8px; border: 1px solid var(--sa-line-2); border-radius: 4px; background: var(--sa-bg); color: var(--sa-text); font: 400 12.5px/1 var(--sa-f); }
-.st-select:focus-visible { outline: 1px solid var(--sa-text); outline-offset: 1px; }
-.st-notice { padding: 14px 16px; }
-.st-notice + .st-notice { border-top: 1px solid var(--sa-line); }
-.st-notice h4 { margin: 0; font: 500 13.5px/1.35 var(--sa-f); }
-.st-notice .when { font: 400 11px/1.4 var(--sa-mono); color: var(--sa-mute); }
-.st-notice p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--sa-text-2); white-space: pre-wrap; }
-.st-codes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.st-df { padding: 12px 14px; border: 1px solid var(--sa-line); border-radius: 4px; background: var(--sa-bg-2); min-width: 0; }
-.st-df.full { grid-column: 1 / -1; }
-.st-df small { display: block; font: 400 10.5px/1 var(--sa-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--sa-mute); }
-.st-df b { display: block; margin-top: 7px; font: 500 13.5px/1.35 var(--sa-f); color: var(--sa-text); word-break: break-word; }
-.st-df b.mono { font: 400 12px/1.5 var(--sa-mono); }
-.st-df b.cap { text-transform: capitalize; }
-.st-df b.good { color: var(--sa-ok); }
-.st-pay { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; transition: background 0.12s; }
-.st-pay + .st-pay { border-top: 1px solid var(--sa-line); }
-.st-pay:hover { background: var(--sa-bg-3); }
-.st-pay .l { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.st-pay b { display: block; font: 500 13.5px/1.35 var(--sa-f); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.st-pay small { display: block; margin-top: 2px; font-size: 12px; color: var(--sa-mute); }
-.st-pay .amt { font: 500 13.5px/1 var(--sa-mono); flex: none; }
+@supports (transition-timing-function: linear(0, 1)) {
+  html.sq-app-root .tv-root {
+    --lq-spring: ${SPRING};
+    --lq-jelly: ${JELLY};
+  }
+}
+
+/* Force zero white tints across child components & switches */
+html.sq-app-root .tv-root :is(.lg-card, .sa-panel, [data-tab-card]) {
+  background: var(--tv-glass) !important;
+  background-image: none !important;
+  border: 1px solid var(--tv-line) !important;
+  border-radius: 26px !important;
+  -webkit-backdrop-filter: blur(22px) !important;
+  backdrop-filter: blur(22px) !important;
+  box-shadow: inset 0 1px 0 var(--tv-rim), 0 22px 48px -22px rgba(0, 0, 0, 0.85) !important;
+}
+html.sq-app-root .tv-root [role="switch"] {
+  background: rgba(232, 231, 225, 0.08) !important;
+  border: 1px solid var(--tv-line) !important;
+  height: 26px !important;
+  width: 46px !important;
+  border-radius: 999px !important;
+  transition: transform 0.55s var(--lq-jelly), background-color 0.2s !important;
+}
+html.sq-app-root .tv-root [role="switch"][data-state="checked"] {
+  background: rgba(134, 195, 161, 0.24) !important;
+  border-color: rgba(134, 195, 161, 0.45) !important;
+}
+html.sq-app-root .tv-root [role="switch"] > span {
+  background: var(--tv-ink) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6) !important;
+  transition: transform 0.55s var(--lq-jelly), scale 0.35s var(--lq-jelly) !important;
+}
+html.sq-app-root .tv-root [role="switch"]:active {
+  transform: scale(0.88) !important;
+}
+html.sq-app-root .tv-root [role="switch"]:active > span {
+  scale: 1.28 0.86;
+}
+
+/* Remove left-side content/marketing splits in auth views */
+html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
+  display: none !important;
+}
+
+/* ── Top floating HUD ── */
+.tv-hud {
+  max-width: 640px;
+  margin: 0 auto 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tv-hud-r {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Centered single-column tvOS stage ── */
+.tv-stage {
+  max-width: 640px;
+  margin: 0 auto;
+}
+.tv-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 0 6px;
+}
+.tv-title {
+  margin: 0;
+  font: 400 26px/1.15 var(--sa-f);
+  letter-spacing: -0.025em;
+  color: var(--tv-ink);
+}
+.tv-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Liquid glass pod ── */
+.tv-pod {
+  position: relative;
+  border-radius: 26px;
+  background: var(--tv-glass);
+  border: 1px solid var(--tv-line);
+  -webkit-backdrop-filter: blur(22px);
+  backdrop-filter: blur(22px);
+  box-shadow: inset 0 1px 0 var(--tv-rim), 0 22px 48px -22px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  transition: transform 0.65s var(--lq-spring), border-color 0.25s, box-shadow 0.35s;
+}
+.tv-pod::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  opacity: 0.45;
+  background: conic-gradient(from 205deg at 50% 50%, var(--tv-rim), transparent 80deg, transparent 160deg, var(--tv-rim) 220deg, transparent 300deg, var(--tv-rim));
+  ${RIM_MASK}
+}
+.tv-pod:hover, .tv-pod:focus-within {
+  border-color: rgba(232, 231, 225, 0.16);
+  box-shadow: inset 0 1px 0 rgba(232, 231, 225, 0.22), 0 28px 56px -22px rgba(0, 0, 0, 0.92);
+}
+.tv-pod.danger {
+  border-color: rgba(229, 121, 111, 0.22);
+}
+.tv-pod-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+}
+.tv-pod-h + .tv-pod-b {
+  border-top: 1px solid var(--tv-line);
+}
+.tv-pod-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: 500 14px/1.2 var(--sa-f);
+  letter-spacing: -0.01em;
+  color: var(--tv-ink);
+}
+.tv-pod-t svg {
+  color: var(--tv-ink-2);
+}
+.tv-pod-b {
+  padding: 18px 20px;
+}
+.tv-pod-b.flush {
+  padding: 0;
+}
+
+/* ── Minimal tvOS rows ── */
+.tv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 12px 20px;
+  transition: background-color 0.2s;
+}
+.tv-row:hover {
+  background: rgba(232, 231, 225, 0.025);
+}
+.tv-row + .tv-row {
+  border-top: 1px solid var(--tv-line);
+}
+.tv-row-l {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tv-row-t {
+  font: 400 14px/1.3 var(--sa-f);
+  color: var(--tv-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tv-row-s {
+  font: 400 12px/1.3 var(--sa-f);
+  color: var(--tv-mute);
+}
+.tv-row-r {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* ── Capsule controls & Jelly buttons (no white fill) ── */
+.tv-pill-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--tv-line);
+  background: var(--tv-glass);
+  color: var(--tv-ink);
+  font: 500 13px/1 var(--sa-f);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: inset 0 1px 0 var(--tv-rim), 0 8px 20px -10px rgba(0, 0, 0, 0.75);
+  transition: transform 0.65s var(--lq-jelly), background-color 0.2s, border-color 0.2s, opacity 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tv-pill-btn:hover {
+  background: var(--tv-glass-hi);
+  border-color: rgba(232, 231, 225, 0.2);
+  transform: scale(1.035);
+}
+.tv-pill-btn:active {
+  transform: scaleX(0.93) scaleY(0.86);
+  transition-duration: 0.12s;
+}
+.tv-pill-btn.lead {
+  background: rgba(232, 231, 225, 0.11);
+  border-color: rgba(232, 231, 225, 0.24);
+}
+.tv-pill-btn.lead:hover {
+  background: rgba(232, 231, 225, 0.17);
+  border-color: rgba(232, 231, 225, 0.34);
+}
+.tv-pill-btn.danger {
+  color: var(--tv-err);
+  border-color: rgba(229, 121, 111, 0.25);
+  background: rgba(229, 121, 111, 0.06);
+}
+.tv-pill-btn.danger:hover {
+  background: rgba(229, 121, 111, 0.14);
+  border-color: rgba(229, 121, 111, 0.4);
+}
+.tv-pill-btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--tv-ink-2);
+}
+.tv-pill-btn.ghost:hover {
+  background: rgba(232, 231, 225, 0.06);
+  color: var(--tv-ink);
+}
+.tv-pill-btn.sm {
+  height: 32px;
+  padding: 0 13px;
+  font-size: 12.5px;
+}
+.tv-pill-btn.icon {
+  width: 36px;
+  padding: 0;
+}
+.tv-pill-btn[disabled] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ── Status badges ── */
+.tv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--tv-line);
+  background: rgba(232, 231, 225, 0.04);
+  font: 500 11px/1 var(--sa-mono);
+  letter-spacing: 0.04em;
+  color: var(--tv-ink-2);
+}
+.tv-badge.ok {
+  color: var(--tv-ok);
+  border-color: rgba(134, 195, 161, 0.28);
+  background: rgba(134, 195, 161, 0.08);
+}
+.tv-badge.warn {
+  color: var(--tv-warn);
+  border-color: rgba(217, 172, 98, 0.28);
+  background: rgba(217, 172, 98, 0.08);
+}
+.tv-badge.err {
+  color: var(--tv-err);
+  border-color: rgba(229, 121, 111, 0.28);
+  background: rgba(229, 121, 111, 0.08);
+}
+.tv-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* ── Glass inputs & selects ── */
+.tv-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 15px;
+  border-radius: 16px;
+  border: 1px solid var(--tv-line);
+  background: var(--tv-well);
+  color: var(--tv-ink);
+  font: 400 13.5px/1 var(--sa-f);
+  transition: border-color 0.2s, box-shadow 0.4s var(--lq-spring), transform 0.4s var(--lq-spring);
+}
+.tv-input::placeholder {
+  color: var(--tv-mute);
+}
+.tv-input:focus {
+  outline: none;
+  border-color: rgba(232, 231, 225, 0.32);
+  box-shadow: 0 0 0 3px rgba(232, 231, 225, 0.06);
+}
+.tv-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tv-select {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--tv-line);
+  background: var(--tv-well);
+  color: var(--tv-ink);
+  font: 400 12.5px/1 var(--sa-f);
+}
+.tv-field-label {
+  display: block;
+  margin-bottom: 6px;
+  font: 400 12px/1 var(--sa-f);
+  color: var(--tv-ink-2);
+}
+.tv-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 560px) {
+  .tv-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ── Metrics strip ── */
+.tv-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  padding: 16px 20px;
+}
+.tv-metric {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--tv-well);
+  border: 1px solid var(--tv-line);
+}
+.tv-metric span {
+  display: block;
+  font: 400 11px/1 var(--sa-mono);
+  color: var(--tv-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.tv-metric b {
+  display: block;
+  margin-top: 8px;
+  font: 400 20px/1.1 var(--sa-f);
+  color: var(--tv-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Single-column Auth / MFA flow (no left content block, no white QR) ── */
+.tv-mfa-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 20px;
+  text-align: center;
+}
+.tv-qr-dark {
+  width: 156px;
+  height: 156px;
+  padding: 12px;
+  border-radius: 22px;
+  background: var(--tv-well);
+  border: 1px solid var(--tv-line);
+  box-shadow: inset 0 1px 0 var(--tv-rim);
+}
+.tv-qr-dark svg, .tv-qr-dark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: invert(0.92) hue-rotate(180deg) contrast(1.15);
+  border-radius: 10px;
+}
+.tv-secret-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 8px 6px 14px;
+  border-radius: 999px;
+  background: var(--tv-well);
+  border: 1px solid var(--tv-line);
+  font: 400 12px/1 var(--sa-mono);
+  color: var(--tv-ink-2);
+}
+.tv-secret-pill code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Progress meter ── */
+.tv-meter {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(232, 231, 225, 0.08);
+  overflow: hidden;
+}
+.tv-meter > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--tv-ink);
+  transition: width 0.7s var(--lq-spring);
+}
+
+/* ── Payment list ── */
+.tv-pay-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  border: 0;
+  background: transparent;
+  color: var(--tv-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.18s;
+}
+.tv-pay-row + .tv-pay-row {
+  border-top: 1px solid var(--tv-line);
+}
+.tv-pay-row:hover {
+  background: rgba(232, 231, 225, 0.04);
+}
+
+/* ── Rounded Floating Dock (Bottom Navigation) ── */
+.tv-dock-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  padding: 0 12px;
+}
+.tv-dock {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(12, 13, 12, 0.88);
+  border: 1px solid rgba(232, 231, 225, 0.11);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 231, 225, 0.18),
+    0 24px 54px -16px rgba(0, 0, 0, 0.88);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tv-dock::-webkit-scrollbar {
+  display: none;
+}
+.tv-dock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  opacity: 0.6;
+  background: conic-gradient(from 205deg at 50% 50%, var(--tv-rim), transparent 80deg, transparent 160deg, var(--tv-rim) 220deg, transparent 300deg, var(--tv-rim));
+  ${RIM_MASK}
+}
+.tv-dock-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tv-mute);
+  font: 500 13px/1 var(--sa-f);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s !important;
+}
+.tv-dock-item:hover {
+  color: var(--tv-ink-2);
+}
+.tv-dock-item[aria-selected="true"] {
+  color: var(--tv-ink);
+}
+.tv-dock-thumb {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(232, 231, 225, 0.09);
+  border: 1px solid rgba(232, 231, 225, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 231, 225, 0.16),
+    0 6px 16px -4px rgba(0, 0, 0, 0.65);
+}
+.tv-dock-content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+@media (max-width: 720px) {
+  .tv-dock-item {
+    padding: 0 12px;
+  }
+  .tv-dock-item:not([aria-selected="true"]) .tv-dock-label {
+    display: none;
+  }
+}
 `;
 
 const ACCOUNT_PREFS_STORAGE_KEY = 'squid_account_settings_v3';
@@ -122,13 +648,11 @@ interface AccountPreferenceSettings {
 interface AccountPreferenceItem {
   key: keyof AccountPreferenceSettings;
   label: string;
-  description: string;
 }
 
 interface AccountPreferenceCategory {
   id: string;
   title: string;
-  subtitle: string;
   items: AccountPreferenceItem[];
 }
 
@@ -157,43 +681,88 @@ const DEFAULT_ACCOUNT_PREFERENCES: AccountPreferenceSettings = {
 const SETTINGS_CATEGORIES = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'security', label: 'Security', icon: Shield },
-  { id: 'devices', label: 'CLI Devices', icon: Smartphone },
-  { id: 'developer', label: 'Developer API', icon: Code },
-  { id: 'webhooks', label: 'Webhooks', icon: Repeat },
-  { id: 'plans', label: 'Plans & Subscription', icon: Crown },
-  { id: 'migration', label: 'Migration', icon: FileArchive },
+  { id: 'plans', label: 'Plan', icon: Crown },
   { id: 'byok', label: 'Encryption', icon: Lock },
-  { id: 'preferences', label: 'Advanced', icon: Settings },
+  { id: 'developer', label: 'API', icon: Code },
+  { id: 'webhooks', label: 'Webhooks', icon: Repeat },
+  { id: 'devices', label: 'CLI', icon: Smartphone },
+  { id: 'migration', label: 'Import', icon: FileArchive },
+  { id: 'preferences', label: 'System', icon: Settings },
 ] as const;
 
 type SettingsCategory = typeof SETTINGS_CATEGORIES[number]['id'];
-
 const SECTION_IDS: SettingsCategory[] = SETTINGS_CATEGORIES.map((c) => c.id);
 
-const NAV_GROUPS: Array<{ label: string; ids: SettingsCategory[] }> = [
-  { label: 'Account', ids: ['profile', 'security', 'plans'] },
-  { label: 'Developer', ids: ['developer', 'webhooks', 'devices'] },
-  { label: 'Data', ids: ['migration', 'byok'] },
-  { label: 'System', ids: ['preferences'] },
-];
+type Tone = 'neutral' | 'ok' | 'warn' | 'err';
 
-const SECTION_DESC: Record<SettingsCategory, string> = {
-  profile: 'Your personal information',
-  security: 'Protect your account',
-  devices: 'Command-line devices linked to your account',
-  developer: 'Manage your API keys and integrations',
-  webhooks: 'Configure event-driven webhook notifications',
-  plans: 'Manage your plan and billing',
-  migration: 'Track your ZIP imports and cloud migrations',
-  byok: 'Encryption keys and data protection',
-  preferences: 'Fine-tune your SquidCloud experience',
-};
+function TvBadge({ tone = 'neutral', dot, children }: { tone?: Tone; dot?: boolean; children: React.ReactNode }) {
+  return (
+    <span className={`tv-badge ${tone === 'neutral' ? '' : tone}`.trim()}>
+      {dot && <span className="tv-dot" />}
+      {children}
+    </span>
+  );
+}
+
+function TvPod({
+  title,
+  icon,
+  actions,
+  children,
+  flush,
+  danger,
+}: {
+  title?: React.ReactNode;
+  icon?: React.ReactNode;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+  flush?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <section className={`tv-pod${danger ? ' danger' : ''}`}>
+      {(title || actions) && (
+        <div className="tv-pod-h">
+          {title ? (
+            <h3 className="tv-pod-t">
+              {icon}
+              <span>{title}</span>
+            </h3>
+          ) : <span />}
+          {actions && <div className="tv-row-r">{actions}</div>}
+        </div>
+      )}
+      <div className={`tv-pod-b${flush ? ' flush' : ''}`}>{children}</div>
+    </section>
+  );
+}
+
+function TvRow({
+  label,
+  sub,
+  children,
+}: {
+  label: React.ReactNode;
+  sub?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="tv-row">
+      <div className="tv-row-l">
+        <div className="tv-row-t">{label}</div>
+        {sub && <div className="tv-row-s">{sub}</div>}
+      </div>
+      {children && <div className="tv-row-r">{children}</div>}
+    </div>
+  );
+}
 
 const AccountSettings = () => {
   const { user, profile, session, signOut, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const reduce = !!useReducedMotion();
 
   const [activeCategory, setActiveCategory] = useHashState<SettingsCategory>('section', 'profile', SECTION_IDS);
   const [vaultOpen, setVaultOpen] = useState(false);
@@ -224,6 +793,33 @@ const AccountSettings = () => {
   const [swkNotices, setSwkNotices] = useState<SwkNotice[]>([]);
   const [swkLoading, setSwkLoading] = useState(false);
   const [swkAppealingId, setSwkAppealingId] = useState<string | null>(null);
+  const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
+  const [paymentLogsLoading, setPaymentLogsLoading] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
+  const [notifPrefs, setNotifPrefs] = useState({
+    email_enabled: true,
+    popup_enabled: true,
+    warning_lead_days: 7,
+    do_not_contact: false,
+  });
+
+  // MFA state
+  const [mfaFactors, setMfaFactors] = useState<MfaFactor[]>([]);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaSetupMode, setMfaSetupMode] = useState(false);
+  const [mfaQrCode, setMfaQrCode] = useState('');
+  const [mfaSecret, setMfaSecret] = useState('');
+  const [mfaEnrollmentId, setMfaEnrollmentId] = useState('');
+  const [mfaVerifyCode, setMfaVerifyCode] = useState('');
+  const [mfaVerifying, setMfaVerifying] = useState(false);
+  const [showUnenrollDialog, setShowUnenrollDialog] = useState(false);
+  const [unenrollFactorId, setUnenrollFactorId] = useState('');
+  const [aalLevel, setAalLevel] = useState<{ currentLevel: string; nextLevel: string } | null>(null);
+  const [secretCopied, setSecretCopied] = useState(false);
+
+  const mountedRef = useRef(false);
+  const paymentLogsFetchedRef = useRef(false);
+  const notifPrefsFetchedRef = useRef(false);
 
   useEffect(() => {
     if (activeCategory !== 'security') return;
@@ -244,7 +840,7 @@ const AccountSettings = () => {
       toast({
         title: ok ? 'Appeal submitted' : 'Appeal failed',
         description: ok
-          ? 'A human reviewer will look at your case. The file stays blocked until then.'
+          ? 'A human reviewer will look at your case.'
           : 'Could not submit the appeal. Try again shortly.',
         variant: ok ? 'default' : 'destructive',
       });
@@ -256,89 +852,49 @@ const AccountSettings = () => {
       setSwkAppealingId(null);
     }
   };
-  const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
-  const [paymentLogsLoading, setPaymentLogsLoading] = useState(false);
-  const [banDialogOpen, setBanDialogOpen] = useState(false);
-  const [banDeviceId, setBanDeviceId] = useState('');
-  const [banReason, setBanReason] = useState('');
-  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
-  const [notifPrefs, setNotifPrefs] = useState({ email_enabled: true, popup_enabled: true, warning_lead_days: 7, do_not_contact: false });
-
-  // MFA state
-  const [mfaFactors, setMfaFactors] = useState<MfaFactor[]>([]);
-  const [mfaLoading, setMfaLoading] = useState(false);
-  const [mfaSetupMode, setMfaSetupMode] = useState(false);
-  const [mfaQrCode, setMfaQrCode] = useState('');
-  const [mfaSecret, setMfaSecret] = useState('');
-  const [mfaEnrollmentId, setMfaEnrollmentId] = useState('');
-  const [mfaVerifyCode, setMfaVerifyCode] = useState('');
-  const [mfaVerifying, setMfaVerifying] = useState(false);
-  const [showUnenrollDialog, setShowUnenrollDialog] = useState(false);
-  const [unenrollFactorId, setUnenrollFactorId] = useState('');
-  const [aalLevel, setAalLevel] = useState<{ currentLevel: string; nextLevel: string } | null>(null);
-  const [secretCopied, setSecretCopied] = useState(false);
-
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [animating, setAnimating] = useState(false);
-  const mountedRef = useRef(false);
-  const devicesFetchedRef = useRef(false);
-  const paymentLogsFetchedRef = useRef(false);
-  const notifPrefsFetchedRef = useRef(false);
-
 
   const preferenceCategories = useMemo<AccountPreferenceCategory[]>(() => [
     {
       id: 'security-hardening',
-      title: 'Security Hardening',
-      subtitle: 'Strict controls for sensitive actions and file handling.',
+      title: 'Hardening',
       items: [
-        { key: 'lockSessionWhenInactive', label: 'Auto-lock account session', description: 'Lock sensitive session access after inactivity.' },
-        { key: 'strictPreviewIsolation', label: 'Strict preview isolation', description: 'Run previews in isolated mode to reduce attack surface.' },
-        { key: 'verifyDownloadIntegrity', label: 'Verify download integrity', description: 'Validate checksum before completing file decryption.' },
-        { key: 'blockUnknownFilePreviews', label: 'Block unknown preview formats', description: 'Prevent preview rendering for unknown MIME signatures.' },
-        { key: 'quarantineRiskyFiles', label: 'Quarantine risky files', description: 'Flag suspicious uploads before opening or sharing.' },
+        { key: 'lockSessionWhenInactive', label: 'Auto-lock inactive session' },
+        { key: 'strictPreviewIsolation', label: 'Strict preview isolation' },
+        { key: 'verifyDownloadIntegrity', label: 'Verify download integrity' },
+        { key: 'blockUnknownFilePreviews', label: 'Block unknown preview formats' },
+        { key: 'quarantineRiskyFiles', label: 'Quarantine risky files' },
       ],
     },
     {
       id: 'operation-guards',
-      title: 'Operation Guards',
-      subtitle: 'Control PIN and action protection behavior.',
+      title: 'Guards & Alerts',
       items: [
-        { key: 'requirePinForDownloads', label: 'Require PIN for downloads', description: 'Prompt PIN before decrypt+download operations.' },
-        { key: 'requirePinForShares', label: 'Require PIN for shares', description: 'Prompt PIN before creating file share links.' },
-        { key: 'notifySecurityEvents', label: 'Security event alerts', description: 'Notify for lockouts, mismatches, and verification failures.' },
-        { key: 'notifyFileShareEvents', label: 'Share event alerts', description: 'Notify when files are shared or accessed.' },
-        { key: 'notifyBackgroundSync', label: 'Background sync alerts', description: 'Notify on background sync completions or errors.' },
+        { key: 'requirePinForDownloads', label: 'Require PIN for downloads' },
+        { key: 'requirePinForShares', label: 'Require PIN for shares' },
+        { key: 'notifySecurityEvents', label: 'Security event alerts' },
+        { key: 'notifyFileShareEvents', label: 'Share event alerts' },
+        { key: 'notifyBackgroundSync', label: 'Background sync alerts' },
       ],
     },
     {
       id: 'data-saver',
-      title: 'Data & Performance',
-      subtitle: 'Optimize bandwidth and preview rendering.',
+      title: 'Performance',
       items: [
-        { key: 'lowDataMode', label: 'Low data mode', description: 'Reduce data usage by limiting preview quality.' },
-        { key: 'prefetchNextPreview', label: 'Prefetch next preview', description: 'Preload the next file for faster viewing.' },
-        { key: 'hardwareDecodeAcceleration', label: 'Hardware decode acceleration', description: 'Use GPU for faster media decoding.' },
+        { key: 'lowDataMode', label: 'Low data mode' },
+        { key: 'prefetchNextPreview', label: 'Prefetch next preview' },
+        { key: 'hardwareDecodeAcceleration', label: 'Hardware decode acceleration' },
       ],
     },
     {
       id: 'sync-diagnostics',
-      title: 'Sync & Diagnostics',
-      subtitle: 'Background sync and developer tools.',
+      title: 'Diagnostics',
       items: [
-        { key: 'autoRetryBackgroundSync', label: 'Auto-retry background sync', description: 'Automatically retry failed background syncs.' },
-        { key: 'developerLogs', label: 'Developer logs', description: 'Enable verbose logging for troubleshooting.' },
-        { key: 'experimentalPreviewPipeline', label: 'Experimental preview pipeline', description: 'Opt into the latest preview renderer.' },
-        { key: 'showTransferDiagnostics', label: 'Transfer diagnostics', description: 'Display detailed transfer metrics in the UI.' },
-        { key: 'showAdvancedMetadata', label: 'Advanced metadata', description: 'Show extended file metadata in the info sidebar.' },
-      ],
-    },
-    {
-      id: 'arcade-entertainment',
-      title: 'Arcade & Entertainment',
-      subtitle: 'Mini-games and fun distractions while files transfer.',
-      items: [
-        { key: 'gameSuggestionsEnabled', label: 'Game Suggestions During Transfers', description: 'Receive friendly mini-game prompts while large files are uploading or downloading. You can launch games anytime using Cmd/Ctrl + Shift + G.' },
+        { key: 'autoRetryBackgroundSync', label: 'Auto-retry background sync' },
+        { key: 'developerLogs', label: 'Developer logs' },
+        { key: 'experimentalPreviewPipeline', label: 'Experimental preview pipeline' },
+        { key: 'showTransferDiagnostics', label: 'Transfer diagnostics' },
+        { key: 'showAdvancedMetadata', label: 'Advanced metadata' },
+        { key: 'gameSuggestionsEnabled', label: 'Arcade prompts during transfers' },
       ],
     },
   ], []);
@@ -365,7 +921,6 @@ const AccountSettings = () => {
 
   const handleEnrollMfa = async () => {
     setMfaLoading(true);
-    // Remove any unverified factors from previous attempts
     const existingFactors = await mfaService.listFactors();
     for (const f of existingFactors) {
       if (f.status === 'unverified') {
@@ -446,7 +1001,7 @@ const AccountSettings = () => {
       const saved = localStorage.getItem(ACCOUNT_PREFS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setAccountPreferences(prev => ({ ...prev, ...parsed }));
+        setAccountPreferences((prev) => ({ ...prev, ...parsed }));
       }
     } catch { /* ignore */ }
   };
@@ -456,7 +1011,7 @@ const AccountSettings = () => {
   };
 
   const updatePreference = (key: keyof AccountPreferenceSettings, enabled: boolean) => {
-    setAccountPreferences(prev => {
+    setAccountPreferences((prev) => {
       const next = { ...prev, [key]: enabled };
       savePreferences(next);
       return next;
@@ -522,43 +1077,11 @@ const AccountSettings = () => {
         .update({ status: 'cancelled' })
         .eq('id', migrationJob.id);
       if (error) throw error;
-      setMigrationJob((prev: any) => prev ? { ...prev, status: 'cancelled' } : prev);
-      toast({ title: "Migration cancelled", description: "The import has been cancelled." });
+      setMigrationJob((prev: any) => (prev ? { ...prev, status: 'cancelled' } : prev));
+      toast({ title: 'Migration cancelled' });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to cancel migration", variant: "destructive" });
+      toast({ title: 'Error', description: error.message || 'Failed to cancel migration', variant: 'destructive' });
     } finally { setCancelling(false); }
-  };
-
-  const formatSpeed = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
-  const getStatusColor = (status: string) => {
-    const map: Record<string, string> = {
-      scheduled: 'text-yellow-500',
-      extracting: 'text-blue-500',
-      uploading: 'text-purple-500',
-      in_progress: 'text-blue-500',
-      completed: 'text-green-500',
-      failed: 'text-red-500',
-    };
-    return map[status] || 'text-muted-foreground';
-  };
-
-  const getStatusLabel = (status: string) => {
-    const map: Record<string, string> = {
-      scheduled: 'Queued',
-      extracting: 'Extracting',
-      uploading: 'Uploading',
-      in_progress: 'In Progress',
-      completed: 'Completed',
-      failed: 'Failed',
-    };
-    return map[status] || status;
   };
 
   const formatBytes = (bytes: number) => {
@@ -569,28 +1092,44 @@ const AccountSettings = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
+  const getStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      scheduled: 'Queued',
+      extracting: 'Extracting',
+      uploading: 'Uploading',
+      in_progress: 'Active',
+      completed: 'Done',
+      failed: 'Failed',
+    };
+    return map[status] || status;
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     setLoading(true);
     try {
       const { error } = await supabase.from('profiles').update({
-        full_name: fullName.trim() || null, display_name: displayName.trim() || null,
+        full_name: fullName.trim() || null,
+        display_name: displayName.trim() || null,
       }).eq('id', user.id);
       if (error) throw error;
-      toast({ title: "Profile updated", description: "Your profile has been updated." });
+      toast({ title: 'Saved' });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to update profile.", variant: "destructive" });
+      toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
-      toast({ title: "Passwords don't match", description: "Please make sure both passwords match.", variant: "destructive" });
+      toast({ title: "Passwords don't match", variant: 'destructive' });
       return;
     }
     setLoading(true);
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email: user?.email || '', password: currentPassword });
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: currentPassword,
+      });
       if (signInError) throw new Error('Current password is incorrect');
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
@@ -598,14 +1137,16 @@ const AccountSettings = () => {
         type: 'password_changed',
         severity: 'warning',
         title: 'Password changed',
-        body: 'Your account password was changed. If this wasn\'t you, contact support immediately.',
+        body: 'Your account password was changed.',
         link: '/settings/account',
       });
-      toast({ title: "Password updated", description: "Your password has been changed." });
-      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+      toast({ title: 'Password updated' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
       setChangingPassword(false);
     } catch (error: any) {
-      toast({ title: "Password change failed", description: error.message, variant: "destructive" });
+      toast({ title: 'Password change failed', description: error.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
@@ -613,17 +1154,13 @@ const AccountSettings = () => {
     if (!user) return;
     setLoading(true);
     try {
-      toast({ title: "Setting up passkey...", description: "Please authenticate." });
       const passkeyResult = await registerPasskey(user.id, user.email || '');
       if (passkeyResult) {
-        toast({ title: "Passkey registered!", description: "You can now use passkey to sign in." });
+        toast({ title: 'Passkey registered' });
         await checkUserPasskey();
-      } else {
-        toast({ title: "Setup cancelled", description: "Passkey registration was cancelled or failed.", variant: "destructive" });
       }
     } catch (error: any) {
-      console.error('Passkey registration error:', error);
-      toast({ title: "Passkey setup failed", description: error.message || "Please try again.", variant: "destructive" });
+      toast({ title: 'Passkey setup failed', description: error.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
@@ -631,29 +1168,25 @@ const AccountSettings = () => {
     if (!user) return;
     setLoading(true);
     try {
-      toast({ title: "Updating passkey...", description: "Please authenticate." });
       const passkeyResult = await registerPasskey(user.id, user.email || '');
       if (passkeyResult) {
         await supabase.from('user_passkeys').update({ credential_id: passkeyResult.credentialId }).eq('user_id', user.id);
-        toast({ title: "Passkey updated!", description: "Your passkey authentication has been updated." });
+        toast({ title: 'Passkey updated' });
         await checkUserPasskey();
-      } else {
-        toast({ title: "Update cancelled", description: "Passkey update was cancelled.", variant: "destructive" });
       }
     } catch (error: any) {
-      toast({ title: "Passkey update failed", description: error.message || "Please try again.", variant: "destructive" });
+      toast({ title: 'Passkey update failed', description: error.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   const handleTestPasskey = async () => {
     setLoading(true);
     try {
-      toast({ title: "Testing passkey...", description: "Please authenticate." });
       const result = await authenticateWithPasskey(user?.email || undefined);
-      if (result.success) toast({ title: "Passkey working!", description: "Your passkey is working correctly." });
-      else toast({ title: "Test failed", description: "Please try updating your passkey.", variant: "destructive" });
+      if (result.success) toast({ title: 'Passkey verified' });
+      else toast({ title: 'Verification failed', variant: 'destructive' });
     } catch (error: any) {
-      toast({ title: "Test failed", description: error.message || "There was an error.", variant: "destructive" });
+      toast({ title: 'Test failed', description: error.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
@@ -662,19 +1195,19 @@ const AccountSettings = () => {
     setLoading(true);
     try {
       await supabase.from('user_passkeys').delete().eq('user_id', user.id);
-      toast({ title: "Passkey removed", description: "Passkey authentication has been disabled." });
-      setHasPasskey(false); setPasskeyData(null); setShowDeleteDialog(false);
+      toast({ title: 'Passkey removed' });
+      setHasPasskey(false);
+      setPasskeyData(null);
+      setShowDeleteDialog(false);
     } catch (error: any) {
-      toast({ title: "Deletion failed", description: error.message || "Please try again.", variant: "destructive" });
+      toast({ title: 'Deletion failed', description: error.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
-
-  const handleSetupBiometric = () => setShowBiometricSetup(true);
 
   const handleBiometricSetupComplete = async () => {
     setShowBiometricSetup(false);
     await checkBiometricStatus();
-    toast({ title: "Biometric Security Enabled", description: "Your device biometric is now protecting your files." });
+    toast({ title: 'Biometric enabled' });
   };
 
   const handleDisableBiometric = async () => {
@@ -683,9 +1216,9 @@ const AccountSettings = () => {
     try {
       await biometricAuthService.disableBiometric(user.id);
       await checkBiometricStatus();
-      toast({ title: "Security Disabled", description: "Biometric security has been turned off." });
+      toast({ title: 'Biometric disabled' });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
@@ -701,20 +1234,20 @@ const AccountSettings = () => {
       const res = await fetch('https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/redeem-code', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ code: redeemCodeInput.trim().toUpperCase() }),
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: 'Redemption failed', description: data.error || 'Something went wrong.', variant: 'destructive' });
+        toast({ title: 'Redemption failed', description: data.error || 'Invalid code.', variant: 'destructive' });
         return;
       }
-      toast({ title: 'Code redeemed!', description: `You now have ${data.plan_type} ${data.billing_period} plan.` });
+      toast({ title: 'Code redeemed', description: `${data.plan_type} ${data.billing_period} unlocked.` });
       setRedeemCodeInput('');
     } catch (error: any) {
-      toast({ title: 'Redemption failed', description: error.message || 'Something went wrong.', variant: 'destructive' });
+      toast({ title: 'Redemption failed', description: error.message, variant: 'destructive' });
     } finally { setRedeeming(false); }
   };
 
@@ -730,8 +1263,7 @@ const AccountSettings = () => {
         .order('created_at', { ascending: false });
       if (error) throw error;
       setPaymentLogs(data || []);
-    } catch (e: any) {
-      console.error('Failed to fetch payment logs:', e);
+    } catch {
       toast({ title: 'Error', description: 'Failed to load payment history', variant: 'destructive' });
     } finally {
       setPaymentLogsLoading(false);
@@ -750,324 +1282,170 @@ const AccountSettings = () => {
     if (!user || notifPrefsFetchedRef.current) return;
     notifPrefsFetchedRef.current = true;
     supabase.from('user_notification_prefs').select('*').eq('user_id', user.id).maybeSingle().then(({ data }) => {
-      if (data) setNotifPrefs({ email_enabled: data.email_enabled ?? true, popup_enabled: data.popup_enabled ?? true, warning_lead_days: data.warning_lead_days ?? 7, do_not_contact: data.do_not_contact ?? false });
+      if (data) {
+        setNotifPrefs({
+          email_enabled: data.email_enabled ?? true,
+          popup_enabled: data.popup_enabled ?? true,
+          warning_lead_days: data.warning_lead_days ?? 7,
+          do_not_contact: data.do_not_contact ?? false,
+        });
+      }
     }).catch(() => {});
   }, [user?.id]);
 
-
   const updateNotifPref = async (key: string, value: boolean | number) => {
-    setNotifPrefs(prev => ({ ...prev, [key]: value }));
+    setNotifPrefs((prev) => ({ ...prev, [key]: value }));
     try {
       await supabase.functions.invoke('subscription-manager/update-prefs', { body: { [key]: value } });
-    } catch (e) {
-      console.error('Failed to update notification prefs:', e);
+    } catch {}
+  };
+
+  const latestPayment = paymentLogs.find((p) => p.status === 'completed');
+
+  const formatPaymentAmount = (p: any) =>
+    p.amount_usd != null ? `$${Number(p.amount_usd).toFixed(2)} ${p.currency || 'USD'}` : '—';
+
+  const formatPaymentDate = (d: string | null) =>
+    d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+
+  const migTone = (s: string): Tone =>
+    s === 'completed' ? 'ok' : s === 'failed' ? 'err' : s === 'scheduled' ? 'warn' : 'neutral';
+
+  const payTone = (s: string): Tone =>
+    s === 'completed' ? 'ok' : s === 'pending' || s === 'expired' ? 'warn' : s === 'failed' ? 'err' : 'neutral';
+
+  /* ── Keyboard navigation on the floating dock ── */
+  const onDockKey = useCallback((e: React.KeyboardEvent) => {
+    const idx = SETTINGS_CATEGORIES.findIndex((c) => c.id === activeCategory);
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setActiveCategory(SETTINGS_CATEGORIES[(idx + 1) % SETTINGS_CATEGORIES.length].id);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setActiveCategory(SETTINGS_CATEGORIES[(idx - 1 + SETTINGS_CATEGORIES.length) % SETTINGS_CATEGORIES.length].id);
     }
-  };
+  }, [activeCategory, setActiveCategory]);
 
-  const latestPayment = paymentLogs.find(p => p.status === 'completed');
-
-  const formatPaymentAmount = (p: any) => {
-    if (p.amount_usd != null) return `$${Number(p.amount_usd).toFixed(2)} ${p.currency || 'USD'}`;
-    return '—';
-  };
-
-  const formatPaymentDate = (d: string | null) => {
-    if (!d) return '—';
-    return new Date(d).toLocaleString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
-    });
-  };
-
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'failed': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'expired': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'refunded': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'cancelled': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
-  };
-
-  /* ───────── presentation helpers (UI only) ───────── */
-  const migTone = (s: string): Exclude<Tone, 'solid'> =>
-    s === 'completed' ? 'ok' : s === 'failed' ? 'err' : s === 'cancelled' ? 'neutral' : s === 'scheduled' ? 'warn' : 'info';
-  const payTone = (s: string): Exclude<Tone, 'solid'> =>
-    s === 'completed' ? 'ok' : s === 'pending' || s === 'expired' ? 'warn' : s === 'failed' ? 'err' : s === 'refunded' ? 'info' : 'neutral';
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  const sv = (v: React.ReactNode) => <span style={{ fontSize: 20 }}>{v}</span>;
-  const iconTitle = (icon: React.ReactNode, text: string) => (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{icon}{text}</span>
-  );
-
-  const DetailField = ({ label, value, capitalize, mono, fullWidth, highlight }: { label: string; value: string; capitalize?: boolean; mono?: boolean; fullWidth?: boolean; highlight?: boolean }) => (
-    <div className={`st-df${fullWidth ? ' full' : ''}`}>
-      <small>{label}</small>
-      <b className={[mono ? 'mono' : '', capitalize ? 'cap' : '', highlight ? 'good' : ''].filter(Boolean).join(' ')}>{value}</b>
-    </div>
-  );
-
-  function renderPlansSection() {
-    const purchaseDate = profile?.subscription_starts_at
-      ? new Date(profile.subscription_starts_at).toLocaleDateString()
-      : latestPayment?.created_at
-        ? new Date(latestPayment.created_at).toLocaleDateString()
-        : '-';
-    const detailItems: Array<[React.ReactNode, React.ReactNode]> = [
-      ['Plan', userTier],
-      ['Billing Period', <span style={{ textTransform: 'capitalize' }}>{latestPayment?.billing_period || '-'}</span>],
-      ['Purchase Date', purchaseDate],
-      ['Expires On', profile?.subscription_expires_at ? new Date(profile.subscription_expires_at).toLocaleDateString() : '-'],
-      ['Amount Paid', latestPayment ? formatPaymentAmount(latestPayment) : '-'],
-      ['Payment Mode', <span style={{ textTransform: 'capitalize' }}>{latestPayment?.tx_hash ? 'Crypto' : latestPayment?.discount_code ? 'Discount Code' : latestPayment?.metadata?.source === 'redeem_code' ? 'Redeem Code' : '-'}</span>],
-    ];
-    if (latestPayment?.discount_percent) {
-      detailItems.push(['Discount', <span style={{ color: 'var(--sa-ok)' }}>{latestPayment.discount_percent}%{latestPayment.discount_code ? ` (${latestPayment.discount_code})` : ''}</span>]);
-    } else if (latestPayment?.metadata?.code) {
-      detailItems.push(['Redeem Code', <span className="sa-mono" style={{ color: 'var(--sa-ok)' }}>{latestPayment.metadata.code}</span>]);
-    }
-
-    return (
-      <>
-        <Panel
-          title={`Current Plan — ${userTier}`}
-          desc={isPremium
-            ? 'Priority queue, unlimited file requests, always-active sites & more'
-            : 'Unlimited storage with standard queue priority'}
-          actions={<Pill tone={isPremium ? 'solid' : 'neutral'}>{userTier}</Pill>}
-          flush
-        >
-          <Stats>
-            <Stat label="Storage" value={sv(formatBytes(storageUsed))} />
-            <Stat label="Total Files" value={sv(`${totalFiles} files`)} />
-            <Stat label="Member Since" value={sv(profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : '-')} />
-            <Stat label="Account Type" value={sv(userTier)} />
-          </Stats>
-          <div className="st-foot">
-            {isPremium ? (
-              <button type="button" className={btn()} onClick={() => navigate('/pricing')}>
-                <Crown className="h-3.5 w-3.5" />Change Plan
-              </button>
-            ) : (
-              <button type="button" className={btn('primary')} onClick={() => navigate('/pricing')}>
-                <Crown className="h-3.5 w-3.5" />Upgrade Now
-              </button>
-            )}
-            <button type="button" className={btn()} onClick={() => { fetchPaymentLogs(); setPaymentHistoryOpen(true); }}>
-              <Calendar className="h-3.5 w-3.5" />History
-            </button>
-          </div>
-        </Panel>
-
-        {isPremium && (
-          <Panel title="Subscription Details">
-            <KV items={detailItems} />
-          </Panel>
-        )}
-
-        <Panel title="Redeem a Code" desc="Enter a redeem code to unlock premium features">
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              className="sa-input sa-mono"
-              style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}
-              placeholder="Enter redeem code"
-              value={redeemCodeInput}
-              onChange={(e) => setRedeemCodeInput(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && handleRedeemCode()}
-              aria-label="Redeem code"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button type="button" className={btn('primary')} onClick={handleRedeemCode} disabled={!redeemCodeInput.trim() || redeeming}>
-              {redeeming && <Spinner size={12} />}Redeem
-            </button>
-          </div>
-        </Panel>
-
-        {isPremium && (
-          <Panel danger title="Cancel Subscription" desc="Your plan will remain active until the end of the billing period">
-            <CancelSubscriptionFlow
-              userId={user?.id || ''}
-              planType={profile?.tier}
-              billingPeriod={latestPayment?.billing_period || 'monthly'}
-              onCancelled={() => { refreshProfile(); fetchPaymentLogs(); }}
-            />
-          </Panel>
-        )}
-
-        <Dialog open={paymentHistoryOpen} onOpenChange={(open) => { setPaymentHistoryOpen(open); if (!open) setSelectedPayment(null); }}>
-          <DialogContent className={isMobile ? 'max-h-[85vh] overflow-y-auto max-w-full p-0' : 'max-h-[85vh] overflow-y-auto max-w-2xl p-0'}>
-            <div style={{ padding: isMobile ? '8px 16px 24px' : 20 }}>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-base">
-                  {selectedPayment ? (
-                    <>
-                      <button type="button" className={btn('ghost', 'icon-sm')} onClick={() => setSelectedPayment(null)} aria-label="Back to payment history">
-                        <Ico.ArrowLeft size={14} />
-                      </button>
-                      <span>Payment Details</span>
-                    </>
-                  ) : (
-                    <>
-                      <Calendar className="h-4 w-4" />
-                      <span>Payment History</span>
-                    </>
-                  )}
-                </DialogTitle>
-              </DialogHeader>
-
-              {paymentLogsLoading ? (
-                <div style={{ paddingTop: 16 }}><SkelRows rows={4} /></div>
-              ) : selectedPayment ? (
-                <div style={{ display: 'grid', gap: 16, marginTop: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, border: '1px solid var(--sa-line)', borderRadius: 5, background: 'var(--sa-bg-2)' }}>
-                    <Pill tone={payTone(selectedPayment.status)}>{cap(selectedPayment.status)}</Pill>
-                    <div>
-                      <div style={{ fontWeight: 500 }}>{selectedPayment.plan_type ? (selectedPayment.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : selectedPayment.plan || 'Subscription'}</div>
-                      <div className="sa-mute" style={{ fontSize: 12 }}>{formatPaymentDate(selectedPayment.created_at)}</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gap: 10, gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr' }}>
-                    <DetailField label="Amount" value={formatPaymentAmount(selectedPayment)} />
-                    <DetailField label="Status" value={selectedPayment.status} capitalize />
-                    <DetailField label="Plan" value={selectedPayment.plan_type ? (selectedPayment.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : selectedPayment.plan || '—'} />
-                    <DetailField label="Billing Period" value={selectedPayment.billing_period || '—'} capitalize />
-                    {selectedPayment.discount_percent ? (
-                      <DetailField label="Discount" value={`${selectedPayment.discount_percent}%${selectedPayment.discount_code ? ` (${selectedPayment.discount_code})` : ''}`} highlight />
-                    ) : null}
-                    {selectedPayment.network ? <DetailField label="Network" value={selectedPayment.network} /> : null}
-                    {selectedPayment.token ? <DetailField label="Token" value={selectedPayment.token} /> : null}
-                    {selectedPayment.tx_hash ? <DetailField label="Transaction Hash" value={selectedPayment.tx_hash} mono fullWidth /> : null}
-                    {selectedPayment.session_id ? <DetailField label="Session ID" value={selectedPayment.session_id} mono fullWidth /> : null}
-                    {selectedPayment.description ? <DetailField label="Description" value={selectedPayment.description} fullWidth /> : null}
-                    <DetailField label="Created" value={formatPaymentDate(selectedPayment.created_at)} />
-                    {selectedPayment.paid_at ? <DetailField label="Paid At" value={formatPaymentDate(selectedPayment.paid_at)} /> : null}
-                    {selectedPayment.timezone ? <DetailField label="Timezone" value={selectedPayment.timezone} /> : null}
-                  </div>
-                </div>
-              ) : paymentLogs.length === 0 ? (
-                <Empty icon={<Calendar className="h-4 w-4" />} title="No payment history yet" body="Your completed payments will appear here." />
-              ) : (
-                <div className="sa-panel" style={{ marginTop: 16, overflow: 'hidden' }}>
-                  {paymentLogs.map((p) => (
-                    <button key={p.id} type="button" className="st-pay" onClick={() => setSelectedPayment(p)}>
-                      <span className="l">
-                        <Pill tone={payTone(p.status)}>{cap(p.status)}</Pill>
-                        <span style={{ minWidth: 0 }}>
-                          <b>
-                            {p.plan_type ? (p.plan_type === 'supporter-plus' ? 'Supporter+' : 'Supporter') : p.plan || 'Subscription'}
-                            {p.billing_period ? ` — ${p.billing_period}` : ''}
-                          </b>
-                          <small>{formatPaymentDate(p.created_at)}</small>
-                        </span>
-                      </span>
-                      <span className="amt">{formatPaymentAmount(p)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  }
+  /* ── Section Renderers (Ultra-minimal tvOS pods) ── */
 
   function renderProfileSection() {
     const dirty = fullName.trim() !== (profile?.full_name || '') || displayName.trim() !== (profile?.display_name || '');
     return (
-      <Panel
-        title="Personal information"
-        actions={dirty ? <Pill tone="warn">Unsaved</Pill> : undefined}
+      <TvPod
+        title="Identity"
+        icon={<User className="h-4 w-4" />}
+        actions={dirty ? <TvBadge tone="warn" dot>Unsaved</TvBadge> : undefined}
       >
         <form
-          className="st-form"
+          style={{ display: 'grid', gap: 14 }}
           onSubmit={(e) => { e.preventDefault(); handleSaveProfile(); }}
           onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); handleSaveProfile(); }
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+              e.preventDefault();
+              handleSaveProfile();
+            }
           }}
         >
-          <div className="st-g2">
-            <Field label="Full name" htmlFor="st-full">
-              <input id="st-full" className="sa-input" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Enter your name" autoComplete="name" />
-            </Field>
-            <Field label="Display name" htmlFor="st-display">
-              <input id="st-display" className="sa-input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Enter display name" autoComplete="nickname" />
-            </Field>
+          <div className="tv-grid-2">
+            <div>
+              <label className="tv-field-label" htmlFor="tv-full">Full name</label>
+              <input
+                id="tv-full"
+                className="tv-input"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Name"
+                autoComplete="name"
+              />
+            </div>
+            <div>
+              <label className="tv-field-label" htmlFor="tv-disp">Display name</label>
+              <input
+                id="tv-disp"
+                className="tv-input"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Handle"
+                autoComplete="nickname"
+              />
+            </div>
           </div>
-          <Field label="Email" htmlFor="st-email" hint="Email cannot be changed.">
-            <input id="st-email" className="sa-input" value={user?.email || ''} disabled />
-          </Field>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button type="submit" className={btn('primary')} disabled={loading}>
-              {loading && <Spinner size={12} />}Save changes
+          <div>
+            <label className="tv-field-label" htmlFor="tv-email">Email</label>
+            <input id="tv-email" className="tv-input" value={user?.email || ''} disabled />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+            <button type="submit" className="tv-pill-btn lead" disabled={loading || !dirty}>
+              {loading && <Spinner size={12} />}
+              Save
             </button>
-            <span className="sa-hint hide-sm" style={{ margin: 0 }}>or press ⌘ / Ctrl + S</span>
           </div>
         </form>
-      </Panel>
+      </TvPod>
     );
   }
 
   function renderSecuritySection() {
     const unread = swkNotices.filter((n) => !n.is_read).length;
+    const mfaActive = aalLevel?.currentLevel === 'aal2' || mfaFactors.length > 0;
+
     return (
       <>
-        {/* Two-factor */}
-        <Panel
-          title={iconTitle(<Smartphone className="h-3.5 w-3.5" />, 'Two-Factor Authentication')}
-          desc="Add an extra layer of security with TOTP authenticator"
-          actions={aalLevel ? <Pill tone={aalLevel.currentLevel === 'aal2' ? 'ok' : 'neutral'}>{aalLevel.currentLevel === 'aal2' ? 'Active' : 'Disabled'}</Pill> : undefined}
+        {/* Single-column Auth / TOTP Pod (no left content block) */}
+        <TvPod
+          title="Authenticator (TOTP)"
+          icon={<Smartphone className="h-4 w-4" />}
+          actions={<TvBadge tone={mfaActive ? 'ok' : 'neutral'} dot>{mfaActive ? 'Active' : 'Off'}</TvBadge>}
           flush
         >
           {!mfaSetupMode && mfaFactors.length === 0 && (
-            <Row label="Authenticator app" desc="Protect your account by requiring a verification code from your authenticator app when signing in.">
-              <button type="button" className={btn()} onClick={handleEnrollMfa} disabled={mfaLoading}>
-                {mfaLoading ? <Spinner size={12} /> : <Plus className="h-3 w-3" />}Enable TOTP
+            <TvRow label="Two-factor code">
+              <button type="button" className="tv-pill-btn sm lead" onClick={handleEnrollMfa} disabled={mfaLoading}>
+                {mfaLoading ? <Spinner size={12} /> : <Plus className="h-3.5 w-3.5" />}
+                Setup
               </button>
-            </Row>
+            </TvRow>
           )}
 
           {mfaSetupMode && (
-            <div className="st-mfa">
-              <div>
-                <div className="st-qr" dangerouslySetInnerHTML={{ __html: mfaQrCode }} />
+            <div className="tv-mfa-flow">
+              <div className="tv-qr-dark" dangerouslySetInnerHTML={{ __html: mfaQrCode }} />
+              <div className="tv-secret-pill">
+                <code title={mfaSecret}>{mfaSecret}</code>
+                <button type="button" className="tv-pill-btn ghost icon sm" onClick={handleCopySecret} aria-label="Copy key">
+                  {secretCopied ? <Ico.Check size={13} /> : <Ico.Copy size={13} />}
+                </button>
               </div>
-              <div style={{ display: 'grid', gap: 14, alignContent: 'start', minWidth: 0 }}>
-                <p className="st-p">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
-                <div>
-                  <div className="sa-label">Manual entry key</div>
-                  <div className="sa-code inline" style={{ maxWidth: '100%' }}>
-                    <code title={mfaSecret} style={{ userSelect: 'all' }}>{mfaSecret}</code>
-                    <button type="button" className={btn('ghost', 'icon-sm')} onClick={handleCopySecret} aria-label="Copy secret">
-                      {secretCopied ? <Ico.Check size={13} /> : <Ico.Copy size={13} />}
-                    </button>
-                  </div>
-                </div>
-                <Field label="Enter 6-digit code from authenticator" htmlFor="st-mfa-code">
-                  <input
-                    id="st-mfa-code"
-                    className="sa-input sa-mono"
-                    style={{ height: 44, fontSize: 18, textAlign: 'center', letterSpacing: '0.4em' }}
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    value={mfaVerifyCode}
-                    onChange={(e) => setMfaVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && mfaVerifyCode.length === 6 && !mfaVerifying) handleVerifyMfa(); }}
-                    placeholder="000000"
-                    autoFocus
-                  />
-                </Field>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" className={btn('ghost')} onClick={() => { setMfaSetupMode(false); setMfaVerifyCode(''); setMfaQrCode(''); setMfaSecret(''); setMfaEnrollmentId(''); }}>Cancel</button>
-                  <button type="button" className={btn('primary')} onClick={handleVerifyMfa} disabled={mfaVerifying || mfaVerifyCode.length !== 6}>
-                    {mfaVerifying && <Spinner size={12} />}Verify &amp; Enable
-                  </button>
-                </div>
+              <input
+                className="tv-input sa-mono"
+                style={{ maxWidth: 220, height: 46, fontSize: 18, textAlign: 'center', letterSpacing: '0.38em' }}
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={mfaVerifyCode}
+                onChange={(e) => setMfaVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onKeyDown={(e) => { if (e.key === 'Enter' && mfaVerifyCode.length === 6 && !mfaVerifying) handleVerifyMfa(); }}
+                placeholder="000000"
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="tv-pill-btn sm ghost"
+                  onClick={() => { setMfaSetupMode(false); setMfaVerifyCode(''); setMfaQrCode(''); setMfaSecret(''); setMfaEnrollmentId(''); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tv-pill-btn sm lead"
+                  onClick={handleVerifyMfa}
+                  disabled={mfaVerifying || mfaVerifyCode.length !== 6}
+                >
+                  {mfaVerifying && <Spinner size={12} />}
+                  Verify
+                </button>
               </div>
             </div>
           )}
@@ -1075,156 +1453,290 @@ const AccountSettings = () => {
           {!mfaSetupMode && mfaFactors.length > 0 && (
             <>
               {mfaFactors.map((factor) => (
-                <Row
+                <TvRow
                   key={factor.id}
-                  label={<span title={factor.friendly_name || 'Authenticator App'} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{factor.friendly_name || 'Authenticator App'}</span>}
-                  desc={`Added ${new Date(factor.created_at).toLocaleDateString()}`}
+                  label={factor.friendly_name || 'Authenticator'}
+                  sub={new Date(factor.created_at).toLocaleDateString()}
                 >
                   <button
                     type="button"
-                    className={btn('danger', 'sm')}
+                    className="tv-pill-btn sm danger"
                     onClick={() => { setUnenrollFactorId(factor.id); setShowUnenrollDialog(true); }}
                     disabled={mfaLoading}
                   >
-                    <Trash2 className="h-3 w-3" />Remove
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Remove
                   </button>
-                </Row>
+                </TvRow>
               ))}
-              <Row label="Add another authenticator" desc="Register a second device so you are never locked out.">
-                <button type="button" className={btn('default', 'sm')} onClick={handleEnrollMfa} disabled={mfaLoading}>
-                  <Plus className="h-3 w-3" /> Add Another
+              <TvRow label="Backup device">
+                <button type="button" className="tv-pill-btn sm" onClick={handleEnrollMfa} disabled={mfaLoading}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Add
                 </button>
-              </Row>
+              </TvRow>
             </>
           )}
-        </Panel>
+        </TvPod>
 
-        {/* Passkey */}
-        <Panel
-          title={iconTitle(<Fingerprint className="h-3.5 w-3.5" />, 'Passkey Authentication')}
-          desc="Use fingerprint, Face ID, or security key to sign in"
-          actions={!isCheckingPasskey && passkeyAvailable ? <Pill tone={hasPasskey ? 'ok' : 'neutral'}>{hasPasskey ? 'Active' : 'Disabled'}</Pill> : undefined}
-          flush
-        >
-          {!passkeyAvailable && (
-            <div style={{ padding: 16 }}>
-              <Note>Your device doesn't support passkey authentication.</Note>
-            </div>
-          )}
-          {isCheckingPasskey && passkeyAvailable && (
-            <Row label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 400 }}><Spinner size={12} />Checking passkey...</span>} />
-          )}
-          {!isCheckingPasskey && passkeyAvailable && hasPasskey && (
-            <Row label="Passkey registered" desc="Test it, replace it, or remove it.">
-              <button type="button" className={btn('default', 'sm')} onClick={handleTestPasskey} disabled={loading}>
-                {loading ? <Spinner size={12} /> : <Fingerprint className="h-3 w-3" />}Test
+        {/* Passkey & Biometrics combined into one minimal pod */}
+        <TvPod title="Hardware & Biometrics" icon={<Fingerprint className="h-4 w-4" />} flush>
+          <TvRow
+            label="Passkey"
+            sub={!passkeyAvailable ? 'Unsupported on this device' : hasPasskey ? 'Registered' : 'Not configured'}
+          >
+            {isCheckingPasskey ? (
+              <Spinner size={14} />
+            ) : passkeyAvailable && hasPasskey ? (
+              <>
+                <button type="button" className="tv-pill-btn sm" onClick={handleTestPasskey} disabled={loading}>Test</button>
+                <button type="button" className="tv-pill-btn sm" onClick={handleUpdatePasskey} disabled={loading}>Replace</button>
+                <button type="button" className="tv-pill-btn sm danger" onClick={() => setShowDeleteDialog(true)} disabled={loading}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : passkeyAvailable ? (
+              <button type="button" className="tv-pill-btn sm lead" onClick={handleRegisterPasskey} disabled={loading}>
+                <Plus className="h-3.5 w-3.5" />
+                Register
               </button>
-              <button type="button" className={btn('default', 'sm')} onClick={handleUpdatePasskey} disabled={loading}>Update</button>
-              <button type="button" className={btn('danger', 'sm')} onClick={() => setShowDeleteDialog(true)} disabled={loading}>
-                <Trash2 className="h-3 w-3" />Remove
-              </button>
-            </Row>
-          )}
-          {!isCheckingPasskey && passkeyAvailable && !hasPasskey && (
-            <Row label="No passkey yet" desc="Sign in with a touch or a look instead of a password.">
-              <button type="button" className={btn('primary', 'sm')} onClick={handleRegisterPasskey} disabled={loading}>
-                {loading ? <Spinner size={12} /> : <Plus className="h-3 w-3" />}Setup Passkey
-              </button>
-            </Row>
-          )}
-        </Panel>
+            ) : null}
+          </TvRow>
 
-        {/* Biometric */}
-        <Panel
-          title={iconTitle(<Fingerprint className="h-3.5 w-3.5" />, 'Biometric Security')}
-          desc="Use device biometrics to protect sensitive actions"
-          actions={<Pill tone={hasBiometric ? 'ok' : 'neutral'}>{hasBiometric ? 'Active' : 'Disabled'}</Pill>}
-          flush
-        >
-          <Row label={hasBiometric ? 'Biometric protection is on' : 'Biometric protection is off'}>
+          <TvRow label="Device biometric lock" sub={hasBiometric ? 'Active' : 'Off'}>
             {!hasBiometric ? (
-              <button type="button" className={btn('default', 'sm')} onClick={handleSetupBiometric}>
-                <Plus className="h-3 w-3" /> Enable Biometric
+              <button type="button" className="tv-pill-btn sm" onClick={() => setShowBiometricSetup(true)}>
+                Enable
               </button>
             ) : (
-              <button type="button" className={btn('danger', 'sm')} onClick={handleDisableBiometric}>Disable Biometric</button>
+              <button type="button" className="tv-pill-btn sm danger" onClick={handleDisableBiometric}>
+                Disable
+              </button>
             )}
-          </Row>
-        </Panel>
+          </TvRow>
+        </TvPod>
 
-        {/* Password */}
-        <Panel
-          title={iconTitle(<Key className="h-3.5 w-3.5" />, 'Change Password')}
-          desc="Update your account password"
+        {/* Password Pod */}
+        <TvPod
+          title="Password"
+          icon={<Key className="h-4 w-4" />}
           flush={!changingPassword}
-          actions={!changingPassword ? <button type="button" className={btn('default', 'sm')} onClick={() => setChangingPassword(true)}>Change</button> : undefined}
+          actions={
+            !changingPassword ? (
+              <button type="button" className="tv-pill-btn sm" onClick={() => setChangingPassword(true)}>
+                Update
+              </button>
+            ) : undefined
+          }
         >
           {changingPassword && (
             <form
-              className="st-form"
-              onSubmit={(e) => { e.preventDefault(); if (currentPassword && newPassword && confirmPassword && !loading) handleChangePassword(); }}
+              style={{ display: 'grid', gap: 10 }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (currentPassword && newPassword && confirmPassword && !loading) handleChangePassword();
+              }}
             >
-              <input type="password" className="sa-input" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" autoComplete="current-password" aria-label="Current password" autoFocus />
-              <input type="password" className="sa-input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" autoComplete="new-password" aria-label="New password" />
-              <input type="password" className="sa-input" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" autoComplete="new-password" aria-label="Confirm new password" />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className={btn('ghost')} onClick={() => { setChangingPassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}>Cancel</button>
-                <button type="submit" className={btn('primary')} disabled={!currentPassword || !newPassword || !confirmPassword || loading}>
-                  {loading && <Spinner size={12} />}Update Password
+              <input
+                type="password"
+                className="tv-input"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Current password"
+                autoComplete="current-password"
+                autoFocus
+              />
+              <div className="tv-grid-2">
+                <input
+                  type="password"
+                  className="tv-input"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="New password"
+                  autoComplete="new-password"
+                />
+                <input
+                  type="password"
+                  className="tv-input"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm password"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+                <button
+                  type="button"
+                  className="tv-pill-btn sm ghost"
+                  onClick={() => { setChangingPassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="tv-pill-btn sm lead"
+                  disabled={!currentPassword || !newPassword || !confirmPassword || loading}
+                >
+                  {loading && <Spinner size={12} />}
+                  Save
                 </button>
               </div>
             </form>
           )}
-        </Panel>
+        </TvPod>
 
-        {/* S-Hawk */}
-        <Panel
-          title={iconTitle(<ShieldAlert className="h-3.5 w-3.5" />, 'Upload Appeals (S-Hawk)')}
-          desc="Why a file was refused — and appeal for human review"
-          actions={unread > 0 ? <Pill tone="err">{unread} new</Pill> : undefined}
-          flush
-        >
-          {swkLoading ? (
-            <div style={{ padding: 16, display: 'grid', gap: 8 }}>
-              <Skel w="40%" h={11} /><Skel w="70%" h={9} />
-              <span className="sa-sr">Loading screening decisions…</span>
-            </div>
-          ) : swkNotices.length === 0 ? (
-            <div style={{ padding: 16 }}>
-              <p className="st-p sa-mute">No screening decisions on your account. Every refused upload will appear here with its exact reasons.</p>
-            </div>
-          ) : (
-            swkNotices.map((notice) => (
-              <div key={notice.id} className="st-notice">
-                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-                  <h4>{notice.title}</h4>
-                  <span className="when">{new Date(notice.created_at).toLocaleString()}</span>
-                </div>
-                <p>{notice.body}</p>
-                {notice.reason_codes.length > 0 && (
-                  <div className="st-codes">
-                    {notice.reason_codes.map((code) => (
-                      <Pill key={code}>{code}</Pill>
-                    ))}
-                  </div>
-                )}
-                {notice.case_id && (
-                  <div style={{ marginTop: 12 }}>
+        {/* S-Hawk Appeals */}
+        {(swkLoading || swkNotices.length > 0) && (
+          <TvPod
+            title="S-Hawk Notices"
+            icon={<ShieldAlert className="h-4 w-4" />}
+            actions={unread > 0 ? <TvBadge tone="err" dot>{unread}</TvBadge> : undefined}
+            flush
+          >
+            {swkLoading ? (
+              <TvRow label="Checking notices…"><Spinner size={14} /></TvRow>
+            ) : (
+              swkNotices.map((notice) => (
+                <TvRow
+                  key={notice.id}
+                  label={notice.title}
+                  sub={notice.body}
+                >
+                  {notice.case_id && (
                     <button
                       type="button"
-                      className={btn('default', 'sm')}
+                      className="tv-pill-btn sm"
                       disabled={swkAppealingId === notice.id}
                       onClick={() => handleSwkAppeal(notice)}
                     >
-                      {swkAppealingId === notice.id ? <Spinner size={12} /> : null}
-                      Appeal for human review
+                      {swkAppealingId === notice.id && <Spinner size={12} />}
+                      Appeal
                     </button>
-                  </div>
+                  )}
+                </TvRow>
+              ))
+            )}
+          </TvPod>
+        )}
+      </>
+    );
+  }
+
+  function renderPlansSection() {
+    return (
+      <>
+        <TvPod
+          title={userTier}
+          icon={<Crown className="h-4 w-4" />}
+          actions={<TvBadge tone={isPremium ? 'ok' : 'neutral'} dot>{isPremium ? 'Active' : 'Standard'}</TvBadge>}
+          flush
+        >
+          <div className="tv-metrics">
+            <div className="tv-metric">
+              <span>Used</span>
+              <b>{formatBytes(storageUsed)}</b>
+            </div>
+            <div className="tv-metric">
+              <span>Files</span>
+              <b>{totalFiles}</b>
+            </div>
+            <div className="tv-metric">
+              <span>Expires</span>
+              <b>{profile?.subscription_expires_at ? new Date(profile.subscription_expires_at).toLocaleDateString() : '—'}</b>
+            </div>
+          </div>
+          <TvRow label="Subscription">
+            <button type="button" className="tv-pill-btn sm" onClick={() => { fetchPaymentLogs(); setPaymentHistoryOpen(true); }}>
+              <Calendar className="h-3.5 w-3.5" />
+              Billing
+            </button>
+            <button type="button" className="tv-pill-btn sm lead" onClick={() => navigate('/pricing')}>
+              <Crown className="h-3.5 w-3.5" />
+              {isPremium ? 'Manage' : 'Upgrade'}
+            </button>
+          </TvRow>
+        </TvPod>
+
+        <TvPod title="Redeem Code">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="tv-input sa-mono"
+              style={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}
+              placeholder="XXXX-XXXX-XXXX"
+              value={redeemCodeInput}
+              onChange={(e) => setRedeemCodeInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && handleRedeemCode()}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className="tv-pill-btn lead"
+              style={{ height: 42 }}
+              onClick={handleRedeemCode}
+              disabled={!redeemCodeInput.trim() || redeeming}
+            >
+              {redeeming && <Spinner size={12} />}
+              Apply
+            </button>
+          </div>
+        </TvPod>
+
+        {isPremium && (
+          <TvPod danger title="Cancel Plan">
+            <CancelSubscriptionFlow
+              userId={user?.id || ''}
+              planType={profile?.tier}
+              billingPeriod={latestPayment?.billing_period || 'monthly'}
+              onCancelled={() => { refreshProfile(); fetchPaymentLogs(); }}
+            />
+          </TvPod>
+        )}
+
+        <Dialog open={paymentHistoryOpen} onOpenChange={(open) => { setPaymentHistoryOpen(open); if (!open) setSelectedPayment(null); }}>
+          <DialogContent className={isMobile ? 'max-h-[85vh] overflow-y-auto max-w-full p-5' : 'max-h-[85vh] overflow-y-auto max-w-lg p-6'}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                {selectedPayment && (
+                  <button type="button" className="tv-pill-btn ghost icon sm" onClick={() => setSelectedPayment(null)}>
+                    <Ico.ArrowLeft size={14} />
+                  </button>
+                )}
+                <span>{selectedPayment ? 'Receipt' : 'Billing History'}</span>
+              </DialogTitle>
+            </DialogHeader>
+
+            {paymentLogsLoading ? (
+              <div style={{ padding: 24, display: 'grid', placeItems: 'center' }}><Spinner size={18} /></div>
+            ) : selectedPayment ? (
+              <div className="tv-pod" style={{ marginTop: 12 }}>
+                <TvRow label="Amount"><span className="sa-mono">{formatPaymentAmount(selectedPayment)}</span></TvRow>
+                <TvRow label="Status"><TvBadge tone={payTone(selectedPayment.status)}>{selectedPayment.status}</TvBadge></TvRow>
+                <TvRow label="Plan">{selectedPayment.plan_type || selectedPayment.plan || '—'}</TvRow>
+                <TvRow label="Date">{formatPaymentDate(selectedPayment.created_at)}</TvRow>
+                {selectedPayment.tx_hash && (
+                  <TvRow label="TX" sub={selectedPayment.tx_hash} />
                 )}
               </div>
-            ))
-          )}
-        </Panel>
+            ) : paymentLogs.length === 0 ? (
+              <div style={{ padding: '32px 12px', textAlign: 'center', color: 'var(--tv-mute)', fontSize: 13 }}>
+                No transactions yet
+              </div>
+            ) : (
+              <div className="tv-pod" style={{ marginTop: 12 }}>
+                {paymentLogs.map((p) => (
+                  <button key={p.id} type="button" className="tv-pay-row" onClick={() => setSelectedPayment(p)}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <TvBadge tone={payTone(p.status)} dot>{p.status}</TvBadge>
+                      <span style={{ fontSize: 13 }}>{formatPaymentDate(p.created_at)}</span>
+                    </span>
+                    <span className="sa-mono" style={{ fontSize: 13 }}>{formatPaymentAmount(p)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </>
     );
   }
@@ -1232,71 +1744,59 @@ const AccountSettings = () => {
   function renderMigrationSection() {
     if (!migrationJob) {
       return (
-        <Panel title="Migration Progress" desc="Track your ZIP imports and cloud migrations">
-          <Empty
-            icon={<FileArchive className="h-4 w-4" />}
-            title="No active imports"
-            body="Import files from other platforms or ZIP archives."
-            action={
-              <button type="button" className={btn()} onClick={() => setShowImportDialog(true)}>
-                <Plus className="h-3.5 w-3.5" /> Import Files
-              </button>
-            }
-          />
-        </Panel>
+        <TvPod title="Cloud & Archive Import" icon={<FileArchive className="h-4 w-4" />} flush>
+          <TvRow label="No active transfers">
+            <button type="button" className="tv-pill-btn sm lead" onClick={() => setShowImportDialog(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              Import
+            </button>
+          </TvRow>
+        </TvPod>
       );
     }
+
     const running = ['scheduled', 'extracting', 'uploading', 'in_progress'].includes(migrationJob.status);
+    const pct = migrationJob.total_files > 0
+      ? Math.min(100, Math.round((migrationJob.processed_files / migrationJob.total_files) * 100))
+      : 0;
+
     return (
-      <Panel
-        title={
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textTransform: 'capitalize' }}>
-            <FolderOpen className="h-3.5 w-3.5" />{migrationJob.source_platform?.replace('-', ' ')}
-          </span>
-        }
-        desc="Track your ZIP imports and cloud migrations"
-        actions={<Pill tone={migTone(migrationJob.status)}>{getStatusLabel(migrationJob.status)}</Pill>}
+      <TvPod
+        title={migrationJob.source_platform?.replace('-', ' ') || 'Import'}
+        icon={<FolderOpen className="h-4 w-4" />}
+        actions={<TvBadge tone={migTone(migrationJob.status)} dot>{getStatusLabel(migrationJob.status)}</TvBadge>}
         flush
       >
         {migrationJob.total_files > 0 && (
-          <>
-            <div style={{ padding: '16px 16px 0' }}>
-              <Meter plain value={migrationJob.processed_files} max={migrationJob.total_files} label="Files processed" />
-            </div>
-            <Stats>
-              <Stat label="Total" value={sv(migrationJob.total_files)} />
-              <Stat label="Done" value={<span style={{ fontSize: 20, color: 'var(--sa-ok)' }}>{migrationJob.processed_files}</span>} />
-              <Stat label="Failed" value={<span style={{ fontSize: 20, color: migrationJob.failed_files ? 'var(--sa-err)' : undefined }}>{migrationJob.failed_files}</span>} />
-            </Stats>
-          </>
-        )}
-        {migrationJob.settings?.totalSize && (
-          <div className="sa-hint" style={{ margin: 0, padding: '12px 16px' }}>
-            Total: {formatSpeed(migrationJob.settings.totalSize)}
-            {migrationJob.settings.processedSize ? ` · Uploaded: ${formatSpeed(migrationJob.settings.processedSize)}` : ''}
+          <div style={{ padding: '16px 20px 4px' }}>
+            <div className="tv-meter"><i style={{ width: `${pct}%` }} /></div>
           </div>
         )}
-        {migrationJob.error_message && (
-          <div style={{ padding: 16 }}><Note tone="err">{migrationJob.error_message}</Note></div>
-        )}
-        {running && (
-          <div className="st-foot">
-            <button type="button" className={btn()} onClick={() => setShowImportDialog(true)}>
-              <RefreshCw className="h-3.5 w-3.5" /> View Details
+        <div className="tv-metrics">
+          <div className="tv-metric"><span>Total</span><b>{migrationJob.total_files || 0}</b></div>
+          <div className="tv-metric"><span>Done</span><b>{migrationJob.processed_files || 0}</b></div>
+          <div className="tv-metric"><span>Failed</span><b>{migrationJob.failed_files || 0}</b></div>
+        </div>
+        <TvRow label={migrationJob.error_message || `${pct}% complete`}>
+          {running ? (
+            <>
+              <button type="button" className="tv-pill-btn sm" onClick={() => setShowImportDialog(true)}>
+                <RefreshCw className="h-3.5 w-3.5" />
+                Inspect
+              </button>
+              <button type="button" className="tv-pill-btn sm danger" onClick={handleCancelMigration} disabled={cancelling}>
+                {cancelling && <Spinner size={12} />}
+                Stop
+              </button>
+            </>
+          ) : (
+            <button type="button" className="tv-pill-btn sm lead" onClick={() => setShowImportDialog(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              New Import
             </button>
-            <button type="button" className={btn('danger')} onClick={handleCancelMigration} disabled={cancelling}>
-              {cancelling ? <Spinner size={12} /> : null}Cancel Import
-            </button>
-          </div>
-        )}
-        {!running && (
-          <div className="st-foot">
-            <button type="button" className={btn()} onClick={() => setShowImportDialog(true)}>
-              <Plus className="h-3.5 w-3.5" /> Import Files
-            </button>
-          </div>
-        )}
-      </Panel>
+          )}
+        </TvRow>
+      </TvPod>
     );
   }
 
@@ -1304,10 +1804,12 @@ const AccountSettings = () => {
     return (
       <>
         <ApiKeyManagement />
-        <button type="button" className={btn() + ' block'} onClick={() => navigate('/developer-api')}>
-          <Book className="h-4 w-4" />
-          API Documentation
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button type="button" className="tv-pill-btn sm" onClick={() => navigate('/developer-api')}>
+            <Book className="h-3.5 w-3.5" />
+            API Docs
+          </button>
+        </div>
       </>
     );
   }
@@ -1316,67 +1818,55 @@ const AccountSettings = () => {
     return (
       <>
         <WebhookManager open={false} onClose={() => {}} standalone />
-        <button type="button" className={btn() + ' block'} onClick={() => navigate('/webhooks')}>
-          <Book className="h-4 w-4" />
-          Webhook Documentation
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button type="button" className="tv-pill-btn sm" onClick={() => navigate('/webhooks')}>
+            <Book className="h-3.5 w-3.5" />
+            Webhook Docs
+          </button>
+        </div>
       </>
     );
-  }
-
-  function renderDevicesSection() {
-    return <CliDevicesSection />;
   }
 
   function renderPreferencesSection() {
     return (
       <>
         {preferenceCategories.map((category) => (
-          <Panel key={category.id} title={category.title} desc={category.subtitle} flush>
+          <TvPod key={category.id} title={category.title} flush>
             {category.items.map((item) => (
-              <Row key={item.key} label={item.label} desc={item.description}>
+              <TvRow key={item.key} label={item.label}>
                 <Switch
                   checked={accountPreferences[item.key]}
                   onCheckedChange={(checked) => updatePreference(item.key, checked)}
                   aria-label={item.label}
                 />
-              </Row>
+              </TvRow>
             ))}
-          </Panel>
+          </TvPod>
         ))}
 
-        <Panel title="Subscription Notifications" desc="Control how and when we remind you about subscription expiry." flush>
-          <Row label="Email notifications" desc="Receive expiry reminders via email">
-            <Switch checked={notifPrefs.email_enabled} onCheckedChange={(v) => updateNotifPref('email_enabled', v)} aria-label="Email notifications" />
-          </Row>
-          <Row label="In-app popups" desc="Show expiry warnings inside the app">
-            <Switch checked={notifPrefs.popup_enabled} onCheckedChange={(v) => updateNotifPref('popup_enabled', v)} aria-label="In-app popups" />
-          </Row>
-          <Row label="Warning lead time" desc="How many days before expiry to start warning you">
+        <TvPod title="Renewal Alerts" flush>
+          <TvRow label="Email reminders">
+            <Switch checked={notifPrefs.email_enabled} onCheckedChange={(v) => updateNotifPref('email_enabled', v)} />
+          </TvRow>
+          <TvRow label="In-app alerts">
+            <Switch checked={notifPrefs.popup_enabled} onCheckedChange={(v) => updateNotifPref('popup_enabled', v)} />
+          </TvRow>
+          <TvRow label="Lead time">
             <select
-              className="st-select"
+              className="tv-select"
               value={notifPrefs.warning_lead_days}
-              onChange={(e) => updateNotifPref('warning_lead_days', parseInt(e.target.value))}
-              aria-label="Warning lead time"
+              onChange={(e) => updateNotifPref('warning_lead_days', parseInt(e.target.value, 10))}
             >
               <option value={1}>1 day</option>
               <option value={3}>3 days</option>
               <option value={7}>7 days</option>
             </select>
-          </Row>
-          <Row label="Do not contact" desc="Stop all win-back emails after cancellation or expiry">
-            <Switch checked={notifPrefs.do_not_contact} onCheckedChange={(v) => updateNotifPref('do_not_contact', v)} aria-label="Do not contact" />
-          </Row>
-        </Panel>
-
-        <Panel danger title="Session" flush>
-          <Row label="Sign out" desc="End this session on this device.">
-            <button type="button" className={btn('danger', 'sm')} onClick={signOut}>
-              <LogOut className="h-3.5 w-3.5" />
-              Sign Out
-            </button>
-          </Row>
-        </Panel>
+          </TvRow>
+          <TvRow label="Silence win-back emails">
+            <Switch checked={notifPrefs.do_not_contact} onCheckedChange={(v) => updateNotifPref('do_not_contact', v)} />
+          </TvRow>
+        </TvPod>
       </>
     );
   }
@@ -1384,113 +1874,173 @@ const AccountSettings = () => {
   const sectionRenderers: Record<SettingsCategory, () => React.ReactNode> = {
     profile: renderProfileSection,
     security: renderSecuritySection,
-    developer: renderDeveloperSection,
-    webhooks: renderWebhooksSection,
-    migration: renderMigrationSection,
     plans: renderPlansSection,
     byok: () => (
-      <div style={{ display: 'grid', gap: 16 }}>
-        <BYOKSettingsCard className="rounded-xl" />
-        <SDESettingsCard className="rounded-xl" />
+      <div className="tv-stack">
+        <BYOKSettingsCard className="rounded-3xl" />
+        <SDESettingsCard className="rounded-3xl" />
       </div>
     ),
+    developer: renderDeveloperSection,
+    webhooks: renderWebhooksSection,
+    devices: () => <CliDevicesSection />,
+    migration: renderMigrationSection,
     preferences: renderPreferencesSection,
-    devices: renderDevicesSection,
   };
 
   const current = SETTINGS_CATEGORIES.find((c) => c.id === activeCategory) ?? SETTINGS_CATEGORIES[0];
-  useDocTitle(`${current.label} · Account settings`);
+  useDocTitle(`${current.label} · Settings`);
+
+  const jellySpring = reduce
+    ? { duration: 0.01 }
+    : { type: 'spring' as const, stiffness: 460, damping: 22, mass: 0.8 };
 
   return (
     <AppShell>
-      <style>{ST_CSS}</style>
-      <style>{`.vk-dock{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:999px;
-        border:1px solid rgba(232,231,225,.1);background:linear-gradient(180deg,rgba(30,31,28,.8),rgba(14,15,13,.9));
-        margin:0 0 14px auto;width:max-content}
-        .vk-dock span{font:400 11px/1 var(--sa-mono);color:var(--sa-mute);letter-spacing:.08em}
-        .vk-dock button{padding:6px 14px;border-radius:999px;border:1px solid rgba(232,231,225,.12);
-        background:rgba(232,231,225,.08);color:#e8e7e1;cursor:pointer;font-size:11px}
-        .vk-dock button:hover{background:rgba(232,231,225,.14)}`}</style>
+      <style>{TV_CSS}</style>
 
-      <div className="vk-dock">
-        <span>VAULT · {vaultState ? 'UNLOCKED' : 'LOCKED'}</span>
-        <button onClick={() => vaultState ? (lockVault(), setVaultState(false)) : setVaultOpen(true)}>
-          {vaultState ? 'Lock' : 'Unlock'}
-        </button>
+      <div className="tv-root">
+        {/* ── Minimal Floating HUD ── */}
+        <header className="tv-hud">
+          <Link to="/dashboard" className="tv-pill-btn sm" aria-label="Back to dashboard">
+            <Ico.ArrowLeft size={14} />
+            <span>Files</span>
+          </Link>
+
+          <div className="tv-hud-r">
+            <button
+              type="button"
+              className="tv-pill-btn sm"
+              onClick={() => (vaultState ? (lockVault(), setVaultState(false)) : setVaultOpen(true))}
+            >
+              <span
+                className="tv-dot"
+                style={{ color: vaultState ? 'var(--tv-ok)' : 'var(--tv-mute)' }}
+              />
+              <span>Vault {vaultState ? 'Unlocked' : 'Locked'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="tv-pill-btn sm danger icon"
+              onClick={signOut}
+              title="Sign Out"
+              aria-label="Sign Out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </header>
+
+        {/* ── Single-Column tvOS Stage ── */}
+        <main className="tv-stage">
+          <div className="tv-title-bar">
+            <h1 className="tv-title">{current.label}</h1>
+            <span className="sa-mono" style={{ fontSize: 12, color: 'var(--tv-mute)' }}>
+              {user?.email}
+            </span>
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeCategory}
+              className="tv-stack"
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.985 }}
+              animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }}
+              transition={jellySpring}
+            >
+              {sectionRenderers[activeCategory]()}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+
+        {/* ── Rounded Floating Dock Navigation ── */}
+        <div className="tv-dock-wrap">
+          <nav
+            className="tv-dock"
+            role="tablist"
+            aria-label="Settings navigation"
+            onKeyDown={onDockKey}
+          >
+            {SETTINGS_CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const active = activeCategory === cat.id;
+              return (
+                <motion.button
+                  key={cat.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  tabIndex={active ? 0 : -1}
+                  className="tv-dock-item"
+                  whileHover={reduce ? undefined : { scale: 1.05 }}
+                  whileTap={reduce ? undefined : { scaleX: 0.91, scaleY: 0.84 }}
+                  transition={jellySpring}
+                  onClick={() => {
+                    setActiveCategory(cat.id);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="tv-dock-pill"
+                      className="tv-dock-thumb"
+                      transition={
+                        reduce
+                          ? { duration: 0.01 }
+                          : { type: 'spring', stiffness: 400, damping: 24, mass: 0.8 }
+                      }
+                    />
+                  )}
+                  <span className="tv-dock-content">
+                    <Icon className="h-3.5 w-3.5" />
+                    <span className="tv-dock-label">{cat.label}</span>
+                  </span>
+                </motion.button>
+              );
+            })}
+          </nav>
+        </div>
       </div>
-      <VaultUnlockDialog open={vaultOpen} userId={user?.id || ''}
+
+      {/* ── Dialogs ── */}
+      <VaultUnlockDialog
+        open={vaultOpen}
+        userId={user?.id || ''}
         onClose={() => setVaultOpen(false)}
         onUnlocked={() => setVaultState(true)}
-        reason="Your files are encrypted with your vault key. Unlock once to access them." />
-
-      <TopBar
-        crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Account settings' }, { label: current.label }]}
-        below={
-          <div className="st-bar">
-            <UnderlineTabs<SettingsCategory>
-              label="Settings sections"
-              idPrefix="st-m"
-              value={activeCategory}
-              onChange={setActiveCategory}
-              tabs={SETTINGS_CATEGORIES.map((c) => ({ id: c.id, label: c.label }))}
-            />
-          </div>
-        }
-      >
-        <span className="hide-sm sa-mono sa-mute" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }} title={user?.email || ''}>{user?.email}</span>
-      </TopBar>
-
-      <Wrap>
-        <div className="st">
-          <nav className="st-nav sa-nav" aria-label="Settings sections">
-            {NAV_GROUPS.map((g) => (
-              <React.Fragment key={g.label}>
-                <div className="sa-nav-h">{g.label}</div>
-                {g.ids.map((id) => {
-                  const cat = SETTINGS_CATEGORIES.find((c) => c.id === id)!;
-                  const Icon = cat.icon;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      className={`sa-nav-i${activeCategory === id ? ' on' : ''}`}
-                      aria-current={activeCategory === id ? 'page' : undefined}
-                      onClick={() => { setActiveCategory(id); window.scrollTo({ top: 0 }); }}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {cat.label}
-                    </button>
-                  );
-                })}
-              </React.Fragment>
-            ))}
-          </nav>
-
-          <div className="st-main sa-in" key={activeCategory}>
-            <PageHead eyebrow="Account settings" title={current.label} desc={SECTION_DESC[activeCategory]} />
-            <div style={{ display: 'grid', gap: 16 }}>
-              {sectionRenderers[activeCategory]()}
-            </div>
-          </div>
-        </div>
-      </Wrap>
+        reason="Unlock your vault key to access encrypted files."
+      />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Passkey?</AlertDialogTitle>
-            <AlertDialogDescription>This will disable passkey authentication. You can set up a new passkey anytime.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This disables passkey sign-in until you register a new key.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePasskey} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {loading ? <><Spinner size={14} /><span style={{ marginLeft: 8 }}>Removing...</span></> : 'Remove Passkey'}
+            <AlertDialogAction
+              onClick={handleDeletePasskey}
+              disabled={loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading ? <Spinner size={14} /> : 'Remove'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {user && <BiometricSetupDialog open={showBiometricSetup} onClose={() => setShowBiometricSetup(false)} onComplete={handleBiometricSetupComplete} />}
+      {user && (
+        <BiometricSetupDialog
+          open={showBiometricSetup}
+          onClose={() => setShowBiometricSetup(false)}
+          onComplete={handleBiometricSetupComplete}
+        />
+      )}
 
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1509,13 +2059,17 @@ const AccountSettings = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Disable Two-Factor Authentication?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the authenticator app from your account. You will no longer need a verification code to sign in.
+              Your account will no longer ask for an authenticator code at sign-in.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={mfaLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUnenrollMfa} disabled={mfaLoading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {mfaLoading ? <><Spinner size={14} /><span style={{ marginLeft: 8 }}>Disabling...</span></> : 'Disable MFA'}
+            <AlertDialogAction
+              onClick={handleUnenrollMfa}
+              disabled={mfaLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {mfaLoading ? <Spinner size={14} /> : 'Disable'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

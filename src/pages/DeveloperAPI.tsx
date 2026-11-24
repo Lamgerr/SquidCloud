@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -24,74 +25,272 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  AppShell, AppTheme, TopBar, Wrap, PageHead, Panel, Row, Pill, Dot, Kbd, Meter, Note,
-  Stat, Stats, Empty, SkelRows, Spinner, Ico, CodeBlock, CopyLine, UnderlineTabs,
+  AppShell, AppTheme, TopBar, Wrap, Panel, Row, Pill, Dot, Kbd, Meter, Note,
+  Empty, SkelRows, Spinner, Ico, CodeBlock, CopyLine,
   btn, useHashState, useDocTitle, useSearchShortcut,
 } from '@/components/custom/squid-app';
-
-/* ═══════════════════════════════════════════════════════════════
-   DEVELOPER API
-   A working surface for people who live in it: tabs that persist in
-   the URL (#tab=playground), ⌘/Ctrl+Enter to send a request, an
-   endpoint reference you can filter and expand, a docs rail that
-   stays put while you scroll. Data, requests and Supabase calls are
-   unchanged.
-   Place at: src/pages/DeveloperAPI.tsx
-   ═══════════════════════════════════════════════════════════════ */
+import { SPRING, JELLY } from '@/components/FloatingDock';
 
 const TAB_IDS = ['overview', 'keys', 'playground', 'status', 'docs'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
-import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
-
 const DV_CSS = `
-${ PAGES_POLISH }
-.dv-bar { position: sticky; top: 48px; z-index: 30; padding: 0 var(--sa-gut); border-bottom: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg) 92%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-.dv-bar .sa-tabs { max-width: 1120px; margin: 0 auto; border-bottom: 0; }
-.dv-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.dv-root {
+  --lq-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --lq-jelly: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --g-ink: #e8e7e1;
+  --g-mute: rgba(232, 231, 225, 0.48);
+  --g-fill: rgba(13, 14, 13, 0.86);
+  --g-fill-hi: rgba(24, 27, 25, 0.94);
+  --g-line: rgba(232, 231, 225, 0.09);
+  --g-rim: rgba(232, 231, 225, 0.16);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  .dv-root { --lq-spring: ${SPRING}; --lq-jelly: ${JELLY}; }
+}
+
+/* Floating top section dock */
+.dv-dock-wrap {
+  position: sticky;
+  top: 58px;
+  z-index: 35;
+  display: flex;
+  justify-content: center;
+  padding: 12px var(--sa-gut) 4px;
+  pointer-events: none;
+}
+.dv-dock {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--g-fill);
+  border: 1px solid var(--g-line);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: inset 0 1px 0 var(--g-rim), 0 16px 38px -14px rgba(0, 0, 0, 0.82);
+}
+.dv-dock-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--g-mute);
+  font: 500 12.5px/1 var(--sa-f);
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.18s !important;
+}
+.dv-dock-btn:hover,
+.dv-dock-btn[aria-selected="true"] {
+  color: var(--g-ink);
+}
+.dv-dock-thumb {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--g-fill-hi);
+  border: 1px solid rgba(232, 231, 225, 0.11);
+  box-shadow: inset 0 1px 0 rgba(232, 231, 225, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.6);
+}
+.dv-dock-lbl {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dv-dock-cnt {
+  font: 400 10.5px/1 var(--sa-mono);
+  color: var(--g-mute);
+}
+
+/* Dark liquid-glass overrides for panels & buttons */
+.dv-root .sa-panel {
+  border-radius: 18px;
+  background: var(--g-fill);
+  border: 1px solid var(--g-line);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(232, 231, 225, 0.1), 0 18px 42px -20px rgba(0, 0, 0, 0.78);
+  overflow: hidden;
+}
+.dv-root .sa-panel-h {
+  border-bottom-color: var(--g-line);
+  padding: 14px 18px;
+}
+.dv-root .sa-row {
+  padding: 13px 18px;
+}
+.dv-root .sa-row + .sa-row,
+.dv-root .sa-panel-b.flush > .sa-row:not(:first-child) {
+  border-top-color: var(--g-line);
+}
+.dv-root .sa-btn {
+  border-radius: 999px;
+  background: rgba(232, 231, 225, 0.05);
+  border: 1px solid var(--g-line);
+  color: var(--g-ink);
+  box-shadow: inset 0 1px 0 rgba(232, 231, 225, 0.08);
+  transition: transform 0.55s var(--lq-jelly), background 0.18s, border-color 0.18s;
+}
+.dv-root .sa-btn:hover {
+  background: rgba(232, 231, 225, 0.1);
+  border-color: rgba(232, 231, 225, 0.18);
+}
+.dv-root .sa-btn:active {
+  transform: scaleX(0.93) scaleY(0.87);
+}
+.dv-root .sa-btn.primary {
+  background: var(--g-fill-hi);
+  color: var(--g-ink);
+  border-color: rgba(232, 231, 225, 0.18);
+  box-shadow: inset 0 1px 0 rgba(232, 231, 225, 0.22), 0 10px 24px -10px rgba(0, 0, 0, 0.8);
+}
+.dv-root .sa-btn.primary:hover {
+  background: rgba(34, 38, 35, 0.96);
+  border-color: rgba(232, 231, 225, 0.28);
+}
+.dv-root .sa-input {
+  border-radius: 999px;
+  height: 36px;
+  padding: 0 14px;
+  background: rgba(8, 9, 8, 0.72);
+  border-color: var(--g-line);
+}
+.dv-root .sa-input.pl { padding-left: 34px; }
+.dv-root .sa-input.pr { padding-right: 42px; }
+.dv-root textarea.sa-input {
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+/* Numbers-only minimal stat strip */
+.dv-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.dv-chip-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--g-fill);
+  border: 1px solid var(--g-line);
+  box-shadow: inset 0 1px 0 rgba(232, 231, 225, 0.1);
+}
+.dv-chip-stat span {
+  font: 400 10.5px/1 var(--sa-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--g-mute);
+}
+.dv-chip-stat b {
+  font: 400 18px/1 var(--sa-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--g-ink);
+}
+
+.dv-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .dv-split > *, .dv-col, .dv-col > *, .dv-lines > * { min-width: 0; }
-.dv-split > .sa-panel + .sa-panel, .dv-col > .sa-panel + .sa-panel { margin-top: 20px; }
-.dv-split .sa-code.inline { display: flex; width: 100%; }
+.dv-split > .sa-panel + .sa-panel, .dv-col > .sa-panel + .sa-panel { margin-top: 16px; }
+.dv-split .sa-code.inline { display: flex; width: 100%; border-radius: 999px; }
 .dv-split .sa-code.inline code { flex: 1; min-width: 0; }
-.dv-sticky { position: sticky; top: 108px; }
+.dv-sticky { position: sticky; top: 112px; }
 @media (max-width: 1100px) { .dv-split { grid-template-columns: minmax(0, 1fr); } .dv-sticky { position: static; } }
-.dv-docs { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: 40px; align-items: start; }
+
+/* Docs floating vertical pill dock */
+.dv-docs { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 28px; align-items: start; }
 .dv-docs > *, .dv-docs .sa-panel-b > * { min-width: 0; }
-.dv-docs-nav { position: sticky; top: 108px; }
-@media (max-width: 1100px) { .dv-docs { grid-template-columns: minmax(0, 1fr); gap: 20px; } .dv-docs-nav { display: none; } }
-.dv-sec { scroll-margin-top: 112px; }
-.dv-sec + .dv-sec { margin-top: 24px; }
-.dv-m { min-width: 56px; justify-content: center; }
-.dv-form { display: grid; gap: 14px; padding: 16px; }
-.dv-form .g2 { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 10px; }
+.dv-docs-nav {
+  position: sticky;
+  top: 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px;
+  border-radius: 20px;
+  background: var(--g-fill);
+  border: 1px solid var(--g-line);
+  box-shadow: inset 0 1px 0 var(--g-rim);
+}
+.dv-doc-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font: 400 12.5px/1 var(--sa-f);
+  color: var(--g-mute);
+  text-decoration: none;
+  transition: color 0.18s;
+}
+.dv-doc-pill:hover,
+.dv-doc-pill.on {
+  color: var(--g-ink);
+}
+.dv-doc-thumb {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--g-fill-hi);
+  border: 1px solid rgba(232, 231, 225, 0.1);
+  box-shadow: inset 0 1px 0 rgba(232, 231, 225, 0.1);
+}
+.dv-doc-lbl {
+  position: relative;
+  z-index: 1;
+}
+@media (max-width: 1100px) { .dv-docs { grid-template-columns: minmax(0, 1fr); gap: 16px; } .dv-docs-nav { display: none; } }
+
+.dv-sec { scroll-margin-top: 116px; }
+.dv-sec + .dv-sec { margin-top: 16px; }
+.dv-m { min-width: 52px; justify-content: center; }
+.dv-form { display: grid; gap: 12px; padding: 16px; }
+.dv-form .g2 { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; }
 .dv-form .g2 > *, .dv-dl > * { min-width: 0; }
-.dv-ta { height: auto; padding: 10px; font-family: var(--sa-mono); font-size: 12.5px; line-height: 1.6; resize: vertical; }
+.dv-ta { height: auto; font-family: var(--sa-mono); font-size: 12.5px; line-height: 1.6; resize: vertical; }
 .dv-send { display: flex; align-items: center; gap: 10px; }
 .dv-send .sa-btn { flex: 1; }
-.dv-ep { border-top: 1px solid var(--sa-line); }
+
+.dv-ep { border-top: 1px solid var(--g-line); }
 .dv-ep:first-child { border-top: 0; }
-.dv-ep > summary { list-style: none; display: grid; grid-template-columns: 60px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 11px 16px; cursor: pointer; transition: background 0.12s; }
+.dv-ep > summary { list-style: none; display: grid; grid-template-columns: 60px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 18px; cursor: pointer; transition: background 0.15s; }
 .dv-ep > summary::-webkit-details-marker { display: none; }
-.dv-ep > summary:hover, .dv-ep[open] > summary { background: var(--sa-bg-3); }
-.dv-ep .path { font: 500 12.5px/1.3 var(--sa-mono); color: var(--sa-text); word-break: break-all; }
-.dv-ep .sum { margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--sa-mute); }
-.dv-ep .scopes { display: flex; gap: 4px; }
-.dv-ep .chev { color: var(--sa-mute); transition: transform 0.2s var(--sa-ease); }
+.dv-ep > summary:hover, .dv-ep[open] > summary { background: rgba(232, 231, 225, 0.04); }
+.dv-ep .path { font: 500 12.5px/1.3 var(--sa-mono); color: var(--g-ink); word-break: break-all; }
+.dv-ep .sum { margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--g-mute); }
+.dv-ep .scopes { display: flex; gap: 4px; align-items: center; }
+.dv-ep .chev { color: var(--g-mute); transition: transform 0.35s var(--lq-spring); }
 .dv-ep[open] .chev { transform: rotate(90deg); }
-.dv-ep .body { display: grid; gap: 12px; padding: 6px 16px 16px; }
-.dv-ep[open] .body { animation: sa-in 0.22s var(--sa-ease) both; }
+.dv-ep .body { display: grid; gap: 12px; padding: 8px 18px 18px; }
 .dv-ep .acts { display: flex; gap: 6px; flex-wrap: wrap; }
 @media (max-width: 720px) { .dv-ep > summary { grid-template-columns: 56px minmax(0, 1fr); } .dv-ep .scopes { display: none; } }
-.dv-inline { padding: 1px 5px; border: 1px solid var(--sa-line); border-radius: 3px; background: var(--sa-bg-3); font: 400 11.5px/1 var(--sa-mono); color: var(--sa-text); }
-.dv-p { margin: 0; font-size: 13px; line-height: 1.65; color: var(--sa-text-2); }
+
+.dv-inline { padding: 2px 7px; border: 1px solid var(--g-line); border-radius: 999px; background: rgba(232, 231, 225, 0.05); font: 400 11.5px/1 var(--sa-mono); color: var(--g-ink); }
+.dv-p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--g-mute); }
 .dv-lines { display: grid; gap: 6px; }
-.dv-dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 16px; }
+.dv-dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px; }
 @media (max-width: 720px) { .dv-dl { grid-template-columns: 1fr; } }
-.dv-dl a { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--sa-line); border-radius: 5px; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
-.dv-dl a:hover { background: var(--sa-bg-3); border-color: var(--sa-dim); }
+.dv-dl a { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--g-line); border-radius: 14px; background: rgba(8, 9, 8, 0.5); text-decoration: none; transition: transform 0.45s var(--lq-jelly), background 0.18s, border-color 0.18s; }
+.dv-dl a:hover { background: rgba(232, 231, 225, 0.06); border-color: rgba(232, 231, 225, 0.18); transform: scale(1.015); }
+.dv-dl a:active { transform: scale(0.97); }
 .dv-dl b { display: block; font: 500 13px/1.3 var(--sa-f); }
-.dv-dl small { display: block; margin-top: 2px; font-size: 12px; color: var(--sa-mute); }
-.dv-health { display: flex; align-items: center; gap: 8px; font: 400 12px/1 var(--sa-mono); color: var(--sa-mute); }
+.dv-dl small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--g-mute); }
+.dv-health { display: flex; align-items: center; gap: 8px; font: 400 11.5px/1 var(--sa-mono); color: var(--g-mute); }
 `;
 
 const methodTone = (m: string) =>
@@ -668,13 +867,13 @@ const endpoints: Endpoint[] = [
 
 const DeveloperAPI = () => {
   const isMobile = useIsMobile();
+  const reduce = !!useReducedMotion();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useHashState<TabId>('tab', 'overview', TAB_IDS);
   const [endpointStatus, setEndpointStatus] = useState<Record<string, EndpointHealth>>({});
   const [activeDoc, setActiveDoc] = useState<string>('dv-auth');
 
-  // Scroll-spy for the Docs rail — highlights the section in view.
   useEffect(() => {
     if (activeTab !== 'docs') return;
     const ids = ['dv-auth', 'dv-agent', 'dv-endpoints', 'dv-costs', 'dv-credits', 'dv-codes', 'dv-downloads'];
@@ -703,7 +902,7 @@ const DeveloperAPI = () => {
   const [playgroundResponse, setPlaygroundResponse] = useState('');
   const [playgroundLoading, setPlaygroundLoading] = useState(false);
 
-  const [creditInfo, setCreditInfo] = useState<{used: number; daily_limit: number; remaining: number} | null>(null);
+  const [creditInfo, setCreditInfo] = useState<{ used: number; daily_limit: number; remaining: number } | null>(null);
   const [loadingCredits, setLoadingCredits] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [operationCosts, setOperationCosts] = useState<any[]>([]);
@@ -794,7 +993,7 @@ const DeveloperAPI = () => {
       setLoadingCredits(true);
       try {
         const apiKey = user.email || '';
-        const [userRes, usageRes] = await Promise.allSettled([
+        const [userRes] = await Promise.allSettled([
           fetch(`${BASE_URL}/user`, { headers: { 'X-SquidCloud-Key': apiKey } }),
           fetch(`${BASE_URL}/stats/usage`, { headers: { 'X-SquidCloud-Key': apiKey } }),
         ]);
@@ -805,7 +1004,6 @@ const DeveloperAPI = () => {
             setCreditInfo(data.credits);
           }
         }
-
       } catch {
       } finally {
         if (isMounted) setLoadingCredits(false);
@@ -819,7 +1017,7 @@ const DeveloperAPI = () => {
       if (keysData) {
         setApiKeys(keysData);
         const limits: Record<string, string> = {};
-        keysData.forEach(k => { limits[k.id] = String(k.custom_daily_limit ?? ''); });
+        keysData.forEach((k) => { limits[k.id] = String(k.custom_daily_limit ?? ''); });
         setCustomLimits(limits);
       }
     };
@@ -945,7 +1143,7 @@ const DeveloperAPI = () => {
     const interval = setInterval(calcCountdown, 1000);
     return () => clearInterval(interval);
   }, []);
-  /* ── workbench additions (UI state only) ── */
+
   const [endpointFilter, setEndpointFilter] = useState('');
   const filterRef = useRef<HTMLInputElement>(null);
   useSearchShortcut(filterRef);
@@ -968,9 +1166,7 @@ const DeveloperAPI = () => {
       respStatus = r.status;
       respLatency = r.latency || '';
     }
-  } catch {
-    /* not a formatted response */
-  }
+  } catch {}
 
   const q = endpointFilter.trim().toLowerCase();
   const shownEndpoints = endpoints.filter(
@@ -985,632 +1181,679 @@ const DeveloperAPI = () => {
 
   const DOC_SECTIONS = [
     ['dv-auth', 'Authentication'],
-    ['dv-agent', 'AI agent prompt'],
-    ['dv-endpoints', 'Endpoint reference'],
-    ['dv-costs', 'Credit costs'],
-    ['dv-credits', 'Credit system'],
-    ['dv-codes', 'HTTP status codes'],
+    ['dv-agent', 'AI Agent Prompt'],
+    ['dv-endpoints', 'Endpoints'],
+    ['dv-costs', 'Credit Costs'],
+    ['dv-credits', 'Credits'],
+    ['dv-codes', 'Status Codes'],
     ['dv-downloads', 'Downloads'],
   ] as const;
 
+  const TABS: Array<{ id: TabId; label: string; count?: number }> = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'keys', label: 'Keys', count: apiKeys.length || undefined },
+    { id: 'playground', label: 'Playground' },
+    { id: 'status', label: 'Status' },
+    { id: 'docs', label: 'Docs' },
+  ];
+
   const keyLabel = (key: any) => key.name || key.key_prefix || key.key?.substring(0, 12);
+  const thumbSpring = reduce ? { duration: 0.01 } : { type: 'spring' as const, stiffness: 380, damping: 21, mass: 0.8 };
+  const pageSpring = reduce ? { duration: 0.01 } : { type: 'spring' as const, stiffness: 330, damping: 26, mass: 0.9 };
 
   return (
     <AppShell>
       <style>{DV_CSS}</style>
       <MobileScrollToTop />
 
-      <TopBar crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Developer API' }]}>
-        <span className="hide-sm"><Pill>API v4.0</Pill></span>
-      </TopBar>
+      <div className="dv-root">
+        <TopBar crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'API' }]}>
+          <span className="hide-sm"><Pill>v4.0</Pill></span>
+        </TopBar>
 
-      <div className="dv-bar">
-        <UnderlineTabs<TabId>
-          label="Developer API sections"
-          idPrefix="dv"
-          value={activeTab}
-          onChange={setActiveTab}
-          tabs={[
-            { id: 'overview', label: 'Overview' },
-            { id: 'keys', label: 'API Keys', count: apiKeys.length || undefined },
-            { id: 'playground', label: 'Playground' },
-            { id: 'status', label: 'Status' },
-            { id: 'docs', label: 'Docs' },
-          ]}
-        />
-      </div>
-
-      <Wrap>
-        <PageHead eyebrow="Developer" title="Developer API" desc="Build with SquidCloud API v4.0" />
-
-        {/* ═════════ Overview ═════════ */}
-        {activeTab === 'overview' && (
-          <div className="sa-in">
-            <Stats>
-              <Stat label="Endpoints" value={endpoints.length} />
-              <Stat label="Uptime" value="99.9%" />
-              <Stat label="Latency" value="<100ms" />
-            </Stats>
-
-            <div className="dv-split" style={{ marginTop: 16 }}>
-              <div className="dv-col">
-                <Panel
-                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Code className="h-3.5 w-3.5" /> SquidCloud API v4.0</span>}
-                  desc="Credit-based file API with RES54 end-to-end encryption, CDN streaming, secrets vault, and workspace collaboration"
+        <div className="dv-dock-wrap">
+          <div className="dv-dock" role="tablist" aria-label="Developer API sections">
+            {TABS.map((t) => {
+              const on = activeTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  className="dv-dock-btn"
+                  onClick={() => setActiveTab(t.id)}
                 >
-                  <div style={{ display: 'grid', gap: 18 }}>
-                    <div>
-                      <div className="sa-label">Base URL</div>
-                      <CopyLine value={BASE_URL} />
+                  {on && <motion.span layoutId="dv-dock-thumb" className="dv-dock-thumb" transition={thumbSpring} />}
+                  <span className="dv-dock-lbl">
+                    {t.label}
+                    {t.count !== undefined && <span className="dv-dock-cnt">{t.count}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <Wrap>
+          <AnimatePresence mode="wait" initial={false}>
+            {/* ═════════ Overview ═════════ */}
+            {activeTab === 'overview' && (
+              <motion.div
+                key="overview"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }}
+                transition={pageSpring}
+              >
+                <div className="dv-strip">
+                  <div className="dv-chip-stat"><span>Endpoints</span><b>{endpoints.length}</b></div>
+                  <div className="dv-chip-stat"><span>Uptime</span><b>99.9%</b></div>
+                  <div className="dv-chip-stat"><span>Latency</span><b>&lt;100ms</b></div>
+                  {creditInfo && (
+                    <div className="dv-chip-stat">
+                      <span>Credits left</span>
+                      <b>{creditInfo.remaining}</b>
                     </div>
-                    <div>
-                      <div className="sa-label">Quick start</div>
-                      <CodeBlock
-                        lang="bash"
-                        code={`curl -H "X-SquidCloud-Key: YOUR_API_KEY" \\
+                  )}
+                </div>
+
+                <div className="dv-split">
+                  <div className="dv-col">
+                    <Panel
+                      title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Code className="h-3.5 w-3.5" /> Base &amp; Quick Start</span>}
+                    >
+                      <div style={{ display: 'grid', gap: 16 }}>
+                        <div>
+                          <div className="sa-label">Endpoint</div>
+                          <CopyLine value={BASE_URL} />
+                        </div>
+                        <div>
+                          <div className="sa-label">cURL</div>
+                          <CodeBlock
+                            lang="bash"
+                            code={`curl -H "X-SquidCloud-Key: YOUR_API_KEY" \\
   -H "X-SquidCloud-Encryption-Key: OPTIONAL_USER_KEY" \\
   ${BASE_URL}/files`}
-                        copyText={`curl -H "X-SquidCloud-Key: YOUR_API_KEY" -H "X-SquidCloud-Encryption-Key: OPTIONAL_USER_KEY" ${BASE_URL}/files`}
-                        wrap
-                      />
-                    </div>
-                  </div>
-                </Panel>
-              </div>
-
-              <div className="dv-col">
-                <Panel
-                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Activity className="h-3.5 w-3.5" /> API Credits</span>}
-                  actions={loadingCredits ? <Spinner /> : undefined}
-                >
-                  {creditInfo ? (
-                    <div style={{ display: 'grid', gap: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }} className="sa-num">
-                        <span>{creditInfo.used} used of {creditInfo.daily_limit} today</span>
-                        <span className="sa-mute">{creditInfo.remaining} remaining</span>
+                            copyText={`curl -H "X-SquidCloud-Key: YOUR_API_KEY" -H "X-SquidCloud-Encryption-Key: OPTIONAL_USER_KEY" ${BASE_URL}/files`}
+                            wrap
+                          />
+                        </div>
                       </div>
-                      <Meter value={creditInfo.used} max={creditInfo.daily_limit} label="Credits used today" />
-                    </div>
-                  ) : loadingCredits ? (
-                    <SkelRows rows={1} />
-                  ) : (
-                    <p className="dv-p sa-mute">Sign in to view your credit usage</p>
-                  )}
-                </Panel>
+                    </Panel>
+                  </div>
 
-                {apiKeys.length > 0 && (
-                  <Panel
-                    title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Sliders className="h-3.5 w-3.5" /> Per-Key Configuration</span>}
-                    desc="Configure limits, rate limits, and security per API key"
-                    flush
-                  >
-                    {apiKeys.map((key) => (
-                      <Row
-                        key={key.id}
-                        label={<span title={String(keyLabel(key))} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}><Key className="h-3.5 w-3.5 sa-mute" style={{ flex: 'none' }} /><code className="sa-mono" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, maxWidth: 220 }}>{keyLabel(key)}</code></span>}
+                  <div className="dv-col">
+                    <Panel
+                      title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Activity className="h-3.5 w-3.5" /> Daily Quota</span>}
+                      actions={loadingCredits ? <Spinner /> : undefined}
+                    >
+                      {creditInfo ? (
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }} className="sa-num">
+                            <span>{creditInfo.used} / {creditInfo.daily_limit}</span>
+                            <span className="sa-mute">{creditInfo.remaining} left</span>
+                          </div>
+                          <Meter value={creditInfo.used} max={creditInfo.daily_limit} label="Credits used today" />
+                        </div>
+                      ) : loadingCredits ? (
+                        <SkelRows rows={1} />
+                      ) : (
+                        <p className="dv-p">Sign in to view quota</p>
+                      )}
+                    </Panel>
+
+                    {apiKeys.length > 0 && (
+                      <Panel
+                        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Sliders className="h-3.5 w-3.5" /> Key Limits</span>}
+                        flush
                       >
-                        <Dialog open={configDialogOpen && configKey?.id === key.id} onOpenChange={(open) => { setConfigDialogOpen(open); if (open) { setConfigKey(key); setConfigForm({ custom_daily_limit: String(key.custom_daily_limit ?? ''), custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''), allow_hmac: key.allow_hmac ?? false, is_disabled: key.is_disabled ?? false }); } }}>
-                          <DialogTrigger asChild>
-                            <button
-                              type="button"
-                              className={btn('default', 'sm')}
-                              onClick={() => { setConfigKey(key); setConfigForm({ custom_daily_limit: String(key.custom_daily_limit ?? ''), custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''), allow_hmac: key.allow_hmac ?? false, is_disabled: key.is_disabled ?? false }); }}
-                            >
-                              <Settings2 className="h-3 w-3" />
-                              Configure
-                            </button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Key Configuration</DialogTitle>
-                              <DialogDescription>
-                                Configure limits and security for <code className="dv-inline">{key.name || key.key_prefix}</code>
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-2">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1.5">
-                                  <Label className="text-xs text-muted-foreground">Daily Credit Limit</Label>
-                                  <Input
-                                    className="h-9 text-sm"
-                                    type="number" min="0"
-                                    placeholder="Default"
-                                    value={configForm.custom_daily_limit}
-                                    onChange={(e) => setConfigForm(p => ({ ...p, custom_daily_limit: e.target.value }))}
-                                  />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <Label className="text-xs text-muted-foreground">Rate Limit (req/s)</Label>
-                                  <Input
-                                    className="h-9 text-sm"
-                                    type="number" min="0"
-                                    placeholder="Default"
-                                    value={configForm.custom_rate_limit_rps}
-                                    onChange={(e) => setConfigForm(p => ({ ...p, custom_rate_limit_rps: e.target.value }))}
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between h-10 px-3 rounded-md border border-border">
-                                <Label className="text-sm">Require HMAC Request Signing</Label>
-                                <Switch
-                                  checked={configForm.allow_hmac}
-                                  onCheckedChange={(v) => setConfigForm(p => ({ ...p, allow_hmac: v }))}
-                                />
-                              </div>
-                              <div className="flex items-center justify-between h-10 px-3 rounded-md border border-border">
-                                <Label className="text-sm">Disable This Key</Label>
-                                <Switch
-                                  checked={configForm.is_disabled}
-                                  onCheckedChange={(v) => setConfigForm(p => ({ ...p, is_disabled: v }))}
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <button
-                                type="button"
-                                className={btn()}
-                                onClick={() => setConfigDialogOpen(false)}
-                              >Cancel</button>
-                              <button
-                                type="button"
-                                className={btn('primary')}
-                                disabled={savingConfig}
-                              onClick={async () => {
-                                setSavingConfig(true);
-                                try {
-                                  const body: Record<string, any> = {};
-                                  if (configForm.custom_daily_limit) body.custom_daily_limit = parseInt(configForm.custom_daily_limit) || 0;
-                                  if (configForm.custom_rate_limit_rps) body.custom_rate_limit_rps = parseInt(configForm.custom_rate_limit_rps) || 0;
-                                  body.allow_hmac = !!configForm.allow_hmac;
-                                  body.is_disabled = !!configForm.is_disabled;
-
-                                  const res = await supabase
-                                    .from('api_key_limits')
-                                    .upsert({
-                                      api_key_id: configKey.id,
-                                      custom_daily_limit: body.custom_daily_limit || null,
-                                      custom_rate_limit_rps: body.custom_rate_limit_rps || null,
-                                      is_disabled: body.is_disabled,
-                                    });
-
-                                  if (configKey.allow_hmac !== body.allow_hmac) {
-                                    await supabase
-                                      .from('api_keys')
-                                      .update({ allow_hmac: body.allow_hmac })
-                                      .eq('id', configKey.id);
-                                  }
-
-                                  setConfigDialogOpen(false);
-                                  sonnerToast.success('Key configuration saved');
-                                } catch {
-                                  sonnerToast.error('Failed to save configuration');
-                                } finally {
-                                  setSavingConfig(false);
+                        {apiKeys.map((key) => (
+                          <Row
+                            key={key.id}
+                            label={
+                              <span title={String(keyLabel(key))} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%' }}>
+                                <Key className="h-3.5 w-3.5 sa-mute" style={{ flex: 'none' }} />
+                                <code className="sa-mono" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, maxWidth: 220 }}>
+                                  {keyLabel(key)}
+                                </code>
+                              </span>
+                            }
+                          >
+                            <Dialog
+                              open={configDialogOpen && configKey?.id === key.id}
+                              onOpenChange={(open) => {
+                                setConfigDialogOpen(open);
+                                if (open) {
+                                  setConfigKey(key);
+                                  setConfigForm({
+                                    custom_daily_limit: String(key.custom_daily_limit ?? ''),
+                                    custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''),
+                                    allow_hmac: key.allow_hmac ?? false,
+                                    is_disabled: key.is_disabled ?? false,
+                                  });
                                 }
                               }}
-                              >
-                                {savingConfig ? <Spinner size={12} /> : 'Save'}
-                              </button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </Row>
-                    ))}
-                  </Panel>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+                            >
+                              <DialogTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={btn('default', 'sm')}
+                                  onClick={() => {
+                                    setConfigKey(key);
+                                    setConfigForm({
+                                      custom_daily_limit: String(key.custom_daily_limit ?? ''),
+                                      custom_rate_limit_rps: String(key.custom_rate_limit_rps ?? ''),
+                                      allow_hmac: key.allow_hmac ?? false,
+                                      is_disabled: key.is_disabled ?? false,
+                                    });
+                                  }}
+                                >
+                                  <Settings2 className="h-3 w-3" />
+                                  Limits
+                                </button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Key Configuration</DialogTitle>
+                                  <DialogDescription>
+                                    Limits for <code className="dv-inline">{key.name || key.key_prefix}</code>
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-2">
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                      <Label className="text-xs text-muted-foreground">Daily Credit Limit</Label>
+                                      <Input
+                                        className="h-9 text-sm"
+                                        type="number"
+                                        min="0"
+                                        placeholder="Default"
+                                        value={configForm.custom_daily_limit}
+                                        onChange={(e) => setConfigForm((p) => ({ ...p, custom_daily_limit: e.target.value }))}
+                                      />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label className="text-xs text-muted-foreground">Rate Limit (req/s)</Label>
+                                      <Input
+                                        className="h-9 text-sm"
+                                        type="number"
+                                        min="0"
+                                        placeholder="Default"
+                                        value={configForm.custom_rate_limit_rps}
+                                        onChange={(e) => setConfigForm((p) => ({ ...p, custom_rate_limit_rps: e.target.value }))}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between h-10 px-3 rounded-md border border-border">
+                                    <Label className="text-sm">Require HMAC Signing</Label>
+                                    <Switch
+                                      checked={configForm.allow_hmac}
+                                      onCheckedChange={(v) => setConfigForm((p) => ({ ...p, allow_hmac: v }))}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between h-10 px-3 rounded-md border border-border">
+                                    <Label className="text-sm">Disable Key</Label>
+                                    <Switch
+                                      checked={configForm.is_disabled}
+                                      onCheckedChange={(v) => setConfigForm((p) => ({ ...p, is_disabled: v }))}
+                                    />
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  <button type="button" className={btn()} onClick={() => setConfigDialogOpen(false)}>
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={btn('primary')}
+                                    disabled={savingConfig}
+                                    onClick={async () => {
+                                      setSavingConfig(true);
+                                      try {
+                                        const body: Record<string, any> = {};
+                                        if (configForm.custom_daily_limit) body.custom_daily_limit = parseInt(configForm.custom_daily_limit) || 0;
+                                        if (configForm.custom_rate_limit_rps) body.custom_rate_limit_rps = parseInt(configForm.custom_rate_limit_rps) || 0;
+                                        body.allow_hmac = !!configForm.allow_hmac;
+                                        body.is_disabled = !!configForm.is_disabled;
 
-        {/* ═════════ API keys ═════════ */}
-        {activeTab === 'keys' && (
-          <div className="sa-in">
-            <ApiKeyManagement />
-          </div>
-        )}
+                                        await supabase
+                                          .from('api_key_limits')
+                                          .upsert({
+                                            api_key_id: configKey.id,
+                                            custom_daily_limit: body.custom_daily_limit || null,
+                                            custom_rate_limit_rps: body.custom_rate_limit_rps || null,
+                                            is_disabled: body.is_disabled,
+                                          });
 
-        {/* ═════════ Playground ═════════ */}
-        {activeTab === 'playground' && (
-          <div className="dv-split sa-in">
-            <div
-              className="dv-col"
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !playgroundLoading) {
-                  e.preventDefault();
-                  testEndpoint();
-                }
-              }}
-            >
-              <Panel
-                title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Play className="h-3.5 w-3.5" /> API Playground</span>}
-                desc="Send requests with API key and optional encryption key"
-                flush
-              >
-                <div className="dv-form">
-                  <div className="g2">
-                    <div>
-                      <label className="sa-label">Method</label>
-                      <Select value={playgroundMethod} onValueChange={(value) => setPlaygroundMethod(value as typeof playgroundMethod)}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="GET" className="text-xs">GET</SelectItem>
-                          <SelectItem value="POST" className="text-xs">POST</SelectItem>
-                          <SelectItem value="PUT" className="text-xs">PUT</SelectItem>
-                          <SelectItem value="PATCH" className="text-xs">PATCH</SelectItem>
-                          <SelectItem value="DELETE" className="text-xs">DELETE</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="sa-label" htmlFor="pg-path">Endpoint path</label>
-                      <input id="pg-path" className="sa-input sa-mono" value={playgroundEndpoint} onChange={(e) => setPlaygroundEndpoint(e.target.value)} placeholder="/files" spellCheck={false} autoComplete="off" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="sa-label" htmlFor="pg-key">API key</label>
-                    <input id="pg-key" className="sa-input sa-mono" type="password" value={playgroundApiKey} onChange={(e) => setPlaygroundApiKey(e.target.value)} placeholder="cb_your_api_key" autoComplete="off" spellCheck={false} />
-                  </div>
-                  <div>
-                    <label className="sa-label" htmlFor="pg-enc">Encryption key <span className="sa-mute" style={{ fontWeight: 400 }}>(optional)</span></label>
-                    <input id="pg-enc" className="sa-input sa-mono" type="password" value={playgroundEncryptionKey} onChange={(e) => setPlaygroundEncryptionKey(e.target.value)} placeholder="optional user encryption key" autoComplete="off" spellCheck={false} />
-                    <div className="sa-hint">Wrong key for encrypted download returns 422.</div>
-                  </div>
-                  {playgroundMethod !== 'GET' && (
-                    <div>
-                      <label className="sa-label" htmlFor="pg-body">Request body <span className="sa-mute" style={{ fontWeight: 400 }}>(JSON)</span></label>
-                      <textarea id="pg-body" className="sa-input dv-ta" rows={5} value={playgroundBody} onChange={(e) => setPlaygroundBody(e.target.value)} placeholder='{"key":"value"}' spellCheck={false} />
-                    </div>
-                  )}
-                  <div className="dv-send">
-                    <button type="button" onClick={testEndpoint} disabled={playgroundLoading} className={btn('primary', 'lg')}>
-                      {playgroundLoading ? <><Spinner /> Sending request...</> : <><Play className="h-3.5 w-3.5" /> Send request</>}
-                    </button>
-                    <span className="hide-sm" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }} aria-hidden="true"><Kbd>⌘</Kbd><Kbd>↵</Kbd></span>
-                  </div>
-                </div>
-              </Panel>
-            </div>
+                                        if (configKey.allow_hmac !== body.allow_hmac) {
+                                          await supabase
+                                            .from('api_keys')
+                                            .update({ allow_hmac: body.allow_hmac })
+                                            .eq('id', configKey.id);
+                                        }
 
-            <div className="dv-col dv-sticky">
-              <Panel
-                title="Response"
-                desc={playgroundResponse ? 'Latest request result' : undefined}
-                actions={
-                  respStatus !== null ? (
-                    <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                      <Pill tone={statusTone(String(respStatus)) as any}>{respStatus}</Pill>
-                      <span className="sa-num sa-mute" style={{ fontSize: 12 }}>{respLatency}</span>
-                    </span>
-                  ) : undefined
-                }
-                flush={!!playgroundResponse}
-              >
-                {playgroundResponse ? (
-                  <CodeBlock code={playgroundResponse} lang="json" maxHeight={560} />
-                ) : (
-                  <p className="dv-p sa-mute">Response will appear here...</p>
-                )}
-              </Panel>
-            </div>
-          </div>
-        )}
-
-        {/* ═════════ Status ═════════ */}
-        {activeTab === 'status' && (
-          <div className="sa-in">
-            <Panel
-              title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Activity className="h-3.5 w-3.5" /> Account Credits</span>}
-              actions={
-                <button type="button" onClick={fetchAccountData} disabled={statusLoading} className={btn('default', 'sm')}>
-                  {statusLoading ? <Spinner size={12} /> : <Activity className="h-3 w-3" />}
-                  Refresh
-                </button>
-              }
-              flush
-            >
-              {accountCredits ? (
-                <div>
-                  <Stats>
-                    <Stat label="Used today" value={accountCredits.credits_used_today} />
-                    <Stat label="Left" value={accountCredits.credits_remaining < 0 ? '∞' : accountCredits.credits_remaining} />
-                    <Stat label="Daily limit" value={accountCredits.daily_limit < 0 ? '∞' : accountCredits.daily_limit} />
-                    <Stat label="Requests today" value={accountRequestCount} />
-                    <Stat label="This week" value={accountWeeklyLog ?? '-'} />
-                    <Stat label="This month" value={accountMonthlyLog ?? '-'} />
-                    <Stat label="Until reset" value={<span className="sa-num" style={{ fontSize: 20 }}>{resetCountdown}</span>} sub="Resets at 00:00 UTC" />
-                  </Stats>
-                  <div style={{ padding: 16, display: 'grid', gap: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }} className="sa-num">
-                      <span>Credits remaining: {accountCredits.credits_remaining < 0 ? '∞' : accountCredits.credits_remaining} / {accountCredits.daily_limit < 0 ? '∞' : accountCredits.daily_limit}</span>
-                      <span className="sa-mute">
-                        {accountCredits.daily_limit > 0
-                          ? Math.round((accountCredits.credits_remaining / accountCredits.daily_limit) * 100) + '%'
-                          : 'Unlimited'}
-                      </span>
-                    </div>
-                    {accountCredits.daily_limit > 0 && (
-                      <Meter value={accountCredits.credits_used_today} max={accountCredits.daily_limit} label="Credits used today" />
+                                        setConfigDialogOpen(false);
+                                        sonnerToast.success('Key configuration saved');
+                                      } catch {
+                                        sonnerToast.error('Failed to save configuration');
+                                      } finally {
+                                        setSavingConfig(false);
+                                      }
+                                    }}
+                                  >
+                                    {savingConfig ? <Spinner size={12} /> : 'Save'}
+                                  </button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </Row>
+                        ))}
+                      </Panel>
                     )}
-                    <div className="sa-hint" style={{ margin: 0 }}>
-                      Last reset: {new Date(accountCredits.last_reset_date + 'T00:00:00Z').toLocaleDateString()}
-                    </div>
                   </div>
                 </div>
-              ) : statusLoading ? (
-                <SkelRows rows={3} />
-              ) : (
-                <Empty icon={<Activity className="h-4 w-4" />} title="No credit data" body="Sign in to view your account credits" />
-              )}
-            </Panel>
+              </motion.div>
+            )}
 
-            <div className="dv-split" style={{ marginTop: 16 }}>
-              <Panel
-                title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Key className="h-3.5 w-3.5" /> API Keys (Shared Credits)</span>}
-                desc="All keys under your account share the same credit pool"
-                flush
+            {/* ═════════ API keys ═════════ */}
+            {activeTab === 'keys' && (
+              <motion.div
+                key="keys"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }}
+                transition={pageSpring}
               >
-                {apiKeys.length > 0 ? apiKeys.map((key) => {
-                  const limit = key.custom_daily_limit || key.daily_limit;
-                  return (
-                    <Row
-                      key={key.id}
-                      label={
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                          <code className="sa-mono" style={{ fontSize: 12.5 }}>{key.name || key.key_prefix}</code>
-                          {!key.is_active && <Pill tone="err">Disabled</Pill>}
-                        </span>
-                      }
-                    >
-                      <span className="sa-num sa-mute" style={{ fontSize: 12 }}>
-                        {limit ? `${limit}/day` : 'No limit'} · {key.allow_hmac ? 'HMAC' : 'No HMAC'}
-                      </span>
-                    </Row>
-                  );
-                }) : (
-                  <Empty icon={<Key className="h-4 w-4" />} title="No API keys found" body="Create one in the API Keys tab." />
-                )}
-              </Panel>
+                <ApiKeyManagement />
+              </motion.div>
+            )}
 
-              <Panel
-                title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Activity className="h-3.5 w-3.5" /> Endpoint Health</span>}
-                actions={
-                  <span className="dv-health">
-                    {stillChecking ? <Spinner size={11} /> : <Dot tone={onlineCount === healthTargets.length ? 'ok' : 'warn'} />}
-                    {onlineCount}/{healthTargets.length} online · every 60s
-                  </span>
-                }
-                flush
+            {/* ═════════ Playground ═════════ */}
+            {activeTab === 'playground' && (
+              <motion.div
+                key="playground"
+                className="dv-split"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }}
+                transition={pageSpring}
               >
-                {healthTargets.map((endpoint) => {
-                  const status = endpointStatus[endpoint.path];
-                  return (
-                    <Row
-                      key={endpoint.path}
-                      label={
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                          <MethodTag method={endpoint.method} />
-                          <code className="sa-mono" style={{ fontSize: 12.5 }}>{endpoint.path}</code>
+                <div
+                  className="dv-col"
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !playgroundLoading) {
+                      e.preventDefault();
+                      testEndpoint();
+                    }
+                  }}
+                >
+                  <Panel
+                    title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Play className="h-3.5 w-3.5" /> Request</span>}
+                    flush
+                  >
+                    <div className="dv-form">
+                      <div className="g2">
+                        <div>
+                          <label className="sa-label">Method</label>
+                          <Select value={playgroundMethod} onValueChange={(value) => setPlaygroundMethod(value as typeof playgroundMethod)}>
+                            <SelectTrigger className="h-9 rounded-full text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="GET" className="text-xs">GET</SelectItem>
+                              <SelectItem value="POST" className="text-xs">POST</SelectItem>
+                              <SelectItem value="PUT" className="text-xs">PUT</SelectItem>
+                              <SelectItem value="PATCH" className="text-xs">PATCH</SelectItem>
+                              <SelectItem value="DELETE" className="text-xs">DELETE</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="sa-label" htmlFor="pg-path">Path</label>
+                          <input id="pg-path" className="sa-input sa-mono" value={playgroundEndpoint} onChange={(e) => setPlaygroundEndpoint(e.target.value)} placeholder="/files" spellCheck={false} autoComplete="off" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="sa-label" htmlFor="pg-key">API Key</label>
+                        <input id="pg-key" className="sa-input sa-mono" type="password" value={playgroundApiKey} onChange={(e) => setPlaygroundApiKey(e.target.value)} placeholder="cb_your_api_key" autoComplete="off" spellCheck={false} />
+                      </div>
+                      <div>
+                        <label className="sa-label" htmlFor="pg-enc">Encryption Key <span className="sa-mute" style={{ fontWeight: 400 }}>(optional)</span></label>
+                        <input id="pg-enc" className="sa-input sa-mono" type="password" value={playgroundEncryptionKey} onChange={(e) => setPlaygroundEncryptionKey(e.target.value)} placeholder="User encryption key" autoComplete="off" spellCheck={false} />
+                      </div>
+                      {playgroundMethod !== 'GET' && (
+                        <div>
+                          <label className="sa-label" htmlFor="pg-body">JSON Body</label>
+                          <textarea id="pg-body" className="sa-input dv-ta" rows={5} value={playgroundBody} onChange={(e) => setPlaygroundBody(e.target.value)} placeholder='{"key":"value"}' spellCheck={false} />
+                        </div>
+                      )}
+                      <div className="dv-send">
+                        <button type="button" onClick={testEndpoint} disabled={playgroundLoading} className={btn('primary', 'lg')}>
+                          {playgroundLoading ? <><Spinner /> Sending…</> : <><Play className="h-3.5 w-3.5" /> Send</>}
+                        </button>
+                        <span className="hide-sm" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }} aria-hidden="true"><Kbd>⌘</Kbd><Kbd>↵</Kbd></span>
+                      </div>
+                    </div>
+                  </Panel>
+                </div>
+
+                <div className="dv-col dv-sticky">
+                  <Panel
+                    title="Response"
+                    actions={
+                      respStatus !== null ? (
+                        <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                          <Pill tone={statusTone(String(respStatus)) as any}>{respStatus}</Pill>
+                          <span className="sa-num sa-mute" style={{ fontSize: 12 }}>{respLatency}</span>
                         </span>
-                      }
-                    >
-                      <span className="dv-health">
-                        {status?.status === 'online' && <><Dot tone="ok" /><span style={{ color: 'var(--sa-ok)' }}>{status.latency ? `${status.latency}ms` : 'Online'}</span></>}
-                        {status?.status === 'offline' && <><Dot tone="err" /><span style={{ color: 'var(--sa-err)' }}>Offline</span></>}
-                        {(!status || status.status === 'checking') && <><Spinner size={11} /><span>Checking</span></>}
-                      </span>
-                    </Row>
-                  );
-                })}
-              </Panel>
-            </div>
+                      ) : undefined
+                    }
+                    flush={!!playgroundResponse}
+                  >
+                    {playgroundResponse ? (
+                      <CodeBlock code={playgroundResponse} lang="json" maxHeight={560} />
+                    ) : (
+                      <p className="dv-p">Run a request to inspect output.</p>
+                    )}
+                  </Panel>
+                </div>
+              </motion.div>
+            )}
 
-            <div style={{ marginTop: 16 }}><ApiUsageChart /></div>
-            <div style={{ marginTop: 16 }}><ApiRequestLogs /></div>
-          </div>
-        )}
-
-        {/* ═════════ Docs ═════════ */}
-        {activeTab === 'docs' && (
-          <div className="dv-docs sa-in">
-            <nav className="dv-docs-nav sa-nav" aria-label="On this page">
-              <div className="sa-nav-h">On this page</div>
-              {DOC_SECTIONS.map(([id, label]) => (
-                <a
-                  key={id}
-                  href={`#${id}`}
-                  className={`sa-nav-i${activeDoc === id ? ' on' : ''}`}
-                  aria-current={activeDoc === id ? 'true' : undefined}
-                  onClick={(e) => { e.preventDefault(); jump(id); }}
-                >
-                  {label}
-                </a>
-              ))}
-            </nav>
-
-            <div style={{ minWidth: 0 }}>
-              <section id="dv-auth" className="dv-sec">
-                <Panel
-                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Key className="h-3.5 w-3.5" /> Authentication</span>}
-                >
-                  <div style={{ display: 'grid', gap: 14 }}>
-                    <p className="dv-p">
-                      All requests require <code className="dv-inline">X-SquidCloud-Key</code> with a <code className="dv-inline">cb_...</code> API key (<code className="dv-inline">Authorization: Bearer</code> also works). Upload and download also support optional caller key input.
-                    </p>
-                    <div className="dv-lines">
-                      <CopyLine value="X-SquidCloud-Key: cb_your_api_key_here" />
-                      <CopyLine value="Authorization: Bearer cb_your_api_key_here" display="Authorization: Bearer cb_your_api_key_here (alternative)" />
-                      <CopyLine value="X-SquidCloud-Encryption-Key: optional_user_encryption_key" />
-                      <CopyLine value="X-Timestamp: 1700000000000" display="X-Timestamp: 1700000000000 (Unix ms, ±5 min)" />
-                      <CopyLine value="X-Signature: HMAC-SHA256(timestamp+nonce+body, apiKey)" />
+            {/* ═════════ Status ═════════ */}
+            {activeTab === 'status' && (
+              <motion.div
+                key="status"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }}
+                transition={pageSpring}
+              >
+                {accountCredits ? (
+                  <>
+                    <div className="dv-strip">
+                      <div className="dv-chip-stat"><span>Used today</span><b>{accountCredits.credits_used_today}</b></div>
+                      <div className="dv-chip-stat"><span>Remaining</span><b>{accountCredits.credits_remaining < 0 ? '∞' : accountCredits.credits_remaining}</b></div>
+                      <div className="dv-chip-stat"><span>Limit</span><b>{accountCredits.daily_limit < 0 ? '∞' : accountCredits.daily_limit}</b></div>
+                      <div className="dv-chip-stat"><span>Requests</span><b>{accountRequestCount}</b></div>
+                      <div className="dv-chip-stat"><span>7d</span><b>{accountWeeklyLog ?? '-'}</b></div>
+                      <div className="dv-chip-stat"><span>30d</span><b>{accountMonthlyLog ?? '-'}</b></div>
+                      <div className="dv-chip-stat"><span>Reset</span><b>{resetCountdown}</b></div>
                     </div>
-                    <Note tone="warn" title="Security notes">
-                      Invalid encryption key format returns 400. Wrong key for encrypted download returns 422. Opt-in HMAC signing prevents request tampering. Credit deduction info is included in every response.
-                    </Note>
-                  </div>
-                </Panel>
-              </section>
 
-              <section id="dv-agent" className="dv-sec">
-                <Panel
-                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Code className="h-3.5 w-3.5" /> AI Agent Prompt</span>}
-                  actions={<Pill>Copy-paste to any AI agent</Pill>}
-                >
-                  <div style={{ display: 'grid', gap: 14 }}>
-                    <p className="dv-p">
-                      Copy this prompt and paste it into your favorite AI coding assistant (Cursor, Claude, Copilot, GPT…).
-                      It contains the complete, verified CloudBliss API spec — the agent will integrate upload, download
-                      (including client-side RES54 decryption), streaming, and error handling without guessing.
-                    </p>
-                    <textarea
-                      readOnly
-                      rows={12}
-                      value={AI_AGENT_PROMPT}
-                      onFocus={(e) => e.currentTarget.select()}
-                      className="sa-input dv-ta"
-                      style={{ minHeight: 140 }}
-                      aria-label="AI agent prompt"
-                    />
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button type="button" onClick={() => copyToClipboard(AI_AGENT_PROMPT)} className={btn('primary', 'sm')}>
-                        <Ico.Copy size={12} /> Copy Prompt
-                      </button>
-                      <button type="button" onClick={() => { navigator.clipboard.writeText(AI_AGENT_PROMPT); sonnerToast.success('Prompt copied — paste it into your AI agent'); }} className={btn('default', 'sm')}>
-                        Copy &amp; Hint
-                      </button>
-                    </div>
-                  </div>
-                </Panel>
-              </section>
-
-              <section id="dv-endpoints" className="dv-sec">
-                <Panel
-                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><FileText className="h-3.5 w-3.5" /> Endpoint Reference</span>}
-                  desc={`${shownEndpoints.length} of ${endpoints.length} endpoints`}
-                  actions={
-                    <div className="sa-field-wrap" style={{ width: 220 }}>
-                      <Ico.Search size={13} />
-                      <input
-                        ref={filterRef}
-                        className={`sa-input pl${endpointFilter ? '' : ' pr'}`}
-                        style={{ height: 28 }}
-                        placeholder="Filter endpoints"
-                        value={endpointFilter}
-                        onChange={(e) => setEndpointFilter(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Escape') { setEndpointFilter(''); e.currentTarget.blur(); } }}
-                        aria-label="Filter endpoints"
-                        spellCheck={false}
-                      />
-                      {!endpointFilter && <span className="end" aria-hidden="true"><Kbd>/</Kbd></span>}
-                    </div>
-                  }
-                  flush
-                >
-                  {shownEndpoints.length === 0 && (
-                    <Empty title="No endpoints match" body="Try a method, a path fragment or a word from the description." />
-                  )}
-                  {shownEndpoints.map((endpoint) => (
-                    <details key={`${endpoint.method}-${endpoint.path}`} className="dv-ep">
-                      <summary>
-                        <MethodTag method={endpoint.method} />
-                        <div style={{ minWidth: 0 }}>
-                          <div className="path">{endpoint.path}</div>
-                          <div className="sum">{endpoint.description}</div>
-                        </div>
-                        <div className="scopes">
-                          {endpoint.scopes.map((scope) => (
-                            <Pill key={scope}>{scope}</Pill>
-                          ))}
-                          <Ico.Chevron className="chev" />
-                        </div>
-                      </summary>
-                      <div className="body">
-                        <CodeBlock code={endpoint.example} lang="curl" wrap />
-                        {endpoint.sampleResponse && <CodeBlock code={endpoint.sampleResponse} lang="response" />}
-                        <div className="acts">
-                          <button
-                            type="button"
-                            className={btn('default', 'sm')}
-                            onClick={() => { setPlaygroundMethod(endpoint.method); setPlaygroundEndpoint(endpoint.path.replace(':id', 'FILE_ID')); setActiveTab('playground'); }}
-                          >
-                            <Play className="h-3 w-3" />
-                            Try in Playground
+                    {accountCredits.daily_limit > 0 && (
+                      <Panel
+                        title="Quota Usage"
+                        actions={
+                          <button type="button" onClick={fetchAccountData} disabled={statusLoading} className={btn('default', 'sm')}>
+                            {statusLoading ? <Spinner size={12} /> : <Activity className="h-3 w-3" />}
+                            Refresh
                           </button>
+                        }
+                      >
+                        <Meter value={accountCredits.credits_used_today} max={accountCredits.daily_limit} label="Credits used today" />
+                      </Panel>
+                    )}
+                  </>
+                ) : statusLoading ? (
+                  <Panel><SkelRows rows={2} /></Panel>
+                ) : (
+                  <Panel><Empty icon={<Activity className="h-4 w-4" />} title="No credit data" /></Panel>
+                )}
+
+                <div className="dv-split" style={{ marginTop: 16 }}>
+                  <Panel
+                    title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Key className="h-3.5 w-3.5" /> Active Keys</span>}
+                    flush
+                  >
+                    {apiKeys.length > 0 ? apiKeys.map((key) => {
+                      const limit = key.custom_daily_limit || key.daily_limit;
+                      return (
+                        <Row
+                          key={key.id}
+                          label={
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                              <code className="sa-mono" style={{ fontSize: 12.5 }}>{key.name || key.key_prefix}</code>
+                              {!key.is_active && <Pill tone="err">Disabled</Pill>}
+                            </span>
+                          }
+                        >
+                          <span className="sa-num sa-mute" style={{ fontSize: 12 }}>
+                            {limit ? `${limit}/day` : 'Unlimited'} · {key.allow_hmac ? 'HMAC' : 'Standard'}
+                          </span>
+                        </Row>
+                      );
+                    }) : (
+                      <Empty icon={<Key className="h-4 w-4" />} title="No keys" />
+                    )}
+                  </Panel>
+
+                  <Panel
+                    title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Activity className="h-3.5 w-3.5" /> Health</span>}
+                    actions={
+                      <span className="dv-health">
+                        {stillChecking ? <Spinner size={11} /> : <Dot tone={onlineCount === healthTargets.length ? 'ok' : 'warn'} />}
+                        {onlineCount}/{healthTargets.length}
+                      </span>
+                    }
+                    flush
+                  >
+                    {healthTargets.map((endpoint) => {
+                      const status = endpointStatus[endpoint.path];
+                      return (
+                        <Row
+                          key={endpoint.path}
+                          label={
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                              <MethodTag method={endpoint.method} />
+                              <code className="sa-mono" style={{ fontSize: 12.5 }}>{endpoint.path}</code>
+                            </span>
+                          }
+                        >
+                          <span className="dv-health">
+                            {status?.status === 'online' && <><Dot tone="ok" /><span style={{ color: 'var(--sa-ok)' }}>{status.latency ? `${status.latency}ms` : 'Online'}</span></>}
+                            {status?.status === 'offline' && <><Dot tone="err" /><span style={{ color: 'var(--sa-err)' }}>Offline</span></>}
+                            {(!status || status.status === 'checking') && <><Spinner size={11} /><span>Checking</span></>}
+                          </span>
+                        </Row>
+                      );
+                    })}
+                  </Panel>
+                </div>
+
+                <div style={{ marginTop: 16 }}><ApiUsageChart /></div>
+                <div style={{ marginTop: 16 }}><ApiRequestLogs /></div>
+              </motion.div>
+            )}
+
+            {/* ═════════ Docs ═════════ */}
+            {activeTab === 'docs' && (
+              <motion.div
+                key="docs"
+                className="dv-docs"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }}
+                transition={pageSpring}
+              >
+                <nav className="dv-docs-nav" aria-label="On this page">
+                  {DOC_SECTIONS.map(([id, label]) => {
+                    const on = activeDoc === id;
+                    return (
+                      <a
+                        key={id}
+                        href={`#${id}`}
+                        className={`dv-doc-pill${on ? ' on' : ''}`}
+                        aria-current={on ? 'true' : undefined}
+                        onClick={(e) => { e.preventDefault(); setActiveDoc(id); jump(id); }}
+                      >
+                        {on && <motion.span layoutId="dv-doc-thumb" className="dv-doc-thumb" transition={thumbSpring} />}
+                        <span className="dv-doc-lbl">{label}</span>
+                      </a>
+                    );
+                  })}
+                </nav>
+
+                <div style={{ minWidth: 0 }}>
+                  <section id="dv-auth" className="dv-sec">
+                    <Panel title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Key className="h-3.5 w-3.5" /> Authentication</span>}>
+                      <div style={{ display: 'grid', gap: 12 }}>
+                        <div className="dv-lines">
+                          <CopyLine value="X-SquidCloud-Key: cb_your_api_key_here" />
+                          <CopyLine value="Authorization: Bearer cb_your_api_key_here" display="Authorization: Bearer cb_your_api_key_here" />
+                          <CopyLine value="X-SquidCloud-Encryption-Key: optional_user_encryption_key" />
+                          <CopyLine value="X-Timestamp: 1700000000000" display="X-Timestamp: 1700000000000 (±5 min)" />
+                          <CopyLine value="X-Signature: HMAC-SHA256(timestamp+nonce+body, apiKey)" />
                         </div>
+                        <Note tone="warn">
+                          Invalid key format returns 400; mismatched encryption key returns 422.
+                        </Note>
                       </div>
-                    </details>
-                  ))}
-                </Panel>
-              </section>
+                    </Panel>
+                  </section>
 
-              <section id="dv-costs" className="dv-sec">
-                <Panel
-                  title="Credit Costs"
-                  actions={
-                    <button type="button" onClick={() => setCostsOpen(!costsOpen)} className={btn('default', 'sm')} aria-expanded={costsOpen}>
-                      {costsOpen ? 'Hide' : 'Show'} costs
-                    </button>
-                  }
-                  flush
-                >
-                  {costsOpen && (
-                    <div>
-                      <div style={{ padding: 16, borderBottom: '1px solid var(--sa-line)' }}>
-                        <input
-                          className="sa-input"
-                          placeholder="Filter by operation name..."
-                          value={costFilter}
-                          onChange={(e) => setCostFilter(e.target.value)}
-                          aria-label="Filter operations"
-                        />
-                      </div>
-                      <div className="sa-tablewrap">
-                        <table className="sa-table">
-                          <thead>
-                            <tr>
-                              <th>Operation</th>
-                              <th>Base Cost</th>
-                              <th>Per MB</th>
-                              <th>Description</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {operationCosts
-                              .filter(c => !costFilter || c.operation.toLowerCase().includes(costFilter.toLowerCase()))
-                              .map((cost) => (
-                                <tr key={cost.id || cost.operation}>
-                                  <td className="k sa-mono">{cost.operation}</td>
-                                  <td className="sa-num">{cost.base_cost}</td>
-                                  <td className="sa-num">{cost.per_mb ?? '-'}</td>
-                                  <td>{cost.description || '-'}</td>
-                                </tr>
+                  <section id="dv-agent" className="dv-sec">
+                    <Panel
+                      title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Code className="h-3.5 w-3.5" /> AI Agent Prompt</span>}
+                      actions={
+                        <button type="button" onClick={() => copyToClipboard(AI_AGENT_PROMPT)} className={btn('primary', 'sm')}>
+                          <Ico.Copy size={12} /> Copy Prompt
+                        </button>
+                      }
+                    >
+                      <textarea
+                        readOnly
+                        rows={8}
+                        value={AI_AGENT_PROMPT}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="sa-input dv-ta"
+                        aria-label="AI agent prompt"
+                      />
+                    </Panel>
+                  </section>
+
+                  <section id="dv-endpoints" className="dv-sec">
+                    <Panel
+                      title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><FileText className="h-3.5 w-3.5" /> Endpoints ({shownEndpoints.length})</span>}
+                      actions={
+                        <div className="sa-field-wrap" style={{ width: 220 }}>
+                          <Ico.Search size={13} />
+                          <input
+                            ref={filterRef}
+                            className={`sa-input pl${endpointFilter ? '' : ' pr'}`}
+                            style={{ height: 32 }}
+                            placeholder="Filter…"
+                            value={endpointFilter}
+                            onChange={(e) => setEndpointFilter(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Escape') { setEndpointFilter(''); e.currentTarget.blur(); } }}
+                            aria-label="Filter endpoints"
+                            spellCheck={false}
+                          />
+                          {!endpointFilter && <span className="end" aria-hidden="true"><Kbd>/</Kbd></span>}
+                        </div>
+                      }
+                      flush
+                    >
+                      {shownEndpoints.length === 0 && <Empty title="No matching endpoints" />}
+                      {shownEndpoints.map((endpoint) => (
+                        <details key={`${endpoint.method}-${endpoint.path}`} className="dv-ep">
+                          <summary>
+                            <MethodTag method={endpoint.method} />
+                            <div style={{ minWidth: 0 }}>
+                              <div className="path">{endpoint.path}</div>
+                              <div className="sum">{endpoint.description}</div>
+                            </div>
+                            <div className="scopes">
+                              {endpoint.scopes.map((scope) => (
+                                <Pill key={scope}>{scope}</Pill>
                               ))}
-                            {operationCosts.length === 0 && (
-                              <tr>
-                                <td colSpan={4} style={{ textAlign: 'center' }} className="sa-mute">No cost data available</td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </Panel>
-              </section>
+                              <Ico.Chevron className="chev" />
+                            </div>
+                          </summary>
+                          <div className="body">
+                            <CodeBlock code={endpoint.example} lang="curl" wrap />
+                            {endpoint.sampleResponse && <CodeBlock code={endpoint.sampleResponse} lang="response" />}
+                            <div className="acts">
+                              <button
+                                type="button"
+                                className={btn('default', 'sm')}
+                                onClick={() => {
+                                  setPlaygroundMethod(endpoint.method);
+                                  setPlaygroundEndpoint(endpoint.path.replace(':id', 'FILE_ID'));
+                                  setActiveTab('playground');
+                                }}
+                              >
+                                <Play className="h-3 w-3" />
+                                Open in Playground
+                              </button>
+                            </div>
+                          </div>
+                        </details>
+                      ))}
+                    </Panel>
+                  </section>
 
-              <section id="dv-credits" className="dv-sec">
-                <Panel title="Credit System">
-                  <div style={{ display: 'grid', gap: 14 }}>
-                    <p className="dv-p">
-                      Every API call deducts credits based on the operation type and file size (where applicable).
-                      Credits reset daily at midnight UTC. The response headers include your remaining credit balance.
-                    </p>
-                    <CodeBlock
-                      lang="credit deduction response"
-                      code={`{
-  "...": "...",
+                  <section id="dv-costs" className="dv-sec">
+                    <Panel
+                      title="Credit Costs"
+                      actions={
+                        <button type="button" onClick={() => setCostsOpen(!costsOpen)} className={btn('default', 'sm')} aria-expanded={costsOpen}>
+                          {costsOpen ? 'Hide' : 'Show'}
+                        </button>
+                      }
+                      flush
+                    >
+                      {costsOpen && (
+                        <div>
+                          <div style={{ padding: 14, borderBottom: '1px solid var(--g-line)' }}>
+                            <input
+                              className="sa-input"
+                              placeholder="Filter operations…"
+                              value={costFilter}
+                              onChange={(e) => setCostFilter(e.target.value)}
+                              aria-label="Filter operations"
+                            />
+                          </div>
+                          <div className="sa-tablewrap">
+                            <table className="sa-table">
+                              <thead>
+                                <tr>
+                                  <th>Operation</th>
+                                  <th>Base</th>
+                                  <th>Per MB</th>
+                                  <th>Description</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {operationCosts
+                                  .filter((c) => !costFilter || c.operation.toLowerCase().includes(costFilter.toLowerCase()))
+                                  .map((cost) => (
+                                    <tr key={cost.id || cost.operation}>
+                                      <td className="k sa-mono">{cost.operation}</td>
+                                      <td className="sa-num">{cost.base_cost}</td>
+                                      <td className="sa-num">{cost.per_mb ?? '-'}</td>
+                                      <td>{cost.description || '-'}</td>
+                                    </tr>
+                                  ))}
+                                {operationCosts.length === 0 && (
+                                  <tr>
+                                    <td colSpan={4} style={{ textAlign: 'center' }} className="sa-mute">No cost data</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </Panel>
+                  </section>
+
+                  <section id="dv-credits" className="dv-sec">
+                    <Panel title="Credit Envelope">
+                      <CodeBlock
+                        lang="response"
+                        code={`{
   "credits": {
     "deducted": 1,
     "remaining": 842,
@@ -1618,79 +1861,79 @@ const DeveloperAPI = () => {
     "daily_limit": 1000
   }
 }`}
-                    />
-                  </div>
-                </Panel>
-              </section>
+                      />
+                    </Panel>
+                  </section>
 
-              <section id="dv-codes" className="dv-sec">
-                <Panel title="HTTP Status Codes" flush>
-                  {[
-                    { code: '200 OK', desc: 'Request succeeded' },
-                    { code: '201 Created', desc: 'Resource created (upload, key, secret)' },
-                    { code: '400 Bad Request', desc: 'Invalid input or encryption key format' },
-                    { code: '401 Unauthorized', desc: 'Missing or invalid API key' },
-                    { code: '402 Payment Required', desc: 'Insufficient credits or expired subscription' },
-                    { code: '403 Forbidden', desc: 'Key disabled or insufficient permissions' },
-                    { code: '404 Not Found', desc: 'Resource not found' },
-                    { code: '409 Conflict', desc: 'Duplicate resource (secret name, CDN publish)' },
-                    { code: '422 Unprocessable Entity', desc: 'Encryption key missing/mismatch for encrypted download' },
-                    { code: '503 Service Unavailable', desc: 'API disabled for maintenance (global guard)' },
-                    { code: '500 Server Error', desc: 'Internal server error' },
-                  ].map(item => (
-                    <Row
-                      key={item.code}
-                      label={
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                          <Dot tone={statusTone(item.code) as any} />
-                          <code className="sa-mono" style={{ fontSize: 12.5 }}>{item.code}</code>
-                        </span>
-                      }
-                    >
-                      <span className="sa-mute" style={{ fontSize: 12.5 }}>{item.desc}</span>
-                    </Row>
-                  ))}
-                </Panel>
-              </section>
+                  <section id="dv-codes" className="dv-sec">
+                    <Panel title="Status Codes" flush>
+                      {[
+                        { code: '200 OK', desc: 'Request succeeded' },
+                        { code: '201 Created', desc: 'Resource created' },
+                        { code: '400 Bad Request', desc: 'Invalid input or key format' },
+                        { code: '401 Unauthorized', desc: 'Missing or invalid API key' },
+                        { code: '402 Payment Required', desc: 'Insufficient credits' },
+                        { code: '403 Forbidden', desc: 'Key disabled or missing scope' },
+                        { code: '404 Not Found', desc: 'Resource not found' },
+                        { code: '409 Conflict', desc: 'Duplicate resource' },
+                        { code: '422 Unprocessable Entity', desc: 'Encryption key mismatch' },
+                        { code: '503 Service Unavailable', desc: 'Maintenance' },
+                        { code: '500 Server Error', desc: 'Internal server error' },
+                      ].map((item) => (
+                        <Row
+                          key={item.code}
+                          label={
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                              <Dot tone={statusTone(item.code) as any} />
+                              <code className="sa-mono" style={{ fontSize: 12.5 }}>{item.code}</code>
+                            </span>
+                          }
+                        >
+                          <span className="sa-mute" style={{ fontSize: 12.5 }}>{item.desc}</span>
+                        </Row>
+                      ))}
+                    </Panel>
+                  </section>
 
-              <section id="dv-downloads" className="dv-sec">
-                <Panel
-                  title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><FileText className="h-3.5 w-3.5" /> Downloadable API Docs</span>}
-                  desc="Complete API documentation in Markdown format. Two versions available:"
-                  flush
-                >
-                  <div className="dv-dl">
-                    <a
-                      href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-ai-agents.md"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  <section id="dv-downloads" className="dv-sec">
+                    <Panel
+                      title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><FileText className="h-3.5 w-3.5" /> Markdown Specs</span>}
+                      flush
                     >
-                      <FileText className="h-4 w-4" />
-                      <div style={{ minWidth: 0 }}>
-                        <b>AI Agent Guide</b>
-                        <small>Technical setup guide for AI agents</small>
+                      <div className="dv-dl">
+                        <a
+                          href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-ai-agents.md"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <div style={{ minWidth: 0 }}>
+                            <b>AI Agent Guide</b>
+                            <small>Full spec for coding agents</small>
+                          </div>
+                          <Ico.ArrowUpRight style={{ marginLeft: 'auto' }} />
+                        </a>
+                        <a
+                          href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-humans.md"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <div style={{ minWidth: 0 }}>
+                            <b>Developer Guide</b>
+                            <small>Human-readable reference</small>
+                          </div>
+                          <Ico.ArrowUpRight style={{ marginLeft: 'auto' }} />
+                        </a>
                       </div>
-                      <Ico.ArrowUpRight style={{ marginLeft: 'auto' }} />
-                    </a>
-                    <a
-                      href="https://aouqcwbdoyrccjcrhzzi.supabase.co/storage/v1/object/public/apidoc/api-docs-for-humans.md"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <FileText className="h-4 w-4" />
-                      <div style={{ minWidth: 0 }}>
-                        <b>User Guide</b>
-                        <small>Simple English user-friendly guide</small>
-                      </div>
-                      <Ico.ArrowUpRight style={{ marginLeft: 'auto' }} />
-                    </a>
-                  </div>
-                </Panel>
-              </section>
-            </div>
-          </div>
-        )}
-      </Wrap>
+                    </Panel>
+                  </section>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Wrap>
+      </div>
     </AppShell>
   );
 };

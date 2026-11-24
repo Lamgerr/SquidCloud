@@ -14,7 +14,7 @@ import MainHeader from "@/components/MainHeader";
 import VersionChecker from "@/components/VersionChecker";
 import UpdateAnnouncement from "@/components/UpdateAnnouncement";
 import MobileUploadNotification from "@/components/MobileUploadNotification";
-import { SquidGuardOverlay } from "@/components/SquidGuardOverlay";
+// SquidGuard overlay disabled (devtools detection is bypassable and disruptive to developers)
 import MobileDownloadNotification from "@/components/MobileDownloadNotification";
 import MaintenanceBanner from "@/components/MaintenanceBanner";
 import ServiceWorkerManager from "@/utils/serviceWorkerManager";
@@ -226,7 +226,7 @@ const AppContent = () => {
 
   return (
     <div className="min-h-screen bg-background font-sans antialiased">
-      <SquidGuardOverlay />
+      {/* <SquidGuardOverlay /> */}
       <AuthProvider>
         <BiometricAuthProvider>
           <BYOKProvider>
