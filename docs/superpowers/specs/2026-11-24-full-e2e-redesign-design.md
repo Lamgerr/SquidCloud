@@ -1,8 +1,8 @@
 # SquidCloud: Wallet-Style Keys, iCloud-Style UX — Design
 
 Date: 2026-11-24
-Status: DRAFT v5 — maximum-hardening pass (awaiting approval; no code written)
-Supersedes: v1 (contradictory hierarchy), v2 (factor-based vault), v3 (iCloud ADP device-approval), v4 (deterministic keys + recovery)
+Status: DRAFT v6 — INTEGRATED plan (E2E + web isolation; awaiting approval; no code written)
+Supersedes: v1–v5 and `2026-11-24-web-isolation-design.md` (merged into §16). This is the single canonical security design.
 
 ## 1. Intent
 
@@ -74,6 +74,9 @@ Trade-offs, stated honestly:
 | XSS while unlocked | Full plaintext compromise — stated honestly; mitigated by CSP, DOMPurify, short unlock windows, step-up before key ops |
 | Stolen locked device | Nothing until unlock |
 | Lost recovery phrase | Unrecoverable — same as iCloud ADP; no backdoor |
+| Other tab / origin | No vault DOM, storage, keys, or opener reference — see §16 |
+| Sandboxed/untrusted file content | No access to app origin, no network exfiltration, no key material |
+| Browser extension / OS malware | Not stoppable by web controls; native client required — see §16.8 |
 
 ## 7. Backend boundary (BFF)
 
@@ -182,6 +185,7 @@ Web + native mobile first. CLI, SquidFS, Electron, API keys, webhooks, AI/previe
 - XSS payloads in shared markdown do not execute.
 - Tests: phrase checksum/derivation stability, device approval, phrase restore, device removal, MK rotation, migration interruption/resume on Wi-Fi vs cellular, CSRF, key substitution by malicious BFF, locked-device sync.
 - Cross-device: upload on A, restore on B with phrase only, open file #500 on cellular without waiting for migration.
+- Isolation verification: run the full matrix in §16.10 (cross-tab, sandbox escape, postMessage fuzz, Spectre probe, storage inspection).
 
 ## 13. Decisions made (mine, open to correction)
 
@@ -196,6 +200,7 @@ Web + native mobile first. CLI, SquidFS, Electron, API keys, webhooks, AI/previe
 1. Recovery factors at launch: phrase + synced passkey + optional 3-of-5 social recovery and recovery-passphrase envelope? My recommendation: all four, with social recovery offered during onboarding rather than bolted on later — it is the only path that helps when both device and phrase are gone.
 2. Web + mobile first vs all clients at once? My recommendation: web + mobile first.
 3. Legacy cutover: sunset window vs immediate shutdown? My recommendation: published sunset window.
+4. Native client timing: web isolation first, native client next phase (§16.13)? My recommendation: yes — web isolation protects existing users immediately.
 
 ---
 
@@ -217,7 +222,9 @@ Anything that violates that is rejected even if it improves convenience.
 | Session | HttpOnly cookie, server-side session, short TTL, step-up for key ops, CSRF | No — biometric re-unlock only |
 | Server | BFF with user-scoped RLS; service role never touches file data; no key columns in any response | No |
 | Recovery | 3-of-5 Shamir, rate limits, notifications, share rotation | Setup once; recovery only |
-| Detection | Audit logs, anomaly alerts, canary files, bug bounty | No |
+| Detection | Audit logs, anomaly alerts, canary files, CSP reports, bug bounty | No |
+| **Isolation** | **Separate origins for app/preview/media/share/api, COOP+COEP+CORP, sandboxed untrusted content, crypto worker, strict storage partition — see §16** | **No — preview opens in place** |
+| **Native** | **Optional hardened client for extension/OS-level threats — see §16.8** | **Optional install choice** |
 | Operations | Key/version rotation, incident runbooks, third-party crypto audit | No |
 
 ## 15.2 Code-delivery integrity — the real ceiling of browser E2E
@@ -279,6 +286,7 @@ A browser E2E app is only as strong as the JavaScript it serves. If an attacker 
 - Anomaly alerts: new device + immediate bulk download, repeated failed verifier checks, recovery from new IP, unusual share creation volume.
 - Canary files in each vault whose access triggers an alert.
 - Incident runbooks: BFF compromise, build-pipeline compromise, contact collusion, lost phrase, extortion attempt.
+- CSP violation reports and `report-to` endpoint (§16) feed anomaly alerts.
 - Public bug bounty with a clear safe-harbor and a crypto-specific scope.
 
 ## 15.8 UX-preservation contract (non-negotiable)
@@ -299,15 +307,183 @@ Every hardening above must satisfy: **no extra taps in the normal path.**
 5. **Metadata** (identity, coarse timing, counts, IPs) remains visible to the service.
 6. **Legacy unmigrated files** remain server-recoverable until re-encrypted.
 7. **Already-downloaded plaintext** on a revoked/stolen device cannot be clawed back.
+8. **Browser extension / OS-level malware** defeats web isolation (§16); native client required for that threat.
+9. **Rendered plaintext** exists briefly in the preview frame; a compromised browser can screenshot it.
 
 ## 15.10 Priority order for implementation
 
 1. Phase 0 containment (section 9) — closes live critical exposure.
 2. Crypto core + deterministic keys (sections 2–5) — the E2E foundation, with third-party review.
 3. BFF + session/cookie + code-integrity controls (sections 7, 15.2, 15.3).
-4. Device lifecycle + recovery (sections 3, 10a, 15.6).
-5. Sharing (section 8).
-6. Legacy migration (section 7).
-7. Detection/response + audit + bug bounty (15.7).
-8. Other clients and workspaces (section 11).
+4. Web isolation (section 16): origin split, headers, sandboxed preview, crypto worker, storage partition — before exposing decrypted content in the browser.
+5. Device lifecycle + recovery (sections 3, 10a, 15.6).
+6. Sharing (section 8).
+7. Legacy migration (section 4).
+8. Detection/response + audit + bug bounty (15.7).
+9. Native hardened client (§16.8) for extension/OS-level threats.
+10. Other clients and workspaces (section 11).
 
+## 16. Web Isolation System — intent and honest limits
+
+Goal: make other tabs, scripts, injected content, and user-run code unable to read or influence SquidCloud's vault, keys, or decrypted data — without changing normal user behavior.
+
+**What a web app cannot defend against:**
+- OS-level malware (keyloggers, memory scraping, screenshots).
+- A malicious browser extension with host permissions for the SquidCloud origin — content scripts run in a separate world but can read the DOM and network responses.
+- The user opening DevTools on their own unlocked SquidCloud tab.
+- A fully compromised browser.
+
+Those require a **native client** (section 9). The web design below stops everything short of that: other origins, other tabs, untrusted file content, postMessage abuse, Spectre-class side channels, storage bleed, and malicious server-supplied JS.
+
+## 16.1 Attack surfaces and controls
+
+| Surface | Threat | Control |
+|---|---|---|
+| Other tabs / origins | Read vault data via DOM, storage, opener | Separate origins, COOP, no opener, partitioned storage |
+| Untrusted file content (markdown, PDF, EPUB, SVG, video) | Script in vault origin, read keys | Sandboxed iframe on a dedicated untrusted origin |
+| Extensions | Inject scripts, read DOM | CSP + isolated worlds limit but do not stop; native client for full defense |
+| postMessage | Forge messages to crypto worker or app | Strict targetOrigin, schema validation, per-message nonce, no `*`. |
+| Spectre / side channels | Cross-origin memory reads | `crossOriginIsolated` via COOP+COEP, CORP on all assets |
+| Storage | Steal session/key via localStorage | HttpOnly/`__Host-` cookies, no keys in JS storage, Storage Buckets |
+| Navigation | Tabnabbing, reverse tabjacking | `rel=noopener,noreferrer`, COOP, `frame-ancestors 'none'` |
+| Third-party scripts | Supply-chain key theft | Zero third-party JS; SRI; signed reproducible builds |
+| DNS / TLS | Domain takeover, MITM | HSTS preload, CAA, CT monitoring, TLS 1.3 only |
+
+## 16.2 Origin topology
+
+```
+app.squidcloud.com        → vault UI, session cookie, crypto worker. No untrusted content.
+preview.squidcloud.net    → sandboxed rendering of PDF/EPUB/markdown/SVG. Unique origin, no cookies.
+media.squidcloud.net      → images/video/audio decoding. No DOM access to app.
+share.squidcloud.net      → public share pages. Separate site; never shares cookies with app.
+api.squidcloud.com        → BFF only; HttpOnly session cookie scoped to api origin.
+```
+
+Separate **sites** (different registrable domains where practical) so cookies and storage are partitioned by the browser itself. `app` never iframes `share`, and `share` never loads app scripts.
+
+- Each origin gets its own CSP, Permissions-Policy, and deploy pipeline.
+- No wildcard subdomains with live DNS records (prevents takeover).
+- `app` sets `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (or `credentialless` where third-party media is unavoidable).
+- All first-party assets send `Cross-Origin-Resource-Policy: same-site` or `same-origin`.
+
+## 16.3 Strict headers on `app` and `api`
+
+```
+Content-Security-Policy:
+  default-src 'none';
+  script-src 'self' 'sha256-...' ;   /* per-build hashes, no unsafe-inline/eval */
+  style-src 'self' 'sha256-...';
+  img-src 'self' media.squidcloud.net blob: data:;
+  media-src 'self' media.squidcloud.net blob:;
+  worker-src 'self';
+  connect-src 'self' api.squidcloud.com;
+  frame-src preview.squidcloud.net;
+  frame-ancestors 'none';
+  form-action 'none';
+  base-uri 'none';
+  object-src 'none';
+  require-trusted-types-for 'script';
+  upgrade-insecure-requests
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+Cross-Origin-Resource-Policy: same-origin
+Referrer-Policy: no-referrer
+X-Content-Type-Options: nosniff
+Permissions-Policy: camera=(), microphone=(), geolocation=(), usb=(), serial=(),
+  hid=(), bluetooth=(), payment=(), accelerometer=(), gyroscope=(),
+  magnetometer=(), ambient-light-sensor=(), autoplay=(), encrypted-media=(),
+  display-capture=(), idle-detection=(), local-fonts=(), xr=(), wake-lock=()
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+```
+
+Cookies: `Set-Cookie: __Host-sqsession=...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=...` scoped to the API origin. No JS-readable session token.
+
+## 16.4 Untrusted content sandbox
+
+All decrypted file rendering happens in a sandboxed iframe on `preview.squidcloud.net`:
+
+```html
+<iframe src="https://preview.squidcloud.net/..." sandbox="allow-scripts"
+        csp="default-src 'none'; script-src 'self'; connect-src 'none';
+             img-src blob: data:; style-src 'self' 'unsafe-inline';
+             frame-ancestors https://app.squidcloud.com" />
+```
+
+- **No `allow-same-origin`** — the frame gets an opaque origin and cannot read app cookies, storage, or DOM.
+- **No `allow-top-navigation`, no `allow-popups`, no `allow-forms`.**
+- `connect-src 'none'` — the frame cannot exfiltrate to arbitrary hosts. It receives the file as a `MessageChannel` port from the parent; only the channel is allowed.
+- The parent passes only the decrypted blob and a render token; the frame never receives MK or FK.
+- Viewer code (PDF.js, EPUB engine) is served from the preview origin with SRI hashes and runs only there.
+- Markdown sanitization still uses DOMPurify inside the sandbox as defense in depth.
+- The iframe is recreated per file; no state persists between files.
+
+For images/video/audio, use `media.squidcloud.net` with the same rules and no DOM scripting at all where possible.
+
+## 16.5 Crypto worker isolation
+
+- All key derivation, encryption and decryption runs in a dedicated `Worker` on `app`, with `worker-src 'self'` and no `importScripts`.
+- Raw keys exist only inside the worker; the main thread receives plaintext only for the specific file being displayed, and hands it directly to the sandboxed preview frame via a transferred `MessagePort`.
+- The worker enforces a per-operation authorization token issued by the BFF after step-up; a script injected into the main thread cannot call decrypt without that token.
+- Messages are schema-validated with a runtime validator; any unknown field or wildcard origin is rejected. No `postMessage('*')` anywhere.
+
+## 16.6 Storage and state isolation
+
+- No vault data in `localStorage`, `sessionStorage`, `IndexedDB` on `app` except encrypted local cache blobs with no keys.
+- Use the Storage Buckets API to partition cache per vault version; evict on lock/logout.
+- Each preview origin has no persistent storage (`storage` permissions denied); file data is ephemeral per iframe.
+- `__Host-` cookie prefix prevents subdomain injection; no cookie on `preview`/`media`/`share`.
+- Service worker on `app` only; no service workers on preview/share origins. It caches only signed static assets, never decrypted data.
+
+## 16.7 Cross-tab and navigation hardening
+
+- `window.opener` is always null for any opened link; all external links use `rel="noopener noreferrer nofollow"`.
+- `Cross-Origin-Opener-Policy: same-origin` prevents other tabs from holding a reference to the app window.
+- No `window.name` use; no broad `postMessage` listeners — only channel-based, origin-checked handlers.
+- If a second SquidCloud tab unlocks, the first is notified and locks immediately (single-active-vault policy) to reduce exposure.
+- Share links open in a new tab on `share.squidcloud.net`, never in the app frame.
+
+## 16.8 Extension and OS-level threat — native fallback
+
+Web controls cannot stop a malicious extension with host permissions or OS malware. To meet the "hackers cry" bar for those threats, ship an **optional hardened native client**:
+
+- Desktop/mobile app with the same E2E protocol; keys in OS keystore (Secure Enclave / Keystore / DPAPI), never in a browser.
+- WebView2/WKWebView with host app enforcing TLS pinning and disabling devtools in production.
+- No browser extensions in-process; OS sandbox + hardened runtime + code signing + notarization.
+- Optional: dedicated kiosk/PWA window with browser profile that has all extensions disabled, managed by enterprise policy.
+- The web app remains the convenience path; the native client is the "high security" path. Both share the same vault and protocol.
+
+Document clearly: for users facing targeted attacks, the native client is required; the browser cannot promise the same guarantee.
+
+## 16.9 Network/DNS hardening
+
+- HSTS preload submission; CAA records limiting certificate issuance; Certificate Transparency monitoring with alerts.
+- TLS 1.3 only on all origins; no mixed content.
+- Separate API egress allowlist; BFF cannot reach arbitrary hosts.
+- No third-party analytics, fonts, CDNs, or support widgets on any SquidCloud origin.
+- CSP violation reports and `report-to` endpoint with anomaly alerts.
+
+## 16.10 Verification (isolation)
+
+- Automated header/CSP checks in CI for all origins.
+- Cross-origin test suite: hostile tab attempts DOM/read/storage/opener access → all fail.
+- Sandbox escape tests: `<script>`, `srcdoc`, `form`, `top.location`, `window.open`, `fetch` from preview → all blocked.
+- postMessage fuzzing: forged origins, wildcard targets, extra fields → rejected.
+- `crossOriginIsolated === true` on app; Spectre-style probe against preview fails.
+- Extension simulation: content-script-like DOM injection cannot read worker keys (it can read rendered plaintext — documented).
+- Storage inspection after lock: no keys, no plaintext, no session tokens in JS storage.
+- Native client: keystore extraction attempt fails; devtools disabled in release build.
+
+## 16.11 UX contract (isolation)
+
+None of the above adds taps. Sign in → unlock → files appear. Preview opens in-place via the invisible sandboxed frame. Native client, if used, is a separate install choice with the same UI.
+
+## 16.12 Residual risks (isolation)
+
+- Browser/OS compromise or host-permission extension defeats web isolation.
+- XSS in the unlocked app can still request decryption through the worker token path; step-up per op limits but does not eliminate.
+- Rendered plaintext exists briefly in the preview frame; a compromised browser can screenshot it.
+- Native client reduces but does not eliminate OS-level risk.
+
+## 16.13 Open decision (native timing)
+
+Should the native hardened client be built in this project, or should the web isolation ship first with the native client as a later phase? My recommendation: web isolation first (it protects the existing user base immediately), native client in the following phase for high-risk users.
