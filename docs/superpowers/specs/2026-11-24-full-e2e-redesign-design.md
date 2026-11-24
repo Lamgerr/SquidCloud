@@ -1,8 +1,8 @@
 # SquidCloud: Wallet-Style Keys, iCloud-Style UX — Design
 
 Date: 2026-11-24
-Status: DRAFT v4 (awaiting approval; no code written)
-Supersedes: v1 (contradictory hierarchy), v2 (factor-based vault), v3 (iCloud ADP device-approval)
+Status: DRAFT v5 — maximum-hardening pass (awaiting approval; no code written)
+Supersedes: v1 (contradictory hierarchy), v2 (factor-based vault), v3 (iCloud ADP device-approval), v4 (deterministic keys + recovery)
 
 ## 1. Intent
 
@@ -196,3 +196,118 @@ Web + native mobile first. CLI, SquidFS, Electron, API keys, webhooks, AI/previe
 1. Recovery factors at launch: phrase + synced passkey + optional 3-of-5 social recovery and recovery-passphrase envelope? My recommendation: all four, with social recovery offered during onboarding rather than bolted on later — it is the only path that helps when both device and phrase are gone.
 2. Web + mobile first vs all clients at once? My recommendation: web + mobile first.
 3. Legacy cutover: sunset window vs immediate shutdown? My recommendation: published sunset window.
+
+---
+
+# 15. Maximum-hardening pass (v5)
+
+## 15.0 The honest bar
+
+No system is unbreakable. The realistic target is: **a successful attacker must obtain one of a small set of expensive things** — the user's unlocked device, the user's recovery phrase/share quorum, or control of the code-delivery pipeline. A database dump, a stolen service-role key, a compromised BFF, or a network position must be worthless on its own.
+
+Anything that violates that is rejected even if it improves convenience.
+
+## 15.1 Hardening layers — and why each is invisible to users
+
+| Layer | Control | User-visible? |
+|---|---|---|
+| Data | Per-file deterministic keys, AES-256-GCM, random IVs, AAD binding file/user/version/chunk | No — decrypt on open |
+| Keys | No server KEK anywhere; phrase-derived MK in device keystore; wrapped MK per device | One-time phrase setup only |
+| Code | Signed, reproducible builds; SRI; isolated immutable asset origin; strict CSP | No |
+| Session | HttpOnly cookie, server-side session, short TTL, step-up for key ops, CSRF | No — biometric re-unlock only |
+| Server | BFF with user-scoped RLS; service role never touches file data; no key columns in any response | No |
+| Recovery | 3-of-5 Shamir, rate limits, notifications, share rotation | Setup once; recovery only |
+| Detection | Audit logs, anomaly alerts, canary files, bug bounty | No |
+| Operations | Key/version rotation, incident runbooks, third-party crypto audit | No |
+
+## 15.2 Code-delivery integrity — the real ceiling of browser E2E
+
+A browser E2E app is only as strong as the JavaScript it serves. If an attacker can alter the bundle, they harvest keys in the unlocked tab. Controls:
+
+- **Reproducible builds** with pinned toolchain and lockfile; a third party can rebuild and compare hashes.
+- **Signed release artifacts** with an offline signing key; signatures verified by CI and at deploy.
+- **Subresource Integrity** on every script/style; no third-party scripts on the app or share page — ever.
+- **Immutable, isolated static asset origin** with deploy credentials separate from the BFF and database. A BFF compromise must not permit shipping new JS.
+- **Strict CSP** (`script-src 'self'` with hashes, no `unsafe-inline`, `object-src 'none'`, `frame-ancestors 'none'`, `require-trusted-types-for 'script'`).
+- **Certificate pinning / transparency logs** in native mobile clients.
+- Two-person review + signed commits for all files under `src/lib/crypto*` and `supabase/functions/*key*`.
+
+## 15.3 Runtime and memory hygiene
+
+- MK and FKs are derived/used inside a closure; never in React state, Redux, global variables, DOM attributes, or `localStorage`/`sessionStorage`/IndexedDB.
+- Use **non-extractable WebCrypto `CryptoKey` objects** where possible so a script cannot read raw key bytes via `crypto.subtle.exportKey`.
+- Zeroize derived byte arrays after use; zero on lock, pagehide, and tab background timeout. JS cannot guarantee physical memory scrubbing — document.
+- Never log key material, wrapped keys, recovery shares, or decrypted content. Log only operation names, ids, and outcomes.
+- Disable source maps in production; strip devtools-friendly debug globals.
+- Auto-lock on idle (default 5 min, configurable), on tab hidden for extended period, and on network change to an untrusted network.
+- Step-up (biometric/passkey/PIN) immediately before: reveal phrase, add/remove device, social recovery, MK rotation, share creation.
+
+## 15.4 Crypto engineering requirements
+
+- One reviewed crypto module; no ad-hoc `crypto.subtle` calls scattered through components.
+- Domain-separated HKDF info strings and a format version byte in every ciphertext/wrapped blob.
+- Random 96-bit IV per encryption; reject reused IVs. Derive IV from a CSPRNG, never from ids or counters.
+- AAD on every AEAD operation: `user_id | file_id | version | chunk_index | commitment`. Decrypt fails closed on mismatch.
+- Constant-time comparison for verifiers; rate-limit verifier checks.
+- Argon2id ≥64 MiB, t≥3, p≥4 for passphrase paths; tune for low-end mobile and re-benchmark each release.
+- Public `key_salt` bound into AAD so a server cannot substitute a salt it knows.
+- Anti-rollback: authenticated monotonic version manifest; reject stale wrapped keys and stale vault versions.
+- Independent cryptographic review and published test vectors before launch.
+
+## 15.5 Server and database hardening
+
+- No server component ever holds a usable plaintext key, recovery share, or plaintext name. Enforce with CI checks scanning all edge functions and RPC definitions for key-returning columns.
+- BFF uses user-scoped JWT + RLS for all file data; service role only for narrow admin operations, never for reading file rows.
+- All identity from verified session; reject body-supplied `userId`/`ownerId`.
+- Every RPC/REST/edge response allow-listed; no `SELECT *`, no `row_to_json(f)` on files.
+- Private storage bucket; signed, short-lived, user-bound URLs only.
+- Secrets in a managed vault with rotation runbooks; no secrets in git, CI logs, edge function source, or mobile bundles.
+- Network/egress allowlists for admin surfaces; MFA + hardware keys for all operator accounts.
+
+## 15.6 Recovery hardening
+
+- 3-of-5 Shamir by default; shares are opaque, per-device, and rotated after every recovery.
+- Recovery requires account login + quorum + step-up; notify all devices and contacts on start and completion.
+- Rate-limit and progressively back off recovery attempts; alert on unusual patterns.
+- Optional recovery-passphrase envelope is Argon2id-wrapped and never transmitted; reject reuse of the account password.
+- Never let support staff trigger or bypass recovery — no social-engineering path exists.
+- Document that colluding contacts (3-of-5) or physical coercion can defeat recovery controls.
+
+## 15.7 Detection and response
+
+- Structured audit events: unlock, device added/removed, share created/revoked, recovery started/completed, key rotation, failed verifier attempts. No key material in logs.
+- Anomaly alerts: new device + immediate bulk download, repeated failed verifier checks, recovery from new IP, unusual share creation volume.
+- Canary files in each vault whose access triggers an alert.
+- Incident runbooks: BFF compromise, build-pipeline compromise, contact collusion, lost phrase, extortion attempt.
+- Public bug bounty with a clear safe-harbor and a crypto-specific scope.
+
+## 15.8 UX-preservation contract (non-negotiable)
+
+Every hardening above must satisfy: **no extra taps in the normal path.**
+- Daily use: sign in → unlock (biometric/passkey) → files appear. Nothing else.
+- New device: approve from existing device (one tap) or phrase restore.
+- Emergency: phrase → open any file immediately on cellular; no migration wait.
+- Background migration, key rotation, audit, and alerts are silent.
+- The only unavoidable user burden is **one-time recovery setup** (phrase + optional contacts), matching iCloud ADP.
+
+## 15.9 Residual risks — stated plainly
+
+1. **XSS in an unlocked tab** can read plaintext. Mitigated by CSP/SRI/DOMPurify, not eliminated.
+2. **Malicious code-delivery** defeats client E2E. Mitigated by signed reproducible builds and an isolated asset origin; a state-level supply-chain attack remains possible.
+3. **Physical coercion** of an unlocked device cannot be defended by cryptography.
+4. **Lost phrase + lost quorum** = permanent loss; support cannot help. Required for E2E.
+5. **Metadata** (identity, coarse timing, counts, IPs) remains visible to the service.
+6. **Legacy unmigrated files** remain server-recoverable until re-encrypted.
+7. **Already-downloaded plaintext** on a revoked/stolen device cannot be clawed back.
+
+## 15.10 Priority order for implementation
+
+1. Phase 0 containment (section 9) — closes live critical exposure.
+2. Crypto core + deterministic keys (sections 2–5) — the E2E foundation, with third-party review.
+3. BFF + session/cookie + code-integrity controls (sections 7, 15.2, 15.3).
+4. Device lifecycle + recovery (sections 3, 10a, 15.6).
+5. Sharing (section 8).
+6. Legacy migration (section 7).
+7. Detection/response + audit + bug bounty (15.7).
+8. Other clients and workspaces (section 11).
+
