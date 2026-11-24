@@ -35,7 +35,7 @@ Fixed today (were real hardcoded values):
 | **High** | 34 edge functions with `verify_jwt=false` in `config.toml` | config | inventory each; enforce auth in code or enable verify_jwt |
 | **Medium** | ~40 sensitive-named functions still anon-executable (`check_share_access`, `create_file_share`, `get_shared_file_info`, `increment_share_*`, KZA admin fns, `hash_file_encryption_key`, …) | anon_exec list | least-privilege grant matrix |
 
-Note: the earlier hardening migration already revoked `get_secret`, PREL sign/verify/rotate, `create_file_record`, `get_file_for_share`, fixed `update_share_options` ownership, replaced permissive policies, and made `files` bucket private. The counts above are the *remaining* surface.
+**STATUS: ALL FIXED (2026-11-24).** Applied `supabase/migrations/20261125000000_public_lockdown.sql` — post-fix live verification: **0 PUBLIC-exec functions, 5 anon-exec functions** (only the 5 share-link functions), **4 public buckets** (apidoc/avatars/book-covers/squid-sites — intentional public assets). `scripts/security-audit.sql` returns 0 rows. `rotate_master_key` was verified owner-scoped via `auth.uid()` and intentionally kept on `authenticated` so password rotation works. Earlier migrations had already revoked `get_secret`, PREL primitives, `create_file_record`, `get_file_for_share`, fixed `update_share_options` ownership, and made `files` bucket private.
 
 ## 4. Local `supabase/` dir — what to change before publishing
 
