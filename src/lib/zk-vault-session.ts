@@ -3,6 +3,7 @@
  * closure — no localStorage/sessionStorage/IndexedDB. Lock drops it immediately.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { appendKtl } from './zk/ktl';
 
 const enc = new TextEncoder();
 const ITER = 310_000;
@@ -66,6 +67,7 @@ export async function saveVaultFileMeta(fileId: string, userId: string, salt: st
     file_id: fileId, user_id: userId, file_salt: salt, iv, version: 1,
   });
   if (error) throw error;
+  await appendKtl(userId, 'vault.file.encrypted', { file_id: fileId, version: 1 }).catch(() => {});
 }
 
 /** Returns null for legacy vault files (no metadata) — caller keeps old behavior. */
@@ -78,6 +80,8 @@ export async function getVaultFileMeta(fileId: string): Promise<{ salt: string; 
 
 /** Delete metadata = crypto-shredding of an encrypted vault file. */
 export async function shredVaultFile(fileId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
   const { error } = await supabase.from('zk_files').delete().eq('file_id', fileId);
   if (error) throw error;
+  if (user) await appendKtl(user.id, 'vault.file.shredded', { file_id: fileId }).catch(() => {});
 }

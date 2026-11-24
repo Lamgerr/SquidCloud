@@ -79,4 +79,4 @@ CREATE POLICY zk_ktl_owner ON public.zk_ktl FOR SELECT TO authenticated
 
 REVOKE ALL ON public.zk_vaults, public.zk_files, public.zk_devices, public.zk_ktl FROM anon, PUBLIC;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.zk_vaults, public.zk_files, public.zk_devices TO authenticated;
-GRANT SELECT ON public.zk_ktl TO authenticated;
+GRANT SELECT, INSERT ON public.zk_ktl TO authenticated;

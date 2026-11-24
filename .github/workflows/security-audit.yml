@@ -1,0 +1,43 @@
+name: Security Invariant Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  supabase-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Secret scan (no keys/tokens in source)
+        run: |
+          if grep -rInE 'ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|sb_secret_[A-Za-z0-9]{20,}' \
+            --exclude-dir=node_modules --exclude-dir=.git --exclude='*.lock' .; then
+            echo "POSSIBLE SECRET IN SOURCE"
+            exit 1
+          fi
+      - name: Keystore must not be tracked
+        run: |
+          if git ls-files | grep -iE '\.(keystore|jks|p12)$'; then
+            echo "SIGNING KEYSTORE TRACKED IN GIT"
+            exit 1
+          fi
+      - name: Run read-only security audit
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+          output=$(supabase db query --linked --file scripts/security-audit.sql)
+          echo "$output"
+          # The audit returns zero rows when all invariants hold. Fail on any data row.
+          if echo "$output" | grep -q '"rows": \[[[:space:]]*{'; then
+            echo "SECURITY INVARIANT VIOLATION"
+            exit 1
+          fi
