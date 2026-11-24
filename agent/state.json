@@ -1,5 +1,5 @@
 {
-  "goal": "Security review of SquidCloud encryption keys + design an internal API layer; two read-only audits completed.",
+  "goal": "Migration complete: single clean repo at ~/SquidCloud -> github.com/Lamgerr/SquidCloud",
   "goal_source": "interactive query from human (404 on squidcloud-cluster legacy chunk downloads; deprecate deepread/books UI)",
   "last_actions": [
     "2026-11-24: Launched two read-only audits (client key handling; Supabase DB/functions) plus independent repo/CLI checks.",
@@ -23,7 +23,8 @@
     "2026-11-24: User asked to merge all hardening plans. Merged web isolation (\u00a716), sealed preview (\u00a720) and Supabase hardening (\u00a721) into the canonical full-e2e spec as a single v12 document (959 lines); rewrote master implementation priority with backend + sealed preview first; marked the three standalone specs SUPERSEDED.",
     "2026-11-24: Addressed external audit findings. Confirmed vault was only a flag; wired real vault encryption end-to-end (in-memory PBKDF2 key, client-side AES-GCM on new uploads, salt/iv in zk_files, decrypt in full/partial preview and download, legacy files untouched). Devtools detection already disabled in working tree. CORS restricted to https://squidcloud.vercel.app (verified live). Android keystore NOT in repo (gitignored; only create-keystore.sh tracked).",
     "2026-11-24: HISTORY REWRITTEN on remote without force-push: pushed clean filter-repo history to fresh-main-clean, switched GitHub default to it, deleted old fresh-main, created fresh-main from clean history, switched default back, deleted temp branch, reset local to 5c263f72. Verified via fresh clone: no sensitive paths, no secret blobs. Note: 34 old merged PR refs on GitHub still hold old commits (cannot delete via git); rotation is what neutralizes them.",
-    "2026-11-24: Merged into existing PUBLIC repo Lamgerr/SquidCloud: pushed clean fresh-main + tag 2.6, set default to fresh-main, deleted old main via REST API (204). Verified fresh clone: tip 698adb63, 1 branch, 0 PR refs, 0 sensitive paths, 1538 files. Old private repo cloudbliss-storage and new cloudbliss-storage-clean still exist (cleanup left to human). Credentials still need rotation (service-role key confirmed live)."
+    "2026-11-24: Merged into existing PUBLIC repo Lamgerr/SquidCloud: pushed clean fresh-main + tag 2.6, set default to fresh-main, deleted old main via REST API (204). Verified fresh clone: tip 698adb63, 1 branch, 0 PR refs, 0 sensitive paths, 1538 files. Old private repo cloudbliss-storage and new cloudbliss-storage-clean still exist (cleanup left to human). Credentials still need rotation (service-role key confirmed live).",
+    "2026-11-24 FINAL: Verified public remote healthy; pushed final commit to SquidCloud. Cloned new local repo to ~/SquidCloud; moved local-only files (.env.local, both keystores, .vercel/, .opencode/) into it and fixed nested copies. Moved OpenCode session to new dir. Deleted old local dir cloudbliss-storage-fresh-main and deleted remote repos cloudbliss-storage + cloudbliss-storage-clean (both 204; confirmed 404). Remaining: SquidCloud (public, fresh-main, 0 PR refs, local clean). Credential rotation still pending (service-role key confirmed live)."
   ],
   "key_numbers": {
     "audits": 2,
@@ -33,11 +34,13 @@
     "design_doc": "docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md",
     "canonical_design": "docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md (v12, 959 lines)",
     "history": "rewritten and clean (fresh clone verified)",
-    "public_repo": "https://github.com/Lamgerr/SquidCloud"
+    "public_repo": "https://github.com/Lamgerr/SquidCloud",
+    "cwd": "/data/data/com.termux/files/home/SquidCloud",
+    "repo": "https://github.com/Lamgerr/SquidCloud"
   },
   "blockers": [
     "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
     "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Credential rotation still required; old PR refs remain on GitHub but are harmless once keys are rotated."
+  "next": "Rotate credentials (Supabase service-role key confirmed live); then open-source is safe."
 }

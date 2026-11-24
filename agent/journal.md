@@ -160,3 +160,12 @@
 - Corrections verified: .har capture (17,194 lines) was counted as JSON -> separated; Cargo.lock (2,115 raw lines) silently skipped by cloc -> added manually where noted; teardown confirmed language rows sum exactly to 249,950.
 - Key result: 249,950 code lines across 1,142 non-md text files (+2,115 Cargo.lock raw = ~252,065 all-text); approx 206,640 lines when generated/data artifacts (lockfiles, HAR, BIP39 wordlist, l0g.txt dump, egg-info, robots) are excluded.
 - Next: nothing queued (cold start; interactive query, no backlog item picked).
+
+## 2026-11-24 - Final migration to ~/SquidCloud (interactive)
+- Verified public remote (Lamgerr/SquidCloud): default=fresh-main, head 45a4fd62, 0 PR refs.
+- Pushed final local commit so local/remote matched.
+- Cloned clean remote into /data/data/com.termux/files/home/SquidCloud; moved local-only files from old repo: .env.local, squidcloud.keystore, android/app/squidcloud.keystore, .vercel/, .opencode/. Fixed accidental nested copies (.opencode/.opencode, .vercel/.vercel).
+- Moved OpenCode session to the new directory via session_move.
+- Deleted old local dir cloudbliss-storage-fresh-main (rm -rf) and deleted remote repos Lamgerr/cloudbliss-storage and Lamgerr/cloudbliss-storage-clean via GitHub API (204 each; verified 404 afterwards).
+- Final: one active repo (SquidCloud, public, fresh-main, 0 PR refs), new local repo clean.
+- REMAINING BLOCKER: credential rotation — Supabase service-role key from leaked history still valid (REST 200, exp 2035). Repo is structurally clean but leaked values are not dead.
