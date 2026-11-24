@@ -1,174 +1,143 @@
-# SquidCloud: iCloud-Style Full E2E — Design
+# SquidCloud: Wallet-Style Keys, iCloud-Style UX — Design
 
 Date: 2026-11-24
-Status: DRAFT v3 (awaiting approval; no code written)
-Supersedes: v1 (contradictory key hierarchy), v2 (factor-based vault)
+Status: DRAFT v4 (awaiting approval; no code written)
+Supersedes: v1 (contradictory hierarchy), v2 (factor-based vault), v3 (iCloud ADP device-approval)
 
-## 1. Intent — what "like iCloud / Google Drive" means
+## 1. Intent
 
-The user wants the *experience* of iCloud/Drive: sign in, files are just there, everything syncs silently across devices, no key management visible — plus full E2E and maximum hardening.
+The user wants wallet-style key ownership (self-custody, recovery phrase, no server keys), iCloud-style seamlessness, and explicitly does **not** want emergency cross-device access to require a long migration or heavy cellular data.
 
-Honest constraint: **Google Drive is not E2E** — Google holds the keys and can read files. iCloud by default is also not fully E2E; **iCloud Advanced Data Protection (ADP)** is the mode where Apple can't decrypt. So "exactly like both + full E2E" is impossible. The correct model to copy is **iCloud ADP's UX with a stricter key model**:
+The resolution: **borrow the wallet key model, not the wallet UX.** The recovery phrase is the universal key, but it is used only at restore time. Daily use stays device-keystore based. Critically, **unlock is not migration** — a restored device can decrypt any single file on demand with no bulk key sync.
 
-- Device generates keys; hardware-backed keystore protects them.
-- Server stores only ciphertext and wrapped keys; no server-held KEK exists.
-- New device is approved from an existing device (or a recovery key) — no manual key typing in normal use.
-- Sync runs in the background, including while locked; decrypt happens on access.
+## 2. The key decision: deterministic per-file keys
 
-## 2. Requirements mapped to design
+```
+Recovery phrase (24 words, BIP39-style wordlist)  -- shown once, never transmitted
+        |
+        v
+   seed = PBKDF2-HMAC-SHA512(phrase, "squidcloud", 2048)     [BIP39-style]
+        |
+        v
+   MK = HKDF(seed, "squidcloud/v4/master")                    [master key]
+        |
+        +--> HKDF(MK, "name")     -> name key
+        +--> HKDF(MK, "share")    -> share key
+        +--> HKDF(MK, "file", file_id, version) -> FK          [per-file key]
+```
 
-| Requirement | How it is met |
+**There are no wrapped-FK blobs to sync.** Each file's key is derived from MK + its id. A new device with the phrase can open file #500 without first downloading keys for files #1–499. That is the direct answer to the cellular/emergency requirement.
+
+Trade-offs, stated honestly:
+- Losing MK means losing all files — same as any wallet, and the required cost of no server escrow.
+- A deterministic FK means key rotation is a vault-wide re-encrypt (version bump). There is no per-file forward secrecy beyond what MK already provides — but the old wrapped-FK model also let MK unwrap every FK, so nothing is lost.
+- File ids become key material inputs; they are already server-visible opaque ids. Store a random `key_salt` per user in the vault record and bind it into every derivation so the server cannot influence derivation by choosing ids.
+
+## 3. Device model (iCloud-like daily experience)
+
+**First device:** sign in → generate recovery phrase → confirm it → MK derived on-device → deviceKey stored in hardware keystore (Android Keystore / iOS Keychain / WebAuthn PRF on web) → `wrapped_MK[deviceId] = AEAD(deviceKey, MK, aad(user,device,version))` uploaded. Files sync invisibly.
+
+**New device, normal:** sign in → pending-device request → existing unlocked device shows approve prompt (biometric/PIN) → MK sent via ephemeral ECDH through the server (server sees only public keys + ciphertext) → new device generates its own deviceKey, uploads its wrapped MK.
+
+**New device, emergency / no other device:** sign in → "Restore with recovery phrase" → type 24 words → MK derived → **immediate on-demand access to every file**. No migration step, no bulk download. The only network traffic is the ciphertext of the file actually opened. This works on cellular.
+
+**Browser without keystore:** WebAuthn passkey PRF as deviceKey (persisted per-credential salt); recovery phrase is always available as first-class restore.
+
+## 4. Why migration is no longer a blocker
+
+- **New (v2) files:** no migration exists. Deterministic keys mean instant restore.
+- **Legacy files (created under the old server-KEK escrow):** they still need one-time re-encryption. This is strictly **background and optional**:
+  - Incremental, per-file, resumable state machine: `pending → v2_ready → cutover → legacy_deleted`.
+  - Wi-Fi only by default; explicitly opt-in on cellular; never blocks opening a file.
+  - Until a file is migrated, opening it on a restored device makes **one small legacy-key fetch** for that file only — never a bulk sync.
+  - Quota accounting must not double-count; verify decrypt before deleting legacy ciphertext.
+- Full E2E is claimed only for v2 files; the legacy gap is documented until its sunset window closes.
+
+## 5. Crypto details
+
+- Recovery phrase: 24 words from a standard 2048-word list (256 bits entropy) with checksum — wallet-standard, portable, human-copyable.
+- Derivations: HKDF-SHA256 with domain-separated info strings; `key_salt` per user bound into AAD.
+- Content: AES-256-GCM, random 96-bit IV per chunk, fixed-size padded chunks (e.g. 1 MiB), AAD = `file_id | user_id | version | chunk_index | commitment`.
+- Names/folders: AES-256-GCM with the name key, AAD binds parent id.
+- Verifier: `HKDF(MK,"verify")`, constant-time compare, never a plaintext key.
+- Recovery phrase verifier on server: slow-hash (Argon2id) of the *phrase-derived seed*, rate-limited; or omit entirely and simply attempt an unwrapping operation. No fast hash.
+- Anti-rollback: monotonic vault version in an authenticated manifest; reject server responses that roll it back.
+
+## 6. Threat model
+
+| Adversary | Must not get |
 |---|---|
-| Seamless UX | Keys live in device keystore; user only signs in and taps "Approve this device" on an existing device. No passphrase in daily use. |
-| Permanent cross-device sync | Ciphertext + per-device wrapped MK sync through the BFF; independent of unlock state. |
-| Maximum hardening | Per-file keys, hardware-backed device keys, AAD binding, no server KEK, recovery key held only by user, strict RLS behind BFF. |
-| Full E2E | Server never sees plaintext keys, filenames or content; no recovery backdoor. |
+| DB admin / full dump + all server secrets | Plaintext keys, names, content — no KEK exists |
+| Compromised BFF | Usable v2 keys; AAD binding prevents key substitution; signed builds + strict CSP + isolated asset origin limit JS tampering |
+| Network | Beyond ciphertext and opaque ids |
+| Share-link holder | Anything except the shared file |
+| XSS while unlocked | Full plaintext compromise — stated honestly; mitigated by CSP, DOMPurify, short unlock windows, step-up before key ops |
+| Stolen locked device | Nothing until unlock |
+| Lost recovery phrase | Unrecoverable — same as iCloud ADP; no backdoor |
 
-## 3. Non-goals / anti-goals
+## 7. Backend boundary (BFF)
 
-- No server-side content search, thumbnails or AI on file contents.
-- No admin recovery. Losing all devices **and** the recovery key means permanent data loss — same as iCloud ADP.
-- No "temporary" plaintext key path that survives onboarding.
-- No trust in body-supplied identity fields.
+- Browser talks only to `/api/*`; Supabase URL/keys absent from `src/`.
+- Session = opaque HttpOnly, Secure, SameSite=Strict cookie + server-side session state; CSRF/Origin checks.
+- BFF uses a user-scoped Supabase JWT with RLS on for data; service role only for narrow admin ops.
+- Identity only from verified session; body `userId`/`ownerId` ignored/rejected.
+- Sensitive ops require step-up bound to session and operation.
 
-Residual metadata that cannot be hidden: account identity, coarse access times, file counts, recipient IPs. State this in docs; do not claim "zero information".
+## 8. Sharing
 
-## 4. Architecture
+- Random 256-bit share secret, URL fragment only, consumed by share-page JS.
+- FK wrapped with share secret; server stores wrapped blob + slow verifier; no password submitted to server.
+- Revocation rotates share id and deletes wrapped blob; copied ciphertext + secret cannot be revoked.
+- Folder shares: group key wrapped per recipient; rekey on membership change.
 
-### 4.1 Key hierarchy (iCloud ADP-style)
+## 9. Phase 0 — containment before E2E work (correct order)
 
-```
-On first device at vault creation:
-  MK          = random 256-bit master key, generated on-device
-  RK          = random 256-bit recovery key, shown once as a 24-word phrase / QR
-  deviceKey   = generated and stored in the device's secure keystore
-                 (Android Keystore / iOS Keychain / WebAuthn PRF on web)
-
-Stored on server (all ciphertext-only, no usable plaintext):
-  wrapped_MK[deviceId] = AEAD(deviceKey, MK, aad(user_id, device_id, version))
-  wrapped_MK[RK]       = AEAD(HKDF(Argon2id(RK, salt), "recovery"), MK, aad)
-  verifier             = HKDF(MK, "verify")   -- constant-time, no plaintext
-  salt, version        -- public; version encodes KDF params + AAD format
-
-Per file:
-  FK            = random 256-bit per file
-  content       = AES-256-GCM(FK, fixed-size padded chunks)
-  wrapped_FK    = AEAD(HKDF(MK,"file"), FK, aad(file_id,user_id,version,chunk_commit))
-  name/folders  = AES-256-GCM(HKDF(MK,"name"), name, aad(parent_id))
-```
-
-- No master KEK exists on any server. There is nothing for a DB admin to derive.
-- Per-file keys mean one compromised file does not expose the vault.
-- Random 96-bit IV per encryption; AAD binds file/user/version/commitment so a malicious server cannot swap keys.
-- MK lives in memory only while unlocked; zeroed on lock/pagehide (JS cannot guarantee memory scrubbing — documented).
-
-### 4.2 Device lifecycle — the iCloud-like part
-
-**First device (vault creation)**
-1. Sign in to the account (session auth only).
-2. Generate MK + recovery key on-device.
-3. Store deviceKey in the hardware keystore; upload wrapped MK copies.
-4. Show the recovery key once with a confirmation step. Files begin syncing invisibly.
-
-**New device — normal path (no typing)**
-1. Sign in on the new device.
-2. It registers a pending device request with a short code.
-3. An existing unlocked device shows an approval prompt; user taps approve (biometric/PIN).
-4. Existing device sends MK wrapped with an ephemeral ECDH key agreed between devices through the server (server sees only public keys and ciphertext).
-5. New device unwraps MK, generates its own deviceKey, uploads its wrapped MK copy, deletes the transient request.
-
-**New device — no existing device available**
-1. Sign in → enter the 24-word recovery key (or scan its QR).
-2. Derive recovery KEK → unwrap MK → generate new deviceKey → upload wrapped copy.
-3. This is the only case where the user types a secret, matching iCloud's recovery-key flow.
-
-**Browser without a keystore:** use WebAuthn passkey PRF with a persisted per-credential salt as the deviceKey; require passphrase/recovery key enrollment as first-class fallback because PRF support on synced passkeys varies.
-
-### 4.3 Sync while locked
-
-Sync is pure ciphertext movement through the BFF and requires no keys. Queued uploads/downloads run in a background worker while the vault is locked. On unlock, the client decrypts names and content on demand. This is exactly iCloud's behavior.
-
-### 4.4 Revocation and rotation
-
-- **Remove a device:** delete its wrapped-MK blob and revoke its sessions. Its cached plaintext cannot be recalled — document.
-- **Rotate MK/recovery key:** rewrap all FKs and names **client-side** on an unlocked device; no server ever sees MK or FK. Add anti-rollback version manifest.
-- **Recovery key rotation:** unwrap MK with old RK, wrap with new RK, delete old blob — file keys untouched.
-
-### 4.5 Sharing
-
-- Random 256-bit share secret generated in-browser; only in URL fragment.
-- FK wrapped with share secret; server stores only the wrapped blob and a slow verifier.
-- Any holder of the share id may fetch the wrapped blob — it is useless without the fragment secret.
-- Share page JS consumes the fragment; no password is sent to the server.
-- Revocation rotates the share id and deletes the wrapped blob; copied ciphertext + secret cannot be revoked.
-- Folder shares use a group key wrapped per recipient; membership changes rekey the group.
-
-## 5. Backend boundary (BFF)
-
-- Browser talks only to `/api/*`; Supabase URL and keys never appear in `src/`.
-- Session = opaque HttpOnly, Secure, SameSite=Strict cookie + server-side session state; CSRF/Origin validation.
-- The BFF uses a **user-scoped Supabase JWT with RLS on** for data access; service role only for narrow admin ops.
-- Identity comes only from the verified session; body `userId`/`ownerId` ignored/rejected.
-- AAD binds wrapped keys to file/user so a compromised BFF cannot substitute keys.
-- Signed, reproducible builds; strict CSP; isolated immutable asset origin — a malicious origin serving altered JS defeats browser E2E, so this is a hard requirement, not a nice-to-have.
-
-## 6. Phase 0 — containment before E2E work (correct order)
-
-1. Rotate secrets reachable via anon `get_secret`, PREL HMAC key (invalidate tokens), hardcoded backfill token, secrets in git history/HAR/keystore; purge history.
-2. Deploy a minimal audited share gateway before locking down old RPCs, so recipients are not broken.
+1. Rotate secrets reachable via anon `get_secret`, PREL HMAC key (invalidate tokens), hardcoded backfill token, git-history secrets; purge history.
+2. Deploy a minimal audited share gateway before locking down old RPCs.
 3. Revoke EXECUTE from `PUBLIC, anon, authenticated` on: `get_shared_file_info`, `get_file_for_share`, `get_folder_share_contents`, `update_share_options`, `get_secret`, `kza_prel_sign_token/verify/rotate`, `create_file_record`, `exec_sql`.
-4. Owner-only `shares` / `files` SELECT policies; remove `shared = true` and `EXISTS(shares...)` from direct table SELECT.
-5. Rewrite share RPCs as `SECURITY INVOKER` with explicit allow-lists; never return keys, `storage_path`, tags, chunk URLs. Fix dead `access_code` checks.
-6. Make `files` bucket private.
-7. Remove raw-key fallback in `res54.ts:782-791` / `FileUpdateService.ts:109-120`; backfill and strip tags.
-8. Remove JWT bypass in `file-key/index.ts:132-143`; route through PREL.
-9. Audit all `verify_jwt=false` functions; fix CORS `*`, admin authz, webhook signatures, KZA fail-open, unsalted vault password gating.
+4. Owner-only `shares`/`files` SELECT policies; remove `shared = true` and `EXISTS(shares...)`.
+5. Share RPCs → `SECURITY INVOKER`, explicit allow-lists; never return keys, `storage_path`, tags, chunk URLs. Fix dead `access_code` checks.
+6. `files` bucket private.
+7. Remove raw-key fallback (`res54.ts:782-791`, `FileUpdateService.ts:109-120`), backfill and strip tags.
+8. Remove JWT bypass (`file-key/index.ts:132-143`); route through PREL.
+9. Audit all `verify_jwt=false` functions; fix CORS `*`, admin authz, webhook signatures, KZA fail-open, unsalted vault password.
 10. DOMPurify + strict CSP for markdown.
-11. CI regression: enumerate grants/definers and assert no RPC/REST response contains key/path/tag columns.
+11. CI regression: enumerate grants/definers; assert no response contains key/path/tag columns.
 
-## 7. Migration of legacy files
+## 10. UX contract
 
-Legacy files are not E2E. The BFF must unwrap the old key once under a step-up-protected channel, return it to the client, which re-encrypts plaintext under a new v2 FK and deletes the old ciphertext. After that the file is E2E and an old DB dump is useless for the new ciphertext.
+- Daily: sign in → files appear. Keys never surface.
+- First use: generate and confirm recovery phrase once.
+- New device: approve from existing device, or restore with phrase.
+- Emergency restore: phrase → open any file immediately, on cellular, without migration.
+- Sync indicator shows queued/synced; background migration is opt-in on cellular and never blocks access.
+- Auto-lock with biometric/PIN; explicit lock/offline/quota states.
+- Onboarding: losing every device and the phrase means permanent loss; server cannot recover.
 
-- State machine: `pending → uploading → v2_ready → cutover → legacy_deleted`, idempotent, decrypt-and-verify before cutover.
-- Per-user migration lease; quota must not double-count.
-- Full E2E is claimed only for v2 files. Legacy gap documented until the sunset window closes.
+## 11. Coverage
 
-## 8. UX contract
+Web + native mobile first. CLI, SquidFS, Electron, API keys, webhooks, AI/preview paths must implement the same E2E protocol or stay gated. Workspaces need a group KEK wrapped per member. Null/drop `files.encryption_key`, `tags[0].encryptionKey`, `is_byok` for v2.
 
-- Daily use: sign in → devices approve silently → files appear. No key management UI.
-- First use: one-time recovery key setup with confirmation.
-- New device: approve from existing device (one tap) or recovery key if no device available.
-- Auto-lock with biometric/PIN re-unlock.
-- Background sync indicator; offline queue.
-- Explicit states for migration, lock, offline, quota.
-- Onboarding states the iCloud-ADP-like truth: losing every device and the recovery key means permanent loss; the server cannot help.
+## 12. Verification
 
-## 9. Coverage
-
-Web + native mobile first. CLI, SquidFS, Electron, API keys, webhooks and AI/preview paths must either implement the same E2E protocol or be explicitly gated off until they do. Workspaces/groups require a group KEK wrapped per member and rekey on membership change. Existing key columns (`files.encryption_key`, `tags[0].encryptionKey`, `is_byok`) nulled/dropped for v2.
-
-## 10. Verification
-
-- DB dump + all server secrets cannot decrypt v2 files (no KEK exists).
+- Full DB dump + all server secrets cannot decrypt v2 files.
 - `anon` cannot EXECUTE key/share/secret functions; CI asserts.
-- No RPC/REST/edge response contains keys, paths, tags, or chunk URLs.
+- No RPC/REST/edge response contains keys, paths, tags, chunk URLs.
 - `files` bucket private; signed URLs only.
 - XSS payloads in shared markdown do not execute.
-- Device approval flow, recovery-key flow, device removal, MK rotation, migration interruption/resume, CSRF, malicious-BFF key substitution all tested.
-- Cross-device: upload on A, approve B from A, file opens on B with no manual key entry.
-- Locked-device sync test: queued uploads complete while locked.
+- Tests: phrase checksum/derivation stability, device approval, phrase restore, device removal, MK rotation, migration interruption/resume on Wi-Fi vs cellular, CSRF, key substitution by malicious BFF, locked-device sync.
+- Cross-device: upload on A, restore on B with phrase only, open file #500 on cellular without waiting for migration.
 
-## 11. Decisions made (mine, open to correction)
+## 13. Decisions made (mine, open to correction)
 
-- iCloud ADP is the model; Google Drive's key model is explicitly rejected because it is not E2E.
-- Recovery key is shown once at vault creation; device approval is the normal onboarding path.
-- Web uses WebAuthn PRF as a deviceKey with passphrase/recovery as first-class fallback.
-- No server recovery backdoor.
-- Legacy migration uses a bounded trusted operation; E2E applies to v2 only.
+- Wallet-style 24-word phrase as the universal recovery secret; wallet *key model*, not wallet *UI* (no token/chain language).
+- Deterministic per-file key derivation — eliminates wrapped-FK sync and makes emergency restore instant.
+- Migration is background-only, Wi-Fi-first, never a blocker.
+- No server recovery backdoor; iCloud-ADP-equivalent loss semantics.
+- Web + mobile first; other clients gated.
 
-## 12. Open decisions for the human
+## 14. Open decisions for the human
 
-1. Recovery method: 24-word phrase only, or also trusted contacts / printed QR? My recommendation: phrase + QR at launch; trusted contacts later.
-2. Scope: web + mobile first (other clients gated), or all clients at once? My recommendation: web + mobile first.
-3. Legacy cutover: sunset window for inactive users, or immediate shutdown? My recommendation: published sunset window.
+1. Phrase-only recovery, or also trusted contacts / hardware-key backup? My recommendation: phrase + optional trusted contacts later.
+2. Web + mobile first vs all clients at once? My recommendation: web + mobile first.
+3. Legacy cutover: sunset window vs immediate shutdown? My recommendation: published sunset window.

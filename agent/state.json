@@ -8,7 +8,8 @@
     "VERIFIED OK: profile is_admin/tier NOT user-writable; github_connections token RLS owner-only; file_key_vault scoped; file-key JWT path guarded. No changes made - read-only.",
     "Proposed phased plan: Phase 0 SQL containment (revoke grants/policies), Phase 1 BFF with HttpOnly cookies, Phase 2 user-held key hierarchy for true E2E.",
     "2026-11-24: Wrote design doc docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md; independent reviewer found 8 blockers (contradictory key hierarchy, unsafe migration, PRF salt/per-credential issue, BFF raw-key exposure, share password leak, incomplete Phase 0, missing AAD/nonce discipline). Rewrote as v2 fixing all blockers; 2 open decisions remain for the human.",
-    "2026-11-24: User clarified target UX = iCloud/Google Drive. Noted GDrive is not E2E; rewrote design v3 around iCloud Advanced Data Protection: device keystore keys, new-device approval from existing device, recovery key fallback, ciphertext sync while locked, no server KEK."
+    "2026-11-24: User clarified target UX = iCloud/Google Drive. Noted GDrive is not E2E; rewrote design v3 around iCloud Advanced Data Protection: device keystore keys, new-device approval from existing device, recovery key fallback, ciphertext sync while locked, no server KEK.",
+    "2026-11-24: User asked for wallet-style keys without hurting UX/emergency access. Rewrote design v4: BIP39-style 24-word phrase -> MK -> deterministic per-file keys (HKDF(MK,file_id,version)), eliminating wrapped-FK blobs and bulk sync; emergency restore opens any file immediately on cellular; legacy migration background-only and Wi-Fi-first."
   ],
   "key_numbers": {
     "audits": 2,
@@ -21,5 +22,5 @@
     "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
     "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Await approval of design v3 + 3 open decisions; then invoke writing-plans."
+  "next": "Await approval of design v4 + 3 open decisions; then invoke writing-plans."
 }
