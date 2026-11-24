@@ -1,8 +1,8 @@
 # SquidCloud: Wallet-Style Keys, iCloud-Style UX — Design
 
 Date: 2026-11-24
-Status: DRAFT v8 — INTEGRATED, HARDENED, ZERO-FRICTION (awaiting approval; no code written)
-Supersedes: v1–v6 and `2026-11-24-web-isolation-design.md` (merged into §16). Single canonical security design. §17 adds key transparency, forward secrecy, crypto-shredding and supply-chain hardening; §18 makes protection silent and automatic (the "Principal and Protection Detail" rule).
+Status: DRAFT v9 — EXTREME ZERO-KNOWLEDGE (awaiting approval; no code written)
+Supersedes: v1–v6 and `2026-11-24-web-isolation-design.md` (merged into §16). Single canonical security design. §17 adds key transparency, forward secrecy, crypto-shredding and supply-chain hardening; §18 makes protection silent and automatic (the "Principal and Protection Detail" rule); §19 defines hard zero-knowledge invariants enforced by CI.
 
 ## 1. Intent
 
@@ -149,18 +149,20 @@ A user who loses a device must always be able to get back into the *account*. Wh
 
 - Split MK with **Shamir secret sharing**, threshold **3-of-5** by default.
 - Shares are given to trusted contacts (who see opaque codes, never the user's data) or stored in independent places: password manager, printed sheet, hardware key, email to self.
-- A share alone reveals nothing. The server stores only encrypted share envelopes and never holds enough shares to reconstruct MK.
+- A share alone reveals nothing. Each share is encrypted **to the recipient's device public key** (whose private key lives only in that recipient's hardware keystore). The server stores only these encrypted envelopes plus a commitment hash — it has no key that can open them and no path to reconstruct MK. An admin with the full database gets ciphertext plus hashes.
 - Recovery ceremony: new device collects 3 shares → reconstructs MK → generates a new deviceKey → uploads a new wrapped-MK blob. Contacts are notified and their shares are rotated (new shares of the same MK) so a past holder cannot retry later.
 - Recovery must require the account login too — a share holder cannot enter without the account. Rate-limit and audit every recovery attempt.
 - Threat: colluding contacts. 3-of-5 means 3 must collude; document this honestly. Offer 2-of-3 or 5-of-7 at setup.
 
-### Recovery passphrase envelope (optional, for users who won't store a phrase)
+### Recovery key — REMOVED the memorable-passphrase option
 
-- Store `AEAD(Argon2id(recovery_passphrase, salt), MK)` on the server.
-- The passphrase is **never transmitted**; the server holds only the wrapped blob. This remains E2E.
-- Must be distinct from the account password (which *is* sent to Supabase Auth) — reuse would break E2E. Enforce at setup by rejecting a match.
-- Argon2id ≥64 MiB, t≥3, p≥4 + BFF rate limits, because a low-entropy passphrase is an offline brute-force target if the DB leaks.
-- This is for convenience, not a replacement for the phrase; recommend users store both.
+Earlier drafts proposed storing `AEAD(Argon2id(recovery_passphrase, salt), MK)` so users could type a memorable passphrase. **That is deleted.** A low-entropy passphrase wrapped under a server-stored blob is offline-brute-forceable by anyone with a DB dump — including an admin — and therefore breaks the "no admin can decrypt" guarantee. Argon2id and rate limits only slow an offline attack; they do not prevent it.
+
+Replacement rules:
+- The only portable recovery secret is a **high-entropy 24-word phrase (256 bits)** or an equivalent random 256-bit recovery key/QR. No human-memorable secret is ever accepted as the sole input to MK recovery.
+- The account password is **never** an input to MK derivation or recovery; it is sent to Supabase Auth and must stay separate. CI must assert no code path derives keys from the account password.
+- If a user wants a second portable secret, it is another random 256-bit key stored as a QR — not a passphrase.
+- This is a deliberate UX trade: restoring requires the phrase/QR, but no admin, DB dump, or offline attack can ever guess their way into a vault.
 
 ### Lost-device operational flow
 
@@ -654,3 +656,43 @@ Absolute invisibility and absolute security conflict at the exact moment of a cr
 ## 18.5 Decision impact
 
 This principle supersedes the earlier "one-time tier choice at vault creation" idea: there is **no tier UI at onboarding at all**. Tiers are internal policy (§17.3). Open decision §16.13 (native client timing) and §14 items now assume the web plan alone already delivers the "principal" experience; native is the added protection detail for users who need it, also without daily UI.
+
+---
+
+# 19. Extreme zero-knowledge invariants (v9)
+
+## 19.1 The single rule
+
+**No person other than the user, and no component of SquidCloud, can obtain a usable key, a recovery share, or plaintext — even with full database access, all server secrets, service-role credentials, and source code.**
+
+## 19.2 Hard invariants (CI must assert these, not just review them)
+
+1. No server-side env var, secret, or config value can decrypt any v7+ file. There is no KEK, no master key, no escrow, and no "recovery" key on any server. A CI check fails the build if any edge function reads a key-like env var for decryption.
+2. No table or RPC response contains a plaintext key, a recovery share, a share secret, `storage_path`, file tags, `encryption_key`, or chunk URLs. Enforced by allow-lists and an automated response-schema audit.
+3. MK is derivable only from the 24-word phrase / random recovery key on a client device, or unwrapped from a device keystore key the server never sees. No password, email, or account-reset flow can produce MK.
+4. Social-recovery shares are encrypted to recipient device public keys; the server holds only envelopes and commitments. No server-held key can open a share.
+5. Account password is never an input to any crypto derivation. Adding such a path is a blocking security regression.
+6. Admins/support have no technical path to user plaintext. Not "policy says no" — technically impossible. Any admin tooling that returns file data or keys from the server is rejected.
+7. Device encryption for Maximum tier requires a fresh signed hardware assertion; the server cannot forge one.
+8. Deletion cryptographically shreds `file_salt`; a witnessed receipt is required before UI shows "deleted".
+9. Legacy escrowed files are explicitly outside the ZK guarantee and must be fully migrated before the legacy KEK path is disabled.
+10. Every sensitive event is appended to the KTL and client-verified; a server cannot silently substitute a key, roll back a version, or forge a recovery.
+
+## 19.3 What "no admin can decrypt" means in practice
+
+- A malicious admin with production DB access sees: opaque object ids, padded ciphertext, coarse timestamps, wrapped MK blobs (unopenable), share envelopes (unopenable), and the KTL.
+- A malicious admin with the service-role key additionally sees: whatever the BFF's user-scoped RLS allows — still ciphertext only, because plaintext is never stored.
+- A subpoena to SquidCloud produces ciphertext; the company has no key to hand over. This is the strongest possible legal posture.
+- The only way to read a v7+ file is on an unlocked user device holding MK. That is the definition of zero-knowledge we are implementing.
+
+## 19.4 Explicitly rejected features (to prevent future "helpful" regressions)
+
+- Server-side "forgot vault password" recovery.
+- Admin key escrow, break-glass access, or "legal compliance" key release.
+- Memorable passphrase as a recovery secret.
+- Server-side content preview, search indexing, or AI over decrypted content without explicit per-file user action on their own device.
+- Any SDK or integration that accepts a raw key from a server response.
+
+## 19.5 Residual truth
+
+Even with all of this: XSS on an unlocked device, a compromised build pipeline, a host-permission browser extension, OS-level malware, physical coercion, or loss of the phrase still defeat or endanger the guarantee. Those are listed in §17.9. Nothing in software removes them; the plan minimizes and, where possible, makes them detectable.
