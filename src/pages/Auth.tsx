@@ -24,7 +24,10 @@ import {
    Place at: src/pages/Auth.tsx
    ═══════════════════════════════════════════════════════════════ */
 
+import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
+
 const AUTH_CSS = `
+${ PAGES_POLISH }
 .au { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); min-height: calc(100vh / var(--sa-zoom, 1) - 48px); }
 .au-side { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 48px; padding: 64px var(--sa-gut) 40px; border-right: 1px solid var(--sa-line); background: var(--sa-bg-2); overflow: hidden; }
 .au-side > * { position: relative; }

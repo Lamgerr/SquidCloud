@@ -44,7 +44,12 @@ import type { Tone } from '@/components/custom/squid-app';
    Place at: src/pages/AccountSettings.tsx
    ═══════════════════════════════════════════════════════════════ */
 
+import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
+import VaultUnlockDialog from '@/components/VaultUnlockDialog';
+import { isVaultUnlocked, lockVault } from '@/lib/zk-vault-session';
+
 const ST_CSS = `
+${ PAGES_POLISH }
 .st { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 48px; align-items: start; }
 .st-nav { position: sticky; top: 72px; }
 .st-main { min-width: 0; max-width: 780px; }
@@ -191,6 +196,8 @@ const AccountSettings = () => {
   const isMobile = useIsMobile();
 
   const [activeCategory, setActiveCategory] = useHashState<SettingsCategory>('section', 'profile', SECTION_IDS);
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const [vaultState, setVaultState] = useState(isVaultUnlocked());
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [loading, setLoading] = useState(false);
@@ -1397,6 +1404,24 @@ const AccountSettings = () => {
   return (
     <AppShell>
       <style>{ST_CSS}</style>
+      <style>{`.vk-dock{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:999px;
+        border:1px solid rgba(232,231,225,.1);background:linear-gradient(180deg,rgba(30,31,28,.8),rgba(14,15,13,.9));
+        margin:0 0 14px auto;width:max-content}
+        .vk-dock span{font:400 11px/1 var(--sa-mono);color:var(--sa-mute);letter-spacing:.08em}
+        .vk-dock button{padding:6px 14px;border-radius:999px;border:1px solid rgba(232,231,225,.12);
+        background:rgba(232,231,225,.08);color:#e8e7e1;cursor:pointer;font-size:11px}
+        .vk-dock button:hover{background:rgba(232,231,225,.14)}`}</style>
+
+      <div className="vk-dock">
+        <span>VAULT · {vaultState ? 'UNLOCKED' : 'LOCKED'}</span>
+        <button onClick={() => vaultState ? (lockVault(), setVaultState(false)) : setVaultOpen(true)}>
+          {vaultState ? 'Lock' : 'Unlock'}
+        </button>
+      </div>
+      <VaultUnlockDialog open={vaultOpen} userId={user?.id || ''}
+        onClose={() => setVaultOpen(false)}
+        onUnlocked={() => setVaultState(true)}
+        reason="Your files are encrypted with your vault key. Unlock once to access them." />
 
       <TopBar
         crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Account settings' }, { label: current.label }]}

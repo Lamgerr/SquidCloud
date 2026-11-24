@@ -12,6 +12,8 @@ import React, {
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { zkDecryptDownload } from '@/lib/zk-mode';
+import VaultUnlockDialog from '@/components/VaultUnlockDialog';
+import { isVaultUnlocked } from '@/lib/zk-vault-session';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -927,6 +929,19 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
     setPreviewFile(file);
   }, [selectionMode]);
 
+  const [vaultUnlockFor, setVaultUnlockFor] = useState<{ id: string; name: string; blob: Blob; taskId?: string } | null>(null);
+
+  const saveDecrypted = useCallback(async (file: FileItemType, blob: Blob, taskId?: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && !isVaultUnlocked()) {
+      setVaultUnlockFor({ id: file.id, name: file.name, blob, taskId });
+      return;
+    }
+    const out = user ? await zkDecryptDownload(blob, file.id, user.id) : blob;
+    await downloadAndSaveBlob(out, file.name);
+    backgroundDownloadService.completeTask(taskId || `download_${file.id}`);
+  }, []);
+
   const handleFileDownload = useCallback(async (file: FileItemType) => {
     haptics.medium();
     const taskId = `download_${file.id}_${Date.now()}`;
@@ -954,18 +969,13 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
           backgroundDownloadService.updateProgress(taskId, progress);
         });
       }
-      // ZK files are stored as ciphertext; decrypt before saving if this file
-      // has client-side encryption metadata.
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) blob = await zkDecryptDownload(blob, file.id, user.id);
-      await downloadAndSaveBlob(blob, file.name);
-      backgroundDownloadService.completeTask(taskId);
+      await saveDecrypted(file, blob, taskId);
       toast({ title: 'Download complete', description: 'Your file has been downloaded.' });
     } catch (e: any) {
       backgroundDownloadService.failTask(taskId, e.message);
       toast({ title: 'Download failed', description: e.message, variant: 'destructive' });
     }
-  }, [toast]);
+  }, [toast, saveDecrypted]);
 
   const handleFileDelete = useCallback(async (file: FileItemType) => {
     haptics.heavy();
@@ -2845,6 +2855,19 @@ const MobileFilesView: React.FC<any> = ({
         )}
       </section>
 
+      <VaultUnlockDialog
+        open={!!vaultUnlockFor}
+        userId={user?.id || ''}
+        onClose={() => setVaultUnlockFor(null)}
+        onUnlocked={() => {
+          const p = vaultUnlockFor;
+          setVaultUnlockFor(null);
+          if (p) {
+            const f = filteredFiles?.find(x => x.id === p.id);
+            void saveDecrypted(f as FileItemType || { id: p.id, name: p.name } as FileItemType, p.blob, p.taskId);
+          }
+        }}
+      />
     </div>
   );
 };

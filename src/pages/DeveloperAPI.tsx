@@ -42,7 +42,10 @@ import {
 const TAB_IDS = ['overview', 'keys', 'playground', 'status', 'docs'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
+import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
+
 const DV_CSS = `
+${ PAGES_POLISH }
 .dv-bar { position: sticky; top: 48px; z-index: 30; padding: 0 var(--sa-gut); border-bottom: 1px solid var(--sa-line); background: color-mix(in srgb, var(--sa-bg) 92%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .dv-bar .sa-tabs { max-width: 1120px; margin: 0 auto; border-bottom: 0; }
 .dv-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }

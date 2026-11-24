@@ -14,6 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { isVaultUnlocked, getVaultFileMeta, decryptVaultBytes } from '@/lib/zk-vault-session';
 import { supabase } from '@/integrations/supabase/client';
 import SealedPreview from './SealedPreview';
+import VaultUnlockDialog from './VaultUnlockDialog';
 
 // Viewers — one frame, type-specific body
 import CBVideoPlayer from './cbVideoPlayer';
@@ -101,6 +102,8 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const [decodedBlob, setDecodedBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [vaultUnlockOpen, setVaultUnlockOpen] = useState(false);
+  const [vaultUnlockTick, setVaultUnlockTick] = useState(0);
   const loadGen = useRef(0);
   const closing = useRef(false);
   const kind: PreviewKind = file ? detectKind(file) : 'other';
@@ -194,7 +197,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
         const meta = await getVaultFileMeta(file.id);
         if (meta) {
           if (!isVaultUnlocked()) {
-            setError('Unlock the vault to view this file');
+            setVaultUnlockOpen(true);
             setLoading(false);
             return;
           }
@@ -211,7 +214,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
         if (loadGen.current === gen) { setError(e?.message || 'Unable to load preview'); setLoading(false); }
       }
     })();
-  }, [isOpen, file?.id, kind, shareId]);
+  }, [isOpen, file?.id, kind, shareId, vaultUnlockTick]);
 
   const handleDownload = useCallback(async () => {
     if (onDownload) { onDownload(); return; }
@@ -284,6 +287,9 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
         <div className="pv-chrome">
           <FloatingDock reduce={reduce} side={isCbVideo ? 'edge' : 'corner'} resetKey={file.id} onMinimize={close} onClose={() => leave(true)} />
         </div>
+        <VaultUnlockDialog open={vaultUnlockOpen} userId={file.user_id || ''}
+          onClose={() => setVaultUnlockOpen(false)}
+          onUnlocked={() => setVaultUnlockTick(t => t + 1)} />
       </CustomDialogContent>
     </Dialog>
   );
