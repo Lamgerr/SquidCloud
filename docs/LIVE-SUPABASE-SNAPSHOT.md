@@ -1,0 +1,651 @@
+# Live Supabase schema snapshot (public schema)
+
+Generated via `supabase db query --linked` on 2026-11-24. Schema-only; no row data.
+
+> This is a reference snapshot, not a runnable migration. The canonical migration is `supabase/migrations/20261110000000_prod_baseline.sql` plus the two hardening migrations.
+
+
+## Tables (150)
+
+- `8djcvk3222`
+- `access_policies`
+- `account_changes`
+- `account_health_logs`
+- `admin_access_logs`
+- `analytics_events`
+- `api_admin_config`
+- `api_credit_log`
+- `api_credits`
+- `api_key_limits`
+- `api_keys`
+- `api_operation_costs`
+- `api_request_logs`
+- `archive_extractions`
+- `audit_logs`
+- `beta_enrollments`
+- `book_metadata`
+- `cli_authorizations`
+- `cli_devices`
+- `discount_codes`
+- `downloads`
+- `embed_tokens`
+- `encrypted_keys`
+- `entity_notes`
+- `extension_analytics`
+- `extension_approval_history`
+- `extension_ratings`
+- `extensions`
+- `file_key_vault`
+- `file_request_submissions`
+- `file_requests`
+- `files`
+- `folders`
+- `github_connections`
+- `installed_extensions`
+- `key_access_logs`
+- `kza_admin_incidents`
+- `kza_banned_entities`
+- `kza_cip_versions`
+- `kza_geo_events`
+- `kza_geo_fence`
+- `kza_health_checks`
+- `kza_honeypot_hits`
+- `kza_ip_rate_buckets`
+- `kza_ip_reputation`
+- `kza_linked_accounts`
+- `kza_phantom_assets`
+- `kza_prel_f2fa_seeds`
+- `kza_prel_hmac_keys`
+- `kza_prel_registry`
+- `kza_prel_sessions`
+- `kza_rate_buckets`
+- `kza_swk_cases`
+- `kza_swk_denylist`
+- `kza_swk_findings`
+- `kza_swk_notices`
+- `kza_swk_policy`
+- `kza_swk_verdict_tokens`
+- `kza_threat_events`
+- `kza_user_profiles`
+- `login_sessions`
+- `maintenance_mode`
+- `maintenance_schedules`
+- `master_keys`
+- `media_playback_logs`
+- `migration_jobs`
+- `migration_logs`
+- `partner_codes`
+- `passkey_challenges`
+- `payment_logs`
+- `pdf_annotations`
+- `pdf_bookmarks`
+- `pdf_reading_progress`
+- `pdf_secure_urls`
+- `pdf_sessions`
+- `pin_attempt_logs`
+- `pin_operation_authorizations`
+- `plan_limits`
+- `playback_resume`
+- `profiles`
+- `reading_progress`
+- `redeem_codes`
+- `remote_reading_progress`
+- `repositories`
+- `reviewers`
+- `sde_chunk_locators`
+- `sde_identity`
+- `sde_recall_tokens`
+- `security_events`
+- `security_keyring`
+- `share_audit_logs`
+- `share_collection_files`
+- `share_collections`
+- `share_decrypt_logs`
+- `shares`
+- `signals`
+- `site_publications`
+- `squid_run_jobs`
+- `squid_run_steps`
+- `squid_script_runs`
+- `squid_script_triggers`
+- `squid_scripts`
+- `squid_vault_secrets`
+- `squid_vaults`
+- `squidcdn_files`
+- `squidcloud_b2_buckets`
+- `squidveil_audit_log`
+- `squidveil_refs`
+- `squidveil_sessions`
+- `storage_cleanup_log`
+- `storage_provider_vault`
+- `storage_providers`
+- `storage_settings`
+- `subscription_events`
+- `subscription_notifications`
+- `subscriptions`
+- `support_activity_log`
+- `support_messages`
+- `support_refunds`
+- `support_tickets`
+- `system_config`
+- `system_settings`
+- `threat_alerts`
+- `transcode_jobs`
+- `upload_sessions`
+- `upload_stats`
+- `user_encryption_settings`
+- `user_notification_prefs`
+- `user_passkeys`
+- `user_preferences`
+- `user_redeem_codes`
+- `user_security_settings`
+- `user_storage_preferences`
+- `user_subscriptions`
+- `user_terms_acceptance`
+- `vault_files`
+- `vaults`
+- `video_processing_queue`
+- `video_quality_metrics`
+- `video_stream_sessions`
+- `webhook_events_log`
+- `webhooks`
+- `workspace_invites`
+- `workspace_members`
+- `workspace_presence`
+- `workspaces`
+- `zk_devices`
+- `zk_files`
+- `zk_ktl`
+- `zk_vaults`
+
+## Functions (185)
+
+- `accept_workspace_invite` **SECURITY DEFINER**
+- `add_file_bytes` **SECURITY DEFINER**
+- `add_file_to_collection` **SECURITY DEFINER**
+- `adjust_bucket_usage` **SECURITY DEFINER**
+- `assert_pin_authorized_operation` **SECURITY DEFINER**
+- `assign_workspace_id` **SECURITY DEFINER**
+- `bulk_save_pdf_annotations` **SECURITY DEFINER**
+- `cancel_subscription` **SECURITY DEFINER**
+- `check_api_credits` **SECURITY DEFINER**
+- `check_api_token_available` **SECURITY DEFINER**
+- `check_download_allowed` **SECURITY DEFINER**
+- `check_share_access` 
+- `check_subscription_validity` **SECURITY DEFINER**
+- `check_upload_allowed` **SECURITY DEFINER**
+- `check_upload_file_size` **SECURITY DEFINER**
+- `cleanup_expired_pdf_urls` **SECURITY DEFINER**
+- `cleanup_old_processing_jobs` **SECURITY DEFINER**
+- `cleanup_old_video_logs` **SECURITY DEFINER**
+- `cleanup_trashed_files` **SECURITY DEFINER**
+- `complete_onboarding` **SECURITY DEFINER**
+- `complete_processing_job` **SECURITY DEFINER**
+- `count_entity_notes` **SECURITY DEFINER**
+- `count_file_upload` **SECURITY DEFINER**
+- `create_collection` **SECURITY DEFINER**
+- `create_default_workspace_for_profile` **SECURITY DEFINER**
+- `create_entity_note` **SECURITY DEFINER**
+- `create_file_record` **SECURITY DEFINER**
+- `create_file_request` **SECURITY DEFINER**
+- `create_file_share` **SECURITY DEFINER**
+- `create_folder_secure` **SECURITY DEFINER**
+- `create_folder_share` **SECURITY DEFINER**
+- `create_webhook` **SECURITY DEFINER**
+- `create_workspace_invite` **SECURITY DEFINER**
+- `create_workspace_owner_member` **SECURITY DEFINER**
+- `decrypt_keyring_secret` **SECURITY DEFINER**
+- `deduct_api_credits` **SECURITY DEFINER**
+- `delete_entity_note` **SECURITY DEFINER**
+- `delete_file_secure` **SECURITY DEFINER**
+- `delete_folder_secure` **SECURITY DEFINER**
+- `delete_sde_locators` **SECURITY DEFINER**
+- `delete_webhook` **SECURITY DEFINER**
+- `encrypt_keyring_secret` **SECURITY DEFINER**
+- `ensure_notification_prefs` **SECURITY DEFINER**
+- `ensure_notification_triggered` **SECURITY DEFINER**
+- `exec_sql` **SECURITY DEFINER**
+- `execute_burn_after_reading` **SECURITY DEFINER**
+- `export_pdf_annotations` **SECURITY DEFINER**
+- `fire_webhook_event` **SECURITY DEFINER**
+- `gen_random_bytes` 
+- `generate_api_key` **SECURITY DEFINER**
+- `generate_share_id` 
+- `get_best_account_for_upload` 
+- `get_book_metadata` **SECURITY DEFINER**
+- `get_collection_files` **SECURITY DEFINER**
+- `get_credit_usage_stats` **SECURITY DEFINER**
+- `get_entity_notes` **SECURITY DEFINER**
+- `get_file_for_share` **SECURITY DEFINER**
+- `get_file_request_by_slug` **SECURITY DEFINER**
+- `get_file_share_id` **SECURITY DEFINER**
+- `get_folder_share_contents` **SECURITY DEFINER**
+- `get_hls_files` **SECURITY DEFINER**
+- `get_next_processing_job` **SECURITY DEFINER**
+- `get_optimal_node` 
+- `get_or_create_default_workspace` **SECURITY DEFINER**
+- `get_or_create_embed_token` **SECURITY DEFINER**
+- `get_pdf_statistics` **SECURITY DEFINER**
+- `get_pending_notifications` **SECURITY DEFINER**
+- `get_playback_resume` **SECURITY DEFINER**
+- `get_public_file_info` **SECURITY DEFINER**
+- `get_public_folder_contents` **SECURITY DEFINER**
+- `get_reading_progress` **SECURITY DEFINER**
+- `get_remote_progress` **SECURITY DEFINER**
+- `get_secret` **SECURITY DEFINER**
+- `get_shared_file_info` **SECURITY DEFINER**
+- `get_subscriptions_needing_notifications` **SECURITY DEFINER**
+- `get_transcode_job_status` **SECURITY DEFINER**
+- `get_user_api_token_usage_today` **SECURITY DEFINER**
+- `get_user_collections` **SECURITY DEFINER**
+- `get_user_encryption_version` 
+- `get_user_file_request_limit` **SECURITY DEFINER**
+- `get_user_key_selection_preference` 
+- `get_user_plan_limits` **SECURITY DEFINER**
+- `get_user_storage_preferences` **SECURITY DEFINER**
+- `get_user_storage_provider_count` **SECURITY DEFINER**
+- `get_user_webhooks` **SECURITY DEFINER**
+- `get_users_with_expiring_subscriptions` **SECURITY DEFINER**
+- `get_users_with_recently_expired_subscriptions` **SECURITY DEFINER**
+- `get_webhook_deliveries` **SECURITY DEFINER**
+- `get_workspace_role` **SECURITY DEFINER**
+- `grant_pin_operation_authorization` **SECURITY DEFINER**
+- `handle_extension_approval_change` **SECURITY DEFINER**
+- `handle_new_user` **SECURITY DEFINER**
+- `has_workspace_role` **SECURITY DEFINER**
+- `hash_file_encryption_key` **SECURITY DEFINER**
+- `increment_embed_view` **SECURITY DEFINER**
+- `increment_pin_attempts` **SECURITY DEFINER**
+- `increment_provider_storage_used` **SECURITY DEFINER**
+- `increment_share_download` **SECURITY DEFINER**
+- `increment_share_view` **SECURITY DEFINER**
+- `is_admin` **SECURITY DEFINER**
+- `is_archive_file` 
+- `is_premium_user` **SECURITY DEFINER**
+- `kza_block_admin_ban` **SECURITY DEFINER**
+- `kza_check_country_block` **SECURITY DEFINER**
+- `kza_check_country_block` **SECURITY DEFINER**
+- `kza_check_geo_fence` **SECURITY DEFINER**
+- `kza_check_geo_velocity` **SECURITY DEFINER**
+- `kza_check_ip_rate_limit` **SECURITY DEFINER**
+- `kza_check_rate_limit` **SECURITY DEFINER**
+- `kza_cleanup_hardening_data` **SECURITY DEFINER**
+- `kza_heartbeat_check` **SECURITY DEFINER**
+- `kza_is_admin_user` **SECURITY DEFINER**
+- `kza_prel_clean_expired_sessions` **SECURITY DEFINER**
+- `kza_prel_generate_f2fa_seed` **SECURITY DEFINER**
+- `kza_prel_generate_f2fa_seed` **SECURITY DEFINER**
+- `kza_prel_hmac_verify` **SECURITY DEFINER**
+- `kza_prel_rotate_hmac_key` **SECURITY DEFINER**
+- `kza_prel_sign_token` **SECURITY DEFINER**
+- `kza_prel_verify_token` **SECURITY DEFINER**
+- `kza_validate_cip_version` **SECURITY DEFINER**
+- `kza_veil_decrypt_snapshot` **SECURITY DEFINER**
+- `kza_veil_delete_profile` **SECURITY DEFINER**
+- `kza_veil_encrypt_snapshot` **SECURITY DEFINER**
+- `kza_veil_export_profile` **SECURITY DEFINER**
+- `kza_veil_ip_hash` **SECURITY DEFINER**
+- `list_remote_progress` **SECURITY DEFINER**
+- `lock_pin` **SECURITY DEFINER**
+- `log_extension_event` **SECURITY DEFINER**
+- `log_key_access` **SECURITY DEFINER**
+- `log_playback_event` **SECURITY DEFINER**
+- `log_share_decrypt_attempt` **SECURITY DEFINER**
+- `log_share_event` **SECURITY DEFINER**
+- `log_upload_stats` 
+- `mark_app_startup_auth` **SECURITY DEFINER**
+- `move_to_trash` **SECURITY DEFINER**
+- `move_to_trash_secure` **SECURITY DEFINER**
+- `notify_playback_event` 
+- `notify_transcode_progress` 
+- `permanently_delete_file` 
+- `ping_webhook` **SECURITY DEFINER**
+- `queue_transcode_job` **SECURITY DEFINER**
+- `remove_file_from_collection` **SECURITY DEFINER**
+- `requires_pin_auth` **SECURITY DEFINER**
+- `reset_all_api_credits` **SECURITY DEFINER**
+- `reset_pin_attempts` **SECURITY DEFINER**
+- `restore_from_trash` **SECURITY DEFINER**
+- `revoke_embed_token` **SECURITY DEFINER**
+- `revoke_file_share` **SECURITY DEFINER**
+- `rotate_master_key` **SECURITY DEFINER**
+- `rotate_webhook_secret` **SECURITY DEFINER**
+- `save_book_metadata` **SECURITY DEFINER**
+- `save_reading_progress` **SECURITY DEFINER**
+- `save_remote_progress` **SECURITY DEFINER**
+- `search_entities_with_notes` **SECURITY DEFINER**
+- `spike_cleanup_old_rows` **SECURITY DEFINER**
+- `submit_file_request` **SECURITY DEFINER**
+- `sync_provider_storage_used` **SECURITY DEFINER**
+- `toggle_storage_provider_permission` **SECURITY DEFINER**
+- `update_account_health` 
+- `update_api_credits_updated_at` 
+- `update_embed_config` **SECURITY DEFINER**
+- `update_entity_note` **SECURITY DEFINER**
+- `update_extension_rating` **SECURITY DEFINER**
+- `update_game_preference` **SECURITY DEFINER**
+- `update_maintenance_schedules_updated_at` 
+- `update_master_keys_updated_at` 
+- `update_migration_updated_at_column` 
+- `update_passkey_last_used` 
+- `update_playback_resume` **SECURITY DEFINER**
+- `update_provider_health` **SECURITY DEFINER**
+- `update_repository_usage` 
+- `update_share_options` 
+- `update_squid_vault_updated_at` 
+- `update_supernode_stats` 
+- `update_support_refunds_updated_at` 
+- `update_system_settings_updated_at` 
+- `update_updated_at` 
+- `update_updated_at_column` 
+- `update_webhook` **SECURITY DEFINER**
+- `upsert_stream_session` **SECURITY DEFINER**
+- `upsert_workspace_presence` **SECURITY DEFINER**
+- `user_has_vault` **SECURITY DEFINER**
+- `verify_user_pin` **SECURITY DEFINER**
+- `verify_vault_password` **SECURITY DEFINER**
+- `workspace_role_rank` 
+
+## Buckets (10)
+
+- `apidoc` public=True
+- `avatars` public=True
+- `book-covers` public=True
+- `extension-manifests` public=True
+- `extensions` public=True
+- `files` public=False
+- `go-mod` public=True
+- `migration-zips` public=False
+- `premium` public=False
+- `squid-sites` public=True
+
+## RLS policies (288)
+
+- `8djcvk3222` / `Service role only access to 8djcvk3222` / ALL / {public}
+- `access_policies` / `Users can manage own access policies` / ALL / {public}
+- `account_changes` / `Users can insert their own account changes` / INSERT / {authenticated}
+- `account_changes` / `Users can view their own account changes` / SELECT / {public}
+- `account_health_logs` / `Users can insert own account health logs` / INSERT / {authenticated}
+- `account_health_logs` / `Users can view own account health logs` / SELECT / {authenticated}
+- `admin_access_logs` / `Admins can manage admin access logs` / ALL / {authenticated}
+- `admin_access_logs` / `No public access to admin logs` / ALL / {public}
+- `analytics_events` / `Users can insert own analytics events` / INSERT / {public}
+- `analytics_events` / `Users can view own analytics events` / SELECT / {public}
+- `api_admin_config` / `Admins can manage admin config` / ALL / {authenticated}
+- `api_admin_config` / `Anyone can read admin config` / SELECT / {authenticated}
+- `api_admin_config` / `Service role manages admin config` / ALL / {authenticated}
+- `api_credit_log` / `System can insert credit logs` / INSERT / {authenticated}
+- `api_credit_log` / `Users can view own credit logs` / SELECT / {authenticated}
+- `api_credits` / `Admins can manage all API credits` / ALL / {authenticated}
+- `api_credits` / `Service role manages credits` / ALL / {authenticated}
+- `api_credits` / `Users can view own credits` / SELECT / {authenticated}
+- `api_key_limits` / `Users can manage own key limits` / ALL / {authenticated}
+- `api_keys` / `Admins can manage all API keys` / ALL / {authenticated}
+- `api_keys` / `Users can create their own API keys` / INSERT / {public}
+- `api_keys` / `Users can delete their own API keys` / DELETE / {public}
+- `api_keys` / `Users can update their own API keys` / UPDATE / {public}
+- `api_keys` / `Users can view their own API keys` / SELECT / {public}
+- `api_operation_costs` / `Admins can update operation costs` / ALL / {authenticated}
+- `api_operation_costs` / `Anyone can read operation costs` / SELECT / {authenticated}
+- `api_operation_costs` / `Only service role modifies costs` / INSERT / {authenticated}
+- `api_request_logs` / `Admins can read all API request logs` / SELECT / {authenticated}
+- `api_request_logs` / `Users can insert their own API request logs` / INSERT / {authenticated}
+- `api_request_logs` / `Users can view their own API request logs` / SELECT / {public}
+- `archive_extractions` / `Users can delete own archive extractions` / DELETE / {authenticated}
+- `archive_extractions` / `Users can insert own archive extractions` / INSERT / {authenticated}
+- `archive_extractions` / `Users can update own archive extractions` / UPDATE / {authenticated}
+- `archive_extractions` / `Users can view own archive extractions` / SELECT / {authenticated}
+- `audit_logs` / `Users can insert own audit logs` / INSERT / {public}
+- `audit_logs` / `Users can view own audit logs` / SELECT / {public}
+- `beta_enrollments` / `Users can manage own beta enrollments` / ALL / {public}
+- `book_metadata` / `Users can manage own book metadata` / ALL / {authenticated}
+- `cli_authorizations` / `Service role full access CLI authorizations` / ALL / {service_role}
+- `cli_authorizations` / `Users can insert own CLI authorizations` / INSERT / {public}
+- `cli_authorizations` / `Users can read own CLI authorizations` / SELECT / {public}
+- `cli_authorizations` / `Users can update own CLI authorizations` / UPDATE / {public}
+- `cli_devices` / `Service role full access CLI devices` / ALL / {service_role}
+- `cli_devices` / `Users can delete own CLI devices` / DELETE / {public}
+- `cli_devices` / `Users can insert own CLI devices` / INSERT / {public}
+- `cli_devices` / `Users can read own CLI devices` / SELECT / {public}
+- `cli_devices` / `Users can update own CLI devices` / UPDATE / {public}
+- `downloads` / `Users can create their own downloads` / INSERT / {public}
+- `downloads` / `Users can delete their own downloads` / DELETE / {public}
+- `downloads` / `Users can update their own downloads` / UPDATE / {public}
+- `downloads` / `Users can view their own downloads` / SELECT / {public}
+- `embed_tokens` / `Users can manage their own embed tokens` / ALL / {authenticated}
+- `encrypted_keys` / `Users can manage own encrypted keys` / ALL / {public}
+- `entity_notes` / `Users can manage their own notes` / ALL / {authenticated}
+- `extension_analytics` / `Extension authors can view analytics for their extensions` / SELECT / {public}
+- `extension_analytics` / `Users can insert their own extension analytics` / INSERT / {authenticated}
+- `extension_approval_history` / `Admin can insert approval history` / INSERT / {authenticated}
+- `extension_approval_history` / `Admin can view all approval history` / SELECT / {authenticated}
+- `extension_ratings` / `Extension ratings are viewable by everyone` / SELECT / {public}
+- `extension_ratings` / `Users can delete their own ratings` / DELETE / {public}
+- `extension_ratings` / `Users can insert their own ratings` / INSERT / {public}
+- `extension_ratings` / `Users can update their own ratings` / UPDATE / {public}
+- `extensions` / `Admin can update extension approval` / UPDATE / {authenticated}
+- `extensions` / `Public extensions are viewable by everyone` / SELECT / {public}
+- `extensions` / `Users can delete their own extensions` / DELETE / {public}
+- `extensions` / `Users can insert their own extensions` / INSERT / {public}
+- `extensions` / `Users can update their own extensions` / UPDATE / {public}
+- `file_key_vault` / `file_key_vault owner all` / ALL / {authenticated}
+- `file_request_submissions` / `Anyone can insert submissions` / INSERT / {public}
+- `file_request_submissions` / `Owners can view submissions` / SELECT / {public}
+- `file_request_submissions` / `Users can view submissions for own file requests` / SELECT / {public}
+- `file_requests` / `Anyone can read active file requests by slug` / SELECT / {public}
+- `file_requests` / `Anyone can read active file_requests by slug` / SELECT / {public}
+- `file_requests` / `Users can CRUD own file_requests` / ALL / {public}
+- `file_requests` / `Users can manage own file requests` / ALL / {public}
+- `files` / `files_owner_delete` / DELETE / {authenticated}
+- `files` / `files_owner_insert` / INSERT / {authenticated}
+- `files` / `files_owner_select` / SELECT / {authenticated}
+- `files` / `files_owner_update` / UPDATE / {authenticated}
+- `folders` / `Allow public access to public folders` / SELECT / {public}
+- `folders` / `Owners can delete their folders` / DELETE / {public}
+- `folders` / `Owners can insert their folders` / INSERT / {public}
+- `folders` / `Owners can update their folders` / UPDATE / {public}
+- `folders` / `Owners can view their folders` / SELECT / {public}
+- `github_connections` / `Users can delete their own GitHub connections` / DELETE / {public}
+- `github_connections` / `Users can insert their own GitHub connections` / INSERT / {public}
+- `github_connections` / `Users can view their own GitHub connections` / SELECT / {public}
+- `installed_extensions` / `Users can install extensions` / INSERT / {public}
+- `installed_extensions` / `Users can uninstall their extensions` / DELETE / {public}
+- `installed_extensions` / `Users can update their installed extensions` / UPDATE / {public}
+- `installed_extensions` / `Users can view their installed extensions` / SELECT / {public}
+- `key_access_logs` / `Users can insert their own key access logs` / INSERT / {authenticated}
+- `key_access_logs` / `Users can view own key access logs` / SELECT / {public}
+- `kza_admin_incidents` / `Service role only access to kza_admin_incidents` / ALL / {public}
+- `kza_banned_entities` / `Service role only access to kza_banned_entities` / ALL / {public}
+- `kza_cip_versions` / `kza_cip_versions_service_role` / ALL / {service_role}
+- `kza_geo_events` / `kza_geo_events_service_role` / ALL / {service_role}
+- `kza_geo_fence` / `admin access to geo_fence` / ALL / {public}
+- `kza_geo_fence` / `service_role only — kza_geo_fence` / ALL / {public}
+- `kza_honeypot_hits` / `Service role only access to kza_honeypot_hits` / ALL / {public}
+- `kza_ip_reputation` / `Admins can manage ip reputation` / ALL / {authenticated}
+- `kza_ip_reputation` / `service_role only — kza_ip_reputation` / ALL / {public}
+- `kza_linked_accounts` / `Service role only access to kza_linked_accounts` / ALL / {public}
+- `kza_phantom_assets` / `Service role only access to kza_phantom_assets` / ALL / {public}
+- `kza_prel_f2fa_seeds` / `kza_prel_f2fa_seeds_service_role` / ALL / {service_role}
+- `kza_prel_registry` / `kza_prel_registry_service_role` / ALL / {service_role}
+- `kza_prel_sessions` / `kza_prel_sessions_service_role` / ALL / {service_role}
+- `kza_rate_buckets` / `kza_rate_buckets_service_role` / ALL / {service_role}
+- `kza_threat_events` / `Service role only access to kza_threat_events` / ALL / {public}
+- `kza_user_profiles` / `Service role only access to kza_user_profiles` / ALL / {public}
+- `login_sessions` / `Users can delete their own login sessions` / DELETE / {public}
+- `login_sessions` / `Users can insert their own login sessions` / INSERT / {public}
+- `login_sessions` / `Users can update their own login sessions` / UPDATE / {public}
+- `login_sessions` / `Users can view their own login sessions` / SELECT / {public}
+- `maintenance_mode` / `Admins can manage maintenance mode` / ALL / {public}
+- `maintenance_schedules` / `Admins can manage maintenance schedules` / ALL / {public}
+- `master_keys` / `Users can manage own master keys` / ALL / {public}
+- `media_playback_logs` / `Users can insert own playback logs` / INSERT / {public}
+- `media_playback_logs` / `Users can view own playback logs` / SELECT / {public}
+- `migration_jobs` / `Users can create their own migration jobs` / INSERT / {public}
+- `migration_jobs` / `Users can update their own migration jobs` / UPDATE / {public}
+- `migration_jobs` / `Users can view their own migration jobs` / SELECT / {public}
+- `migration_logs` / `Users can insert their own migration logs` / INSERT / {authenticated}
+- `migration_logs` / `Users can view their own migration logs` / SELECT / {public}
+- `payment_logs` / `Service role can insert payment logs` / INSERT / {authenticated}
+- `payment_logs` / `Service role can update payment logs` / UPDATE / {authenticated}
+- `payment_logs` / `Users can view their own payment logs` / SELECT / {authenticated}
+- `pdf_annotations` / `Users can manage own annotations` / ALL / {authenticated}
+- `pdf_bookmarks` / `Users can manage own bookmarks` / ALL / {authenticated}
+- `pdf_reading_progress` / `Users can manage own reading progress` / ALL / {authenticated}
+- `pdf_secure_urls` / `Users can manage their own PDF secure URLs` / ALL / {public}
+- `pdf_sessions` / `Users can manage own sessions` / ALL / {authenticated}
+- `pin_attempt_logs` / `Users can insert own PIN attempt logs` / INSERT / {authenticated}
+- `pin_attempt_logs` / `Users can view own PIN attempt logs` / SELECT / {authenticated}
+- `pin_operation_authorizations` / `Users can delete own pin operation authorizations` / DELETE / {authenticated}
+- `pin_operation_authorizations` / `Users can insert own pin operation authorizations` / INSERT / {authenticated}
+- `pin_operation_authorizations` / `Users can view own pin operation authorizations` / SELECT / {authenticated}
+- `plan_limits` / `Anyone can view plan limits` / SELECT / {authenticated}
+- `plan_limits` / `Only service role can insert plan limits` / INSERT / {authenticated}
+- `plan_limits` / `Only service role can update plan limits` / UPDATE / {authenticated}
+- `playback_resume` / `Users can manage own resume positions` / ALL / {public}
+- `profiles` / `Admins can read all profiles` / SELECT / {authenticated}
+- `profiles` / `Admins can update all profiles` / UPDATE / {authenticated}
+- `profiles` / `Users can insert own profile` / INSERT / {public}
+- `profiles` / `Users can read own profile` / SELECT / {public}
+- `profiles` / `Users can update own profile` / UPDATE / {public}
+- `profiles` / `Users can update own profile (restricted)` / UPDATE / {public}
+- `profiles` / `Users can update their own profile` / UPDATE / {public}
+- `profiles` / `Users can view own profile` / SELECT / {public}
+- `profiles` / `Users can view their own profile` / SELECT / {public}
+- `reading_progress` / `Users can manage own reading progress` / ALL / {authenticated}
+- `remote_reading_progress` / `Users manage own remote progress` / ALL / {authenticated}
+- `repositories` / `Admins can delete all repositories` / DELETE / {authenticated}
+- `repositories` / `Admins can read all repositories` / SELECT / {authenticated}
+- `repositories` / `Admins can update all repositories` / UPDATE / {authenticated}
+- `repositories` / `Users can create their own repositories` / INSERT / {public}
+- `repositories` / `Users can view their own repositories` / SELECT / {public}
+- `reviewers` / `Reviewers can view own profile` / SELECT / {public}
+- `sde_chunk_locators` / `Users manage own SDE locators` / ALL / {authenticated}
+- `sde_identity` / `Users can insert own SDE identity` / INSERT / {public}
+- `sde_identity` / `Users can read own SDE identity` / SELECT / {public}
+- `sde_identity` / `Users can update own SDE identity` / UPDATE / {public}
+- `sde_recall_tokens` / `Users can delete own recall tokens` / DELETE / {public}
+- `sde_recall_tokens` / `Users can insert own recall tokens` / INSERT / {public}
+- `sde_recall_tokens` / `Users can read own recall tokens` / SELECT / {public}
+- `security_events` / `Service role can manage security_events` / ALL / {service_role}
+- `security_events` / `Users can insert own security events` / INSERT / {public}
+- `security_events` / `Users can view own security events` / SELECT / {public}
+- `share_audit_logs` / `Owners can view own share audit logs` / SELECT / {authenticated}
+- `share_audit_logs` / `Public can insert share audit logs` / INSERT / {anon,authenticated}
+- `share_collection_files` / `Users can delete own share collection files` / DELETE / {authenticated}
+- `share_collection_files` / `Users can insert own share collection files` / INSERT / {authenticated}
+- `share_collection_files` / `Users can view own share collection files` / SELECT / {authenticated}
+- `share_collections` / `Users can delete own share collections` / DELETE / {authenticated}
+- `share_collections` / `Users can insert own share collections` / INSERT / {authenticated}
+- `share_collections` / `Users can update own share collections` / UPDATE / {authenticated}
+- `share_collections` / `Users can view own share collections` / SELECT / {authenticated}
+- `share_decrypt_logs` / `Anyone can insert decrypt logs` / INSERT / {public}
+- `share_decrypt_logs` / `Share owners can view decrypt logs` / SELECT / {public}
+- `shares` / `shares_owner_select` / SELECT / {authenticated}
+- `shares` / `shares_owner_write` / ALL / {authenticated}
+- `signals` / `signals_delete_own` / DELETE / {public}
+- `signals` / `signals_select_own` / SELECT / {public}
+- `signals` / `signals_update_own` / UPDATE / {public}
+- `site_publications` / `Anyone can view public sites` / SELECT / {anon,authenticated}
+- `site_publications` / `Users can create own publications` / INSERT / {authenticated}
+- `site_publications` / `Users can delete own publications` / DELETE / {authenticated}
+- `site_publications` / `Users can update own publications` / UPDATE / {authenticated}
+- `site_publications` / `Users can view own publications` / SELECT / {authenticated}
+- `squid_run_jobs` / `Users can manage own run jobs` / ALL / {authenticated}
+- `squid_run_steps` / `Users can manage own run steps` / ALL / {authenticated}
+- `squid_script_runs` / `Users can manage own runs` / ALL / {authenticated}
+- `squid_script_triggers` / `Users can manage own triggers` / ALL / {authenticated}
+- `squid_scripts` / `Users can manage own scripts` / ALL / {authenticated}
+- `squid_vault_secrets` / `Users can manage own vault secrets` / ALL / {authenticated}
+- `squid_vaults` / `Users can create their own vault` / INSERT / {public}
+- `squid_vaults` / `Users can delete their own vault` / DELETE / {public}
+- `squid_vaults` / `Users can update their own vault` / UPDATE / {public}
+- `squid_vaults` / `Users can view their own vault` / SELECT / {public}
+- `squidcdn_files` / `Public can read active CDN files` / SELECT / {anon}
+- `squidcdn_files` / `Users can manage own CDN files` / ALL / {authenticated}
+- `squidcloud_b2_buckets` / `Admins can delete squidcloud buckets` / DELETE / {authenticated}
+- `squidcloud_b2_buckets` / `Admins can insert squidcloud buckets` / INSERT / {authenticated}
+- `squidcloud_b2_buckets` / `Admins can update squidcloud buckets` / UPDATE / {authenticated}
+- `squidcloud_b2_buckets` / `Admins can view squidcloud buckets` / SELECT / {authenticated}
+- `squidveil_audit_log` / `service_role_all_audit` / ALL / {public}
+- `squidveil_refs` / `service_role_all_refs` / ALL / {public}
+- `squidveil_sessions` / `service_role_all_sessions` / ALL / {public}
+- `storage_providers` / `Users can create own storage providers` / INSERT / {public}
+- `storage_providers` / `Users can delete own storage providers` / DELETE / {public}
+- `storage_providers` / `Users can manage their own storage providers` / ALL / {public}
+- `storage_providers` / `Users can update own storage providers` / UPDATE / {public}
+- `storage_providers` / `Users can view own storage providers` / SELECT / {public}
+- `subscription_events` / `Admins can read all subscription events` / SELECT / {authenticated}
+- `subscription_events` / `Service role can insert subscription events` / INSERT / {authenticated}
+- `subscription_events` / `Users can view their own subscription events` / SELECT / {authenticated}
+- `subscription_notifications` / `Service role can manage notifications` / ALL / {authenticated}
+- `subscription_notifications` / `Service role manages notifications` / ALL / {public}
+- `subscription_notifications` / `Users can view own notifications` / SELECT / {authenticated}
+- `subscription_notifications` / `Users update own notifications` / UPDATE / {public}
+- `subscription_notifications` / `Users view own notifications` / SELECT / {public}
+- `subscriptions` / `Anyone can view subscriptions` / SELECT / {public}
+- `support_activity_log` / `Reviewers can manage all activity logs` / ALL / {public}
+- `support_activity_log` / `Users can view own ticket activity` / SELECT / {public}
+- `support_messages` / `Admins can manage all support messages` / ALL / {authenticated}
+- `support_messages` / `Reviewers can manage all support messages` / ALL / {public}
+- `support_messages` / `Users can insert messages for their tickets` / INSERT / {public}
+- `support_messages` / `Users can view messages for their tickets` / SELECT / {public}
+- `support_refunds` / `Reviewers can manage all refunds` / ALL / {public}
+- `support_refunds` / `Users can view own refunds` / SELECT / {public}
+- `support_tickets` / `Admins can manage all support tickets` / ALL / {authenticated}
+- `support_tickets` / `Reviewers can manage all support tickets` / ALL / {public}
+- `support_tickets` / `Users can insert their own tickets` / INSERT / {public}
+- `support_tickets` / `Users can update their own tickets` / UPDATE / {public}
+- `support_tickets` / `Users can view their own tickets` / SELECT / {public}
+- `system_config` / `service_role access` / ALL / {service_role}
+- `system_settings` / `Admins can read system settings` / SELECT / {authenticated}
+- `system_settings` / `Admins can update system settings` / ALL / {authenticated}
+- `system_settings` / `Anyone can read maintenance mode` / SELECT / {anon,authenticated}
+- `threat_alerts` / `Users can insert their own threat alerts` / INSERT / {authenticated}
+- `threat_alerts` / `Users can view threat alerts` / SELECT / {public}
+- `transcode_jobs` / `Users can create own transcode jobs` / INSERT / {public}
+- `transcode_jobs` / `Users can update own transcode jobs` / UPDATE / {public}
+- `transcode_jobs` / `Users can view own transcode jobs` / SELECT / {public}
+- `upload_sessions` / `Admins can manage upload sessions` / ALL / {authenticated}
+- `upload_stats` / `Users can view their own upload stats` / SELECT / {public}
+- `user_encryption_settings` / `Users can manage own encryption settings` / ALL / {public}
+- `user_notification_prefs` / `Service role can manage notification prefs` / ALL / {authenticated}
+- `user_notification_prefs` / `Service role reads prefs` / SELECT / {public}
+- `user_notification_prefs` / `Users can update own notification prefs` / UPDATE / {authenticated}
+- `user_notification_prefs` / `Users can view own notification prefs` / SELECT / {authenticated}
+- `user_notification_prefs` / `Users manage own notification prefs` / ALL / {public}
+- `user_passkeys` / `Users can delete their own passkeys` / DELETE / {public}
+- `user_passkeys` / `Users can insert their own passkeys` / INSERT / {public}
+- `user_passkeys` / `Users can update their own passkeys` / UPDATE / {public}
+- `user_passkeys` / `Users can view their own passkeys` / SELECT / {public}
+- `user_preferences` / `Users manage own preferences` / ALL / {public}
+- `user_redeem_codes` / `Users can read own redeem code claims` / SELECT / {authenticated}
+- `user_security_settings` / `Users can insert own security settings` / INSERT / {authenticated}
+- `user_security_settings` / `Users can update own security settings` / UPDATE / {authenticated}
+- `user_security_settings` / `Users can view own security settings` / SELECT / {authenticated}
+- `user_storage_preferences` / `Users can update own preferences` / UPDATE / {public}
+- `user_storage_preferences` / `Users can upsert own preferences` / INSERT / {public}
+- `user_storage_preferences` / `Users can view own preferences` / SELECT / {public}
+- `user_subscriptions` / `Users can view their subscriptions` / SELECT / {public}
+- `user_terms_acceptance` / `Users can insert their own terms acceptance` / INSERT / {public}
+- `user_terms_acceptance` / `Users can update their own terms acceptance` / UPDATE / {public}
+- `user_terms_acceptance` / `Users can view their own terms acceptance` / SELECT / {public}
+- `vault_files` / `Users can manage own vault files` / ALL / {public}
+- `vaults` / `Users can manage own vaults` / ALL / {public}
+- `video_processing_queue` / `Users can create own processing jobs` / INSERT / {public}
+- `video_processing_queue` / `Users can view own processing jobs` / SELECT / {public}
+- `video_quality_metrics` / `Users can access own quality metrics` / SELECT / {public}
+- `video_quality_metrics` / `Users can insert own quality metrics` / INSERT / {public}
+- `video_stream_sessions` / `Users can manage own stream sessions` / ALL / {public}
+- `webhook_events_log` / `Users can view their own webhook event logs` / SELECT / {authenticated}
+- `webhooks` / `Users can manage their own webhooks` / ALL / {authenticated}
+- `workspace_invites` / `Workspace owners manage invites` / ALL / {public}
+- `workspace_members` / `Workspace owners manage members` / ALL / {public}
+- `workspace_presence` / `Workspace owners manage presence` / ALL / {public}
+- `workspaces` / `Owners can delete their workspaces` / DELETE / {public}
+- `workspaces` / `Owners can update their workspaces` / UPDATE / {public}
+- `workspaces` / `Owners can view their workspaces` / SELECT / {public}
+- `workspaces` / `Users can create workspaces` / INSERT / {public}
+- `zk_devices` / `zk_devices_owner` / ALL / {authenticated}
+- `zk_files` / `zk_files_owner` / ALL / {authenticated}
+- `zk_ktl` / `zk_ktl_owner` / SELECT / {authenticated}
+- `zk_vaults` / `zk_vaults_owner` / ALL / {authenticated}

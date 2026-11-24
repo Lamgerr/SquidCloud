@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const encoder = new TextEncoder();
 const DECODER = new TextDecoder();
-const TOKEN = "provider-backfill-2026-08-05-v1";
+// SECURITY: never hardcode privileged tokens. Set PROVIDER_BACKFILL_TOKEN as a Supabase secret.
+const TOKEN = Deno.env.get("PROVIDER_BACKFILL_TOKEN") || "";
 
 function fromHex(hex: string): Uint8Array {
   const out = new Uint8Array(hex.length / 2);
@@ -49,7 +50,7 @@ async function wrapProviderCreds(serviceKey: string, plaintext: string): Promise
 
 serve(async (req) => {
   const token = req.headers.get("x-backfill-token");
-  if (token !== TOKEN) {
+  if (!TOKEN || token !== TOKEN) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },

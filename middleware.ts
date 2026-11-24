@@ -1,5 +1,6 @@
-const SUPABASE_URL = 'https://aouqcwbdoyrccjcrhzzi.supabase.co';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvdXFjd2Jkb3lyY2NqY3JoenppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NjAyMTEsImV4cCI6MjA1ODUzNjIxMX0.b_VHC6uP3Efw3o_yibCoZKmsCIVZgOJ4FUF1NK-nd7U';
+// Config comes from environment at build/deploy time — no project-specific hardcoded keys.
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 
 const BLOCK_PAGE_CSS = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#060607;color:#e6edf3;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}.card{max-width:480px;width:100%;text-align:center}.icon{width:64px;height:64px;margin:0 auto 24px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);border-radius:50%;display:flex;align-items:center;justify-content:center}.icon svg{width:32px;height:32px;color:#f85149}h1{font-size:24px;font-weight:700;margin-bottom:10px;letter-spacing:-.02em}.subtitle{font-size:14px;color:#8b949e;line-height:1.6;margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto}.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;margin-bottom:20px}.badge.blocked{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);color:#f85149}.info-box{background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:20px;margin-bottom:24px;text-align:left}.info-box h3{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#484f58;margin-bottom:12px;font-weight:600}.info-box ul{list-style:none;padding:0}.info-box li{font-size:13px;color:#8b949e;padding:6px 0;display:flex;align-items:flex-start;gap:8px;line-height:1.5}.info-box li::before{content:'';width:4px;height:4px;border-radius:50%;background:#30363d;margin-top:7px;flex-shrink:0}.meta{font-size:11px;color:#484f58;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:24px}.meta span{padding:4px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;font-family:monospace}.contact{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#0d1117;border:1px solid #21262d;border-radius:8px;color:#58a6ff;font-size:13px;text-decoration:none;transition:all .15s}.contact:hover{background:#161b22;border-color:#30363d}.contact svg{width:14px;height:14px}`;
 
@@ -86,6 +87,7 @@ export default async function middleware(request: Request): Promise<Response | u
     return cached.blocked ? blockPage(ip, country, cached.reason) : undefined;
   }
 
+  if (!SUPABASE_URL || !ANON_KEY) return undefined; // no config → skip country check
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/rpc/kza_check_country_block`,

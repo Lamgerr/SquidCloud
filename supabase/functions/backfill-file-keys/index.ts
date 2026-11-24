@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const TOKEN = "backfill-2026-08-04-kza-v1";
+// SECURITY: never hardcode privileged tokens. Set BACKFILL_TOKEN as a Supabase secret.
+const TOKEN = Deno.env.get("BACKFILL_TOKEN") || "";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -75,7 +76,7 @@ serve(async (req) => {
   try {
     body = await req.json();
   } catch { /* ignore */ }
-  if (body.token !== TOKEN) {
+  if (!TOKEN || body.token !== TOKEN) {
     return new Response(JSON.stringify({ success: false, error: 'invalid token' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },

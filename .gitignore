@@ -27,3 +27,6 @@ l0g.txt
 *.backup
 *.disabled.*
 *-bkp*
+
+# Supabase local CLI state (project ref / metadata — not source)
+supabase/.temp/
