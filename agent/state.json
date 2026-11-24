@@ -19,7 +19,8 @@
     "2026-11-24: User asked for iCloud/Drive seamlessness with secret-service-level invisible protection. Added \u00a718 Principal and Protection Detail principle: zero routine security UI, background protection while locked, advance verification, step-forward only on specific anomalies, risk engine with no fail-open, UX tests, and removed tier choice from onboarding (tiers now internal policy).",
     "2026-11-24: User demanded extreme ZK/no admin decryption. Found and closed two gaps: removed memorable recovery-passphrase envelope (offline brute-force by admin with DB); specified social-recovery shares encrypted to recipient device public keys with server holding only envelopes+commitments. Added \u00a719 with 10 CI-enforced invariants, rejected features list, and explicit residual truth.",
     "2026-11-24: User demanded preview-modal security and closure of 8 residual risks. Audited EnhancedInstantPreviewModal: decrypts in main thread, holds plaintext in module decryptedBlobCache + decodedBlob + blob URLs in app origin, markdown dangerouslySetInnerHTML. Wrote companion spec v10: sealed preview (decrypt/render inside sandboxed preview origin worker, app gets only bitmaps + opaque per-file render tokens), viewer-by-viewer plan, concrete mitigations for all 8 concerns, preview-specific verification, zero UX change.",
-    "2026-11-24: User demanded extremely hardened Supabase backend. Wrote companion spec v11: privilege revocation/default privileges, role separation, function inventory (160 definer defs, 88 functions), RLS rules + CI checks, private storage with signed URLs, auth/MFA, edge function auth inventory, secrets/private networking/mTLS, pgaudit detection, backup rules, 7-point CI enforcement."
+    "2026-11-24: User demanded extremely hardened Supabase backend. Wrote companion spec v11: privilege revocation/default privileges, role separation, function inventory (160 definer defs, 88 functions), RLS rules + CI checks, private storage with signed URLs, auth/MFA, edge function auth inventory, secrets/private networking/mTLS, pgaudit detection, backup rules, 7-point CI enforcement.",
+    "2026-11-24: User asked to merge all hardening plans. Merged web isolation (\u00a716), sealed preview (\u00a720) and Supabase hardening (\u00a721) into the canonical full-e2e spec as a single v12 document (959 lines); rewrote master implementation priority with backend + sealed preview first; marked the three standalone specs SUPERSEDED."
   ],
   "key_numbers": {
     "audits": 2,
@@ -27,11 +28,11 @@
     "high_findings": 4,
     "code_changes": 0,
     "design_doc": "docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md",
-    "canonical_design": "docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md"
+    "canonical_design": "docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md (v12, 959 lines)"
   },
   "blockers": [
     "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
     "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Await approval of v11 specs; recommend backend hardening ships as Phase 0."
+  "next": "Await approval of the single v12 plan; then invoke writing-plans."
 }

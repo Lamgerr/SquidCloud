@@ -1,3 +1,9 @@
+# 2026-11-24-web-isolation-design.md (SUPERSEDED)
+
+This document has been **merged into** the single canonical security design:
+`docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md` (v12).
+Content preserved below for history only.
+
 # SquidCloud Web Isolation System — Design (SUPERSEDED)
 
 This document has been **merged into** the single canonical security design:

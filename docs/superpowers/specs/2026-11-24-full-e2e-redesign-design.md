@@ -1,8 +1,8 @@
 # SquidCloud: Wallet-Style Keys, iCloud-Style UX — Design
 
 Date: 2026-11-24
-Status: DRAFT v11 — EXTREME ZERO-KNOWLEDGE + SEALED PREVIEW + BACKEND HARDENING (awaiting approval; no code written)
-Supersedes: v1–v6 and `2026-11-24-web-isolation-design.md` (merged into §16). Single canonical security design. §17 adds key transparency, forward secrecy, crypto-shredding and supply-chain hardening; §18 makes protection silent and automatic (the "Principal and Protection Detail" rule); §19 defines hard zero-knowledge invariants enforced by CI; `2026-11-24-preview-and-residual-hardening.md` covers the sealed preview modal; `2026-11-24-supabase-hardening.md` covers the extreme backend hardening.
+Status: FINAL MERGED DRAFT v12 — single canonical security design (awaiting approval; no code written)
+Supersedes ALL earlier security specs: v1–v11, `2026-11-24-web-isolation-design.md` (§16), `2026-11-24-preview-and-residual-hardening.md` (§20) and `2026-11-24-supabase-hardening.md` (§21). This is the single canonical security design.
 
 ## 1. Intent
 
@@ -591,17 +591,18 @@ Rules that keep it invisible:
 
 ## 17.10 Updated implementation priority (governed by §18: zero-friction rule)
 
-1. Phase 0 containment (§9) — close live critical exposure.
-2. Crypto core: MK, per-file salts, AAD, transparency log (§§2, 5, 17.1) + third-party review.
-3. BFF + session/cookie + code integrity (§§7, 15.2, 15.3, 17.6).
-4. Web isolation (§16) before any decrypted content is rendered.
-5. Device lifecycle + recovery + ratchet (§§3, 10a, 17.2, 17.8).
-6. Sharing (§8).
-7. Legacy migration (§4).
-8. Duress/travel + security tiers (§§17.3, 17.4) — opt-in, no UX change by default; Balanced tier is default.
-9. Detection, canaries, bug bounty, runbooks (§15.7).
-10. Native hardened client (§16.8).
-11. Other clients and workspaces (§11).
+1. **Backend hardening + Phase 0 containment (§21, §9)** — close live critical exposure first.
+2. **Sealed preview modal (§20)** — stop plaintext/keys leaking through previews immediately.
+3. Crypto core: MK, per-file salts, AAD, transparency log (§§2, 5, 17.1) + third-party review.
+4. BFF + session/cookie + code integrity (§§7, 15.2, 15.3, 17.6, 21.8).
+5. Web isolation (§16) before any decrypted content is rendered outside the sealed preview.
+6. Device lifecycle + recovery + ratchet (§§3, 10a, 17.2, 17.8).
+7. Sharing (§8).
+8. Legacy migration (§4).
+9. Duress/travel + security tiers (§§17.3, 17.4) — opt-in, invisible by default.
+10. Detection, canaries, bug bounty, runbooks (§15.7, §21.10).
+11. Native hardened client (§16.8).
+12. Other clients and workspaces (§11).
 
 Every step above must satisfy §18: no routine security UI; background protection; prompts only on specific anomalies.
 
@@ -696,3 +697,264 @@ This principle supersedes the earlier "one-time tier choice at vault creation" i
 ## 19.5 Residual truth
 
 Even with all of this: XSS on an unlocked device, a compromised build pipeline, a host-permission browser extension, OS-level malware, physical coercion, or loss of the phrase still defeat or endanger the guarantee. Those are listed in §17.9. Nothing in software removes them; the plan minimizes and, where possible, makes them detectable.
+
+---
+
+# 20. Sealed Preview Modal + Residual Risk Closure
+
+## 20.1. The problem in the preview modal today
+
+`EnhancedInstantPreviewModal.tsx` currently does the wrong thing for a zero-knowledge product:
+
+- Decryption happens in the **main thread** (`downloadFilePreview` / `smartDownload`, lines 148–182).
+- Plaintext lives in a **module-level `decryptedBlobCache`** keyed by file id (line 32) and in React state (`decodedBlob`).
+- `URL.createObjectURL(blob)` creates **blob URLs in the main origin** (lines 159, 172) — readable by any script in the page, including an injected extension content script.
+- Viewers (PDF, image, video, markdown, spreadsheet) render that plaintext **inside the app origin**, so XSS or an extension can read pixels, text, or the blob itself.
+- The markdown path uses a blocklist sanitizer + `dangerouslySetInnerHTML` — a direct script-injection path into the origin that holds keys.
+
+Net result: if an attacker gets script execution in the app tab (or a host-permission extension), every decrypted file is theirs. That is exactly what you do not want.
+
+## 20.2. Target architecture: the preview is a sealed room
+
+```
+app origin (keys, worker)
+   |  postMessage: { sealed blob handle, render token, ephemeral key }
+   v
+preview origin (sandboxed iframe, opaque origin)
+   |  decrypt inside the frame's own worker, render to canvas
+   v
+pixels only -> transferred canvas / compositor to app UI
+```
+
+Rules:
+1. **No plaintext, keys, or blob URLs ever exist in the app origin's DOM, window, module state, or React tree.**
+2. Decryption and rendering happen **inside the sandboxed preview origin** (§16.4), in that frame's own crypto worker.
+3. The app sends only: ciphertext (or a stream handle), the per-file salt, an ephemeral one-time render key, and a short-lived render token. The ephemeral key is generated per preview and never reused.
+4. The frame returns **only rendered output** (a `Transferable` `ImageBitmap`/canvas handle or video frame), never the underlying bytes. The app composes it into the UI.
+5. The preview iframe is destroyed and its memory/state discarded when the modal closes. No `decryptedBlobCache` in the app; if caching is needed, keep **encrypted** cache only, in the preview origin.
+6. `decodedBlob`, `blobUrl`, and `decryptedBlobCache` are removed from the modal entirely. The "download" action is a separate, explicit, step-up-gated operation that streams plaintext to a user-initiated save — it never populates a shared cache.
+
+## 20.3. Key exposure in the modal — eliminated
+
+- The modal **never receives MK or FK**. It holds an opaque `renderToken` issued by the crypto worker after the user's session unlock.
+- The render token is scoped to one file, one operation, and a short TTL (seconds). It cannot be replayed to decrypt another file.
+- The worker enforces that a token is bound to the file id and the specific preview origin; a forged `postMessage` from another tab or frame is rejected by origin check + token binding.
+- The ephemeral key used to hand ciphertext to the preview frame is generated in the worker, used once, and destroyed. An extension reading the app's JS heap sees no persistent key.
+
+## 20.4. Viewer-by-viewer plan
+
+| Viewer | Today | After |
+|---|---|---|
+| Text / Markdown | Blob in app, `dangerouslySetInnerHTML` | Rendered in preview frame; DOMPurify inside sandbox; plain text to canvas/DOM in frame only |
+| Image | `blobUrl` in app | Decoded in preview worker, drawn to canvas, transferred bitmap to app |
+| PDF | Blob + worker in app origin | PDF.js runs entirely in preview origin with its own worker; pages painted to canvas there |
+| Video / Audio | `blobUrl` fed to `<video>` in app | Media Source Extensions fed inside preview frame; no blob URL in app origin |
+| EPUB | `DeepReadReader` in app | Moved to preview origin; same sandboxed rules as PDF |
+| Spreadsheet / font / model / archive | Blob in app | Same sealed-frame pattern; each viewer gets its own disposable frame |
+
+Download/share actions stay in the app origin but are **explicit user actions requiring step-up**; they never create a plaintext cache entry.
+
+## 20.5. Closing the eight residual concerns
+
+### 5.1 XSS in an unlocked tab
+- **Cause today:** decrypted content and blob URLs live in the app origin; markdown uses a weak sanitizer.
+- **Fix:** sealed preview (§2–4) means XSS in the app origin finds no plaintext and no keys — only rendered bitmaps and opaque tokens. DOMPurify + strict CSP + Trusted Types remain as defense in depth. The crypto worker is the only key holder; tokens are short-lived and per-file.
+- **Remaining:** XSS can still ask the worker to decrypt *the currently open file* while the user is looking at it, if it can guess the token — token binding to a user gesture + preview-origin message channel prevents this. Residual is reduced to the single file already on screen, not the whole vault.
+
+### 5.2 Compromised build pipeline
+- Signed reproducible builds, SRI, isolated immutable asset origin, independent witnesses (§17.6).
+- **Added:** release artifacts are verified in the client before first decrypt; a hash mismatch locks the vault and refuses to render. A malicious build cannot silently start harvesting keys.
+
+### 5.3 Browser extensions / OS malware
+- Web cannot stop them (§16.8). **New mitigations that reduce value even if present:**
+  - No keys or plaintext in the app origin heap/DOM — an extension's content script sees only rendered pixels and opaque tokens.
+  - Keys live in non-extractable WebCrypto objects inside a dedicated worker; extensions cannot call `exportKey`.
+  - Maximum tier requires per-decrypt hardware assertion; OS malware without the hardware can't decrypt.
+  - Native client remains the only complete answer for this threat class.
+
+### 5.4 Physical coercion
+- Duress code opens a decoy vault; travel mode strips wrapped-MK blobs (§17.4).
+- **Added:** automatic sensitive-action lock — after a duress unlock, real vault writes are silently disabled and only decoy data is shown, while alerts go to contacts.
+
+### 5.5 Losing phrase and quorum
+- Unchanged and unavoidable: no backdoor (§19). Onboarding states it plainly. Social recovery + safety numbers are the mitigation.
+
+### 5.6 Metadata
+- Fixed-size blocks, constant-rate heartbeats, batched fetches, coarse timestamps, no IP persistence (§17.5).
+- **Added:** preview access does not reveal the exact file to the server beyond the ciphertext request already required; filenames are decrypted only in the preview frame.
+
+### 5.7 Legacy files server-recoverable
+- Migration is background, Wi-Fi-first, silent (§4). **Added:** the legacy KEK path is firewalled to a single audited endpoint, callable only during an active, step-up-authenticated migration session; after the sunset window it is removed and CI asserts no such code path exists.
+
+### 5.8 Old ciphertext + salt retained by server
+- Deletion destroys every salt copy and produces a witnessed receipt in the KTL (§17.1). **Added:** periodic background audit re-fetches all "deleted" file ids from the user's KTL and asserts no corresponding salt remains; a mismatch triggers an alert and automatic re-shred request. A DB snapshot taken before deletion plus a later MK compromise remains the theoretical edge; documented, and mitigated by epoch ratchet (§17.2) which destroys old MK epochs.
+
+## 20.6. Verification specific to preview
+
+- Automated test: after any preview, assert no `blob:` URL, no `decodedBlob`, and no plaintext string exists in the app origin's DOM, window globals, or module state.
+- Malicious-extension simulation: content script injected into app tab cannot read keys, plaintext, or blob bytes; only sees a canvas handle.
+- Forged `postMessage` from another tab/frame to the crypto worker is rejected.
+- Token replay to decrypt a second file fails.
+- Markdown XSS payloads render as text inside the sandbox with no script execution.
+- Modal close destroys the frame and zeroizes the ephemeral key; no cache residue.
+
+## 20.7. UX contract
+
+Zero change. The user sees the same full-screen preview with the floating dock. All sealing, token issuance and rendering happen behind the scenes. File open latency must not regress — the sealed frame is pre-warmed while the modal animates in.
+
+## 20.8. Decision for the human
+
+Should the sealed-preview rewrite ship as part of the main E2E rollout, or as an immediate standalone hardening pass before the rest? My recommendation: **immediate standalone pass** — it closes the most reachable leak (any preview of any file) without waiting for the full vault migration.
+
+
+---
+
+# 21. Extreme Supabase Backend Hardening
+
+## 21.1. Scope and goal
+
+The backend must be hardened to the point where **compromising any single backend component yields no user plaintext and no usable key**, and where an administrator with full SQL access still cannot decrypt user data. This spec covers Postgres/RLS/functions, storage, auth, edge functions, secrets, network, audit, and CI enforcement.
+
+Current exposure that motivated this: ~88 edge functions (many with `verify_jwt = false` in `supabase/config.toml`), ~160 `SECURITY DEFINER` definitions in the baseline migration, permissive share/file policies, a public `files` bucket, an anon-callable vault-secret reader, and token-signing primitives executable by `anon`.
+
+## 21.2. Hardening layers at a glance
+
+| Layer | Goal | User-visible? |
+|---|---|---|
+| Postgres roles/grants | Least privilege; no PUBLIC/anonEXECUTE on sensitive objects | No |
+| RLS | One explicit policy per table; deny by default | No |
+| Functions | No SECURITY DEFINER for data paths; allow-listed columns | No |
+| Storage | Private buckets; signed short-lived URLs only | No — downloads still work |
+| Auth | MFA, short sessions, rate limits, no email-only admin | Login only |
+| Edge functions | Authenticate every caller; no service-role data reads | No |
+| Secrets/network | Rotated secrets, private DB, mTLS, egress allowlist | No |
+| Audit/detection | pgaudit, anomaly alerts, canaries | No |
+| CI enforcement | Automated assertions on grants/policies/responses | No |
+
+## 21.3. Postgres role and privilege model
+
+### 3.1 Revoke by default
+```
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
+```
+Then grant explicitly, per object, only what the application needs. No `GRANT ALL`, no broad `PUBLIC EXECUTE`.
+
+### 3.2 Role separation
+- `anon_gateway` — only the handful of functions needed for public share pages; no table privileges.
+- `authenticated_user` — table access only through RLS; no direct function execution on key/share/secret functions.
+- `bff_service` — narrow role used by the BFF's user-scoped JWT; can execute only allow-listed RPCs.
+- `admin_ops` — no SELECT on `files`, `shares`, `file_key_vault`, or any key table; used for operational maintenance only.
+- `service_role` — reserved for migrations and narrow admin operations; never used by data-plane functions that return file data.
+
+### 3.3 Function inventory
+Build a machine-readable manifest of all functions with: name, `prosecdef`, owner, grants, and whether it returns key/path/tag columns. CI fails on:
+- Any `SECURITY DEFINER` function owned by `postgres` executable by `anon`/`authenticated`.
+- Any function returning `encryption_key`, `wrapped_key`, `shared_encryption_key`, `storage_path`, tags, or chunk URLs to a non-service role.
+- `row_to_json(files)` or `SELECT *` from `files` in any function body.
+
+Target: reduce ~160 SECURITY DEFINER definitions to a short, reviewed allow-list (ideally zero on data paths).
+
+## 21.4. RLS policy model
+
+### 4.1 Rules
+- Every table in `public` has RLS enabled and **at least one explicit policy**; tables with no legitimate user access have zero policies (deny all).
+- `FORCE ROW LEVEL SECURITY` on all user-data tables.
+- One SELECT policy per role per table, no overlapping permissive policies that OR into broader access.
+- No `USING (true)` for `anon`/`authenticated`.
+- No policy based solely on `is_public = true` or `shared = true` granting full rows; share access goes through the audited gateway function.
+- `shares` and `files` policies owner-only; public recipients use the share gateway.
+- `github_connections`, `file_key_vault`, `master_keys`, `security_keyring`, `kza_prel_*` remain owner/service-only with no extra permissive policies.
+
+### 4.2 CI verification
+Query `pg_policies` and `information_schema.role_table_grants` on every deploy; fail if any policy matches forbidden patterns, or if any key-bearing table has a policy for `anon`/`authenticated`.
+
+## 21.5. Function hardening
+
+- Convert `get_shared_file_info`, `get_file_for_share`, `get_folder_share_contents`, `update_share_options` to `SECURITY INVOKER` with explicit allow-lists and password/quorum checks in the BFF.
+- Revoke `get_secret`, `kza_prel_sign_token`, `kza_prel_verify_token`, `kza_prel_rotate_hmac_key`, `create_file_record`, `exec_sql` from all non-service roles.
+- `search_path` pinned on every remaining SECURITY DEFINER function; no unqualified references.
+- No function accepts a user id from a caller and acts on it — identity from `auth.uid()` or the BFF session only.
+- Mandatory `security_barrier` views where filters must not leak via function pushdown.
+
+## 21.6. Storage hardening
+
+- `files` bucket `public = false`; all access via short-lived (≤60 s), user-bound signed URLs from the BFF.
+- No direct `/storage/v1/object/public/...` path for private data.
+- Object keys opaque; no user-supplied names in paths.
+- Separate buckets for ciphertext, previews, and exports with distinct policies.
+- Lifecycle rules: delete old temp artifacts; encrypted cache only.
+- Storage policies audited in CI: no public read on private buckets.
+
+## 21.7. Auth hardening
+
+- MFA required for accounts with sharing/admin capabilities; passkeys/WebAuthn preferred.
+- Short JWT expiry (≤1 h) with refresh token rotation; BFF holds refresh tokens in server-side session only.
+- Password policy: breach checks, rate limits, no password reuse, no password-derived keys (§19).
+- Signup/email verification required; no anonymous account creation for vault features.
+- Session invalidation on new-device approval, password change, or risk-engine escalation.
+- Admin actions require hardware-key MFA and a separate admin session, never the user session.
+
+## 21.8. Edge function hardening
+
+- Inventory all ~88 functions; classify each as public, user, admin, or internal.
+- Every function touching keys/shares/secrets must call `auth.getUser()` or validate a service token in code — `verify_jwt = false` is allowed only for genuinely public endpoints with their own strict validation (e.g. share gateway with verifier).
+- Service-role key used only in narrow functions that never return file rows or keys.
+- Egress allowlist per function; no arbitrary fetch from user-controlled URLs.
+- No secrets in source; all from env/vault with rotation runbooks.
+- Deploy pipeline signs artifacts; runtime verifies integrity (§17.6).
+- Remove or secure the hardcoded backfill token; audit `admin-data-access` authorization.
+
+## 21.9. Secrets and network
+
+- Rotate all secrets exposed by the anon-callable `get_secret` (past and present), the PREL HMAC key (invalidating tokens), hardcoded tokens, and anything in git history/HAR/keystore files.
+- Secrets stored in a managed vault with versioned rotation and short-lived credentials.
+- Supabase database **not publicly reachable**; BFF connects over private networking/mTLS.
+- IP allowlists on admin APIs; no SSH into production.
+- CAA records, HSTS preload, CT monitoring, TLS 1.3 only.
+
+## 21.10. Audit, detection, and response
+
+- `pgaudit` enabled for DDL and access to sensitive tables; logs shipped to a separate, append-only store.
+- Alerts: new SECURITY DEFINER function, broadened grant, policy change, failed auth spike, bulk share creation, recovery anomaly, service-role use outside allow-list.
+- Canary rows in sensitive tables; reading them triggers an alert.
+- Runbooks: DB role compromise, function privilege regression, secret leak, malicious admin, share-gateway abuse.
+- Quarterly external review and continuous bug bounty.
+
+## 21.11. Backup and recovery of the backend (not user vaults)
+
+- Encrypted backups with separate key custody; restore drills quarterly.
+- Backups never contain plaintext keys — enforced by column exclusion and a post-backup scan.
+- Point-in-time recovery tested; no admin can restore a "convenient" older key state because no keys exist server-side.
+
+## 21.12. CI enforcement (the real guarantee)
+
+A dedicated CI job runs on every migration/function change:
+1. Enumerate all `pg_proc` grants; fail on forbidden roles for sensitive functions.
+2. Enumerate all policies; fail on forbidden patterns.
+3. Enumerate all RPC/REST responses via schema introspection; fail on key/path/tag columns.
+4. Scan all function sources for `SECURITY DEFINER`, `row_to_json`, `SELECT *`, hard-coded tokens.
+5. Verify every bucket is private unless explicitly allow-listed.
+6. Verify no service-role credential appears in any function that returns user data.
+7. Verify `search_path` pinning on remaining definer functions.
+
+No migration merges without this job passing.
+
+## 21.13. Verification
+
+- Anon caller cannot execute any sensitive function (`has_function_privilege` asserts).
+- Authenticated user cannot enumerate shares or read another user's rows.
+- Share gateway returns metadata only; password/quorum verified before wrapped blob release.
+- Storage private; signed URLs expire and are user-bound.
+- Secrets rotate without downtime; old PREL tokens invalidated.
+- Audit alerts fire in test for each forbidden pattern.
+
+## 21.14. UX contract
+
+None of this changes the user experience. Sign in, unlock, files appear. Downloads work via signed URLs. The backend hardening is invisible.
+
+## 21.15. Decision for the human
+
+Should the backend hardening (§3–§12) ship as Phase 0 before the E2E crypto work? My recommendation: **yes** — it closes live critical exposure immediately and is independent of the key-model migration.

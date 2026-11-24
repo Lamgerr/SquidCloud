@@ -1,3 +1,9 @@
+# 2026-11-24-supabase-hardening.md (SUPERSEDED)
+
+This document has been **merged into** the single canonical security design:
+`docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md` (v12).
+Content preserved below for history only.
+
 # Extreme Supabase Backend Hardening (v11)
 
 Date: 2026-11-24
