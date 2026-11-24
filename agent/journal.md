@@ -1,3 +1,10 @@
+## 2026-11-24 - Integrate isolation into security plan (interactive query)
+- User: "integrate it into the previous security plan".
+- Merged `2026-11-24-web-isolation-design.md` into the canonical E2E design as section 16 with subsections 16.1-16.13 (origins, headers, sandbox, worker, storage, tabs, native fallback, DNS, verification, UX, risks, decision).
+- Updated cross-cutting sections so the plan is coherent: threat model gained other-tab/origin and extension/OS rows; hardening table gained Isolation + Native rows; detection gained CSP reports; residual risks gained extension/OS and preview-frame plaintext; verification gained §16.10 matrix; priority order now includes web isolation as step 4 before exposing decrypted content and native client as step 9; open decisions gained native timing.
+- Bumped status to v6 INTEGRATED; marked standalone isolation doc SUPERSEDED. Committed c906c41f.
+- Next: await approval, then invoke writing-plans.
+
 ## 2026-11-24 - Security review: keys + Supabase (read-only, interactive query)
 - User feared DB admins/attackers could obtain user files; proposed replacing direct Supabase calls with a server-side API layer and asked how to fix other findings.
 - Loaded systematic-debugging for the audit and brainstorming for the architecture discussion. Launched two background read-only subagents (client key handling; Supabase DB/functions) plus independent repo scan and CLI SQL checks.
