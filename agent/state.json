@@ -1,19 +1,23 @@
 {
-  "goal": "Redesign the EPUB reader to match the PDF viewer's UI/UX exactly, with EPUB-specific features.",
-  "goal_source": "interactive query from human ('do the same redesign with epub reader')",
+  "goal": "Restore legacy GitHub-repo file downloads and deprecate the user-facing Books/DeepRead section.",
+  "goal_source": "interactive query from human (404 on squidcloud-cluster legacy chunk downloads; deprecate deepread/books UI)",
   "last_actions": [
-    "2026-11-24: Audited DeepReadReader.tsx (old full-width header, slide-in panels, bottom progress bar, CSS skin) and OptimizedPDFViewer.tsx (grouped floating docks, dense neutral glass, JELLY/POP/SOFT springs).",
-    "Replaced only the render layer of DeepReadReader (logic above it untouched): top three grouped docks (contents/bookmarks/search, title+page, text size/settings/annotate/fullscreen/bookmark), bottom nav dock with scrubbable progress, floating sidebar island, glass settings popover (themes/typeface/line spacing), glass loading/error cards.",
-    "Added useReducedMotion import; kept EPUB engine, fetch, progress sync, bookmarks, search and annotation logic identical. PDF branch now renders OptimizedPDFViewer alone so docks do not overlap.",
-    "Updated docs/UI-UX-STANDARD.md; committed cd8189d3; Vercel READY."
+    "2026-11-24: Systematic debugging. Traced the failing payload to the legacy GitHub branch of squidcloud-cluster. Live CLI SQL showed the failing file dcd032b5 with repo dataMatrix_mczm2tm6_0 and accountId 1; chunks live under GitHub account LamGPT123, while the edge function used global GITHUB_USERNAME/GITHUB_TOKEN (and the DB github_connections username hellosquidcloud) — both returned 404.",
+    "Verified with the user-supplied token: api.github.com/user => LamGPT123, and the exact chunk URL returned HTTP 200 with that token (404 anonymously and with hellosquidcloud's token). Root cause confirmed.",
+    "Stored dedicated secrets LEGACY_STORAGE_GITHUB_TOKEN / LEGACY_STORAGE_GITHUB_USERNAME via supabase CLI (token not written to repo). Rewrote the legacy download branches in squidcloud-cluster and github-storage to try: dedicated storage account, requesting user's github_connections, indexed legacy accounts, all global accounts, then public access. Deployed both functions via CLI.",
+    "Deprecation: removed Books tab + catalog panels from Dashboard, removed standalone DeepReadReader mounts from Dashboard, FileCard, MobileEnhancedUI, ManageFileRequests and SharePage. Instant preview modal still renders DeepReadReader for EPUBs.",
+    "Verified no token string in repo, syntax balance; committed de2baf40; Vercel READY."
   ],
   "key_numbers": {
-    "commit": "cd8189d3",
-    "deploy_url": "https://cloudbliss-storage-8r1varhp8-sqc.vercel.app",
-    "deploy_state": "READY"
+    "commit": "de2baf40",
+    "deploy_url": "https://cloudbliss-storage-5yw6gy30f-sqc.vercel.app",
+    "deploy_state": "READY",
+    "edge_functions_deployed": ["squidcloud-cluster", "github-storage"],
+    "supabase_project": "aouqcwbdoyrccjcrhzzi"
   },
   "blockers": [
-    "No local tsc; Vercel cloud build authoritative (build passed)."
+    "No local tsc/deno; Vercel build and Supabase CLI deploy are authoritative.",
+    "End-to-end edge function invocation could not be run without the app's PREL token (function returned KZA_PREL_MISSING for an anonymous test); the underlying GitHub fetch is independently verified at HTTP 200."
   ],
-  "next": "Await visual verification of the EPUB docks, sidebar island and reading surface."
+  "next": "Have the human retry an old file in the app; if a specific repo still 404s, check which GitHub account owns it and add another credential or repo-owner mapping."
 }

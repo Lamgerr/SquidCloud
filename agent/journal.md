@@ -1,3 +1,12 @@
+## 2026-11-24 - Restore legacy GitHub downloads + deprecate Books UI (interactive query)
+- User reported old files (GitHub-repo buckets) 404ing at squidcloud-cluster with payload {action:download, nodeId:0, repo:dataMatrix_mczm2tm6_0, path:1dee.../res54_...json}. Also asked to deprecate DeepRead/Books sections; EPUBs should be read via preview modal.
+- Used the systematic-debugging process. Phase 1 evidence via Supabase CLI (`supabase db query --linked`): found file dcd032b5 (InflateOrbit.txt) with that exact chunk; chunks carry accountId 1 but no owner. github_connections for that user = hellosquidcloud. MCP Supabase tools were permission-denied for this project; CLI worked.
+- Phase 3 hypothesis: repos live under a different GitHub account. User supplied a token; verified /user => LamGPT123 and the exact chunk URL with that token => HTTP 200, while anon and hellosquidcloud token => 404. Root cause confirmed.
+- Phase 4 fix: set dedicated secrets LEGACY_STORAGE_GITHUB_TOKEN/USERNAME via CLI (never committed). Rewrote the legacy branch in both squidcloud-cluster and github-storage to try dedicated account -> user's github_connections -> indexed accounts -> all globals -> public, returning 404 only after all fail. Deployed both functions with `supabase functions deploy`.
+- Deprecation: removed Books tab/catalog from Dashboard (both mobile/desktop panels), removed standalone DeepReadReader mounts from Dashboard + FileCard + MobileEnhancedUI + ManageFileRequests + SharePage. Preview modal keeps its inline DeepReadReader for EPUBs.
+- Verified no token in repo, brace/paren/template balance; committed de2baf40; Vercel READY. Anonymous invoke of the function returned KZA_PREL_MISSING (expected — needs the app's PREL token), so the underlying GitHub 200 is the verification.
+- Next: human retries an old file; investigate any repo owned by another account.
+
 ## 2026-11-24 - EPUB reader redesign to match PDF viewer (interactive query)
 - User: "do the same redesign with epub reader, making them both exactly same but differs in features".
 - DeepReadReader had a full-width header bar, slide-in side panel and bottom progress bar, plus a CSS skin (RD_DOCK_CSS) trying to make them look docked. Replaced the entire render layer while leaving all logic (secure fetch, EpubEngine init, theme/font effects, TOC, bookmarks, search, remote progress, annotation) byte-identical.

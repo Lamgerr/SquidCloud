@@ -250,6 +250,9 @@ a full-height panel and not a capsule with a background behind it:
   audio, text/code, markdown, EPUB, spreadsheet, font, archive, 3D, generic fallback.
 - PDFs use `OptimizedPDFViewer.tsx` (the project's own viewer, reinstated after a
   Folio-based experiment proved worse in practice).
+- The standalone **Books / DeepRead section is deprecated** in the user-facing UI:
+  no Books tab or catalog, no standalone reader mounts elsewhere. EPUBs are read
+  inline in the instant preview modal (which still uses `DeepReadReader`).
 - EPUBs use `DeepReadReader.tsx` with the **same chrome as the PDF viewer**: three
   grouped floating docks at the top, a bottom navigation/progress dock, a floating
   sidebar island and glass popovers. EPUB-specific features (TOC, bookmarks, search,
