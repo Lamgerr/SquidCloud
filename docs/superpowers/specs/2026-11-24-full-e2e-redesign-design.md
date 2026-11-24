@@ -114,6 +114,61 @@ Trade-offs, stated honestly:
 - Auto-lock with biometric/PIN; explicit lock/offline/quota states.
 - Onboarding: losing every device and the phrase means permanent loss; server cannot recover.
 
+## 10a. Lost / broken device: account recovery vs vault recovery
+
+**Two separate locks — never conflate them in UI or copy:**
+
+| Lock | What it protects | How it is recovered |
+|---|---|---|
+| **Account** | Signing in to SquidCloud | Email/password reset, OAuth, or synced passkey. The server *can* reset this — it is not tied to file encryption. |
+| **Vault (MK)** | Decrypting files | Recovery phrase, an approved existing device, or social recovery shares. The server **cannot** reset this. |
+
+A user who loses a device must always be able to get back into the *account*. Whether they get their *files* back depends on which vault factors survive. The UI must say which lock is being recovered at each step, or users will think they are locked out when only the account needs resetting.
+
+### Recovery matrix
+
+| Situation | Result |
+|---|---|
+| Device lost, recovery phrase available | Restore phrase on new device → **full access immediately**, any file, on cellular. |
+| Device lost, another approved device available | Approve new device from existing one → **full access**, phrase never needed. |
+| Phone replaced but passkey was platform-synced (iCloud Keychain / Google Password Manager) | New device obtains the passkey; if PRF output is stable and a wrapped-MK blob exists for that credential, **silent unlock**. Platform support varies — never the only path. |
+| Device lost, phrase lost, trusted contacts enrolled | Social recovery (below) → **full access** after quorum. |
+| Device lost, phrase lost, no contacts | **Files are permanently unrecoverable.** Account can be reset and used as a new, empty vault. This is the iCloud-ADP-equivalent truth and must be stated in onboarding. |
+| Device stolen but still unlocked | Remote-revoke that device: delete its wrapped-MK blob, revoke sessions, trigger re-approval. Already-downloaded plaintext cannot be recalled. |
+| Server unavailable during restore | Phrase still derives MK, but ciphertext cannot be fetched; show "offline — cached files only". |
+
+### Social recovery (recommended second factor for the "neither" case)
+
+- Split MK with **Shamir secret sharing**, threshold **3-of-5** by default.
+- Shares are given to trusted contacts (who see opaque codes, never the user's data) or stored in independent places: password manager, printed sheet, hardware key, email to self.
+- A share alone reveals nothing. The server stores only encrypted share envelopes and never holds enough shares to reconstruct MK.
+- Recovery ceremony: new device collects 3 shares → reconstructs MK → generates a new deviceKey → uploads a new wrapped-MK blob. Contacts are notified and their shares are rotated (new shares of the same MK) so a past holder cannot retry later.
+- Recovery must require the account login too — a share holder cannot enter without the account. Rate-limit and audit every recovery attempt.
+- Threat: colluding contacts. 3-of-5 means 3 must collude; document this honestly. Offer 2-of-3 or 5-of-7 at setup.
+
+### Recovery passphrase envelope (optional, for users who won't store a phrase)
+
+- Store `AEAD(Argon2id(recovery_passphrase, salt), MK)` on the server.
+- The passphrase is **never transmitted**; the server holds only the wrapped blob. This remains E2E.
+- Must be distinct from the account password (which *is* sent to Supabase Auth) — reuse would break E2E. Enforce at setup by rejecting a match.
+- Argon2id ≥64 MiB, t≥3, p≥4 + BFF rate limits, because a low-entropy passphrase is an offline brute-force target if the DB leaks.
+- This is for convenience, not a replacement for the phrase; recommend users store both.
+
+### Lost-device operational flow
+
+1. User signs in on new device → account lock opens.
+2. App detects no deviceKey for this device → shows "Unlock your vault" with three paths: approve from existing device, enter recovery phrase, start social recovery.
+3. On success: generate new deviceKey, upload wrapped MK, mark device trusted.
+4. Offer a one-time "review your recovery setup" screen — confirm contacts/phrase still valid.
+5. If all paths fail: offer "Start a new empty vault" with explicit warning that old files cannot be recovered. Never silently discard old data.
+
+### Device revocation and rotation
+
+- Removing a device: delete its wrapped-MK blob, revoke its sessions, require re-approval for that device id. No re-encryption of files.
+- Rotating MK (e.g. suspected compromise): rewrap all per-file keys **client-side** on an unlocked device; no server ever sees MK. Old devices' cached plaintext remains a residual risk — document.
+- Rotating the recovery phrase: re-wrap MK under the new seed; file keys untouched.
+- Social shares rotate after every recovery; contacts must be re-issued new shares.
+
 ## 11. Coverage
 
 Web + native mobile first. CLI, SquidFS, Electron, API keys, webhooks, AI/preview paths must implement the same E2E protocol or stay gated. Workspaces need a group KEK wrapped per member. Null/drop `files.encryption_key`, `tags[0].encryptionKey`, `is_byok` for v2.
@@ -138,6 +193,6 @@ Web + native mobile first. CLI, SquidFS, Electron, API keys, webhooks, AI/previe
 
 ## 14. Open decisions for the human
 
-1. Phrase-only recovery, or also trusted contacts / hardware-key backup? My recommendation: phrase + optional trusted contacts later.
+1. Recovery factors at launch: phrase + synced passkey + optional 3-of-5 social recovery and recovery-passphrase envelope? My recommendation: all four, with social recovery offered during onboarding rather than bolted on later — it is the only path that helps when both device and phrase are gone.
 2. Web + mobile first vs all clients at once? My recommendation: web + mobile first.
 3. Legacy cutover: sunset window vs immediate shutdown? My recommendation: published sunset window.
