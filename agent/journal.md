@@ -1,3 +1,11 @@
+## 2026-11-24 - Clean PDF chrome + restore glass/motion (interactive query)
+- User rejected the new PDF viewer's interface as AI slop and asked to restore animations and glass effects.
+- Audit: six floating surfaces at once (top-left dock, title chip, top-right 8-button dock, markup row, transient bottom page HUD, sidebar island) plus a white `.pdv-pill`. Crowded and generic.
+- Changes in OptimizedPDFViewer.tsx: removed the duplicate transient bottom page HUD and put prev/next into the title dock; top-right dock now zoom-out/pct/zoom-in/search/more only, with Bookmark/Markup/Search in the More menu; mobile dock cut to Pages/Markup/More. Replaced the white pill with neutral glass, rebuilt `.pdv-g` with a soft vertical gradient, hairline rim and deeper shadow (22px saturate blur). Title dock padding tightened.
+- Restored the punchy springs across cbVideoPlayer (JELLY 520/15, POP 380/17, SOFT 300/26, scrubber stretch 0.85, button squash .88/.8) and the preview dock (faceSpring 520/15, rubber 96, overshoot velocities, magnetic pull 46, press .93/.86, hover 1.045, conic rim no longer suppressed). Kept the plain-CSS corner anchoring that fixed wide-screen visibility.
+- Committed d3ffc34b; `vercel --prod --yes` READY.
+- Next: await visual feedback.
+
 ## 2026-11-24 - Integrate newest OptimizedPDFViewer (interactive query)
 - Found new OptimizedPDFViewer.tsx (Nov 24 11:06, 1074 lines) in /storage/emulated/0/Download; replaced src/components/OptimizedPDFViewer.tsx verbatim.
 - New design: macOS Preview-style, virtualised continuous scroll / single / dual page, floating glass docks (sidebar+view, title+page, zoom+tools), markup dock (highlight/underline/strike/draw/text/note/erase), annotations + bookmarks via supabase, persistent prefs in localStorage.
