@@ -1,3 +1,10 @@
+## 2026-11-24 - Integrate newest OptimizedPDFViewer (interactive query)
+- Found new OptimizedPDFViewer.tsx (Nov 24 11:06, 1074 lines) in /storage/emulated/0/Download; replaced src/components/OptimizedPDFViewer.tsx verbatim.
+- New design: macOS Preview-style, virtualised continuous scroll / single / dual page, floating glass docks (sidebar+view, title+page, zoom+tools), markup dock (highlight/underline/strike/draw/text/note/erase), annotations + bookmarks via supabase, persistent prefs in localStorage.
+- Verified imports (pdfjs-dist, framer-motion, @/integrations/supabase/client, @/lib/utils) all exist; worker setup unchanged. Props interface identical to old one, so EnhancedInstantPreviewModal and DeepReadReader call sites were untouched.
+- Brace/paren/template balance verified; committed 91f36648; `vercel --prod --yes` READY.
+- Next: await visual verification.
+
 ## 2026-11-23 - Revert Folio PDF viewer (interactive query)
 - User: "i think our own previous pdf viewer was far better". Reverted the PDF part of commit 8a681899 only.
 - EnhancedInstantPreviewModal imports/renders OptimizedPDFViewer again; deleted FolioPdfViewer.tsx (verified no other references); reverted the UI-UX-STANDARD.md note.

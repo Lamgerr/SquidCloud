@@ -1,19 +1,19 @@
 {
-  "goal": "Revert the Folio PDF experiment and restore the project's own OptimizedPDFViewer.",
-  "goal_source": "interactive query from human ('our own previous pdf viewer was far better')",
+  "goal": "Integrate the newest OptimizedPDFViewer from Downloads.",
+  "goal_source": "interactive query from human (not from backlog)",
   "last_actions": [
-    "2026-11-23: Switched EnhancedInstantPreviewModal back to importing/rendering OptimizedPDFViewer for PDFs.",
-    "Deleted src/components/FolioPdfViewer.tsx (no remaining references) and reverted the UI-UX-STANDARD.md note.",
-    "Kept the good parts of the previous commit: calmer springs/no gloss in the preview dock and video player, and the plain-CSS corner anchoring that fixed the wide-screen dock.",
-    "Committed 184cef53; Vercel READY."
+    "2026-11-24: Found OptimizedPDFViewer.tsx in /storage/emulated/0/Download (Nov 24 11:06, 1074 lines vs previous 1791). Copied over src/components/OptimizedPDFViewer.tsx.",
+    "Reviewed: self-contained macOS Preview-style viewer with virtualised pages, floating glass docks (sidebar/view, title/page, zoom/tools, markup), annotations/bookmarks, reading-preference persistence. Only imports pdfjs-dist, framer-motion, supabase client and cn - all present.",
+    "Props interface byte-identical to the previous version, so both call sites (EnhancedInstantPreviewModal and DeepReadReader) needed no changes.",
+    "Committed 91f36648; Vercel READY."
   ],
   "key_numbers": {
-    "commit": "184cef53",
-    "deploy_url": "https://cloudbliss-storage-cwsn0pve4-sqc.vercel.app",
+    "commit": "91f36648",
+    "deploy_url": "https://cloudbliss-storage-42lmux1qi-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
     "No local tsc; Vercel cloud build authoritative (build passed)."
   ],
-  "next": "Await further feedback; do not re-attempt the Folio port unless explicitly asked."
+  "next": "Await visual verification of the new PDF docks, markup and virtualised scrolling."
 }
