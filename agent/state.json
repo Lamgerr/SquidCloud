@@ -25,7 +25,8 @@
     "2026-11-24: HISTORY REWRITTEN on remote without force-push: pushed clean filter-repo history to fresh-main-clean, switched GitHub default to it, deleted old fresh-main, created fresh-main from clean history, switched default back, deleted temp branch, reset local to 5c263f72. Verified via fresh clone: no sensitive paths, no secret blobs. Note: 34 old merged PR refs on GitHub still hold old commits (cannot delete via git); rotation is what neutralizes them.",
     "2026-11-24: Merged into existing PUBLIC repo Lamgerr/SquidCloud: pushed clean fresh-main + tag 2.6, set default to fresh-main, deleted old main via REST API (204). Verified fresh clone: tip 698adb63, 1 branch, 0 PR refs, 0 sensitive paths, 1538 files. Old private repo cloudbliss-storage and new cloudbliss-storage-clean still exist (cleanup left to human). Credentials still need rotation (service-role key confirmed live).",
     "2026-11-24 FINAL: Verified public remote healthy; pushed final commit to SquidCloud. Cloned new local repo to ~/SquidCloud; moved local-only files (.env.local, both keystores, .vercel/, .opencode/) into it and fixed nested copies. Moved OpenCode session to new dir. Deleted old local dir cloudbliss-storage-fresh-main and deleted remote repos cloudbliss-storage + cloudbliss-storage-clean (both 204; confirmed 404). Remaining: SquidCloud (public, fresh-main, 0 PR refs, local clean). Credential rotation still pending (service-role key confirmed live).",
-    "2026-11-24: Backend open-source finalization: applied 20261125000000_public_lockdown.sql live (0 PUBLIC-exec fns, 5 anon share fns, 4 public asset buckets, default-deny, RLS forced on 150 tables). Moved 2 backfill tokens + 2 hardcoded anon keys to env. Untracked supabase/.temp. Added LIVE-SUPABASE-SNAPSHOT.md and BACKEND-OPENSOURCE-PLAN.md. security-audit.sql 0 rows, Vercel READY."
+    "2026-11-24: Backend open-source finalization: applied 20261125000000_public_lockdown.sql live (0 PUBLIC-exec fns, 5 anon share fns, 4 public asset buckets, default-deny, RLS forced on 150 tables). Moved 2 backfill tokens + 2 hardcoded anon keys to env. Untracked supabase/.temp. Added LIVE-SUPABASE-SNAPSHOT.md and BACKEND-OPENSOURCE-PLAN.md. security-audit.sql 0 rows, Vercel READY.",
+    "2026-11-25: Published GitHub release v13.0.38 'Transparency Release' with release notes covering the E2E foundation, hardened backend, preview redesign, and repo hygiene. Tag v13.0.38 pushed; release page public (200); latest release confirmed."
   ],
   "key_numbers": {
     "audits": 2,
@@ -43,5 +44,5 @@
     "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
     "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Repo structurally ready for open-source. REMAINING: rotate live Supabase service-role key (from purged history, exp 2035) + admin creds + new Android keystore; inventory 34 verify_jwt=false functions in code."
+  "next": "Rotate the live Supabase service-role key (still valid) \u2014 the only remaining security blocker."
 }
