@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Lock, X, Shield } from '@/lib/icon-map';
-import { unlockVault, isVaultUnlocked } from '@/lib/zk-vault-session';
+import { unlockVault } from '@/lib/zk-vault-session';
+import { verifyVaultPassword } from '@/lib/zk-vault-verify';
 
 interface Props {
   open: boolean;
@@ -20,6 +21,8 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
     if (!password) return;
     setBusy(true); setError('');
     try {
+      const ok = await verifyVaultPassword(userId, password);
+      if (!ok) throw new Error('Incorrect vault password');
       await unlockVault(password, userId);
       setPassword('');
       onUnlocked?.();
