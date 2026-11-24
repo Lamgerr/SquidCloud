@@ -6,7 +6,7 @@ way to get a repo with zero old PR refs is to create a new repo from the clean
 history and retire the old one.
 
 ## Prepared and verified
-- Clean history bundle: `/data/data/com.termux/files/usr/tmp/opencode/squidcloud-clean.bundle`
+- Clean history bundle: `/data/data/com.termux/files/usr/tmp/opencode/squidcloud-clean-final.bundle`
 - Fresh-clone verification already done: no sensitive paths, no secret blobs
 - Current repo settings (to reapply): default_branch=fresh-main, has_issues=true,
   has_projects=true, has_wiki=false, merge options all true, delete_branch_on_merge=false,
@@ -32,7 +32,7 @@ curl -X POST https://api.github.com/user/repos \
 
 ### 3. Push clean history
 ```bash
-git clone /data/data/com.termux/files/usr/tmp/opencode/squidcloud-clean.bundle /tmp/newrepo
+git clone /data/data/com.termux/files/usr/tmp/opencode/squidcloud-clean-final.bundle /tmp/newrepo
 cd /tmp/newrepo
 git remote add new https://x-access-token:$TOKEN@github.com/Lamgerr/cloudbliss-storage-clean.git
 git push new refs/heads/fresh-main:refs/heads/fresh-main
