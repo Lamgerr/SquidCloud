@@ -11,7 +11,8 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { zkDecryptDownload } from '@/lib/zk-mode';
+import { zkDecryptDownload, requireVaultUnlocked } from '@/lib/zk-mode';
+import VaultUnlockFor from '@/components/VaultUnlockFor';
 import VaultUnlockDialog from '@/components/VaultUnlockDialog';
 import { isVaultUnlocked } from '@/lib/zk-vault-session';
 import { useAuth } from '@/contexts/AuthContext';
@@ -267,6 +268,9 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [previewFile, setPreviewFile]   = useState<FileItemType | null>(null);
+  const [vaultUnlockFor, setVaultUnlockFor] = useState<{ id: string; name: string; blob: Blob; taskId?: string } | null>(null);
+  const [vaultUploadQueue, setVaultUploadQueue] = useState<Array<{ file: File; folder: string }>>([]);
+  const [vaultUploadOpen, setVaultUploadOpen] = useState(false);
 
   // Restoring a minimized preview tab reopens its file in the viewer
   useEffect(() => {
@@ -929,7 +933,18 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
     setPreviewFile(file);
   }, [selectionMode]);
 
-  const [vaultUnlockFor, setVaultUnlockFor] = useState<{ id: string; name: string; blob: Blob; taskId?: string } | null>(null);
+  // When an upload is attempted while the vault is locked, prompt to unlock
+  // and re-queue the files once the key is available.
+  useEffect(() => {
+    const onNeedUnlock = (e: Event) => {
+      const files = (e as CustomEvent).detail?.files;
+      if (!Array.isArray(files)) return;
+      setVaultUploadQueue(files);
+      setVaultUploadOpen(true);
+    };
+    window.addEventListener('squidcloud:vault-unlock-required', onNeedUnlock);
+    return () => window.removeEventListener('squidcloud:vault-unlock-required', onNeedUnlock);
+  }, []);
 
   const saveDecrypted = useCallback(async (file: FileItemType, blob: Blob, taskId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -1172,6 +1187,9 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
     }
     const target = folderPath || currentFolder;
     const folderCache = new Map<string, string>();
+
+    // Every new file is E2E encrypted — require the vault key before uploading.
+    if (!requireVaultUnlocked(droppedFiles.map(f => ({ file: f, folder: target })))) return;
 
     for (const f of droppedFiles) {
       const filePath = (f as any).path;
@@ -1814,6 +1832,24 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
             onDismiss={dismissNotification}
           />
         ))}
+        <VaultUnlockFor
+          pending={vaultUnlockFor}
+          userId={user?.id || ''}
+          onCancel={() => setVaultUnlockFor(null)}
+          onUnlocked={(p) => {
+            setVaultUnlockFor(null);
+            const f = filteredFiles?.find(x => x.id === p.id);
+            void saveDecrypted(f as FileItemType || { id: p.id, name: p.name } as FileItemType, p.blob, p.taskId);
+          }}
+        />
+        <VaultUnlockDialog open={vaultUploadOpen} userId={user?.id || ''}
+          reason="Unlock your vault to encrypt and upload files."
+          onClose={() => { setVaultUploadOpen(false); setVaultUploadQueue([]); }}
+          onUnlocked={() => {
+            setVaultUploadOpen(false);
+            const q = vaultUploadQueue; setVaultUploadQueue([]);
+            q.forEach(({ file, folder }) => void backgroundUploadService.addTask(file, folder));
+          }} />
       </AppStartupBiometricCheck>
       </FileViewInfoContext.Provider>
     );
@@ -2855,19 +2891,24 @@ const MobileFilesView: React.FC<any> = ({
         )}
       </section>
 
-      <VaultUnlockDialog
-        open={!!vaultUnlockFor}
+      <VaultUnlockFor
+        pending={vaultUnlockFor}
         userId={user?.id || ''}
-        onClose={() => setVaultUnlockFor(null)}
-        onUnlocked={() => {
-          const p = vaultUnlockFor;
+        onCancel={() => setVaultUnlockFor(null)}
+        onUnlocked={(p) => {
           setVaultUnlockFor(null);
-          if (p) {
-            const f = filteredFiles?.find(x => x.id === p.id);
-            void saveDecrypted(f as FileItemType || { id: p.id, name: p.name } as FileItemType, p.blob, p.taskId);
-          }
+          const f = filteredFiles?.find(x => x.id === p.id);
+          void saveDecrypted(f as FileItemType || { id: p.id, name: p.name } as FileItemType, p.blob, p.taskId);
         }}
       />
+      <VaultUnlockDialog open={vaultUploadOpen} userId={user?.id || ''}
+        reason="Unlock your vault to encrypt and upload files."
+        onClose={() => { setVaultUploadOpen(false); setVaultUploadQueue([]); }}
+        onUnlocked={() => {
+          setVaultUploadOpen(false);
+          const q = vaultUploadQueue; setVaultUploadQueue([]);
+          q.forEach(({ file, folder }) => void backgroundUploadService.addTask(file, folder));
+        }} />
     </div>
   );
 };

@@ -8,6 +8,17 @@ import { isVaultUnlocked, encryptVaultBytes, decryptVaultBytes, saveVaultFileMet
 
 export const zkReady = (): boolean => isVaultUnlocked();
 
+/**
+ * Ensures the vault is unlocked before an upload. If locked, emits a global
+ * event that the Dashboard listens to and returns false; the caller should
+ * abort that upload. On unlock the Dashboard re-queues via the event detail.
+ */
+export function requireVaultUnlocked(files: Array<{ file: File; folder: string }>): boolean {
+  if (isVaultUnlocked()) return true;
+  window.dispatchEvent(new CustomEvent('squidcloud:vault-unlock-required', { detail: { files } }));
+  return false;
+}
+
 /** Encrypt a file just before upload. Returns a replacement File when ZK is on. */
 export async function zkEncryptForUpload(
   file: File, userId: string,
