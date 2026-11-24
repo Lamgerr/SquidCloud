@@ -33,10 +33,19 @@ serve(async (req) => {
         }
       }
 
-      if (shareInfo.access_code && shareInfo.access_code.trim() !== '') {
-        if (!password || password !== shareInfo.access_code) {
-          return jsonResponse({ error: "Invalid password", requiresPassword: true }, 401);
-        }
+      // SECURITY: access_code is never returned by get_shared_file_info.
+      // Validate it with a service-role lookup inside this trusted function.
+      const { data: shareRow } = await supabase
+        .from('shares')
+        .select('access_code, is_active')
+        .eq('share_id', shareId)
+        .maybeSingle();
+      const requiredCode = shareRow?.access_code?.trim();
+      if (requiredCode && requiredCode !== password) {
+        return jsonResponse({ error: "Invalid password", requiresPassword: true }, 401);
+      }
+      if (shareRow && shareRow.is_active === false) {
+        return jsonResponse({ error: "Share link is no longer active" }, 403);
       }
       
       const { data: fileRecord, error: fileError } = await supabase
