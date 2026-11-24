@@ -12,3 +12,18 @@ squidveil/target/
 *.log
 .vercel
 .env*
+
+# Sensitive captures / archives
+*.har
+
+# Signing material (never commit)
+*.keystore
+*.jks
+android/app/*.keystore
+
+# Repo hygiene — transient artifacts
+deploy_payload.json
+l0g.txt
+*.backup
+*.disabled.*
+*-bkp*
