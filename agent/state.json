@@ -15,7 +15,8 @@
     "2026-11-24: User asked for advanced web isolation. Wrote separate spec docs/superpowers/specs/2026-11-24-web-isolation-design.md: origin topology (app/preview/media/share/api), COOP/COEP/CORP, strict CSP + Trusted Types + Permissions-Policy, sandboxed untrusted-content iframes with no allow-same-origin, crypto worker with per-op tokens, storage partitioning, postMessage discipline, OS/extension limits with native-client fallback, DNS/TLS hardening, verification matrix.",
     "2026-11-24: User asked to integrate web isolation into the security plan. Merged the isolation spec into the canonical design as section 16, updated threat model, hardening layers table, detection, residual risks, verification and priority order. Bumped to v6 INTEGRATED. Marked standalone isolation doc as superseded.",
     "2026-11-24: User asked for even harder plan. v7: replaced deterministic FK (HKDF(MK,file_id)) with per-file random salts so deletion is true crypto-shredding; added key transparency log with witnesses, epoch ratchet for post-compromise security, hardware-bound decrypt mode, duress/travel modes, metadata/traffic defenses, SLSA-style supply chain, mTLS/private infra, safety numbers for recovery contacts, final residual list, updated priority.",
-    "2026-11-24: User correctly noted hardware-bound per-decrypt mode is annoying. Reworked \u00a717.3 into three security tiers (Balanced default / High / Maximum opt-in), one-time per-vault choice, configurable touch-cache window, invisible to default users."
+    "2026-11-24: User correctly noted hardware-bound per-decrypt mode is annoying. Reworked \u00a717.3 into three security tiers (Balanced default / High / Maximum opt-in), one-time per-vault choice, configurable touch-cache window, invisible to default users.",
+    "2026-11-24: User asked for iCloud/Drive seamlessness with secret-service-level invisible protection. Added \u00a718 Principal and Protection Detail principle: zero routine security UI, background protection while locked, advance verification, step-forward only on specific anomalies, risk engine with no fail-open, UX tests, and removed tier choice from onboarding (tiers now internal policy)."
   ],
   "key_numbers": {
     "audits": 2,
@@ -29,5 +30,5 @@
     "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
     "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Await approval of v7 + open decisions; then writing-plans."
+  "next": "Await approval of v8 + open decisions; then writing-plans."
 }

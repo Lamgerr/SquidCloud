@@ -1,8 +1,8 @@
 # SquidCloud: Wallet-Style Keys, iCloud-Style UX — Design
 
 Date: 2026-11-24
-Status: DRAFT v7 — INTEGRATED + NEXT-LEVEL HARDENED (awaiting approval; no code written)
-Supersedes: v1–v6 and `2026-11-24-web-isolation-design.md` (merged into §16). Single canonical security design; §17 adds key transparency, forward secrecy, hardware/duress modes and supply-chain hardening.
+Status: DRAFT v8 — INTEGRATED, HARDENED, ZERO-FRICTION (awaiting approval; no code written)
+Supersedes: v1–v6 and `2026-11-24-web-isolation-design.md` (merged into §16). Single canonical security design. §17 adds key transparency, forward secrecy, crypto-shredding and supply-chain hardening; §18 makes protection silent and automatic (the "Principal and Protection Detail" rule).
 
 ## 1. Intent
 
@@ -520,22 +520,24 @@ Current design: an attacker who steals MK can read every current file. Add epoch
 - A stolen *current* MK therefore does not decrypt files from prior epochs, and removing a compromised device and ratcheting restores confidentiality for future content.
 - Ratchet is client-side, incremental, resumable, Wi-Fi-first, and silent — same engine as legacy migration (§4).
 
-## 17.3 Security tiers — hardware binding is opt-in, never the default
+## 17.3 Security tiers — invisible, automatic, never in the user's face
 
-You are right: requiring a physical touch on every decrypt is annoying and breaks the seamless requirement. So it is **not a mode users stumble into**. It is a one-time choice at vault creation, presented as three tiers, with the tradeoff stated plainly:
+Requiring a physical touch on every decrypt is annoying and breaks the seamless requirement. So the tiers below are **an internal policy engine, not an onboarding questionnaire**. The user never picks a tier in the normal flow — protection is chosen for them, silently, the way a protection detail works.
 
-| Tier | Unlock | Per-file access | Who it is for |
+| Tier | Unlock | Per-file access | When it applies |
 |---|---|---|---|
-| **Balanced (default)** | Device keystore / passkey once per session | Automatic, no prompt | Everyone — preserves iCloud-like UX |
-| **High** | Same, plus step-up before sharing/recovery/device changes | Automatic for reads | Most users who want extra protection with zero friction |
-| **Maximum** | Hardware-bound | FIDO2/Passkey touch (or biometric) per decrypt | Journalists, activists, admins, targeted users |
+| **Balanced** | Device keystore / passkey once per session | Automatic, no prompt | Default for everyone |
+| **High** | Same, plus step-up before sharing/recovery/device changes | Automatic reads | Applied automatically when risk rises, or by an org admin |
+| **Maximum** | Hardware-bound | FIDO2/Passkey touch (or biometric) per decrypt | Auto-escalated on credible targeted-attack signals, or set by org policy |
 
-Rules that keep it non-annoying:
-- **Balanced is the default.** No user is nudged into Maximum. It appears only in Settings → Security with a clear "this requires a touch each time you open a file" warning.
-- **Maximum is per-vault, chosen once**, not a per-file toggle. No repeated decisions.
-- Caching: a Maximum vault may allow a short, configurable "session window" (e.g. 5 minutes after the last touch) so opening several files in a row doesn't require repeated taps — the user chooses the window length, including zero.
-- Enforcement: in Maximum, the crypto worker holds only a wrapped MK and requires a fresh signed assertion per operation; keys never leave secure hardware.
-- Never show security warnings or badges to Balanced users. The tier is invisible unless the user opens Settings.
+Rules that keep it invisible:
+- **No tier selection at vault creation.** Onboarding is: sign in → generate recovery phrase → done. The user is not asked to understand security modes.
+- Tiers are **assigned by the risk engine or org policy**, not manually toggled. A user who never opens Settings still gets the right level.
+- Risk-based escalation is automatic and silent: repeated failed verifier attempts, a new device plus bulk download, impossible travel, or a credible threat report can raise the tier temporarily. De-escalates when risk clears.
+- Advanced users and org admins can pin a tier in a buried Advanced Settings screen — never surfaced, never badged, never nagging.
+- Caching in Maximum: short configurable touch window (default 5 minutes, settable to zero) so several files in a row don't mean repeated taps.
+- Enforcement: in Maximum the crypto worker holds only a wrapped MK and requires a fresh signed assertion per operation; keys never leave secure hardware.
+- No security scores, warning banners, or "protect your account" notifications for users at normal risk. The only visible security moment is a genuine anomaly — and that prompt must be rare, specific and quick.
 
 ## 17.4 Duress and coercion resistance
 
@@ -585,7 +587,7 @@ Rules that keep it non-annoying:
 8. Plaintext already downloaded to a stolen device cannot be recalled.
 9. A server that keeps a deleted file's ciphertext **and its salt** plus later obtains MK can still read it — hence witnessed shredding receipts are mandatory.
 
-## 17.10 Updated implementation priority
+## 17.10 Updated implementation priority (governed by §18: zero-friction rule)
 
 1. Phase 0 containment (§9) — close live critical exposure.
 2. Crypto core: MK, per-file salts, AAD, transparency log (§§2, 5, 17.1) + third-party review.
@@ -598,3 +600,57 @@ Rules that keep it non-annoying:
 9. Detection, canaries, bug bounty, runbooks (§15.7).
 10. Native hardened client (§16.8).
 11. Other clients and workspaces (§11).
+
+Every step above must satisfy §18: no routine security UI; background protection; prompts only on specific anomalies.
+
+---
+
+# 18. The "Principal and Protection Detail" principle
+
+## 18.0 The analogy, made concrete
+
+The user should be the oblivious principal: they sign in, their files are there, and nothing else is required of them. Everything in this plan is the **protection detail** — working continuously, invisibly, ahead of threats, and revealing itself only when there is a real, specific danger.
+
+This is not a marketing metaphor; it is a hard design rule with testable consequences:
+
+1. **Zero routine security UI.** No badges, scores, warning banners, "review your security" nags, tier pickers, or key-management screens in the normal path.
+2. **Protection runs while the user is idle and locked.** Key ratchet (§17.2), legacy migration (§4), transparency-log verification (§17.1), canary checks, and audit reconciliation are background services. The user only sees a sync indicator.
+3. **Advance verification before exposure.** Before any device is trusted or any large data transfer is allowed, the system silently verifies: device attestation, session binding, KTL head, risk signals. The user is not part of this ceremony unless it fails.
+4. **Step forward only on real anomalies.** A prompt appears only for: new device, recovery attempt, unusual bulk access, impossible travel, repeated verifier failures. It is specific ("New device in Berlin — approve?") and one tap. Never generic.
+5. **Deception and counterintelligence are invisible.** Canary files, decoy vaults (duress code, §17.4), and anomaly alerts require no user action and generate no routine UI.
+6. **Recovery is a silent evacuation plan.** The quorum, rotated shares, safety numbers, and KTL receipts are all maintained in the background; the user encounters them only if they actually lose a device.
+
+## 18.1 Risk engine (the detail's threat assessment)
+
+- Inputs: device attestation, IP/ASN reputation, impossible travel, access volume, verifier failures, new share creation rate, recovery attempts, time since last unlock, network trust.
+- Outputs: silently assign tier (§17.3), require step-up for a specific operation, lock other sessions, trigger ratchet, alert contacts, or create a canary alert.
+- All decisions are audited in the KTL; none produce routine UI.
+- Fail-safe: if the risk engine itself is unavailable, the system falls back to **Balanced + step-up for sensitive ops**, never to "allow everything" (no fail-open).
+
+## 18.2 What the user actually experiences
+
+| Moment | User sees | System does (invisible) |
+|---|---|---|
+| Sign in | Email/passkey → files appear | Device attestation, session binding, KTL verify, risk scoring |
+| Unlock | Biometric once per session | MK unwrapped in isolated worker, zeroized on lock |
+| Open a file | File appears | Per-file salt fetch, FK derivation, AAD verify, sandboxed render, canary check |
+| Sync | Small "synced" indicator | Background ciphertext transfer, ratchet, migration, log verification |
+| New device | "Approve this device?" on existing device | ECDH key exchange, wrapped MK, KTL entry, witness cosign |
+| Genuine threat | One specific prompt | Auto-escalate tier, lock sessions, alert, ratchet |
+| Recovery | Phrase/quorum flow only if needed | Share verification, safety numbers, notifications, KTL receipts |
+
+## 18.3 Non-negotiable UX tests
+
+- A user who never opens Settings must still receive full protection.
+- No screen in the normal path may contain the words "security", "encryption key", "tier", or "warning" unless an actual anomaly is happening.
+- Routine file open must not require more than the session unlock already performed.
+- Background security work must not delay file availability, including on cellular.
+- If a security prompt appears, it must name a specific event and be dismissible in one action with a safe default.
+
+## 18.4 Honest tension
+
+Absolute invisibility and absolute security conflict at the exact moment of a credible threat — the detail must show itself. The compromise is: **invisible by default, specific and rare when it matters**. A prompt the user never sees is worthless; a prompt they see every day is ignored. Both are bugs.
+
+## 18.5 Decision impact
+
+This principle supersedes the earlier "one-time tier choice at vault creation" idea: there is **no tier UI at onboarding at all**. Tiers are internal policy (§17.3). Open decision §16.13 (native client timing) and §14 items now assume the web plan alone already delivers the "principal" experience; native is the added protection detail for users who need it, also without daily UI.
