@@ -1,3 +1,11 @@
+## 2026-11-24 - EPUB reader redesign to match PDF viewer (interactive query)
+- User: "do the same redesign with epub reader, making them both exactly same but differs in features".
+- DeepReadReader had a full-width header bar, slide-in side panel and bottom progress bar, plus a CSS skin (RD_DOCK_CSS) trying to make them look docked. Replaced the entire render layer while leaving all logic (secure fetch, EpubEngine init, theme/font effects, TOC, bookmarks, search, remote progress, annotation) byte-identical.
+- New chrome mirrors OptimizedPDFViewer exactly: dense neutral `.rd-g` glass (near-opaque, blur only, hairline rim), grouped circular docks with JELLY/POP/SOFT springs, three top docks (contents/bookmarks/search | title+page | font size, settings, annotate, fullscreen, bookmark), bottom nav dock with clickable progress rail, floating sidebar island for TOC/bookmarks/search, glass settings popover for theme/typeface/line spacing, glass loading/error cards. Mobile stacks the docks and turns the island into a bottom sheet.
+- PDF branch now renders OptimizedPDFViewer alone (no overlapping reader docks). Added useReducedMotion import.
+- Verified brace/paren/template balance; updated UI-UX-STANDARD.md; committed cd8189d3; `vercel --prod --yes` READY.
+- Next: await visual verification.
+
 ## 2026-11-24 - Strip white tints (interactive query)
 - User: "remove that white tint from ui its looking trash".
 - Root cause for the PDF chrome: `.pdv-g` used translucent glass with `saturate(160%)` over a white PDF page, so the page bled through and made the docks look white. Changed to near-opaque neutral gradient + blur only (no saturate), with a neutral hairline rim and deeper shadow.

@@ -1,20 +1,19 @@
 {
-  "goal": "Remove remaining white tints from the viewer/palette UI.",
-  "goal_source": "interactive query from human ('remove that white tint from ui')",
+  "goal": "Redesign the EPUB reader to match the PDF viewer's UI/UX exactly, with EPUB-specific features.",
+  "goal_source": "interactive query from human ('do the same redesign with epub reader')",
   "last_actions": [
-    "2026-11-24: Diagnosed the PDF dock white tint as the white PDF page bleeding through the translucent saturate(160%) glass.",
-    "PDF .pdv-g changed to dense near-opaque neutral glass, blur only (no saturate); neutralized dot/swatch/checkbox rims, focused textbox, and the Light theme swatch.",
-    "Neutralized video spinner/subtitle glyphs and the command palette AI pill white borders/glow + orb highlight (blue accent retained).",
-    "Committed 5d106f9c; Vercel READY."
+    "2026-11-24: Audited DeepReadReader.tsx (old full-width header, slide-in panels, bottom progress bar, CSS skin) and OptimizedPDFViewer.tsx (grouped floating docks, dense neutral glass, JELLY/POP/SOFT springs).",
+    "Replaced only the render layer of DeepReadReader (logic above it untouched): top three grouped docks (contents/bookmarks/search, title+page, text size/settings/annotate/fullscreen/bookmark), bottom nav dock with scrubbable progress, floating sidebar island, glass settings popover (themes/typeface/line spacing), glass loading/error cards.",
+    "Added useReducedMotion import; kept EPUB engine, fetch, progress sync, bookmarks, search and annotation logic identical. PDF branch now renders OptimizedPDFViewer alone so docks do not overlap.",
+    "Updated docs/UI-UX-STANDARD.md; committed cd8189d3; Vercel READY."
   ],
   "key_numbers": {
-    "commit": "5d106f9c",
-    "deploy_url": "https://cloudbliss-storage-b90rxrhhq-sqc.vercel.app",
+    "commit": "cd8189d3",
+    "deploy_url": "https://cloudbliss-storage-8r1varhp8-sqc.vercel.app",
     "deploy_state": "READY"
   },
   "blockers": [
-    "No local tsc; Vercel cloud build authoritative (build passed).",
-    "PDF page backgrounds stay white by design (document content), only the chrome was neutralized."
+    "No local tsc; Vercel cloud build authoritative (build passed)."
   ],
-  "next": "Await visual confirmation; if a specific surface still looks white, identify it from a screenshot."
+  "next": "Await visual verification of the EPUB docks, sidebar island and reading surface."
 }

@@ -250,6 +250,11 @@ a full-height panel and not a capsule with a background behind it:
   audio, text/code, markdown, EPUB, spreadsheet, font, archive, 3D, generic fallback.
 - PDFs use `OptimizedPDFViewer.tsx` (the project's own viewer, reinstated after a
   Folio-based experiment proved worse in practice).
+- EPUBs use `DeepReadReader.tsx` with the **same chrome as the PDF viewer**: three
+  grouped floating docks at the top, a bottom navigation/progress dock, a floating
+  sidebar island and glass popovers. EPUB-specific features (TOC, bookmarks, search,
+  themes, typeface, line spacing, reading progress, annotations) live inside that
+  shared shell; the engine and reading logic are unchanged.
 - Minimize turns a viewer into a floating "picking card" in a right-center deck.
   `MinimizedPreviewStack.tsx` is the presentational card deck (fanned, springy, drag to
   maximize/close, hide-all / close-all, hidden handle); `PreviewTabStack.tsx` is the
