@@ -13,7 +13,8 @@
     "2026-11-24: User asked about lost/broken device recovery. Added section 10a to design: account lock vs vault lock, recovery matrix, 3-of-5 Shamir social recovery, optional Argon2id recovery-passphrase envelope (never transmitted), lost-device flow, revocation/rotation semantics.",
     "2026-11-24: v5 maximum-hardening pass: added code-delivery integrity (reproducible signed builds, SRI, isolated asset origin, strict CSP), runtime key hygiene, crypto engineering rules, server hardening, recovery hardening, detection/response, UX-preservation contract, residual risks, implementation priority order.",
     "2026-11-24: User asked for advanced web isolation. Wrote separate spec docs/superpowers/specs/2026-11-24-web-isolation-design.md: origin topology (app/preview/media/share/api), COOP/COEP/CORP, strict CSP + Trusted Types + Permissions-Policy, sandboxed untrusted-content iframes with no allow-same-origin, crypto worker with per-op tokens, storage partitioning, postMessage discipline, OS/extension limits with native-client fallback, DNS/TLS hardening, verification matrix.",
-    "2026-11-24: User asked to integrate web isolation into the security plan. Merged the isolation spec into the canonical design as section 16, updated threat model, hardening layers table, detection, residual risks, verification and priority order. Bumped to v6 INTEGRATED. Marked standalone isolation doc as superseded."
+    "2026-11-24: User asked to integrate web isolation into the security plan. Merged the isolation spec into the canonical design as section 16, updated threat model, hardening layers table, detection, residual risks, verification and priority order. Bumped to v6 INTEGRATED. Marked standalone isolation doc as superseded.",
+    "2026-11-24: User asked for even harder plan. v7: replaced deterministic FK (HKDF(MK,file_id)) with per-file random salts so deletion is true crypto-shredding; added key transparency log with witnesses, epoch ratchet for post-compromise security, hardware-bound decrypt mode, duress/travel modes, metadata/traffic defenses, SLSA-style supply chain, mTLS/private infra, safety numbers for recovery contacts, final residual list, updated priority."
   ],
   "key_numbers": {
     "audits": 2,
@@ -27,5 +28,5 @@
     "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
     "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Await approval of v6 integrated plan + 4 open decisions; then writing-plans."
+  "next": "Await approval of v7 + open decisions; then writing-plans."
 }

@@ -1,8 +1,8 @@
 # SquidCloud: Wallet-Style Keys, iCloud-Style UX — Design
 
 Date: 2026-11-24
-Status: DRAFT v6 — INTEGRATED plan (E2E + web isolation; awaiting approval; no code written)
-Supersedes: v1–v5 and `2026-11-24-web-isolation-design.md` (merged into §16). This is the single canonical security design.
+Status: DRAFT v7 — INTEGRATED + NEXT-LEVEL HARDENED (awaiting approval; no code written)
+Supersedes: v1–v6 and `2026-11-24-web-isolation-design.md` (merged into §16). Single canonical security design; §17 adds key transparency, forward secrecy, hardware/duress modes and supply-chain hardening.
 
 ## 1. Intent
 
@@ -10,7 +10,7 @@ The user wants wallet-style key ownership (self-custody, recovery phrase, no ser
 
 The resolution: **borrow the wallet key model, not the wallet UX.** The recovery phrase is the universal key, but it is used only at restore time. Daily use stays device-keystore based. Critically, **unlock is not migration** — a restored device can decrypt any single file on demand with no bulk key sync.
 
-## 2. The key decision: deterministic per-file keys
+## 2. The key decision: per-file random salts (crypto-shreddable)
 
 ```
 Recovery phrase (24 words, BIP39-style wordlist)  -- shown once, never transmitted
@@ -19,19 +19,23 @@ Recovery phrase (24 words, BIP39-style wordlist)  -- shown once, never transmitt
    seed = PBKDF2-HMAC-SHA512(phrase, "squidcloud", 2048)     [BIP39-style]
         |
         v
-   MK = HKDF(seed, "squidcloud/v4/master")                    [master key]
+   MK = HKDF(seed, "squidcloud/v7/master")                    [master key]
         |
-        +--> HKDF(MK, "name")     -> name key
-        +--> HKDF(MK, "share")    -> share key
-        +--> HKDF(MK, "file", file_id, version) -> FK          [per-file key]
+        +--> HKDF(MK, "name")              -> name key
+        +--> HKDF(MK, "share")             -> share key
+        +--> HKDF(MK, "file", file_salt, version) -> FK        [per-file key]
 ```
 
-**There are no wrapped-FK blobs to sync.** Each file's key is derived from MK + its id. A new device with the phrase can open file #500 without first downloading keys for files #1–499. That is the direct answer to the cellular/emergency requirement.
+`file_salt` is **32 random bytes generated on the client per file**, stored on the server as non-secret metadata and returned with the file on access. FK is derived only on an unlocked device.
+
+**Why not pure `HKDF(MK, file_id)` (v4–v6):** that made every past ciphertext decryptable forever by anyone holding MK — including files the user had "deleted" but whose ciphertext a server had snapshotted. With a per-file salt, **deleting the salt is real crypto-shredding**: even a full DB dump plus MK cannot open that file afterwards. This is a material upgrade in "no fear of leaks".
+
+**Why this still solves the emergency/cellular case:** the salt is 32 bytes and travels with the file's metadata. A device restored from the phrase fetches only the salt and ciphertext of the one file it opens — no bulk key download, no migration wait. The earlier objection was to syncing hundreds of wrapped-key blobs; a public salt per file is negligible and deliberately non-secret.
 
 Trade-offs, stated honestly:
-- Losing MK means losing all files — same as any wallet, and the required cost of no server escrow.
-- A deterministic FK means key rotation is a vault-wide re-encrypt (version bump). There is no per-file forward secrecy beyond what MK already provides — but the old wrapped-FK model also let MK unwrap every FK, so nothing is lost.
-- File ids become key material inputs; they are already server-visible opaque ids. Store a random `key_salt` per user in the vault record and bind it into every derivation so the server cannot influence derivation by choosing ids.
+- Losing MK still loses all *existing* files — the required cost of no escrow.
+- Salt loss for one file makes that file unrecoverable; back it up with the ciphertext.
+- A server retaining both a deleted file's ciphertext **and its salt** can still decrypt it if it later obtains MK. Therefore deletion must propagate to every replica/backup of the salt, and clients verify shredding receipts. This is enforced by the key transparency log (§17.1).
 
 ## 3. Device model (iCloud-like daily experience)
 
@@ -45,7 +49,7 @@ Trade-offs, stated honestly:
 
 ## 4. Why migration is no longer a blocker
 
-- **New (v2) files:** no migration exists. Deterministic keys mean instant restore.
+- **New (v7) files:** no migration exists. Per-file salts travel with metadata, so restore stays instant.
 - **Legacy files (created under the old server-KEK escrow):** they still need one-time re-encryption. This is strictly **background and optional**:
   - Incremental, per-file, resumable state machine: `pending → v2_ready → cutover → legacy_deleted`.
   - Wi-Fi only by default; explicitly opt-in on cellular; never blocks opening a file.
@@ -56,8 +60,9 @@ Trade-offs, stated honestly:
 ## 5. Crypto details
 
 - Recovery phrase: 24 words from a standard 2048-word list (256 bits entropy) with checksum — wallet-standard, portable, human-copyable.
-- Derivations: HKDF-SHA256 with domain-separated info strings; `key_salt` per user bound into AAD.
-- Content: AES-256-GCM, random 96-bit IV per chunk, fixed-size padded chunks (e.g. 1 MiB), AAD = `file_id | user_id | version | chunk_index | commitment`.
+- Derivations: HKDF-SHA256 with domain-separated info strings; per-user `key_salt` and per-file `file_salt` both bound into AAD.
+- Content: AES-256-GCM, random 96-bit IV per chunk, fixed-size padded chunks (e.g. 1 MiB), AAD = `file_id | user_id | file_salt | version | chunk_index | commitment`.
+- Deletion = destroy every copy of `file_salt` and ciphertext; clients verify a shredding receipt from the transparency log (§17.1) before showing "deleted".
 - Names/folders: AES-256-GCM with the name key, AAD binds parent id.
 - Verifier: `HKDF(MK,"verify")`, constant-time compare, never a plaintext key.
 - Recovery phrase verifier on server: slow-hash (Argon2id) of the *phrase-derived seed*, rate-limited; or omit entirely and simply attempt an unwrapping operation. No fast hash.
@@ -310,7 +315,7 @@ Every hardening above must satisfy: **no extra taps in the normal path.**
 8. **Browser extension / OS-level malware** defeats web isolation (§16); native client required for that threat.
 9. **Rendered plaintext** exists briefly in the preview frame; a compromised browser can screenshot it.
 
-## 15.10 Priority order for implementation
+## 15.10 Priority order for implementation (superseded by §17.10 — use that one)
 
 1. Phase 0 containment (section 9) — closes live critical exposure.
 2. Crypto core + deterministic keys (sections 2–5) — the E2E foundation, with third-party review.
@@ -487,3 +492,98 @@ None of the above adds taps. Sign in → unlock → files appear. Preview opens 
 ## 16.13 Open decision (native timing)
 
 Should the native hardened client be built in this project, or should the web isolation ship first with the native client as a later phase? My recommendation: web isolation first (it protects the existing user base immediately), native client in the following phase for high-risk users.
+
+---
+
+# 17. Next-level hardening (v7)
+
+## 17.0 Honest framing
+
+"No fear of leaks" cannot be a promise. What v7 delivers is a precise property: **no single compromise short of the user's unlocked device, their recovery quorum, or the build pipeline yields plaintext.** Anything less — DB dump, service-role theft, BFF compromise, network position, subpoena, rogue admin — returns ciphertext and opaque metadata only. The residual list stays explicit (§17.9).
+
+## 17.1 Key transparency log (KTL) — stops server-side key substitution
+
+A compromised BFF or DB admin could otherwise swap a wrapped key or roll back a vault version without the client noticing. Fix with an append-only, client-verified log:
+
+- Every event (device added/removed, MK wrapped for a device, recovery quorum change, MK rotation, file salt created/destroyed, share created/revoked) is appended as `hash(prev || event || signature)` — a hash chain, like Certificate Transparency.
+- Each client stores the last head it saw and verifies the chain on every sync; any fork, rollback, or skipped event fails closed and locks the vault.
+- Events are signed with a per-user key derived from MK, so the server cannot forge them.
+- Witnesses: two independent, read-only services (one self-hostable by the user) cosign the head periodically. A user who runs their own witness gets detection even if the whole SquidCloud infrastructure is malicious.
+- Deletion/shredding receipts live in the KTL — clients refuse to show "deleted" until the receipt is witnessed.
+
+## 17.2 Post-compromise security (forward secrecy for the vault)
+
+Current design: an attacker who steals MK can read every current file. Add epoch-based ratcheting:
+
+- Vault has an `epoch` counter. Each file's FK is derived from `HKDF(MK_epoch, file_salt, version)`, and `MK_epoch+1 = HKDF(MK_epoch, "ratchet", epoch)` with the previous epoch key **destroyed** on all devices after re-encryption.
+- Periodic background ratchet (e.g. weekly, or on any device removal/recovery) re-encrypts content under the new epoch. Old ciphertext becomes unreadable once old epoch keys are gone.
+- A stolen *current* MK therefore does not decrypt files from prior epochs, and removing a compromised device and ratcheting restores confidentiality for future content.
+- Ratchet is client-side, incremental, resumable, Wi-Fi-first, and silent — same engine as legacy migration (§4).
+
+## 17.3 Hardware-bound mode (opt-in, for high-risk users)
+
+- Optional "require hardware" mode: every decrypt requires a FIDO2/Passkey assertion (physical touch) or OS keystore biometric. Keys never leave secure hardware; even a fully compromised browser cannot decrypt without the user present.
+- Enforced by the crypto worker: it holds only a wrapped MK and requires a fresh signed assertion per operation.
+- Default off (UX), one toggle to enable. Recommended for journalists, activists, admins.
+
+## 17.4 Duress and coercion resistance
+
+- **Duress code:** a second recovery phrase that unlocks a realistic decoy vault and silently raises a high-priority alert to the user's trusted contacts and their other devices. Indistinguishable from a normal unlock to an observer.
+- **Travel mode:** one tap strips wrapped-MK blobs from the device, leaving only encrypted cache; on return, re-approval from another device or phrase restores access. Border crossings and device searches yield nothing.
+- **No support bypass:** support staff have no technical path to vault data, so social engineering of staff cannot produce a leak. Documented in training and in public policy.
+
+## 17.5 Metadata and traffic-analysis defenses
+
+- Fixed-size blocks (not just 1 MiB buckets) and constant-rate sync heartbeats so file size and access timing are harder to infer.
+- Batch fetch: requesting one file also fetches a few adjacent padded blocks, hiding the exact access pattern.
+- Coarse timestamp buckets; share graph and folder structure encrypted with the name key.
+- IP addresses retained only in memory for rate limiting, never persisted in audit logs.
+- Document residual: the service still knows who the account is and roughly when it is active. That is unavoidable for a cloud sync product and must not be overclaimed.
+
+## 17.6 Supply chain and build integrity (SLSA-style)
+
+- SLSA Level 3+ target for all release artifacts: hermetic, reproducible builds from a pinned toolchain with a generated SBOM.
+- Signed commits and two-person review for `src/lib/crypto*`, `supabase/functions/*key*`, and isolation/CSP config.
+- Dependency pinning, lockfile verification, `npm audit` + provenance checks in CI; no runtime dependency installation.
+- Binary transparency: release hashes published to an append-only log; clients verify the hash of any update against the log and an independent witness before installing.
+- Secrets scanning in pre-commit and CI; no secrets in git history, HAR files, keystores, or CI logs (cleanup from Phase 0 is mandatory, not optional).
+
+## 17.7 Infrastructure hardening
+
+- Private networking / mTLS between BFF, database and storage; no public database endpoint reachable from the internet.
+- Service-role key restricted by network and by database role that can only call the narrow allow-listed RPCs.
+- Immutable infrastructure, short-lived credentials, no SSH into production; all changes via reviewed pipeline.
+- Backup ciphertext and salts are encrypted separately; a backup of one is useless without the other and without MK.
+
+## 17.8 Recovery trust hardening
+
+- Safety numbers for trusted contacts (Signal-style): verify out of band so a malicious server cannot substitute a contact's share.
+- Recovery ceremonies require the account login + quorum + step-up + KTL witness, and notify all devices in real time.
+- Progressive backoff, IP/device fingerprint rate limits, and mandatory cool-down after a failed recovery attempt.
+- Social shares are one-time and rotated after every use; stale shares are rejected by the KTL.
+
+## 17.9 Residual risks — final honest list
+
+1. XSS in an unlocked tab can read plaintext — mitigated, not eliminated (§16).
+2. Malicious code delivery defeats browser E2E — mitigated by signed reproducible builds, SRI, isolated origin, witnesses.
+3. Browser extension / OS-level malware — web cannot stop it; hardware-bound mode and native client are the only answers.
+4. Physical coercion of an unlocked device — duress/travel modes help, cannot guarantee.
+5. Lost phrase + lost quorum = permanent loss; support cannot help.
+6. Metadata (identity, coarse timing, counts, IPs) remains visible by design.
+7. Legacy unmigrated files remain server-recoverable until re-encrypted.
+8. Plaintext already downloaded to a stolen device cannot be recalled.
+9. A server that keeps a deleted file's ciphertext **and its salt** plus later obtains MK can still read it — hence witnessed shredding receipts are mandatory.
+
+## 17.10 Updated implementation priority
+
+1. Phase 0 containment (§9) — close live critical exposure.
+2. Crypto core: MK, per-file salts, AAD, transparency log (§§2, 5, 17.1) + third-party review.
+3. BFF + session/cookie + code integrity (§§7, 15.2, 15.3, 17.6).
+4. Web isolation (§16) before any decrypted content is rendered.
+5. Device lifecycle + recovery + ratchet (§§3, 10a, 17.2, 17.8).
+6. Sharing (§8).
+7. Legacy migration (§4).
+8. Duress/travel/hardware-bound modes (§§17.3, 17.4) — opt-in, no UX change by default.
+9. Detection, canaries, bug bounty, runbooks (§15.7).
+10. Native hardened client (§16.8).
+11. Other clients and workspaces (§11).
