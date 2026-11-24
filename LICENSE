@@ -1,0 +1,127 @@
+SQUIDCLOUD PUBLIC LICENSE
+Version 1.0, 24 November 2026
+
+Copyright (c) 2026 SquidCloud contributors
+
+PREAMBLE
+
+SquidCloud is a privacy-first cloud storage platform. This license grants you
+broad freedom to run, study, modify, extend, rebuild, and redistribute the
+software, including for commercial purposes, on terms no more restrictive than
+those of the GNU General Public License under which Linux is distributed.
+
+That freedom is not a license to harm other people. The rights granted below
+are conditioned on lawful, respectful use. If you use this software to commit
+crimes or to violate the rights and safety of others, this license terminates
+automatically and your use is unauthorized.
+
+1. DEFINITIONS
+
+   "Software" means the SquidCloud source code, configuration, documentation,
+   schema and migration files, edge functions, and any derivative works.
+
+   "You" means any person or entity exercising the rights granted here.
+
+   "Unlawful Activity" means any conduct that violates applicable law,
+   including but not limited to: unauthorized access to computers, accounts,
+   networks, or data ("breaching" or "hacking"); credential theft, phishing,
+   or brute-force attacks; distribution of malware, ransomware, or exploits;
+   counterfeiting, forgery, or trademark/copyright infringement; fraud,
+   money laundering, or payment-card abuse; unlawful surveillance, stalking,
+   or harassment; and any use of the Software to facilitate the foregoing.
+
+2. GRANT OF RIGHTS
+
+   Subject to this license, you are granted a worldwide, royalty-free,
+   non-exclusive license to:
+
+     (a) use the Software for any lawful purpose, personal or commercial;
+     (b) copy, modify, adapt, translate, and create derivative works;
+     (c) distribute the Software and your modifications, in source or built
+         form, including as part of a commercial product or service;
+     (d) submit issues, pull requests, patches, features, rewrites, and
+         architectural upgrades to the upstream project;
+     (e) fork the project, rebrand your fork, and operate your own instance;
+     (f) study, audit, and improve the security and privacy of the Software.
+
+   You do not need permission from the maintainers to exercise these rights.
+   There are no field-of-use, user-class, or seat restrictions.
+
+3. CONDITIONS
+
+   (a) NOTICE. If you distribute the Software or substantial portions of it,
+       you must include a copy of this license and retain copyright notices.
+   (b) NO FALSE ENDORSEMENT. You may not claim the upstream project endorses
+       your fork, product, or modifications without written permission.
+   (c) OPEN SOURCE OF DERIVATIVES. If you distribute a modified version, you
+       must make your source changes available under this same license, so the
+       commons remains open. You may keep your own deployment's data, secrets,
+       and infrastructure configuration private.
+
+4. PROHIBITED USE — HARD LIMIT
+
+   The Software may NOT be used, in whole or in part, for Unlawful Activity.
+
+   Without limiting section 1, you may not use SquidCloud to:
+     - gain or attempt to gain unauthorized access to any system or account;
+     - steal, exfiltrate, or traffic in credentials, personal data, or keys;
+     - build, host, or distribute malware, exploits, or attack infrastructure;
+     - counterfeit goods, documents, currencies, identities, or brands;
+     - conduct fraud, scams, payment abuse, or money laundering;
+     - facilitate harassment, stalking, doxxing, or unlawful surveillance;
+     - violate sanctions, export-control, or privacy laws.
+
+   Any use described in this section is outside the scope of this license and
+   is expressly forbidden.
+
+5. AUTOMATIC TERMINATION
+
+   If you breach section 4, all rights granted to you under this license
+   terminate automatically and immediately, without notice. You must cease all
+   use and distribution of the Software. The maintainers and contributors may
+   report suspected Unlawful Activity to appropriate authorities.
+
+6. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. No warranty
+   is made that the Software is error-free, secure against all threats, or
+   suitable for your specific use. Security claims must be verified by you.
+
+7. LIMITATION OF LIABILITY
+
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE MAINTAINERS AND CONTRIBUTORS
+   ARE NOT LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN
+   CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH
+   THE SOFTWARE OR THE USE OF IT, INCLUDING DATA LOSS, SERVICE INTERRUPTION,
+   OR SECURITY INCIDENTS. Nothing in this license excludes liability that
+   cannot lawfully be excluded.
+
+8. PATENTS
+
+   Each contributor grants you a royalty-free, non-exclusive patent license to
+   make, use, and sell the patented claims implemented in their contributions.
+   If you initiate patent litigation against the project or its contributors
+   over the Software, your patent grants under this license terminate.
+
+9. TRADEMARKS
+
+   This license does not grant permission to use the SquidCloud name, logo, or
+   trademarks except as required to identify the origin of the Software.
+
+10. MISCELLANEOUS
+
+   This license is the entire agreement for the Software. If any provision is
+   held unenforceable, the remainder stays in effect. You may not relicense the
+   Software under terms that remove sections 4 or 5. This license does not
+   override mandatory law.
+
+   Questions: open a discussion in the repository. Security reports: see
+   SECURITY.md — do not file public issues for vulnerabilities.
+
+---
+
+NOTE: This document is a license proposal for the project. It is not legal
+advice. Have qualified counsel review it before relying on it in a
+commercial or public release.

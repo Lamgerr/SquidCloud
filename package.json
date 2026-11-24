@@ -1,7 +1,7 @@
 {
   "name": "squidcloud-storage",
   "private": true,
-  "version": "12.0.22",
+  "version": "13.0.38",
   "type": "module",
   "scripts": {
     "copy:wasm": "cp node_modules/argon2-browser/dist/argon2.wasm public/argon2.wasm || true",

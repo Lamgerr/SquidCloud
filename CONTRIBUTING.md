@@ -13,7 +13,7 @@ Thanks for your interest in contributing. This guide is the starting point for r
 
 ```bash
 git clone <repo-url>
-cd cloudbliss-storage-fresh-main
+cd SquidCloud
 npm install
 cp .env.example .env.local   # fill with your own project values; never commit
 npm run dev

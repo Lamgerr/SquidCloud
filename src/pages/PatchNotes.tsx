@@ -44,7 +44,7 @@ const PatchNotes: React.FC = () => {
   const patchNotes: PatchNote[] = [
     {
       id: 'v12-0-23-rework-drop',
-      version: '12.0.23',
+      version: '13.0.38',
       date: '2026-10-13',
       title: 'Rework Drop: Books, Transfers, Dispersal',
       description: 'Books, transfers, file compatibility, dispersal, and one design language',
@@ -58,10 +58,10 @@ const PatchNotes: React.FC = () => {
         'Faster parallel uploads with honest progress and errors',
       ],
       tags: ['books', 'transfers', 'storage', 'dispersal', 'redesign'],
-      content: `# Rework Drop v12.0.23
+      content: `# Rework Drop v13.0.38
 
 **Release Date:** October 13, 2026
-**Version:** 12.0.23
+**Version:** 13.0.38
 **Type:** Minor Release (Feature Drop)
 
 ---

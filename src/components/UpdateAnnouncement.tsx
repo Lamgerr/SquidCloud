@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Book, ArrowRight, Github } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 
-const SEEN_KEY = 'sqc-update-seen-12.0.23';
+const SEEN_KEY = 'sqc-update-seen-13.0.38';
 
 const NOTES = [
   'Books work end to end — reliable catalog, covers, free editions only',
@@ -85,7 +85,7 @@ export default function UpdateAnnouncement() {
 
             <div className="px-6 pt-6 sm:px-7">
               <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#8d8f89]">
-                What's new · v12.0.23
+                What's new · v13.0.38
               </p>
               <h2 className="mt-2 text-[22px] font-semibold leading-tight tracking-[-0.01em]">
                 The rework drop is live.
