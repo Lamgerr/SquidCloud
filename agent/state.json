@@ -17,7 +17,8 @@
     "2026-11-24: User asked for even harder plan. v7: replaced deterministic FK (HKDF(MK,file_id)) with per-file random salts so deletion is true crypto-shredding; added key transparency log with witnesses, epoch ratchet for post-compromise security, hardware-bound decrypt mode, duress/travel modes, metadata/traffic defenses, SLSA-style supply chain, mTLS/private infra, safety numbers for recovery contacts, final residual list, updated priority.",
     "2026-11-24: User correctly noted hardware-bound per-decrypt mode is annoying. Reworked \u00a717.3 into three security tiers (Balanced default / High / Maximum opt-in), one-time per-vault choice, configurable touch-cache window, invisible to default users.",
     "2026-11-24: User asked for iCloud/Drive seamlessness with secret-service-level invisible protection. Added \u00a718 Principal and Protection Detail principle: zero routine security UI, background protection while locked, advance verification, step-forward only on specific anomalies, risk engine with no fail-open, UX tests, and removed tier choice from onboarding (tiers now internal policy).",
-    "2026-11-24: User demanded extreme ZK/no admin decryption. Found and closed two gaps: removed memorable recovery-passphrase envelope (offline brute-force by admin with DB); specified social-recovery shares encrypted to recipient device public keys with server holding only envelopes+commitments. Added \u00a719 with 10 CI-enforced invariants, rejected features list, and explicit residual truth."
+    "2026-11-24: User demanded extreme ZK/no admin decryption. Found and closed two gaps: removed memorable recovery-passphrase envelope (offline brute-force by admin with DB); specified social-recovery shares encrypted to recipient device public keys with server holding only envelopes+commitments. Added \u00a719 with 10 CI-enforced invariants, rejected features list, and explicit residual truth.",
+    "2026-11-24: User demanded preview-modal security and closure of 8 residual risks. Audited EnhancedInstantPreviewModal: decrypts in main thread, holds plaintext in module decryptedBlobCache + decodedBlob + blob URLs in app origin, markdown dangerouslySetInnerHTML. Wrote companion spec v10: sealed preview (decrypt/render inside sandboxed preview origin worker, app gets only bitmaps + opaque per-file render tokens), viewer-by-viewer plan, concrete mitigations for all 8 concerns, preview-specific verification, zero UX change."
   ],
   "key_numbers": {
     "audits": 2,
@@ -31,5 +32,5 @@
     "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
     "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Await approval of v9 + decisions; then writing-plans."
+  "next": "Await approval; recommend sealed-preview pass ships immediately before full vault migration."
 }

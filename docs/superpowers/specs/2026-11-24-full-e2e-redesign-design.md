@@ -1,8 +1,8 @@
 # SquidCloud: Wallet-Style Keys, iCloud-Style UX — Design
 
 Date: 2026-11-24
-Status: DRAFT v9 — EXTREME ZERO-KNOWLEDGE (awaiting approval; no code written)
-Supersedes: v1–v6 and `2026-11-24-web-isolation-design.md` (merged into §16). Single canonical security design. §17 adds key transparency, forward secrecy, crypto-shredding and supply-chain hardening; §18 makes protection silent and automatic (the "Principal and Protection Detail" rule); §19 defines hard zero-knowledge invariants enforced by CI.
+Status: DRAFT v10 — EXTREME ZERO-KNOWLEDGE + SEALED PREVIEW (awaiting approval; no code written)
+Supersedes: v1–v6 and `2026-11-24-web-isolation-design.md` (merged into §16). Single canonical security design. §17 adds key transparency, forward secrecy, crypto-shredding and supply-chain hardening; §18 makes protection silent and automatic (the "Principal and Protection Detail" rule); §19 defines hard zero-knowledge invariants enforced by CI; `2026-11-24-preview-and-residual-hardening.md` is the companion spec for the sealed preview modal and residual-risk closure.
 
 ## 1. Intent
 
