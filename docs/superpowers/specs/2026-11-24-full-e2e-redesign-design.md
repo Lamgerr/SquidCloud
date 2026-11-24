@@ -520,11 +520,22 @@ Current design: an attacker who steals MK can read every current file. Add epoch
 - A stolen *current* MK therefore does not decrypt files from prior epochs, and removing a compromised device and ratcheting restores confidentiality for future content.
 - Ratchet is client-side, incremental, resumable, Wi-Fi-first, and silent — same engine as legacy migration (§4).
 
-## 17.3 Hardware-bound mode (opt-in, for high-risk users)
+## 17.3 Security tiers — hardware binding is opt-in, never the default
 
-- Optional "require hardware" mode: every decrypt requires a FIDO2/Passkey assertion (physical touch) or OS keystore biometric. Keys never leave secure hardware; even a fully compromised browser cannot decrypt without the user present.
-- Enforced by the crypto worker: it holds only a wrapped MK and requires a fresh signed assertion per operation.
-- Default off (UX), one toggle to enable. Recommended for journalists, activists, admins.
+You are right: requiring a physical touch on every decrypt is annoying and breaks the seamless requirement. So it is **not a mode users stumble into**. It is a one-time choice at vault creation, presented as three tiers, with the tradeoff stated plainly:
+
+| Tier | Unlock | Per-file access | Who it is for |
+|---|---|---|---|
+| **Balanced (default)** | Device keystore / passkey once per session | Automatic, no prompt | Everyone — preserves iCloud-like UX |
+| **High** | Same, plus step-up before sharing/recovery/device changes | Automatic for reads | Most users who want extra protection with zero friction |
+| **Maximum** | Hardware-bound | FIDO2/Passkey touch (or biometric) per decrypt | Journalists, activists, admins, targeted users |
+
+Rules that keep it non-annoying:
+- **Balanced is the default.** No user is nudged into Maximum. It appears only in Settings → Security with a clear "this requires a touch each time you open a file" warning.
+- **Maximum is per-vault, chosen once**, not a per-file toggle. No repeated decisions.
+- Caching: a Maximum vault may allow a short, configurable "session window" (e.g. 5 minutes after the last touch) so opening several files in a row doesn't require repeated taps — the user chooses the window length, including zero.
+- Enforcement: in Maximum, the crypto worker holds only a wrapped MK and requires a fresh signed assertion per operation; keys never leave secure hardware.
+- Never show security warnings or badges to Balanced users. The tier is invisible unless the user opens Settings.
 
 ## 17.4 Duress and coercion resistance
 
@@ -566,7 +577,7 @@ Current design: an attacker who steals MK can read every current file. Add epoch
 
 1. XSS in an unlocked tab can read plaintext — mitigated, not eliminated (§16).
 2. Malicious code delivery defeats browser E2E — mitigated by signed reproducible builds, SRI, isolated origin, witnesses.
-3. Browser extension / OS-level malware — web cannot stop it; hardware-bound mode and native client are the only answers.
+3. Browser extension / OS-level malware — web cannot stop it; the Maximum tier (§17.3) and native client are the only answers, both opt-in.
 4. Physical coercion of an unlocked device — duress/travel modes help, cannot guarantee.
 5. Lost phrase + lost quorum = permanent loss; support cannot help.
 6. Metadata (identity, coarse timing, counts, IPs) remains visible by design.
@@ -583,7 +594,7 @@ Current design: an attacker who steals MK can read every current file. Add epoch
 5. Device lifecycle + recovery + ratchet (§§3, 10a, 17.2, 17.8).
 6. Sharing (§8).
 7. Legacy migration (§4).
-8. Duress/travel/hardware-bound modes (§§17.3, 17.4) — opt-in, no UX change by default.
+8. Duress/travel + security tiers (§§17.3, 17.4) — opt-in, no UX change by default; Balanced tier is default.
 9. Detection, canaries, bug bounty, runbooks (§15.7).
 10. Native hardened client (§16.8).
 11. Other clients and workspaces (§11).
