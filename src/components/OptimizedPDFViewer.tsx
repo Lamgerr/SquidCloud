@@ -55,7 +55,7 @@ const ZMIN = 0.25, ZMAX = 5;
 const COLORS = ['#FFD60A', '#32D74B', '#64D2FF', '#FF6B9A', '#FF9F0A', '#BF5AF2'];
 const FILTERS: Record<Theme, string> = { light: 'none', sepia: 'sepia(.38) saturate(1.05) brightness(.97)', dark: 'invert(.9) hue-rotate(180deg) contrast(.92)' };
 const THEMES: { id: Theme; label: string; sw: string }[] = [
-  { id: 'light', label: 'Light', sw: '#fff' }, { id: 'sepia', label: 'Sepia', sw: '#efe0bd' }, { id: 'dark', label: 'Dark', sw: '#1c1c1e' },
+  { id: 'light', label: 'Light', sw: '#d9d9d4' }, { id: 'sepia', label: 'Sepia', sw: '#efe0bd' }, { id: 'dark', label: 'Dark', sw: '#1c1c1e' },
 ];
 
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
@@ -943,10 +943,11 @@ const CSS = `
   position: relative; width: 100%; height: 100%; overflow: hidden; background: #161714; color: var(--ink);
   font-family: var(--sa-f, 'Hanken Grotesk', system-ui, -apple-system, sans-serif); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
 .pdv-stage { display: grid; place-items: center; padding: 24px; }
-/* one glass tier: soft vertical falloff, hairline rim, clean drop — no white gloss */
-.pdv-g { background: linear-gradient(180deg, rgba(36,37,33,.86), rgba(15,16,13,.92)); border: 1px solid var(--line);
-  -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
-  box-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 rgba(0,0,0,.35), 0 18px 40px -18px rgba(0,0,0,.85); }
+/* dense neutral glass: near-opaque so a white PDF page cannot bleed through and
+   tint the chrome. No saturate boost, no white sheen. */
+.pdv-g { background: linear-gradient(180deg, rgba(32,33,29,.97), rgba(14,15,12,.985)); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  box-shadow: inset 0 1px 0 rgba(232,231,225,.06), inset 0 -1px 0 rgba(0,0,0,.4), 0 18px 40px -18px rgba(0,0,0,.9); }
 .pdv[data-tool="draw"] { cursor: crosshair; } .pdv[data-tool="erase"] { cursor: pointer; }
 
 /* buttons */
@@ -955,7 +956,7 @@ const CSS = `
 .pdv-btn[data-on="true"] { background: rgba(232,231,225,.16); color: var(--ink); }
 .pdv-btn:disabled { opacity: .3; pointer-events: none; }
 .pdv-btn:focus-visible, .pdv-row:focus-visible, .pdv-pct:focus-visible, .pdv-pill:focus-visible, .pdv-thumb:focus-visible { outline: 2px solid rgba(232,231,225,.85); outline-offset: 2px; }
-.pdv-dot { display: block; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.35); }
+.pdv-dot { display: block; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(232,231,225,.16); }
 .pdv-vsep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--line); }
 
 /* docks */
@@ -996,14 +997,14 @@ const CSS = `
 .pdv-popl { left: 0; top: calc(100% + 10px); } .pdv-popr { right: 0; top: calc(100% + 10px); } .pdv-popup { left: 0; bottom: calc(100% + 10px); }
 .pdv-colors { display: flex; gap: 8px; min-width: 0; width: max-content; padding: 10px 12px; border-radius: 999px; left: 0; right: 0; margin: 0 auto; top: calc(100% + 10px); }
 .pdv-markup-m .pdv-colors { top: auto; bottom: calc(100% + 10px); }
-.pdv-swatch { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.3); }
+.pdv-swatch { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1.5px rgba(232,231,225,.14); }
 .pdv-swatch[data-on="true"] { box-shadow: 0 0 0 2px var(--fill), 0 0 0 4px var(--ink); }
 .pdv-row { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 12px 0 6px; border: 0; border-radius: 11px; background: none; color: var(--ink); font: 500 13.5px/1 inherit; text-align: left; cursor: pointer; transition: background .15s; }
 .pdv[data-compact="true"] .pdv-row { height: 44px; font-size: 15px; }
 .pdv-row:hover { background: rgba(232,231,225,.12); } .pdv-row:disabled { opacity: .35; pointer-events: none; }
 .pdv-chk { display: grid; place-items: center; width: 20px; flex: none; }
 .pdv-rl { flex: 1; } .pdv-hint { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
-.pdv-sw { flex: none; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
+.pdv-sw { flex: none; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(232,231,225,.14); }
 .pdv-sep { height: 1px; margin: 5px 8px; background: var(--line); }
 
 /* sidebar island + mobile sheet */
@@ -1049,7 +1050,7 @@ const CSS = `
 .pdv-layer { position: absolute; inset: 0; z-index: 4; } .pdv-layer[data-tool="draw"] { cursor: crosshair; } .pdv-layer[data-tool="text"] { cursor: text; } .pdv-layer[data-tool="note"] { cursor: copy; }
 .pdv-ann { position: absolute; z-index: 3; }
 .pdv-textbox { min-width: 36px; padding: 2px 5px; border-radius: 6px; outline: none; white-space: pre-wrap; cursor: text; font: 500 calc(15px * var(--pdv-s, 1)) / 1.25 var(--sa-f, system-ui, sans-serif); }
-.pdv-textbox:focus { background: rgba(255,255,255,.75); box-shadow: 0 0 0 1.5px currentColor; } .pdv-textbox:empty::before { content: 'Text'; opacity: .45; }
+.pdv-textbox:focus { background: rgba(28,29,26,.92); box-shadow: 0 0 0 1.5px currentColor; } .pdv-textbox:empty::before { content: 'Text'; opacity: .45; }
 .pdv-note { translate: -50% -100%; } .pdv-note > button { padding: 0; border: 0; background: none; cursor: pointer; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); line-height: 0; }
 .pdv-notebox { position: absolute; left: 0; top: calc(100% + 6px); width: 210px; min-height: 88px; padding: 10px 12px; border-radius: 14px; resize: none; outline: none; color: var(--ink); font: 400 13px/1.45 inherit; }
 .pdv-selwrap { position: fixed; z-index: 70; width: 0; height: 0; }

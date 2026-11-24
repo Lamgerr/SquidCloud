@@ -1115,7 +1115,7 @@ const CSS = `
 .cbp-wait { position: absolute; left: 50%; top: 50%; z-index: 12; display: grid; justify-items: center; gap: 12px; pointer-events: none; }
 .cbp-spin { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 999px; }
 .cbp-spin svg { animation: cbp-rot 1s linear infinite; }
-.cbp-spin circle { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 56 88; }
+.cbp-spin circle { fill: none; stroke: #e8e7e1; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 56 88; }
 @keyframes cbp-rot { to { transform: rotate(360deg); } }
 .cbp-waitlab { font: 500 12px/1 inherit; color: var(--ink-dim); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
 .cbp-flash { position: absolute; left: 50%; top: 50%; z-index: 14; display: grid; place-items: center; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 999px; pointer-events: none; }
@@ -1128,7 +1128,7 @@ const CSS = `
 .cbp-gesture svg { opacity: .8; }
 .cbp-file { display: none; }
 .cbp-cue { position: absolute; left: 0; right: 0; z-index: 10; display: flex; justify-content: center; padding: 0 6%; pointer-events: none; }
-.cbp-cue span { max-width: 880px; text-align: center; white-space: pre-line; font: 600 clamp(16px, 2.3vw, 26px)/1.3 inherit; color: #fff;
+.cbp-cue span { max-width: 880px; text-align: center; white-space: pre-line; font: 600 clamp(16px, 2.3vw, 26px)/1.3 inherit; color: #e8e7e1;
   text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 2px 14px rgba(0,0,0,.75); }
 .cbp-stats { position: absolute; top: max(16px, env(safe-area-inset-top)); left: 16px; z-index: 25; min-width: 220px; padding: 12px 14px; border-radius: 16px; display: grid; gap: 7px; font-size: 12px; }
 .cbp-stats[data-compact="true"] { top: auto; bottom: 120px; }

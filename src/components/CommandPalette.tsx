@@ -99,12 +99,12 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 /* Squid AI mode — bring back the soft colour, but keep the dock shape */
 .spot-pill::before, .spot-ai::before, .spot-pill::after, .spot-ai::after { content: ''; position: absolute; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .7s ease; }
 .spot-pill::before, .spot-ai::before { inset: 0; z-index: -1; background-size: 220% 220%; }
-.spot-pill::after, .spot-ai::after { inset: -1px; z-index: 1; border: 1px solid rgba(255,255,255,.34); box-shadow: 0 0 22px rgba(140,150,255,.3), 0 0 2px rgba(255,255,255,.5), inset 0 0 18px rgba(170,160,255,.14); }
-.spot-pill[data-ai="true"] { --ink: #fff; --mute: rgba(255,255,255,.62); background-color: rgba(14,15,24,.97);
+.spot-pill::after, .spot-ai::after { inset: -1px; z-index: 1; border: 1px solid rgba(232,231,225,.18); box-shadow: 0 0 22px rgba(140,150,255,.3), 0 0 2px rgba(232,231,225,.18), inset 0 0 18px rgba(170,160,255,.14); }
+.spot-pill[data-ai="true"] { --ink: #e8e7e1; --mute: rgba(232,231,225,.62); background-color: rgba(14,15,24,.97);
   background-image: ${NANO_GRAIN}, ${NANO_TEXTURE}, linear-gradient(180deg, rgba(34,36,52,.92), rgba(10,11,20,.98));
   background-size: 120px 120px, 200px 200px, auto;
-  border-color: rgba(255,255,255,.16);
-  animation: spot-swell .8s ${SPRING} both; box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 28px 70px -22px rgba(90,100,200,.45); }
+  border-color: rgba(232,231,225,.14);
+  animation: spot-swell .8s ${SPRING} both; box-shadow: inset 0 1px 0 rgba(232,231,225,.16), 0 28px 70px -22px rgba(90,100,200,.45); }
 .spot-pill[data-ai="true"]::before { opacity: 1; animation: spot-drift 7s ease-in-out infinite alternate; background-image:
   radial-gradient(48% 90% at 18% 110%, rgba(122,142,255,.62), transparent 70%), radial-gradient(44% 90% at 52% 120%, rgba(176,140,255,.52), transparent 70%),
   radial-gradient(40% 80% at 84% 115%, rgba(244,164,200,.46), transparent 70%), radial-gradient(30% 70% at 66% -20%, rgba(255,206,160,.3), transparent 70%); }
@@ -112,8 +112,8 @@ html.light .spot-root, html[data-theme="light"] .spot-root { --ink: #e8e7e1; --g
 .spot-ai[data-on="true"]::before { opacity: 1; background-image: radial-gradient(70% 90% at 20% 110%, rgba(122,142,255,.62), transparent 70%), radial-gradient(60% 90% at 85% 110%, rgba(244,164,200,.52), transparent 70%); }
 .spot-pill[data-busy="true"]::before { animation-duration: 2.2s; } .spot-pill[data-busy="true"]::after { animation-duration: 1.4s; }
 .spot-orb { display: block; width: 20px; height: 20px; border-radius: 50%; flex: none; background-color: #1a1c2c; background-size: 220% 220%;
-  background-image: radial-gradient(circle at 28% 24%, rgba(255,255,255,.75), transparent 34%), radial-gradient(circle at 25% 80%, #7a8eff, transparent 60%), radial-gradient(circle at 80% 75%, #f4a4c8, transparent 58%), radial-gradient(circle at 70% 20%, #b08cff, transparent 60%);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.6), 0 0 14px rgba(150,150,255,.5); animation: spot-drift 5s ease-in-out infinite alternate; }
+  background-image: radial-gradient(circle at 28% 24%, rgba(232,231,225,.45), transparent 34%), radial-gradient(circle at 25% 80%, #7a8eff, transparent 60%), radial-gradient(circle at 80% 75%, #f4a4c8, transparent 58%), radial-gradient(circle at 70% 20%, #b08cff, transparent 60%);
+  box-shadow: inset 0 1px 1px rgba(232,231,225,.25), 0 0 14px rgba(150,150,255,.5); animation: spot-drift 5s ease-in-out infinite alternate; }
 .spot-orb[data-busy="true"] { animation-duration: 1.6s; } .spot-orb.big { width: 44px; height: 44px; }
 /* panel */
 .spot-panel { border-radius: 30px; display: grid; grid-template-rows: 0fr; opacity: 0; translate: 0 -10px; scale: .97; transform-origin: top center; pointer-events: none;
