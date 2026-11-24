@@ -27,7 +27,8 @@
     {
       "source": "/api/v1/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Origin", "value": "https://squidcloud.vercel.app" },
+        { "key": "Vary", "value": "Origin" },
         { "key": "Access-Control-Allow-Methods", "value": "GET, POST, DELETE, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "X-SquidCloud-Key, X-SquidCloud-Encryption-Key, Content-Type" }
       ]
@@ -35,7 +36,8 @@
     {
       "source": "/api/epub-proxy(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Origin", "value": "https://squidcloud.vercel.app" },
+        { "key": "Vary", "value": "Origin" },
         { "key": "Access-Control-Allow-Methods", "value": "GET, OPTIONS" }
       ]
     },

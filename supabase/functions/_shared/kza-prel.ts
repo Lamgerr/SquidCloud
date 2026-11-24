@@ -23,8 +23,14 @@ export interface PrelOptions {
   ttlSeconds?: number
 }
 
+// CORS is restricted to the SquidCloud app origin. A wildcard here lets any
+// website that obtains a token read responses from our functions. Native/CLI
+// clients are unaffected by CORS (they are not browsers).
+const APP_ORIGIN = Deno.env.get('APP_ORIGIN')?.trim() ||
+  'https://squidcloud.vercel.app';
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': APP_ORIGIN,
+  'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cip, x-f2fa, x-prel-token, x-prel-session, x-prel-op, x-prel-long-op, x-kza-session, x-upload-chunkindex, x-upload-chunksize, x-upload-chunkcount, x-upload-totalchunks, x-upload-filename, x-upload-filetype, x-upload-totalsize, x-upload-userid, x-upload-path, x-upload-repo, x-upload-nodeid',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
