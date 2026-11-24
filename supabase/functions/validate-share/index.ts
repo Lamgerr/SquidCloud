@@ -26,20 +26,31 @@ serve(async (req) => {
 
       const shareInfo = data[0];
 
+      // SECURITY: access_code is deliberately NOT returned by get_shared_file_info
+      // (it must never reach an anonymous caller). Validate the password with a
+      // service-role lookup here, inside the trusted function.
+      const { data: shareRow } = await supabase
+        .from('shares')
+        .select('access_code, is_active, expires_at')
+        .eq('share_id', shareId)
+        .maybeSingle();
+
+      const requiredCode = shareRow?.access_code?.trim();
+      if (requiredCode && requiredCode !== password) {
+        return jsonResponse({
+          success: false,
+          message: "Password required",
+          requiresPassword: true,
+        }, 401);
+      }
+      if (shareRow && shareRow.is_active === false) {
+        return jsonResponse({ success: false, message: "This share link is no longer active" }, 403);
+      }
+
       if (shareInfo.share_expires_at) {
         const expiresAt = new Date(shareInfo.share_expires_at);
         if (expiresAt < new Date()) {
           return jsonResponse({ success: false, message: "This share link has expired" }, 403);
-        }
-      }
-
-      if (shareInfo.access_code && shareInfo.access_code.trim() !== '') {
-        if (!password || password !== shareInfo.access_code) {
-          return jsonResponse({ 
-            success: false, 
-            message: "Password required",
-            requiresPassword: true 
-          }, 401);
         }
       }
 

@@ -123,3 +123,47 @@ ALTER TABLE public.github_connections FORCE ROW LEVEL SECURITY;
 -- 7. Default privileges: new objects are denied by default.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
+
+-- 8. get_shared_file_info must not disclose storage paths, file tags or the
+-- original encryption key to anonymous share-link holders. Keep the wrapped
+-- share key (useless without the URL fragment secret) and metadata only.
+CREATE OR REPLACE FUNCTION public.get_shared_file_info(share_id_param text)
+ RETURNS TABLE(file_id uuid, file_name text, file_type text, file_size bigint,
+   file_created_at timestamp with time zone, file_updated_at timestamp with time zone,
+   is_encrypted boolean, owner_id uuid, share_created_at timestamp with time zone,
+   share_expires_at timestamp with time zone, share_download_limit integer,
+   share_download_count integer, share_view_only boolean, share_require_email boolean,
+   shared_encryption_key text, is_folder_share boolean, folder_id uuid,
+   folder_name text, is_byok boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = public
+AS $function$
+DECLARE
+  v_folder_id uuid;
+  v_is_folder boolean;
+BEGIN
+  SELECT s.folder_id INTO v_folder_id FROM public.shares s WHERE s.share_id = share_id_param;
+  v_is_folder := v_folder_id IS NOT NULL;
+
+  IF v_is_folder THEN
+    RETURN QUERY
+    SELECT NULL::uuid, f.name, 'inode/directory'::text, 0::bigint, f.created_at, f.updated_at,
+           false, f.user_id, s.created_at, s.expires_at, NULL::integer, NULL::integer,
+           NULL::boolean, NULL::boolean, s.shared_encryption_key, true, s.folder_id, f.name, false
+    FROM public.shares s JOIN public.folders f ON s.folder_id = f.id
+    WHERE s.share_id = share_id_param AND (s.expires_at IS NULL OR s.expires_at > NOW())
+      AND s.is_active IS NOT FALSE;
+  ELSE
+    RETURN QUERY
+    SELECT f.id, f.name, f.type, f.size, f.created_at, f.updated_at, f.encrypted,
+           f.user_id, s.created_at, s.expires_at, s.download_limit, s.download_count,
+           s.view_only, s.require_email, s.shared_encryption_key, false,
+           NULL::uuid, NULL::text,
+           (f.encryption_key IN ('sha256:byok_encrypted','byok_encrypted'))
+    FROM public.shares s JOIN public.files f ON s.file_id = f.id
+    WHERE s.share_id = share_id_param AND (s.expires_at IS NULL OR s.expires_at > NOW())
+      AND s.is_active IS NOT FALSE;
+  END IF;
+END;
+$function$;
