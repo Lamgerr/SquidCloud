@@ -6,17 +6,19 @@
     "CLIENT: default managed uploads escrow raw AES key to server (file-key/store-file-key) with KEK from SQUIDVEIL_MASTER_KEY - NOT zero-knowledge; false docs claims. store-file-key failure writes raw key into files.tags (res54.ts:782-791), which get_shared_file_info returns to anon. file-key bypasses PREL/f2fa for JWT holders (132-143). Markdown preview uses weak blocklist sanitizer + dangerouslySetInnerHTML.",
     "SUPABASE CRITICAL (live): shares RLS policy returns ALL public share rows incl shared_encryption_key + access_code; get_shared_file_info / get_file_for_share are anon-callable SECURITY DEFINER key/path oracles with no password check; update_share_options lets anon overwrite any share; get_secret is anon-callable vault reader; files bucket public; anon has EXECUTE on kza_prel token-signing primitives; several key functions verify_jwt=false; hardcoded backfill token.",
     "VERIFIED OK: profile is_admin/tier NOT user-writable; github_connections token RLS owner-only; file_key_vault scoped; file-key JWT path guarded. No changes made - read-only.",
-    "Proposed phased plan: Phase 0 SQL containment (revoke grants/policies), Phase 1 BFF with HttpOnly cookies, Phase 2 user-held key hierarchy for true E2E."
+    "Proposed phased plan: Phase 0 SQL containment (revoke grants/policies), Phase 1 BFF with HttpOnly cookies, Phase 2 user-held key hierarchy for true E2E.",
+    "2026-11-24: Wrote design doc docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md; independent reviewer found 8 blockers (contradictory key hierarchy, unsafe migration, PRF salt/per-credential issue, BFF raw-key exposure, share password leak, incomplete Phase 0, missing AAD/nonce discipline). Rewrote as v2 fixing all blockers; 2 open decisions remain for the human."
   ],
   "key_numbers": {
     "audits": 2,
     "critical_findings": 3,
     "high_findings": 4,
-    "code_changes": 0
+    "code_changes": 0,
+    "design_doc": "docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md"
   },
   "blockers": [
     "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
     "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Present consolidated findings + phased remediation; await direction on Phase 0 containment and migration scope."
+  "next": "Await approval of design v2 + answers on legacy cutover and client scope; then invoke writing-plans."
 }
