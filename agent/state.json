@@ -1,23 +1,22 @@
 {
-  "goal": "Restore legacy GitHub-repo file downloads and deprecate the user-facing Books/DeepRead section.",
+  "goal": "Security review of SquidCloud encryption keys + design an internal API layer; two read-only audits completed.",
   "goal_source": "interactive query from human (404 on squidcloud-cluster legacy chunk downloads; deprecate deepread/books UI)",
   "last_actions": [
-    "2026-11-24: Systematic debugging. Traced the failing payload to the legacy GitHub branch of squidcloud-cluster. Live CLI SQL showed the failing file dcd032b5 with repo dataMatrix_mczm2tm6_0 and accountId 1; chunks live under GitHub account LamGPT123, while the edge function used global GITHUB_USERNAME/GITHUB_TOKEN (and the DB github_connections username hellosquidcloud) — both returned 404.",
-    "Verified with the user-supplied token: api.github.com/user => LamGPT123, and the exact chunk URL returned HTTP 200 with that token (404 anonymously and with hellosquidcloud's token). Root cause confirmed.",
-    "Stored dedicated secrets LEGACY_STORAGE_GITHUB_TOKEN / LEGACY_STORAGE_GITHUB_USERNAME via supabase CLI (token not written to repo). Rewrote the legacy download branches in squidcloud-cluster and github-storage to try: dedicated storage account, requesting user's github_connections, indexed legacy accounts, all global accounts, then public access. Deployed both functions via CLI.",
-    "Deprecation: removed Books tab + catalog panels from Dashboard, removed standalone DeepReadReader mounts from Dashboard, FileCard, MobileEnhancedUI, ManageFileRequests and SharePage. Instant preview modal still renders DeepReadReader for EPUBs.",
-    "Verified no token string in repo, syntax balance; committed de2baf40; Vercel READY."
+    "2026-11-24: Launched two read-only audits (client key handling; Supabase DB/functions) plus independent repo/CLI checks.",
+    "CLIENT: default managed uploads escrow raw AES key to server (file-key/store-file-key) with KEK from SQUIDVEIL_MASTER_KEY - NOT zero-knowledge; false docs claims. store-file-key failure writes raw key into files.tags (res54.ts:782-791), which get_shared_file_info returns to anon. file-key bypasses PREL/f2fa for JWT holders (132-143). Markdown preview uses weak blocklist sanitizer + dangerouslySetInnerHTML.",
+    "SUPABASE CRITICAL (live): shares RLS policy returns ALL public share rows incl shared_encryption_key + access_code; get_shared_file_info / get_file_for_share are anon-callable SECURITY DEFINER key/path oracles with no password check; update_share_options lets anon overwrite any share; get_secret is anon-callable vault reader; files bucket public; anon has EXECUTE on kza_prel token-signing primitives; several key functions verify_jwt=false; hardcoded backfill token.",
+    "VERIFIED OK: profile is_admin/tier NOT user-writable; github_connections token RLS owner-only; file_key_vault scoped; file-key JWT path guarded. No changes made - read-only.",
+    "Proposed phased plan: Phase 0 SQL containment (revoke grants/policies), Phase 1 BFF with HttpOnly cookies, Phase 2 user-held key hierarchy for true E2E."
   ],
   "key_numbers": {
-    "commit": "de2baf40",
-    "deploy_url": "https://cloudbliss-storage-5yw6gy30f-sqc.vercel.app",
-    "deploy_state": "READY",
-    "edge_functions_deployed": ["squidcloud-cluster", "github-storage"],
-    "supabase_project": "aouqcwbdoyrccjcrhzzi"
+    "audits": 2,
+    "critical_findings": 3,
+    "high_findings": 4,
+    "code_changes": 0
   },
   "blockers": [
-    "No local tsc/deno; Vercel build and Supabase CLI deploy are authoritative.",
-    "End-to-end edge function invocation could not be run without the app's PREL token (function returned KZA_PREL_MISSING for an anonymous test); the underlying GitHub fetch is independently verified at HTTP 200."
+    "No code changes made yet - user asked for review/design only (brainstorming gate: design approval before implementation).",
+    "Open decision: whether existing managed files must be client-side re-encrypted to user-held keys, or only new files get true E2E."
   ],
-  "next": "Have the human retry an old file in the app; if a specific repo still 404s, check which GitHub account owns it and add another credential or repo-owner mapping."
+  "next": "Present consolidated findings + phased remediation; await direction on Phase 0 containment and migration scope."
 }

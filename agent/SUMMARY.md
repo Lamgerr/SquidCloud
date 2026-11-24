@@ -1,16 +1,18 @@
 # What happened while you were away
 
 ## Done
-- **Legacy file downloads fixed.** Old chunks stored only a repo name + account index; the edge functions guessed the owner from global env accounts that no longer own those repos, so GitHub returned 404. Live CLI SQL and a direct GitHub API test confirmed the repos live under `LamGPT123`. Both `squidcloud-cluster` and `github-storage` now resolve the owner at read time: a dedicated storage credential first, then the requesting user's GitHub connection, then the legacy accounts and public access. Both functions were redeployed. The supplied token was stored only as a Supabase secret — it is not in the repo.
-- **Books / DeepRead deprecated in the UI.** Removed the Books tab and catalog from the Dashboard and all standalone reader mounts across FileCard, MobileEnhancedUI, ManageFileRequests and SharePage. EPUBs remain readable inline in the instant preview modal.
-- Committed `de2baf40`. Web app **READY** at `https://cloudbliss-storage-5yw6gy30f-sqc.vercel.app`.
+- **Security review completed (read-only, no changes made).** Two audits: client-side key handling and Supabase-side DB/functions, plus independent CLI SQL checks.
+- **Critical live issues found on Supabase:** any authenticated user can enumerate all public share rows including `shared_encryption_key` and `access_code`; `get_shared_file_info` / `get_file_for_share` are anon-callable SECURITY DEFINER functions that return keys and storage paths with no password check (edge-function password checks are dead code because `access_code` isn't even returned); `update_share_options` lets anon overwrite any share; `get_secret` is an anon-callable vault-secret reader; the `files` bucket is public; `anon` has EXECUTE on token-signing primitives; several key functions have `verify_jwt=false` and one has a hardcoded maintenance token.
+- **Client side:** default managed uploads escrow the raw AES key to the server, so "zero-knowledge" claims are false; a fallback writes the raw key into `files.tags`; the key RPC bypasses step-up for JWT holders; the markdown preview sanitizer is a weak blocklist.
+- **Verified OK:** profile admin/tier fields are not user-writable, GitHub tokens are RLS owner-only, `file_key_vault` is scoped, and `file-key`'s JWT path does validate ownership. No plaintext key values are logged.
+- Proposed a three-phase fix: (0) SQL containment, (1) BFF with HttpOnly cookies, (2) user-held keys for true E2E.
 
 ## In progress
-- Nothing actively being edited. Please retry an old file in the app.
+- Nothing being edited. Awaiting direction.
 
 ## Blocked / needs a decision
-- No local `tsc`/`deno`; Vercel build and Supabase CLI deploy are authoritative.
-- An anonymous invoke of the edge function is blocked by the app's PREL token (`KZA_PREL_MISSING`); the exact GitHub fetch behind the fix was independently verified at HTTP 200.
+- Review only per your request; the brainstorming gate means no implementation until a design is agreed.
+- Open decision: must existing managed files be re-encrypted client-side to user-held keys on next open, or should only new files be true E2E?
 
 ## Queued next
-- If any specific repo still 404s, identify its owner and add a credential or repo-owner mapping.
+- Phase 0 containment if you approve; then the BFF design doc and plan.
