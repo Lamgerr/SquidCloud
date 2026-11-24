@@ -50,7 +50,6 @@ const PREVIEW_CSS = `${GRAIN_CSS}
   bottom: calc(20px + env(safe-area-inset-bottom)) !important;
   min-width: 114px; min-height: 52px; pointer-events: auto; touch-action: none; cursor: pointer; }
 .pv-dock.sq-orb-slot[data-edge="true"] { top: 50% !important; bottom: auto !important; min-width: 52px; min-height: 114px; }
-.pv-dock.sq-orb-slot::before { display: none !important; }   /* no glossy conic rim */
 .pv-blob { position: absolute; inset: 0; height: auto; border-radius: inherit; pointer-events: none; }
 .pv-dock-row { position: absolute; display: flex; gap: 10px; }
 
@@ -260,8 +259,8 @@ const GEO = {
 } as const;
 const OPEN_R = 26;
 const spring = (stiffness: number, damping: number, extra: object = {}) => ({ type: 'spring' as const, stiffness, damping, mass: 1, ...extra });
-const rubber = (d: number) => (d > 0 ? 44 * (1 - Math.exp(-d / 140)) : 0);   // gentle, capped stretch
-const faceSpring = { type: 'spring' as const, stiffness: 320, damping: 30, mass: 1 };
+const rubber = (d: number) => (d > 0 ? 96 * (1 - Math.exp(-d / 120)) : 0);   // soft-capped stretch
+const faceSpring = { type: 'spring' as const, stiffness: 520, damping: 15, mass: 0.8 };
 
 const MinimizeGlyph: React.FC<{ size?: number }> = ({ size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -276,8 +275,8 @@ const FloatingDock: React.FC<{ reduce: boolean; side: DockSide; resetKey: unknow
 
   const w = useMotionValue<number>(g.open.w), h = useMotionValue<number>(g.open.h);
   const rTL = useMotionValue(OPEN_R), rTR = useMotionValue(OPEN_R), rBR = useMotionValue(OPEN_R), rBL = useMotionValue(OPEN_R);
-  const mw = useSpring(0, { stiffness: 240, damping: 26, mass: 1 });
-  const mh = useSpring(0, { stiffness: 240, damping: 26, mass: 1 });
+  const mw = useSpring(0, { stiffness: 190, damping: 13, mass: 0.8 });
+  const mh = useSpring(0, { stiffness: 190, damping: 13, mass: 0.8 });
   const width = useTransform([w, mw], ([a, b]: number[]) => Math.max(24, a + b));
   const height = useTransform([h, mh], ([a, b]: number[]) => Math.max(24, a + b));
   const radius = useTransform([rTL, rTR, rBR, rBL], (v: number[]) => v.map((n) => `${Math.max(0, n)}px`).join(' '));
@@ -302,15 +301,15 @@ const FloatingDock: React.FC<{ reduce: boolean; side: DockSide; resetKey: unknow
       return;
     }
     if (open) {
-      animate(w, G.open.w, spring(320, 30));
-      animate(h, G.open.h, spring(320, 30));
-      [rTL, rTR, rBR, rBL].forEach((v) => animate(v, OPEN_R, spring(300, 30)));
+      animate(w, G.open.w, spring(300, 12));
+      animate(h, G.open.h, spring(320, 13, { velocity: edge ? 140 : -140 }));
+      [rTL, rTR, rBR, rBL].forEach((v) => animate(v, OPEN_R, spring(260, 15)));
     } else {
-      animate(w, G.dock.w, spring(300, 32));
-      animate(h, G.dock.h, spring(300, 32));
-      [rTL, rTR, rBR, rBL].forEach((v, i) => animate(v, G.r[i], spring(320, 34)));
+      animate(w, G.dock.w, spring(210, 9));
+      animate(h, G.dock.h, spring(240, 10, { velocity: 260 }));
+      [rTL, rTR, rBR, rBL].forEach((v, i) => animate(v, G.r[i], i === 2 ? spring(700, 40) : spring(300, i === 0 ? 16 : 12)));
     }
-  }, [reduce, w, h, rTL, rTR, rBR, rBL, mw, mh]);
+  }, [reduce, edge, w, h, rTL, rTR, rBR, rBL, mw, mh]);
   const settleRef = useRef(settle); settleRef.current = settle;
 
   const hold = () => window.clearTimeout(timer.current);
@@ -329,7 +328,7 @@ const FloatingDock: React.FC<{ reduce: boolean; side: DockSide; resetKey: unknow
       const dy = ed ? Math.abs(e.clientY - window.innerHeight / 2) : window.innerHeight - e.clientY;
       const d = Math.hypot(dx, dy) || 1, R = 240;
       if (d >= R) { mw.set(0); mh.set(0); return; }
-      const pull = Math.pow(1 - d / R, 2) * 16;
+      const pull = Math.pow(1 - d / R, 2) * 46;
       mw.set((pull * dx) / d); mh.set(((ed ? 0.7 : 1) * pull * dy) / d);
     };
     window.addEventListener('pointermove', move);
@@ -337,8 +336,8 @@ const FloatingDock: React.FC<{ reduce: boolean; side: DockSide; resetKey: unknow
   }, [reduce, mw, mh]);
 
   const stretchY = (oy: number) => (edge ? rubber(Math.abs(oy)) * 0.5 : rubber(-oy));
-  const press = reduce ? undefined : { scaleX: 0.97, scaleY: 0.95 };
-  const hoverFx = reduce ? undefined : { scale: 1.02 };
+  const press = reduce ? undefined : { scaleX: 0.93, scaleY: 0.86 };
+  const hoverFx = reduce ? undefined : { scale: 1.045 };
   const rowStyle: React.CSSProperties = edge
     ? { right: 0, top: '50%', marginTop: -57, width: 52, height: 114, flexDirection: 'column', transformOrigin: '100% 50%' }
     : { right: 0, bottom: 0, width: 114, height: 52, flexDirection: 'row', transformOrigin: '100% 100%' };

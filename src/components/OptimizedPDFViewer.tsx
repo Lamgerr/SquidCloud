@@ -728,13 +728,15 @@ export default function OptimizedPDFViewer({ file, blobUrl, pdfBlob, onDownload 
     </motion.div>
   );
   const titleChip = (
-    <motion.div key="title" className="pdv-g pdv-title" initial={reduce ? false : { opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} transition={T}>
+    <motion.div key="title" className="pdv-g pdv-dock pdv-title" initial={reduce ? false : { opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} transition={T}>
+      <Btn reduce={reduce} size={32} label="Previous page" disabled={page <= 1} onClick={() => goTo(page - step)}><Ico n="left" size={18} /></Btn>
       <span className="pdv-name" title={file.name}>{file.name.replace(/\.pdf$/i, '')}</span>
       <i className="pdv-vsep" />
       <input className="pdv-pg" inputMode="numeric" aria-label="Page number" value={pageInput} style={{ width: `${Math.max(2, pageInput.length) + 0.6}ch` }}
         onChange={(e) => setPageInput(e.target.value.replace(/\D/g, ''))} onFocus={(e) => e.target.select()}
         onKeyDown={(e) => { if (e.key === 'Enter') { goTo(parseInt(pageInput, 10) || page); (e.target as HTMLInputElement).blur(); } }} onBlur={() => setPageInput(String(page))} />
       <span className="pdv-of">of {n}</span>
+      <Btn reduce={reduce} size={32} label="Next page" disabled={page + step > n} onClick={() => goTo(page + step)}><Ico n="right" size={18} /></Btn>
     </motion.div>
   );
   const viewMenu = menu === 'view' && (
@@ -758,6 +760,10 @@ export default function OptimizedPDFViewer({ file, blobUrl, pdfBlob, onDownload 
         <div className="pdv-sep" /><Row label="Fit Width" checked={zoomMode === 'width'} onClick={() => { setZoomMode('width'); setMenu(null); }} />
         <Row label="Fit Page" checked={zoomMode === 'page'} onClick={() => { setZoomMode('page'); setMenu(null); }} /><div className="pdv-sep" />
       </>}
+      <Row label="Search" hint="⌘F" onClick={() => { setSearching(true); setMenu(null); }} />
+      <Row label={marked ? 'Remove Bookmark' : 'Bookmark Page'} checked={marked} onClick={() => { toggleMark(); setMenu(null); }} />
+      <Row label="Markup" checked={markup} onClick={() => { setMarkup((m) => !m); if (markup) setTool('select'); setMenu(null); }} />
+      <div className="pdv-sep" />
       <Row label="Rotate Left" onClick={() => { rotate(-90); setMenu(null); }} /><Row label="Rotate Right" onClick={() => { rotate(90); setMenu(null); }} /><div className="pdv-sep" />
       {onDownload && <Row label="Download" onClick={() => { onDownload(); setMenu(null); }} />}
       <Row label="Export Annotations" disabled={!anns.length} onClick={() => { exportNotes(); setMenu(null); }} />
@@ -867,8 +873,6 @@ export default function OptimizedPDFViewer({ file, blobUrl, pdfBlob, onDownload 
                 <button type="button" className="pdv-pct" data-on={menu === 'zoom'} onClick={() => openMenu('zoom')} aria-label="Zoom options">{zoomPct}%</button>
                 <Btn reduce={reduce} label="Zoom in" onClick={() => zoomBy(1.25)}><Ico n="zin" /></Btn>
                 <i className="pdv-vsep" />
-                <Btn reduce={reduce} label={marked ? 'Remove bookmark' : 'Bookmark page'} on={marked} onClick={toggleMark}><Ico n="bookmark" fill={marked} /></Btn>
-                <Btn reduce={reduce} label="Markup" on={markup} onClick={() => { setMarkup((m) => !m); if (markup) setTool('select'); }}><Ico n="markup" /></Btn>
                 <Btn reduce={reduce} label="Search" on={searching} onClick={() => (searching ? closeSearch() : setSearching(true))}><Ico n="search" /></Btn>
                 <Btn reduce={reduce} label="More" on={menu === 'more'} onClick={() => openMenu('more')}><Ico n="more" /></Btn>
               </div>
@@ -887,16 +891,6 @@ export default function OptimizedPDFViewer({ file, blobUrl, pdfBlob, onDownload 
 
       {!compact && <div className="pdv-row2" data-hidden={hidden}><AnimatePresence>{markupDock}</AnimatePresence></div>}
 
-      {/* transient page HUD (desktop) */}
-      {!compact && (
-        <div className="pdv-bot"><AnimatePresence>{hud && !hidden && (
-          <motion.div className="pdv-g pdv-dock pdv-hud" onPointerEnter={() => setHud(true)} initial={reduce ? false : { opacity: 0, y: 18, scaleX: 0.9, scaleY: 0.8 }} animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1 }} exit={{ opacity: 0, y: 12, scaleX: 0.94, scaleY: 0.88 }} transition={T}>
-            <Btn reduce={reduce} size={32} label="Previous page" disabled={page <= 1} onClick={() => goTo(page - step)}><Ico n="left" size={18} /></Btn>
-            <span className="pdv-hudtxt">{page}{layout === 'dual' && page + 1 <= n ? `–${page + 1}` : ''} of {n}</span>
-            <Btn reduce={reduce} size={32} label="Next page" disabled={page + step > n} onClick={() => goTo(page + step)}><Ico n="right" size={18} /></Btn>
-          </motion.div>)}</AnimatePresence></div>
-      )}
-
       {/* mobile dock, left-aligned so the modal's own dock keeps the right corner */}
       {compact && (
         <motion.div className="pdv-botm" animate={{ y: hidden ? 110 : 0, opacity: hidden ? 0 : 1 }} transition={T} style={{ pointerEvents: hidden ? 'none' : undefined }}>
@@ -905,9 +899,7 @@ export default function OptimizedPDFViewer({ file, blobUrl, pdfBlob, onDownload 
             <AnimatePresence>{moreMenu}</AnimatePresence>
             <div className="pdv-g pdv-dock">
               <Btn reduce={reduce} size={44} label="Pages" on={sidebarOpen} onClick={() => setSidebarOpen((s) => !s)}><Ico n="grid" /></Btn>
-              <Btn reduce={reduce} size={44} label="Search" on={searching} onClick={() => (searching ? closeSearch() : setSearching(true))}><Ico n="search" /></Btn>
               <Btn reduce={reduce} size={44} label="Markup" on={markup} onClick={() => { setMarkup((m) => !m); if (markup) setTool('select'); }}><Ico n="markup" /></Btn>
-              <Btn reduce={reduce} size={44} label={marked ? 'Remove bookmark' : 'Bookmark page'} on={marked} onClick={toggleMark}><Ico n="bookmark" fill={marked} /></Btn>
               <Btn reduce={reduce} size={44} label="More" on={menu === 'more'} onClick={() => openMenu('more')}><Ico n="more" /></Btn>
             </div>
           </div>
@@ -951,8 +943,10 @@ const CSS = `
   position: relative; width: 100%; height: 100%; overflow: hidden; background: #161714; color: var(--ink);
   font-family: var(--sa-f, 'Hanken Grotesk', system-ui, -apple-system, sans-serif); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
 .pdv-stage { display: grid; place-items: center; padding: 24px; }
-.pdv-g { background: var(--fill); border: 1px solid var(--line); -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
-  box-shadow: inset 0 1px 0 var(--rim), 0 16px 36px -16px rgba(0,0,0,.75); }
+/* one glass tier: soft vertical falloff, hairline rim, clean drop — no white gloss */
+.pdv-g { background: linear-gradient(180deg, rgba(36,37,33,.86), rgba(15,16,13,.92)); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: inset 0 1px 0 var(--rim), inset 0 -1px 0 rgba(0,0,0,.35), 0 18px 40px -18px rgba(0,0,0,.85); }
 .pdv[data-tool="draw"] { cursor: crosshair; } .pdv[data-tool="erase"] { cursor: pointer; }
 
 /* buttons */
@@ -974,7 +968,8 @@ const CSS = `
 .pdv-dock { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; }
 .pdv-pct { min-width: 54px; height: 38px; padding: 0 6px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font: 500 12.5px/1 inherit; font-variant-numeric: tabular-nums; cursor: pointer; transition: background .2s; }
 .pdv-pct:hover, .pdv-pct[data-on="true"] { background: rgba(232,231,225,.12); }
-.pdv-title { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px 0 18px; border-radius: 999px; max-width: 100%; }
+.pdv-title { display: flex; align-items: center; gap: 4px; height: 46px; padding: 4px 6px; border-radius: 999px; max-width: 100%; }
+.pdv-title .pdv-name { padding-left: 8px; }
 .pdv-title-m { height: 44px; padding: 0 16px; max-width: min(72vw, 320px); color: var(--ink); cursor: pointer; font-family: inherit; }
 .pdv-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; font: 600 13.5px/1 inherit; letter-spacing: -.005em; }
 .pdv-of { color: var(--dim); font: 500 13px/1 inherit; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -1067,7 +1062,9 @@ const CSS = `
 .pdv-card { display: grid; justify-items: center; gap: 12px; width: min(400px, 100%); padding: 28px 26px 24px; border-radius: 26px; text-align: center; }
 .pdv-card h3 { margin: 4px 0 0; font: 600 17px/1.2 inherit; } .pdv-card p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--dim); }
 .pdv-cico { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: rgba(232,231,225,.1); }
-.pdv-pill { height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: rgba(255,255,255,.92); color: #121310; font: 600 14px/1 inherit; cursor: pointer; transition: transform .5s cubic-bezier(.34,1.56,.64,1); }
+.pdv-pill { height: 44px; padding: 0 22px; border: 1px solid var(--line); border-radius: 999px;
+  background: linear-gradient(180deg, rgba(36,37,33,.9), rgba(15,16,13,.94)); color: var(--ink); font: 600 14px/1 inherit; cursor: pointer; transition: transform .35s cubic-bezier(.34,1.4,.64,1), background .2s; }
+.pdv-pill:hover { background: linear-gradient(180deg, rgba(48,49,44,.92), rgba(20,21,18,.94)); }
 .pdv-pill:hover { transform: scale(1.04); } .pdv-pill:active { transform: scale(.94, .88); }
 
 @media (prefers-reduced-motion: reduce) { .pdv-skel, .pdv-spin svg { animation: none !important; } .pdv-thumbimg, .pdv-pill { transition-duration: .01ms !important; } }
