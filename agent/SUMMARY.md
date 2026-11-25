@@ -1,18 +1,21 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- **Vault unlock fixed**: verifies the real passphrase against the BYOK account-key hash in `user_encryption_settings` (with legacy fallback), then derives the in-memory vault key.
-- **All browser console errors routed through BFF**: `security_events` writes and `system_settings.maintenance_mode` reads now use a service-role BFF client, eliminating 42501 anon/RLS errors. Live checks: maintenance read 200, unauth security event 401.
-- **Vault reset forces re-login** via `supabase.auth.signOut()` and redirect to `/auth?reason=vault-reset`.
-- **Layout seam + rail box**: viewport-fixed wash replaced with document-level background; settings roots have uniform background and rail is forced transparent with inline overrides.
-- BFF response hang and edge 403 were fixed in the prior pass. Vercel READY.
+- Vault unlock now routes passphrase verification through the BFF (`vault-pass-meta`), eliminating the Firefox CORS block. Client receives only the Argon2 hash+salt and verifies locally.
+- Vault unlock verifies the real BYOK account-key passphrase (legacy fallback retained).
+- Security events and maintenance status route through the BFF service-role client; no anon 42501 errors.
+- Vault reset forces sign-out/re-login.
+- Layout seam eliminated: ambient wash moved from a viewport-fixed body pseudo-element to the full-document `.sa` shell; settings roots use document-sized wash; rail forced transparent.
+- BFF actual responses fixed (no more 300s timeout); edge 403 gate removed.
+- Vercel READY.
 
-## Blocked — needs a decision
-- Supabase service-role key from old history still live; user deprioritized rotation.
-- No local browser rendering; cannot self-verify visual quality.
+## Blocked / known
+- Supabase service-role key from old history still live (user deprioritized rotation).
+- Realtime websocket errors come from other Supabase channels (signals/support/share surveillance), not the routes changed here; left untouched.
+- No local browser rendering; user verifies visually.
 
 ## Queued next
-1. User to retest vault unlock with the real account-key passphrase and check the settings layout.
-2. If unlock still fails, inspect logs for which verification path fired.
+1. User retest: vault unlock, layout seam, reset flow.
+2. If realtime websocket errors remain disruptive, migrate those channels to BFF polling or disable them.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
