@@ -3,7 +3,7 @@ import { animate, motion, useMotionValue, useReducedMotion, useSpring, useTransf
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import {
-  AlertCircle, Download, FileText, Layers,
+  AlertCircle, Download, FileText,
 } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import { downloadFilePreview } from '@/lib/res54';
@@ -15,19 +15,13 @@ import { isVaultUnlocked, getVaultFileMeta, decryptVaultBytes } from '@/lib/zk-v
 import { supabase } from '@/integrations/supabase/client';
 import SealedPreview from './SealedPreview';
 import VaultUnlockDialog from './VaultUnlockDialog';
-import SealedPreview from './SealedPreview';
+import SealedMediaFrame from './SealedMediaFrame';
 
-// Viewers — one frame, type-specific body
+// Viewers — sealed frames for all inline types; only the streaming player and
+// EPUB/PDF/3D (which need their own React runtimes) remain in the app origin.
 import CBVideoPlayer from './cbVideoPlayer';
-import MobileVideoPlayer from './MobileVideoPlayer';
-import AudioPlayer from './AudioPlayer';
-import EnhancedTextEditor from './EnhancedTextEditor';
-import AdvancedImageViewer from '@/components/AdvancedImageViewer';
-import SpreadsheetViewer from '@/components/spreadsheet/SpreadsheetViewer';
 import OptimizedPDFViewer from '@/components/OptimizedPDFViewer';
 import ModelViewer from '@/components/ModelViewer';
-import FontPreviewer from '@/components/FontPreviewer';
-import ArchiveViewerModal from '@/components/ArchiveViewerModal';
 import DeepReadReader from './DeepReadReader';
 import { markdownToSafeHtml } from './EnhancedMarkdownPreview';
 import { previewTabs, detectKind, type PreviewKind } from '@/services/preview-tabs';
@@ -102,7 +96,6 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const [error, setError] = useState<string | null>(null);
   const [decodedBlob, setDecodedBlob] = useState<Blob | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [vaultUnlockOpen, setVaultUnlockOpen] = useState(false);
   const [vaultUnlockTick, setVaultUnlockTick] = useState(0);
   const loadGen = useRef(0);
@@ -250,12 +243,11 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const renderBody = () => {
     if (kind === 'video') {
       if (file?.encrypted && file?.storage_path === 'res54_distributed') return <CBVideoPlayer file={file} autoPlay className="h-full w-full" shareId={shareId} />;
-      if (!blobUrl) return <Loading />;
-      return isMobile
-        ? <MobileVideoPlayer file={file} blobUrl={blobUrl} onClose={close} />
-        : <div className="h-full w-full grid place-items-center"><video src={blobUrl} controls className="max-h-full max-w-full" /></div>;
+      return decodedBlob ? <SealedMediaFrame blob={decodedBlob} kind="video" name={file.name} /> : <Loading />;
     }
-    if (kind === 'audio') return blobUrl ? <AudioPlayer file={file} src={blobUrl} open onClose={close} onDownload={handleDownload} onShare={handleShare} /> : <Loading />;
+    if (kind === 'audio') return decodedBlob
+      ? <SealedMediaFrame blob={decodedBlob} kind="audio" name={file.name} />
+      : <Loading />;
     if (kind === 'epub') return <DeepReadReader file={file} source="local" isOpen onClose={close} />;
     if (loading) return <Loading />;
     if (error) return <div className="pv-error"><AlertCircle size={28} /><p className="text-sm">{error}</p></div>;
@@ -263,12 +255,12 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
 
     switch (kind) {
       case 'pdf': return <OptimizedPDFViewer file={file} blobUrl={blobUrl!} pdfBlob={decodedBlob!} onClose={close} onDownload={handleDownload} />;
-      case 'image': return <AdvancedImageViewer src={blobUrl!} alt={file.name} file={{ name: file.name, size: file.size, type: file.type }} onDownload={handleDownload} onShare={handleShare} />;
-      case 'text': return <EnhancedTextEditor file={file} decodedBlob={decodedBlob!} onSave={async () => {}} onDownload={handleDownload} onShare={handleShare} readonly={false} />;
+      case 'image': return <SealedMediaFrame blob={decodedBlob!} kind="image" name={file.name} />;
+      case 'text': return <SealedMediaFrame blob={decodedBlob!} kind="text" name={file.name} />;
       case 'markdown': return <MarkdownBody blob={decodedBlob} />;
-      case 'spreadsheet': return <SpreadsheetViewer src={blobUrl!} fileName={file.name} onDownload={handleDownload} onClose={close} />;
-      case 'font': return <FontPreviewer src={blobUrl!} fileName={file.name} />;
-      case 'archive': return <div className="pv-generic"><div className="pv-generic-ico"><Layers size={28} /></div><button className="pv-pill" onClick={() => setArchiveOpen(true)}>Browse</button><ArchiveViewerModal open={archiveOpen} onClose={() => setArchiveOpen(false)} file={{ id: file.id, name: file.name, url: blobUrl! }} onDownload={handleDownload} /></div>;
+      case 'font': return <SealedMediaFrame blob={decodedBlob!} kind="font" name={file.name} />;
+      case 'spreadsheet':
+      case 'archive': return <div className="pv-generic"><div className="pv-generic-ico"><FileText size={28} /></div><p className="text-sm text-muted-foreground">Download to open {kind} file.</p><button className="pv-pill" onClick={handleDownload}><Download size={17} /></button></div>;
       case 'model': return <ModelViewer src={blobUrl || file.url || ''} fileName={file.name} fileType={file.type} />;
       default: return <div className="pv-generic"><div className="pv-generic-ico"><FileText size={28} /></div><p className="text-sm text-muted-foreground">No inline preview — download to open.</p><button className="pv-pill" onClick={handleDownload}><Download size={17} /></button></div>;
     }
