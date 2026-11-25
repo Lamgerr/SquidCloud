@@ -85,6 +85,27 @@ serve(async (req) => {
       });
       if (checkError) return json({ error: checkError.message }, 500);
 
+      // A share link carries a 64-char encryption secret in its URL fragment.
+      // Users often paste that into the "password" field. Accept it as a
+      // valid credential: re-run the guard with the server-side access code
+      // so country/device/burn/limit checks still apply.
+      if (!accessCheck?.allowed && accessCheck?.reason === 'wrong_password' && password) {
+        const { data: cred } = await supabase.from('shares')
+          .select('access_code, share_secret_hash').eq('share_id', shareId).maybeSingle();
+        if (cred?.share_secret_hash && cred.share_secret_hash === password) {
+          const { data: relaxed } = await supabase.rpc('check_share_access', {
+            p_share_id: shareId,
+            p_password: cred.access_code || null,
+            p_country: country || null,
+            p_device_fingerprint: deviceFingerprint || null,
+          });
+          if (relaxed?.allowed) {
+            console.log('[share-access] accepted share secret as password credential', { shareId });
+            return json(relaxed);
+          }
+        }
+      }
+
       // Non-secret diagnostics: distinguish a mistyped link password from a
       // stale/rotated access code. Never logs the password or code itself.
       if (!accessCheck?.allowed) {

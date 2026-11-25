@@ -339,7 +339,7 @@ const SharePage: React.FC = () => {
     const gColor = isPassword ? 'text-[#58A6FF]' : isCountry ? 'text-[#F85149]' : isDevice ? 'text-[#BC8CFF]' : 'text-[#F85149]';
     const gBg = isPassword ? 'bg-[#58A6FF]/10' : isCountry ? 'bg-[#F85149]/10' : isDevice ? 'bg-[#BC8CFF]/10' : 'bg-[#F85149]/10';
     const gTitle = isPassword ? 'Password Required' : isCountry ? 'Region Locked' : isDevice ? 'Device Mismatch' : 'Access Denied';
-    const gDesc = isPassword ? 'This file is password protected.' :
+    const gDesc = isPassword ? 'Enter the link password, or paste the encryption key from the link.' :
       isCountry ? 'The owner restricted access to specific countries.' :
       isDevice ? 'This link is locked to the first device that opened it.' :
       "You don't have access to this file.";
@@ -366,7 +366,7 @@ const SharePage: React.FC = () => {
 
           {isPassword && (
             <div className={cn("space-y-3", isMobile ? 'w-full max-w-sm mt-6' : 'max-w-xs mx-auto')}>
-              <Input type="password" placeholder="Enter password" value={passwordInput}
+              <Input type="password" placeholder="Link password or encryption key" value={passwordInput}
                 onChange={e => { setPasswordInput(e.target.value); setPasswordError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
                 className={cn(
@@ -637,7 +637,7 @@ const SharePage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-[16px] font-semibold text-[#E6EDF3]">Encryption Key Required</h3>
-                  <p className="text-[12px] text-[#768390]">Enter the key to unlock this file</p>
+                  <p className="text-[12px] text-[#768390]">Paste the encryption key from the share link</p>
                 </div>
               </div>
               <Input type="password" placeholder="Encryption key" value={byokKeyInput}
@@ -683,7 +683,7 @@ const SharePage: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-[15px] text-[#E6EDF3]">Encryption key required</h3>
-                <p className="text-sm text-[#768390]">Enter the key to unlock this file</p>
+                <p className="text-sm text-[#768390]">Paste the encryption key from the share link</p>
               </div>
             </div>
             <Input type="password" placeholder="Encryption key" value={byokKeyInput}
