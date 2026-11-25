@@ -1,3 +1,4 @@
+import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -620,6 +621,7 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
     display: none;
   }
 }
+${ PAGES_POLISH }
 `;
 
 const ACCOUNT_PREFS_STORAGE_KEY = 'squid_account_settings_v3';

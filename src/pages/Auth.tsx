@@ -1,3 +1,4 @@
+import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -419,6 +420,7 @@ const AUTH_CSS = `
   line-height: 1.5;
   color: rgba(232, 231, 225, 0.78);
 }
+${ PAGES_POLISH }
 `;
 
 const GoogleMark = () => (

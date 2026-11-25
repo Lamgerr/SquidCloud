@@ -1,3 +1,4 @@
+import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
@@ -291,6 +292,7 @@ const DV_CSS = `
 .dv-dl b { display: block; font: 500 13px/1.3 var(--sa-f); }
 .dv-dl small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--g-mute); }
 .dv-health { display: flex; align-items: center; gap: 8px; font: 400 11.5px/1 var(--sa-mono); color: var(--g-mute); }
+${ PAGES_POLISH }
 `;
 
 const methodTone = (m: string) =>

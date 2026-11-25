@@ -9,7 +9,8 @@ import React, { useEffect, useRef, useState } from 'react';
 const FRAME_HTML = `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <style>
-html,body{margin:0;height:100%;background:transparent;color:#e8e7e1;font:14px/1.6 system-ui,sans-serif;overflow:auto}
+html,body{margin:0;height:100%;background:#0c0d09;color:#e8e7e1;font:14px/1.6 system-ui,sans-serif;overflow:auto}
+body *{color:inherit} a{color:#9fb3ff!important} code,pre{color:#e8e7e1!important}
 #c{padding:24px;white-space:pre-wrap;word-break:break-word}
 a{color:#9fb3ff} pre{background:rgba(232,231,225,.06);padding:12px;border-radius:8px;overflow:auto}
 code{font-family:ui-monospace,monospace} table{border-collapse:collapse} td,th{border:1px solid rgba(232,231,225,.12);padding:6px}

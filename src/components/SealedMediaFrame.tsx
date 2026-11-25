@@ -10,7 +10,7 @@ type Kind = 'image' | 'video' | 'audio' | 'text' | 'font';
 
 const FRAME = `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; media-src blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; object-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'">
-<style>html,body{margin:0;height:100%;background:transparent;color:#e8e7e1;font:14px/1.6 system-ui;overflow:auto;display:flex;align-items:center;justify-content:center}
+<style>html,body{margin:0;height:100%;background:#0c0d09;color:#e8e7e1;font:14px/1.6 system-ui;overflow:auto;display:flex;align-items:center;justify-content:center}body *{color:inherit}
 img,video{max-width:100%;max-height:100%;object-fit:contain}audio{width:min(560px,90%)}pre{margin:0;padding:24px;white-space:pre-wrap;word-break:break-word;font:13px/1.6 ui-monospace,monospace}
 @font-face{font-family:'SealedFont';src:url('blob:') format('truetype')}.sample{font-family:'SealedFont';font-size:34px;padding:32px;text-align:center}</style>
 </head><body><div id="c"></div><script>
