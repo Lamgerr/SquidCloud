@@ -1,19 +1,19 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- **Auth**: monochrome, dashboard-consistent, glass segmented switcher with EnterpriseSidebar spring physics, proper passkey/OAuth SVGs, Apple-style shake on failed sign-in.
-- **AccountSettings**: layout bug fixed — boxed rail removed (floating items + glass active thumb), shell centred, content pane constrained to 720px. TOTP setup redesigned: real QR image, two-step panel, six segmented OTP cells. Vault security panel inside Security. Encryption cards monochrome glass. Apple shake on MFA/password errors. Vault recovery card added with typed ERASE confirmation and visible formatting progress.
-- **Vault unlock dialog**: no white tints, Apple shake on wrong password.
-- **Uploads**: silently use the account key; key choice is opt-in.
-- **DeveloperAPI**: light consistency layer.
+- **Auth**: monochrome, dashboard-consistent, glass segmented switcher, Apple-style shake on failed sign-in, proper passkey/OAuth SVGs.
+- **AccountSettings**: centred shell, no boxed rail, TOTP panel with real QR + six-digit input, vault security in Security, encryption cards monochrome glass. Background seam (fixed attachment) removed.
+- **Vault reset is BFF-gated**: browser calls `POST /api/internal/vault` (`op: reset-vault`) with the session JWT; the BFF verifies identity and invokes the Supabase edge function server-side. No direct Supabase call from the client. Edge function requires verified email, fresh session, TOTP `aal2` if enrolled, passkey verification if registered, and typed `ERASE`; deletes folders, files, keys, shares and all storage objects under the user prefix. Deployed via Supabase CLI (`verify_jwt=true`, unauthenticated call returns 401).
+- **Skills**: 99 installed globally, including OWASP secure-agent-playbook, briiirussell cybersecurity skills, `headless-bff-architecture`, and the 37 UI/UX skills.
+- Repo public/clean, release v13.0.38. Vercel READY.
 
 ## Blocked — needs a decision
-- **vault-reset purge endpoint is NOT implemented.** Recovery UI invokes a `vault-reset` function that does not exist; it will fail until an authorized server-side purge is built. Per AGENTS.md, irreversible deletion of live DB rows/file chunks was not performed or wired autonomously.
 - Supabase service-role key from old history still live; user deprioritized rotation.
 - No local browser rendering; cannot self-verify visual quality.
+- BFF endpoint returned curl 000 from this sandbox (network limitation); its live response was not verified here. Edge function unauthenticated gate was verified.
 
 ## Queued next
-1. Await verdict on settings layout, rail, TOTP and shake.
-2. With explicit authorization: implement the irreversible vault-reset edge function (auth-verified, typed confirmation, purge DB rows + storage chunks), then deploy.
+1. Await user verdict on the BFF-gated reset and settings layout.
+2. Apply the same BFF pattern to any other destructive Supabase operation if requested.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
