@@ -185,3 +185,10 @@
 - Motion reduced to 180ms opacity fades and a 1px underline slide; one subtle breathing fingerprint while waiting for a passkey. prefers-reduced-motion fully honored.
 - Deleted AuthIdentityStage.tsx and PasskeyRitual.tsx (superseded). Build initially failed on duplicate viewAnim from the prior splice; removed the stale declaration. Vercel READY.
 - Lesson recorded: user does not want decorative animation or accent color on auth. Minimalism means removing elements, not restyling them.
+
+## 2026-11-25 — Auth consistency fixes from screenshot
+- User: keep monochrome but add the dashboard's "little green thing in bg"; remove one of two logos; fix broken passkey icon; use high-quality monochrome OAuth SVGs; make UI/UX consistent.
+- Found source of the green tint: dashboard DARK token `bg: #090b0a` plus a quiet ambient wash. Auth now consumes sa-* tokens directly and adds a very faint green radial at bottom-left (rgba(134,195,161,.05)), matching the dashboard rather than inventing a new palette.
+- Removed the centre logo mark; top-left brand stays. Replaced the malformed hand-written passkey SVG with lucide `Fingerprint`. Replaced Google/Discord marks with clean single-colour simple-icons paths; GitHub uses lucide `Github`.
+- Root cause of the stray rounded outline in the screenshot: the global `:focus-visible` rule included inputs, overriding the bare-field underline. Scoped it to buttons and links only.
+- Vercel READY.
