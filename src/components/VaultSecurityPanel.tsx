@@ -13,8 +13,9 @@ import { createRecoveryShares, encryptShareForContact } from '@/lib/zk/social-re
 import { ratchetAdvance, currentEpoch, isRatcheted } from '@/lib/zk/ratchet';
 
 const T = { type: 'spring' as const, stiffness: 420, damping: 28 };
+const TAP = { type: 'spring' as const, stiffness: 600, damping: 16 };
 
-export default function VaultSecurityPanel({ userId }: { userId: string }) {
+export default function VaultSecurityPanel({ userId, onUnlock }: { userId: string; onUnlock?: () => void }) {
   const { toast } = useToast();
   const [busy, setBusy] = useState('');
   const [shares, setShares] = useState<string[] | null>(null);
@@ -23,7 +24,16 @@ export default function VaultSecurityPanel({ userId }: { userId: string }) {
   if (!isVaultUnlocked()) {
     return (
       <div className="vsp vsp-locked">
-        <Lock size={18} /><span>Unlock your vault to manage security</span>
+        <style>{CSS}</style>
+        <div className="vsp-lock-ico"><Lock size={18} /></div>
+        <div className="vsp-lock-copy">
+          <b>Vault is locked</b>
+          <span>Unlock it to manage devices, recovery and key rotation.</span>
+        </div>
+        <motion.button type="button" className="vsp-unlock" onClick={onUnlock}
+          whileHover={{ x: 2 }} whileTap={{ scale: 0.97 }} transition={TAP}>
+          Unlock vault
+        </motion.button>
       </div>
     );
   }
@@ -92,13 +102,26 @@ export default function VaultSecurityPanel({ userId }: { userId: string }) {
 }
 
 const CSS = `
-.vsp{display:grid;gap:6px;color:#e8e7e1;font-family:var(--sa-f,system-ui,sans-serif)}
-.vsp-locked{display:flex;align-items:center;gap:10px;padding:14px;border-radius:16px;
-  border:1px solid rgba(232,231,225,.1);background:rgba(13,14,13,.6);font-size:13px;color:rgba(232,231,225,.6)}
-.vsp-head{display:flex;align-items:center;gap:8px;font:500 10px/1 var(--sa-mono,monospace);letter-spacing:.12em;color:rgba(232,231,225,.5);margin-bottom:4px}
+.vsp{display:grid;gap:6px;color:var(--sa-text,#e8e7e1);font-family:var(--sa-f,system-ui,sans-serif)}
+.vsp-locked{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:18px;
+  border:1px solid var(--sa-line,#1f2221);
+  background:linear-gradient(180deg,var(--sa-bg-3,#141816),var(--sa-bg-2,#0e1110));
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.06),0 18px 40px -24px rgba(0,0,0,.8)}
+.vsp-lock-ico{flex:none;width:38px;height:38px;display:grid;place-items:center;border-radius:12px;
+  background:var(--sa-bg-4,#1b201d);border:1px solid var(--sa-line,#1f2221);color:var(--sa-mute,#8d8f89)}
+.vsp-lock-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.vsp-lock-copy b{font-size:13px;font-weight:500;color:var(--sa-text,#e8e7e1)}
+.vsp-lock-copy span{font-size:11px;color:var(--sa-mute,#8d8f89)}
+.vsp-unlock{flex:none;min-height:34px;padding:0 14px;border:1px solid var(--sa-line,#1f2221);border-radius:999px;
+  background:var(--sa-bg-4,#1b201d);color:var(--sa-text,#e8e7e1);font:inherit;font-size:12px;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.06)}
+.vsp-head{display:flex;align-items:center;gap:8px;font:500 10px/1 var(--sa-mono,monospace);letter-spacing:.12em;color:var(--sa-mute,#8d8f89);margin-bottom:4px}
 .vsp-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:14px;text-align:left;cursor:pointer;
-  border:1px solid rgba(232,231,225,.1);background:linear-gradient(180deg,rgba(30,31,28,.7),rgba(14,15,12,.8));color:#e8e7e1}
+  border:1px solid var(--sa-line,#1f2221);
+  background:linear-gradient(180deg,var(--sa-bg-3,#141816),var(--sa-bg-2,#0e1110));color:var(--sa-text,#e8e7e1);
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.05)}
+.vsp-row:hover{border-color:var(--sa-rim,#2f3230)}
 .vsp-row:disabled{opacity:.5;cursor:default}
-.vsp-row span{display:flex;flex-direction:column;gap:3px}.vsp-row b{font-size:13px;font-weight:500}.vsp-row small{font-size:11px;color:rgba(232,231,225,.5)}
-.vsp-shares{display:grid;gap:4px;padding:8px}.vsp-shares code{font:400 10px/1.4 var(--sa-mono,monospace);color:rgba(232,231,225,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vsp-row span{display:flex;flex-direction:column;gap:3px}.vsp-row b{font-size:13px;font-weight:500}.vsp-row small{font-size:11px;color:var(--sa-mute,#8d8f89)}
+.vsp-shares{display:grid;gap:4px;padding:8px}.vsp-shares code{font:400 10px/1.4 var(--sa-mono,monospace);color:var(--sa-mute,#8d8f89);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 `;

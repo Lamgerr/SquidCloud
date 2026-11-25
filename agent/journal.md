@@ -208,3 +208,11 @@
 - Upload friction: `getUploadKeySelection` now defaults to `always_saved` with no prompt unless the user explicitly configures an advanced mode in Encryption settings. Fixed a second path in BYOKContext that was reading the raw stored preference (`always_prompt`) and re-opening the dialog despite the new default.
 - Copy updated in BYOKSettingsCard: plain explanation that uploads just use the account key, with "Ask each upload" as an explicit opt-in.
 - Vercel READY.
+
+## 2026-11-25 — Settings visual fixes from screenshots
+- Screenshots found in ~/Downloads (not shared/Download): Profile + Security.
+- Root cause of the floating "Unlock your vault to manage security" text: VaultSecurityPanel returned early with className vsp-locked, but `<style>{CSS}</style>` was only rendered in the unlocked branch, so the locked state had zero CSS. Rewrote the component: style tag in both branches, locked state is now a glass pod with icon, copy and an Unlock button wired via new onUnlock prop from AccountSettings.
+- VaultUnlockDialog: removed every white-alpha fill (icon, input, primary button, card). Card uses sa-bg gradient + rim + inset highlight; overlay uses a near-opaque scrim with blur.
+- Encryption category: BYOK/SDESettingsCard were still on the old white/5 + amber/purple/emerald Tailwind look. Wrapped them with tv-enc/tv-enc-card and scoped overrides to monochrome glass, neutral icons/badges/inputs/pills.
+- Settings pages now carry the same faint bone-white + green ambient wash as auth and dashboard.
+- Vercel READY.

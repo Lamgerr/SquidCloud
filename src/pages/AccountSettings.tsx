@@ -657,6 +657,22 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
   .tv-rail-text{font-size:12px}
   .tv-pane{max-width:100%}
 }
+
+/* ── encryption settings: same glass, no cartoon colours ────────── */
+.tv-enc-card{background:linear-gradient(180deg,var(--sa-bg-3,#141816),var(--sa-bg-2,#0e1110))!important;
+  border:1px solid var(--sa-line,#1f2221)!important;border-radius:20px!important;
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.06),0 20px 44px -24px rgba(0,0,0,.8)!important;
+  color:var(--sa-text,#e8e7e1)!important}
+.tv-enc-card :is([class*="bg-white/"],[class*="bg-black/"],[class*="bg-amber-"],[class*="bg-purple-"],[class*="bg-emerald-"],[class*="bg-blue-"]){
+  background:var(--sa-bg-4,#1b201d)!important}
+.tv-enc-card :is([class*="border-white/"],[class*="border-amber-"],[class*="border-purple-"],[class*="border-emerald-"]){
+  border-color:var(--sa-line,#1f2221)!important}
+.tv-enc-card :is([class*="text-white"],[class*="text-amber-"],[class*="text-purple-"],[class*="text-emerald-"],[class*="text-blue-"],[class*="text-red-"]){
+  color:var(--sa-text,#e8e7e1)!important}
+.tv-enc-card :is(.rounded-xl,.rounded-2xl,.rounded-lg){border-radius:12px!important}
+.tv-enc-card :is(button,[role="switch"]){border-radius:999px!important}
+.tv-enc-card input{border-color:var(--sa-line,#1f2221)!important;background:var(--sa-bg,#090b0a)!important;color:var(--sa-text,#e8e7e1)!important}
+.tv-enc-card input:focus{border-color:var(--sa-text,#e8e7e1)!important}
 ${ PAGES_POLISH }
 `;
 
@@ -1665,7 +1681,7 @@ const AccountSettings = () => {
         )}
 
         {/* Vault security belongs with the rest of account security. */}
-        <VaultSecurityPanel userId={user?.id || ''} />
+        <VaultSecurityPanel userId={user?.id || ''} onUnlock={() => setVaultOpen(true)} />
       </>
     );
   }
@@ -1924,9 +1940,9 @@ const AccountSettings = () => {
     security: renderSecuritySection,
     plans: renderPlansSection,
     byok: () => (
-      <div className="tv-stack">
-        <BYOKSettingsCard className="rounded-3xl" />
-        <SDESettingsCard className="rounded-3xl" />
+      <div className="tv-stack tv-enc">
+        <BYOKSettingsCard className="tv-enc-card" />
+        <SDESettingsCard className="tv-enc-card" />
       </div>
     ),
     developer: renderDeveloperSection,
