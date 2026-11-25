@@ -1,0 +1,204 @@
+/* Global consistency layer for every route except /, /pricing and /checkout.
+   Scoped by [data-sq-clean="on"] set in App.tsx. It neutralises the hardcoded
+   GitHub/navy palettes and white tints, and enforces the same quiet monochrome
+   language used by Auth, Dashboard and AccountSettings. */
+
+:root[data-sq-clean="on"] {
+  --ap-bg: var(--sa-bg, #090b0a);
+  --ap-bg-2: var(--sa-bg-2, #0e1110);
+  --ap-bg-3: var(--sa-bg-3, #141816);
+  --ap-bg-4: var(--sa-bg-4, #1b201d);
+  --ap-ink: var(--sa-text, #e8e7e1);
+  --ap-mute: var(--sa-mute, #8d8f89);
+  --ap-dim: var(--sa-dim, #62655f);
+  --ap-line: var(--sa-line, #1f2221);
+  --ap-rim: var(--sa-rim, #2f3230);
+  color-scheme: dark;
+}
+
+/* Body shell - one document-sized wash, no viewport seam. */
+:root[data-sq-clean="on"] body {
+  background: var(--ap-bg) !important;
+  color: var(--ap-ink) !important;
+}
+:root[data-sq-clean="on"] body::before { display: none !important; }
+
+/* Hardcoded dark surfaces -> one near-black tier. */
+:root[data-sq-clean="on"] [class*="bg-[#0"],
+:root[data-sq-clean="on"] [class*="bg-[#1"],
+:root[data-sq-clean="on"] [class*="bg-black/"],
+:root[data-sq-clean="on"] [class*="bg-slate-"],
+:root[data-sq-clean="on"] [class*="bg-card"],
+:root[data-sq-clean="on"] [class*="bg-white/"],
+:root[data-sq-clean="on"] [class*="bg-muted/"] {
+  background-color: var(--ap-bg-2) !important;
+  background-image: none !important;
+}
+:root[data-sq-clean="on"] [class*="bg-white"]:not(.tv-qr-card) {
+  background-color: var(--ap-bg-3) !important;
+}
+
+/* Blue / violet / green accents -> neutral. Status dots keep their meaning but
+   are desaturated to the house ink. */
+:root[data-sq-clean="on"] [class*="bg-blue-"],
+:root[data-sq-clean="on"] [class*="bg-sky-"],
+:root[data-sq-clean="on"] [class*="bg-violet-"],
+:root[data-sq-clean="on"] [class*="bg-purple-"],
+:root[data-sq-clean="on"] [class*="bg-emerald-"],
+:root[data-sq-clean="on"] [class*="bg-green-"],
+:root[data-sq-clean="on"] [class*="bg-primary"],
+:root[data-sq-clean="on"] [class*="bg-[#58"],
+:root[data-sq-clean="on"] [class*="bg-[#4F"] {
+  background-color: var(--ap-bg-4) !important;
+  color: var(--ap-ink) !important;
+  box-shadow: none !important;
+}
+:root[data-sq-clean="on"] [class*="text-blue-"],
+:root[data-sq-clean="on"] [class*="text-sky-"],
+:root[data-sq-clean="on"] [class*="text-violet-"],
+:root[data-sq-clean="on"] [class*="text-purple-"],
+:root[data-sq-clean="on"] [class*="text-emerald-"],
+:root[data-sq-clean="on"] [class*="text-green-"],
+:root[data-sq-clean="on"] [class*="text-white/"],
+:root[data-sq-clean="on"] [class*="text-[#58"],
+:root[data-sq-clean="on"] [class*="text-[#4F"],
+:root[data-sq-clean="on"] [class*="text-primary"] {
+  color: var(--ap-ink) !important;
+}
+:root[data-sq-clean="on"] [class*="border-blue-"],
+:root[data-sq-clean="on"] [class*="border-sky-"],
+:root[data-sq-clean="on"] [class*="border-violet-"],
+:root[data-sq-clean="on"] [class*="border-purple-"],
+:root[data-sq-clean="on"] [class*="border-emerald-"],
+:root[data-sq-clean="on"] [class*="border-green-"],
+:root[data-sq-clean="on"] [class*="border-white/"],
+:root[data-sq-clean="on"] [class*="border-[#2"],
+:root[data-sq-clean="on"] [class*="border-[#3"],
+:root[data-sq-clean="on"] [class*="border-primary"] {
+  border-color: var(--ap-line) !important;
+}
+
+/* Generic text neutrals. */
+:root[data-sq-clean="on"] [class*="text-[#8"],
+:root[data-sq-clean="on"] [class*="text-[#7"],
+:root[data-sq-clean="on"] [class*="text-[#4"],
+:root[data-sq-clean="on"] [class*="text-muted-foreground"] {
+  color: var(--ap-mute) !important;
+}
+
+/* Cards/panels: one hairline, one tier, no stacked glass. */
+:root[data-sq-clean="on"] :is([class*="rounded-xl"], [class*="rounded-2xl"], [class*="rounded-3xl"], [class*="rounded-[20px]"]) {
+  border-radius: 16px !important;
+}
+:root[data-sq-clean="on"] :is([class*="shadow-sm"], [class*="shadow-lg"], [class*="shadow-2xl"], [class*="shadow-["] ) {
+  box-shadow: none !important;
+}
+
+/* One focus treatment everywhere. */
+:root[data-sq-clean="on"] :is(button, a, input, select, textarea, [role="button"], [role="tab"]):focus-visible {
+  outline: 1px solid var(--ap-ink) !important;
+  outline-offset: 2px !important;
+}
+
+/* Quiet headings. */
+:root[data-sq-clean="on"] :is(h1, h2, h3) {
+  font-weight: 400 !important;
+  letter-spacing: -0.03em !important;
+}
+
+/* Preserve functional exceptions: QR tile must stay scannable. */
+:root[data-sq-clean="on"] .tv-qr-card { background: #fff !important; }
+
+/* Literal fallbacks: tokens are not guaranteed on pages that don't mount AppTheme. */
+:root[data-sq-clean="on"] [class*="bg-[#58"],
+:root[data-sq-clean="on"] [class*="hover:bg-[#58"],
+:root[data-sq-clean="on"] [class*="bg-[#4F"],
+:root[data-sq-clean="on"] [class*="bg-blue-"],
+:root[data-sq-clean="on"] [class*="bg-primary"] {
+  background-color: #1b201d !important;
+  color: #e8e7e1 !important;
+}
+:root[data-sq-clean="on"] [class*="text-white"],
+:root[data-sq-clean="on"] [class*="text-[#E"],
+:root[data-sq-clean="on"] [class*="text-[#F"] {
+  color: #e8e7e1 !important;
+}
+:root[data-sq-clean="on"] [class*="border-white"],
+:root[data-sq-clean="on"] [class*="border-[#2"],
+:root[data-sq-clean="on"] [class*="border-[#3"] {
+  border-color: #1f2221 !important;
+}
+
+/* Final literal mapping - last wins, avoids any theme token resolution. */
+:root[data-sq-clean="on"] [class*="bg-[#0"],
+:root[data-sq-clean="on"] [class*="bg-[#1"],
+:root[data-sq-clean="on"] [class*="bg-black/"],
+:root[data-sq-clean="on"] [class*="bg-card"],
+:root[data-sq-clean="on"] [class*="bg-white/"],
+:root[data-sq-clean="on"] [class*="bg-muted/"] {
+  background-color: #0e1110 !important;
+  background-image: none !important;
+}
+:root[data-sq-clean="on"] [class*="bg-white"]:not(.tv-qr-card) {
+  background-color: #141816 !important;
+}
+
+/* ── Content-page layouts: calm, centred, one hairline, no stacked boxes ── */
+:root[data-sq-clean="on"]:is(
+  [data-sq-page="help"], [data-sq-page="cli"], [data-sq-page="squidfs"],
+  [data-sq-page="support"], [data-sq-page="terms"], [data-sq-page="privacy"],
+  [data-sq-page="legal"], [data-sq-page="signals"], [data-sq-page="storage"],
+  [data-sq-page="scripts"], [data-sq-page="webhooks"], [data-sq-page="extensions"],
+  [data-sq-page="beta"], [data-sq-page="profile"], [data-sq-page="repo"],
+  [data-sq-page="workspace"], [data-sq-page="r"], [data-sq-page="s"],
+  [data-sq-page="share"], [data-sq-page="file"], [data-sq-page="embed"],
+  [data-sq-page="cc"], [data-sq-page="analytics"], [data-sq-page="security"]
+) body {
+  background-image: none !important;
+}
+:root[data-sq-clean="on"]:is(
+  [data-sq-page="help"], [data-sq-page="cli"], [data-sq-page="squidfs"],
+  [data-sq-page="support"], [data-sq-page="terms"], [data-sq-page="privacy"],
+  [data-sq-page="legal"], [data-sq-page="signals"], [data-sq-page="storage"],
+  [data-sq-page="scripts"], [data-sq-page="webhooks"], [data-sq-page="extensions"],
+  [data-sq-page="beta"], [data-sq-page="profile"], [data-sq-page="repo"],
+  [data-sq-page="workspace"], [data-sq-page="r"], [data-sq-page="s"],
+  [data-sq-page="share"], [data-sq-page="file"], [data-sq-page="embed"],
+  [data-sq-page="cc"], [data-sq-page="analytics"], [data-sq-page="security"]
+) [class*="rounded-xl"],
+:root[data-sq-clean="on"]:is(
+  [data-sq-page="help"], [data-sq-page="cli"], [data-sq-page="squidfs"],
+  [data-sq-page="support"], [data-sq-page="terms"], [data-sq-page="privacy"],
+  [data-sq-page="legal"], [data-sq-page="signals"], [data-sq-page="storage"],
+  [data-sq-page="scripts"], [data-sq-page="webhooks"], [data-sq-page="extensions"],
+  [data-sq-page="beta"], [data-sq-page="profile"], [data-sq-page="repo"],
+  [data-sq-page="workspace"], [data-sq-page="r"], [data-sq-page="s"],
+  [data-sq-page="share"], [data-sq-page="file"], [data-sq-page="embed"],
+  [data-sq-page="cc"], [data-sq-page="analytics"], [data-sq-page="security"]
+) [class*="rounded-2xl"] {
+  border: 1px solid #1f2221 !important;
+  background-color: #0e1110 !important;
+  box-shadow: none !important;
+}
+:root[data-sq-clean="on"]:is(
+  [data-sq-page="help"], [data-sq-page="cli"], [data-sq-page="squidfs"],
+  [data-sq-page="support"], [data-sq-page="terms"], [data-sq-page="privacy"],
+  [data-sq-page="legal"], [data-sq-page="signals"], [data-sq-page="storage"],
+  [data-sq-page="scripts"], [data-sq-page="webhooks"], [data-sq-page="extensions"],
+  [data-sq-page="beta"], [data-sq-page="profile"], [data-sq-page="repo"],
+  [data-sq-page="workspace"], [data-sq-page="r"], [data-sq-page="s"],
+  [data-sq-page="share"], [data-sq-page="file"], [data-sq-page="embed"],
+  [data-sq-page="cc"]
+) [class*="p-5"],
+:root[data-sq-clean="on"]:is(
+  [data-sq-page="help"], [data-sq-page="cli"], [data-sq-page="squidfs"],
+  [data-sq-page="support"], [data-sq-page="terms"], [data-sq-page="privacy"],
+  [data-sq-page="legal"], [data-sq-page="signals"], [data-sq-page="storage"],
+  [data-sq-page="scripts"], [data-sq-page="webhooks"], [data-sq-page="extensions"],
+  [data-sq-page="beta"], [data-sq-page="profile"], [data-sq-page="repo"],
+  [data-sq-page="workspace"], [data-sq-page="r"], [data-sq-page="s"],
+  [data-sq-page="share"], [data-sq-page="file"], [data-sq-page="embed"],
+  [data-sq-page="cc"]
+) [class*="p-6"] {
+  padding: 20px !important;
+}

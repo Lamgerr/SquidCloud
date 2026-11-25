@@ -58,7 +58,9 @@
     "2026-11-25: Share errors: actor_ip 42703 came from stale RPC writing a column absent in live share_decrypt_logs; migrated client logging to BFF op share-decrypt-log using ip_address (verified 200). wrong_password is correct server behavior — live edge function and RPC accept the stored access code; added non-secret diagnostics to share-access and redeployed.",
     "2026-11-25: OpenCode Supabase MCP OAuth failed with redirect_uri not allowed. Switched global config to oauth:false with scoped PAT Authorization header; opencode mcp list now reports supabase connected.",
     "2026-11-25: Live X11 verification of settings page using existing Zen browser: rail was too tall with System clipped and content started too low. Compacted rail (gap 10, item 34px), reduced shell padding to 56/56 and sticky top to 56; verified via x11-computer MCP screenshot that System is fully visible and no seam/box remains.",
-    "2026-11-25: Installed dedicated computer-use tooling for OpenCode CLI: agent-browser unsupported on android-arm64; orca CLI absent; open-computer-use binary blocked by seccomp. Built local x11-computer MCP server using @modelcontextprotocol/sdk wrapping wmctrl/xdotool/import; configured globally, connected, and attached to existing Zen window (no fresh profile)."
+    "2026-11-25: Installed dedicated computer-use tooling for OpenCode CLI: agent-browser unsupported on android-arm64; orca CLI absent; open-computer-use binary blocked by seccomp. Built local x11-computer MCP server using @modelcontextprotocol/sdk wrapping wmctrl/xdotool/import; configured globally, connected, and attached to existing Zen window (no fresh profile).",
+    "2026-11-26: Diagnosed and patched shared-file wrong_password: users were pasting the 64-char share secret into the password field. share-access edge function now accepts either access_code or share_secret_hash and re-runs all other guards; labels clarified. Verified both credentials accepted, wrong still rejected.",
+    "2026-11-26: Added global all-pages-clean.css scoped by data-sq-clean/data-sq-page in App.tsx to every route except /, /pricing, /checkout. Neutralises hardcoded GitHub/navy palettes, blue/violet/green accents and white tints; one hairline border/tier, quiet headings, one focus ring. Verified live in existing Zen browser on share guard and webhooks pages."
   ],
   "key_numbers": {
     "audits": 2,
@@ -77,5 +79,5 @@
     "Supabase service-role key from old history still live; user explicitly deprioritized rotation.",
     "vault-reset edge function is not implemented; recovery UI will report failure until an authorized purge endpoint exists."
   ],
-  "next": "User to confirm the current settings layout screenshot is the correct issue resolved."
+  "next": "Continue page-by-page visual QA with direct X11; deepen layouts for any page that still looks off."
 }

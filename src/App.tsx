@@ -201,6 +201,14 @@ const NativeMobileBridge = () => {
 
 const AppContent = () => {
   const location = useLocation();
+
+  // Global clean layer applies to every route except the marketing pages.
+  useEffect(() => {
+    const path = location.pathname;
+    const excluded = path === '/' || path === '/pricing' || path === '/checkout';
+    document.documentElement.dataset.sqClean = excluded ? 'off' : 'on';
+    document.documentElement.dataset.sqPage = path.split('/')[1] || 'dashboard';
+  }, [location.pathname]);
   // First path segment allow-list: anything else falls through to the
   // catch-all 404 route, which renders chromeless (no global header).
   const KNOWN_FIRST_SEGMENTS = new Set([

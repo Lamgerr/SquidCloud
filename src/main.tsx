@@ -3,6 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import './styles/all-pages-clean.css';
 import { registerServiceWorker } from './pwaInstall.ts';
 import { squidguard } from './services/squidguard-shield';
 import { ErrorBoundary } from './components/ErrorBoundary';
