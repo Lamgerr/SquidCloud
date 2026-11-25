@@ -1,20 +1,21 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- Vault unlock works via master-key verification through BFF.
-- Settings layout verified live in your existing Zen browser via a new `x11-computer` MCP: rail compacted so "System" is fully visible, no seam, no enclosing rail box.
-- Share decrypt logging routed through BFF; share-access diagnostics deployed.
-- OpenCode Supabase MCP uses PAT header (OAuth redirect was rejected).
-- Dedicated computer-use tooling for OpenCode CLI built locally because agent-browser/orca/open-computer-use/Playwright cannot attach to existing Firefox-based Zen on Termux Android. `x11-computer` MCP is connected and attached to your browser.
+- Shared-file `wrong_password` fixed: server accepts the 64-char share secret or the link password; all other guards still apply. Labels clarified. Verified live.
+- Global monochrome cleanup layer (`all-pages-clean.css`) applied to every route except `/`, `/pricing`, `/checkout`, scoped via `data-sq-clean` / `data-sq-page`. Neutralises hardcoded GitHub/navy palettes, blue/violet/green accents, white tints; normalises borders, focus and typography.
+- Live-verified in existing Zen browser: share guard and Webhooks page are now clean/monochrome.
+- Earlier: Auth, AccountSettings, BFF gates, vault unlock, MCP PAT, x11-computer MCP all in place.
 - Vercel READY, pushed to `fresh-main`.
 
+## In progress
+- Page-by-page visual QA of the remaining routes using direct X11 (faster than MCP).
+
 ## Blocked / needs data
-- `wrong_password` needs one retry so new diagnostics show submitted vs stored lengths (no secrets logged).
 - Supabase migration-history mismatch blocks DB migrations; fixes done at BFF layer.
-- Supabase service-role key from old history still live (user deprioritized rotation).
+- Supabase service-role key from old history still live (deprioritized).
 
 ## Queued next
-1. Confirm the current settings screenshot is the correct issue resolved.
-2. Read share-access diagnostics after user retries.
+1. Spot-check and deepen layouts on remaining worst pages (BetaSubstrate, SquidVeilDocs, Onboarding, Settings, Embed, ManageShares).
+2. Address any page that still looks inconsistent when viewed live.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
