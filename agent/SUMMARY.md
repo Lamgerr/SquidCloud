@@ -2,6 +2,7 @@
 
 ## Done
 - Shared-file `wrong_password` fixed: server accepts the 64-char share secret or the link password; all other guards still apply. Labels clarified. Verified live.
+- Dialog backdrops restored translucent; input focus outlines/rings removed.
 - Global monochrome cleanup layer (`all-pages-clean.css`) applied to every route except `/`, `/pricing`, `/checkout`, scoped via `data-sq-clean` / `data-sq-page`. Neutralises hardcoded GitHub/navy palettes, blue/violet/green accents, white tints; normalises borders, focus and typography.
 - Live-verified in existing Zen browser: share guard and Webhooks page are now clean/monochrome.
 - Earlier: Auth, AccountSettings, BFF gates, vault unlock, MCP PAT, x11-computer MCP all in place.
