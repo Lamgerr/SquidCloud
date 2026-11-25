@@ -2,19 +2,19 @@
 
 ## Done
 - Vault unlock works via master-key verification through BFF.
-- Settings screenshot verified: seam and rail box are gone; spacing tightened.
-- Share decrypt logging routed through BFF using the live `ip_address` column (fixes 42703 actor_ip).
-- Share password rejection is correct server behavior — live RPC/edge function accept the stored access code. Non-secret diagnostics added to identify mismatches; share-access redeployed.
-- OpenCode Supabase MCP now uses a scoped PAT header instead of OAuth (redirect URI was rejected); `opencode mcp list` shows connected.
-- Vercel READY.
+- Settings layout verified live in your existing Zen browser via a new `x11-computer` MCP: rail compacted so "System" is fully visible, no seam, no enclosing rail box.
+- Share decrypt logging routed through BFF; share-access diagnostics deployed.
+- OpenCode Supabase MCP uses PAT header (OAuth redirect was rejected).
+- Dedicated computer-use tooling for OpenCode CLI built locally because agent-browser/orca/open-computer-use/Playwright cannot attach to existing Firefox-based Zen on Termux Android. `x11-computer` MCP is connected and attached to your browser.
+- Vercel READY, pushed to `fresh-main`.
 
 ## Blocked / needs data
-- To finish the `wrong_password` case: need one retry so the new diagnostics show submitted password length vs stored access-code length (secrets are never logged).
-- Supabase DB migration push is blocked by migration-history mismatch, so schema fixes are done at BFF layer.
+- `wrong_password` needs one retry so new diagnostics show submitted vs stored lengths (no secrets logged).
+- Supabase migration-history mismatch blocks DB migrations; fixes done at BFF layer.
 - Supabase service-role key from old history still live (user deprioritized rotation).
 
 ## Queued next
-1. Read share-access diagnostics after user retries.
-2. Continue page polish only where requested.
+1. Confirm the current settings screenshot is the correct issue resolved.
+2. Read share-access diagnostics after user retries.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
