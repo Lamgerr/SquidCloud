@@ -2005,7 +2005,12 @@ const AccountSettings = () => {
       <div className="tv-stack tv-enc">
         <BYOKSettingsCard className="tv-enc-card" />
         <SDESettingsCard className="tv-enc-card" />
-        <VaultRecoveryCard />
+        <VaultRecoveryCard
+          emailVerified={!!user?.email_confirmed_at}
+          totpEnabled={mfaFactors.length > 0}
+          hasPasskey={hasPasskey}
+          userEmail={user?.email}
+        />
       </div>
     ),
     developer: renderDeveloperSection,

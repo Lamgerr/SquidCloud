@@ -10,6 +10,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { AlertTriangle, RotateCcw, X } from '@/lib/icon-map';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { authenticateWithPasskey } from '@/lib/webauthn';
 
 const STEPS = [
   'Revoking vault keys',
@@ -18,16 +19,50 @@ const STEPS = [
   'Preparing a fresh vault',
 ];
 
-export default function VaultRecoveryCard() {
+export default function VaultRecoveryCard({ emailVerified = true, totpEnabled = false, hasPasskey = false, userEmail }: {
+  emailVerified?: boolean; totpEnabled?: boolean; hasPasskey?: boolean; userEmail?: string;
+}) {
   const reduce = !!useReducedMotion();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [step, setStep] = useState(-1);
   const [busy, setBusy] = useState(false);
+  const [verifying, setVerifying] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [totpDone, setTotpDone] = useState(false);
+  const [passkeyDone, setPasskeyDone] = useState(false);
+
+  const verifyTotp = async () => {
+    setVerifying('totp');
+    try {
+      const { data, error } = await supabase.auth.mfa.listFactors();
+      if (error || !data?.totp?.length) throw error || new Error('No authenticator found');
+      const { error: vErr } = await supabase.auth.mfa.challengeAndVerify({
+        factorId: data.totp[0].id, code: totpCode.trim(),
+      });
+      if (vErr) throw vErr;
+      setTotpDone(true);
+    } catch (e: any) {
+      toast({ title: 'Verification failed', description: e?.message || 'Check your code', variant: 'destructive' });
+    } finally { setVerifying(''); }
+  };
+
+  const verifyPasskey = async () => {
+    setVerifying('passkey');
+    try {
+      const result = await authenticateWithPasskey(userEmail);
+      if (!result.success) throw new Error('Passkey was not verified');
+      setPasskeyDone(true);
+    } catch (e: any) {
+      toast({ title: 'Passkey failed', description: e?.message || 'Try again', variant: 'destructive' });
+    } finally { setVerifying(''); }
+  };
+
+  const ready = text === 'ERASE' && emailVerified && (!totpEnabled || totpDone) && (!hasPasskey || passkeyDone);
 
   const reset = async () => {
-    if (text !== 'ERASE' || busy) return;
+    if (!ready || busy) return;
     setBusy(true);
     setStep(0);
     try {
@@ -35,10 +70,21 @@ export default function VaultRecoveryCard() {
         await new Promise((r) => setTimeout(r, reduce ? 10 : 620));
         setStep(i);
       }
-      const { error } = await supabase.functions.invoke('vault-reset', {
-        body: { confirmation: 'ERASE' },
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error('No active session');
+      const resp = await fetch('/api/internal/vault', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          op: 'reset-vault',
+          confirmation: 'ERASE',
+          totpVerified: totpDone,
+          passkeyVerified: passkeyDone,
+        }),
       });
-      if (error) throw error;
+      const payload = await resp.json().catch(() => ({}));
+      if (!resp.ok || payload?.error) throw new Error(payload?.error || `Reset failed (${resp.status})`);
       await new Promise((r) => setTimeout(r, reduce ? 10 : 500));
       setStep(STEPS.length);
       toast({ title: 'Vault erased', description: 'Your account is ready for a fresh setup.' });
@@ -81,12 +127,41 @@ export default function VaultRecoveryCard() {
                   <div className="vrc-warn"><AlertTriangle size={20} /></div>
                   <h2>Erase everything and start over?</h2>
                   <p>Your files, keys and vault records will be deleted immediately. This cannot be undone or recovered.</p>
+                  <div className="vrc-checks">
+                    <div className={`vrc-check${emailVerified ? ' ok' : ''}`}>
+                      <span>{emailVerified ? '✓' : '!'}</span> Email {emailVerified ? 'verified' : 'not verified'}
+                    </div>
+                    {totpEnabled && (
+                      <div className={`vrc-check${totpDone ? ' ok' : ''}`}>
+                        <span>{totpDone ? '✓' : '2'}</span>
+                        {totpDone ? 'Authenticator verified' : 'Authenticator required'}
+                        {!totpDone && (
+                          <div className="vrc-inline">
+                            <input className="vrc-code" inputMode="numeric" maxLength={6} placeholder="000000"
+                              value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
+                            <button type="button" onClick={verifyTotp} disabled={totpCode.length !== 6 || !!verifying}>Verify</button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {hasPasskey && (
+                      <div className={`vrc-check${passkeyDone ? ' ok' : ''}`}>
+                        <span>{passkeyDone ? '✓' : '3'}</span>
+                        {passkeyDone ? 'Passkey verified' : 'Passkey required'}
+                        {!passkeyDone && (
+                          <button type="button" className="vrc-inline-btn" onClick={verifyPasskey} disabled={!!verifying}>
+                            {verifying === 'passkey' ? 'Verifying…' : 'Verify with passkey'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <label className="vrc-label" htmlFor="vrc-confirm">Type <code>ERASE</code> to continue</label>
                   <input id="vrc-confirm" className="vrc-input" value={text} autoFocus spellCheck={false}
                     placeholder="ERASE" onChange={(e) => setText(e.target.value.toUpperCase())} />
                   <div className="vrc-actions">
                     <button type="button" className="vrc-cancel" onClick={() => setOpen(false)}>Cancel</button>
-                    <button type="button" className="vrc-danger" disabled={text !== 'ERASE'} onClick={reset}>
+                    <button type="button" className="vrc-danger" disabled={!ready} onClick={reset}>
                       Erase everything
                     </button>
                   </div>
@@ -136,6 +211,18 @@ const CSS = `
   background:var(--sa-bg-3,#141816);border:1px solid var(--sa-line,#1f2221)}
 .vrc-dialog h2{margin:0;font-size:17px;font-weight:500;letter-spacing:-.02em}
 .vrc-dialog p{margin:10px 0 18px;font-size:12px;line-height:1.6;color:var(--sa-mute,#8d8f89)}
+.vrc-checks{display:grid;gap:7px;margin:0 0 18px;text-align:left}
+.vrc-check{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--sa-mute,#8d8f89);flex-wrap:wrap}
+.vrc-check.ok{color:var(--sa-text,#e8e7e1)}
+.vrc-check>span{width:19px;height:19px;flex:none;display:grid;place-items:center;border-radius:50%;
+  border:1px solid var(--sa-line,#1f2221);font:400 10px/1 var(--sa-mono,monospace)}
+.vrc-check.ok>span{border-color:var(--sa-text,#e8e7e1)}
+.vrc-inline{display:flex;gap:6px;width:100%;margin-top:6px}
+.vrc-code{flex:1;height:34px;padding:0 12px;border:1px solid var(--sa-line,#1f2221);border-radius:999px;
+  background:var(--sa-bg,#090b0a);color:var(--sa-text,#e8e7e1);outline:none;font:inherit;font-size:13px;letter-spacing:.2em}
+.vrc-inline button,.vrc-inline-btn{height:34px;padding:0 12px;border:1px solid var(--sa-line,#1f2221);border-radius:999px;
+  background:var(--sa-bg-4,#1b201d);color:var(--sa-text,#e8e7e1);font:inherit;font-size:11px;cursor:pointer}
+.vrc-inline button:disabled{opacity:.4}
 .vrc-label{display:block;text-align:left;font-size:11px;color:var(--sa-mute,#8d8f89);margin-bottom:7px}
 .vrc-label code{font:400 11px/1 var(--sa-mono,monospace);color:var(--sa-text,#e8e7e1)}
 .vrc-input{width:100%;height:42px;padding:0 14px;border:1px solid var(--sa-line,#1f2221);border-radius:999px;

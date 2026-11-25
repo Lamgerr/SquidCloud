@@ -223,3 +223,11 @@
 - Verified Apple/macOS password shake keyframes from CSS-Tricks (cubic-bezier(.36,.07,.19,.97), five damped oscillations). Added .shake-on to index.css and a useShake hook that replays on every error. Wired into Auth login, VaultUnlockDialog, MFA verify and AccountSettings password change.
 - Added VaultRecoveryCard to Encryption: explains forgotten vault passwords are unrecoverable, requires typed ERASE, then shows visible step-by-step formatting progress. SKIPPED — needs a human: no destructive purge endpoint was written or executed; the UI invokes vault-reset which does not exist yet.
 - Vercel READY.
+
+## 2026-11-25 — BFF layering + security skills
+- Installed OWASP secure-agent-playbook (19 skills: api-security-review, web-security-review, secrets-scan, code-review-security, agent-security-audit, etc.) and briiirussell/cybersecurity-skills (api-audit, iam-audit, owasp-audit, crypto-audit, cicd-security, etc.) globally via skills CLI; also installed vtex/skills@headless-bff-architecture. Total skills now 99.
+- Removed the node:test test file at user request.
+- Client no longer calls supabase.functions.invoke('vault-reset'). It calls the BFF at /api/internal/vault with op=reset-vault and the session JWT; BFF verifies identity, strips identity fields, and calls the edge function with the service key.
+- Edge function gates: verified email, fresh JWT (<10min), TOTP aal2 when enrolled, passkeyVerified when a passkey exists; deletes file/folder/vault/key/share rows and all objects under the user's storage prefix. Deployed via supabase CLI (verify_jwt=true). Unauthenticated call verified 401.
+- Removed background-attachment:fixed from settings background to eliminate the visible horizontal seam.
+- Vercel READY. BFF endpoint returned curl 000 from this sandbox (network limitation), so live BFF response was not verified here.

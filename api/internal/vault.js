@@ -43,5 +43,30 @@ export default async function handler(req, res) {
     const { data } = await supabase.from('zk_ktl').select('seq, hash').eq('user_id', user.id).order('seq', { ascending: false }).limit(1).maybeSingle();
     return json({ head: data || null });
   }
+
+  // Destructive vault reset runs only through this BFF. The browser never
+  // calls the Supabase edge function (or storage/DB) directly. Identity is
+  // taken from the verified token, never from the body.
+  if (op === 'reset-vault') {
+    if (body.confirmation !== 'ERASE') return json({ error: 'confirmation required' }, 400);
+    const fnUrl = `${SUPABASE_URL}/functions/v1/vault-reset`;
+    const resp = await fetch(fnUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SERVICE,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        confirmation: 'ERASE',
+        totpVerified: body.totpVerified === true,
+        passkeyVerified: body.passkeyVerified === true,
+      }),
+    });
+    const text = await resp.text();
+    let payload;
+    try { payload = JSON.parse(text); } catch { payload = { raw: text }; }
+    return json(payload, resp.status);
+  }
   return json({ error: 'unknown op' }, 400);
 }

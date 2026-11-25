@@ -12,7 +12,6 @@ export const PAGES_POLISH = `
   background-image:
     radial-gradient(65% 45% at 88% -12%, rgba(232,231,225,.04), transparent 70%),
     radial-gradient(55% 40% at -8% 108%, rgba(134,195,161,.045), transparent 72%) !important;
-  background-attachment: fixed !important;
   color: var(--sa-text, #e8e7e1) !important;
   font-family: var(--sa-f, -apple-system, system-ui, sans-serif) !important;
   -webkit-font-smoothing: antialiased;
