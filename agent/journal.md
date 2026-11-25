@@ -274,3 +274,7 @@
 ## 2026-11-26 — Share bug fixed; global UI cleanup layer across all non-marketing routes
 - Reproduced share `wrong_password` via live edge function: stored 12-char access_code works, but users paste the 64-char share_secret_hash from the URL into the password field. Patched share-access to accept the secret hash as a credential, then re-run check_share_access with the server-side access code so country/device/burn/limit guards still apply. Updated SharePage labels. Verified: password true, secret true, wrong rejected; deployed edge function and Vercel.
 - Audited all 43 pages and every route. Created `src/styles/all-pages-clean.css`, imported in main.tsx, scoped by `data-sq-clean`/`data-sq-page` set in AppContent from location.pathname. Excludes /, /pricing, /checkout. Neutralises hardcoded dark/blue palettes, white tints, accents; normalises borders, radii, shadows, focus, headings; adds content-page rules. Initial var-based mapping produced an olive button on share page, fixed with literal colour fallbacks. Verified live via direct X11 (Zen): share guard and webhooks page now monochrome/clean.
+
+## 2026-11-26 — Dialog backdrop and input outline fixes
+- Global cleanup layer mapped `bg-black/*` to an opaque color, flattening Radix/custom dialog backdrops into solid panels. Added a later, more specific rule for fixed inset-0 bg-black overlays: rgba(3,4,3,.62) + blur.
+- Global focus rule drew a 1px bright outline on inputs; removed outline/box-shadow for input/textarea/select and neutralised ring-white/ring-2/ring-primary. Vercel READY.

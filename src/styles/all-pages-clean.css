@@ -202,3 +202,26 @@
 ) [class*="p-6"] {
   padding: 20px !important;
 }
+
+/* Dialog backdrops must stay translucent - earlier opaque mapping flattened them. */
+:root[data-sq-clean="on"] [class*="fixed"][class*="inset-0"][class*="bg-black/"] {
+  background-color: rgba(3, 4, 3, 0.62) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+
+/* Inputs get a quiet hairline, never a bright white focus ring. */
+:root[data-sq-clean="on"] :is(input, textarea, select):focus,
+:root[data-sq-clean="on"] :is(input, textarea, select):focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+:root[data-sq-clean="on"] :is(input, textarea, select) {
+  box-shadow: none !important;
+}
+:root[data-sq-clean="on"] [class*="ring-white"],
+:root[data-sq-clean="on"] [class*="ring-2"],
+:root[data-sq-clean="on"] [class*="ring-primary"] {
+  --tw-ring-color: transparent !important;
+  box-shadow: none !important;
+}
