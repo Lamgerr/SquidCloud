@@ -464,16 +464,16 @@ export function useBYOK() {
     mode: KeySelectionPref;
     shouldPrompt: boolean;
   } => {
-    if (!settings) return { mode: 'always_prompt', shouldPrompt: true };
-
-    if (settings.keySelectionDontAskAgain && settings.keySelectionPreference) {
+    /* E2E uploads should just work: the account key is used silently unless
+       the user explicitly opts into a different mode in Encryption settings. */
+    if (settings?.keySelectionDontAskAgain && settings.keySelectionPreference) {
       return {
         mode: settings.keySelectionPreference,
         shouldPrompt: false,
       };
     }
 
-    return { mode: 'always_prompt', shouldPrompt: true };
+    return { mode: 'always_saved', shouldPrompt: false };
   };
 
   return {

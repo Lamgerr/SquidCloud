@@ -308,11 +308,11 @@ export function BYOKSettingsCard({ className }: BYOKSettingsCardProps) {
                 </div>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm text-white">Key selection behavior</p>
+                    <p className="text-sm text-white">Upload encryption</p>
                     <p className="text-xs text-white/50">
                       {!settings?.keySelectionDontAskAgain
-                        ? 'You will be asked to choose an encryption mode for each upload'
-                        : `Always using "${settings?.keySelectionPreference?.replace('always_', '')}" without asking`
+                        ? 'Files are encrypted with your account key automatically. No choice needed when uploading.'
+                        : `Using "${settings?.keySelectionPreference?.replace('always_', '')}" for new uploads`
                       }
                     </p>
                   </div>
@@ -325,7 +325,7 @@ export function BYOKSettingsCard({ className }: BYOKSettingsCardProps) {
                         await setKeySelectionPref('always_prompt', false);
                       }}
                     >
-                      Reset prompt
+                      Ask each upload
                     </Button>
                   )}
                 </div>

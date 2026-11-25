@@ -200,3 +200,11 @@
 - pages-polish.css.ts: the old file had a blanket `box-shadow:none !important` that was destroying the glass depth on AccountSettings/DeveloperAPI. Rewrote as a light alignment layer — keep glass, align tokens/type/focus/entrance, neutralize only stray white surfaces and green action colors.
 - Unified AccountSettings dock thumbnail spring from 400/24/0.8 to 380/21/0.8. DeveloperAPI already used THUMB.
 - Vercel READY.
+
+## 2026-11-25 — AccountSettings shell redesign + remove upload friction
+- User: bottom dock layout is the worst possible UX; use the auth switcher's glass physics for the navbar; move the vault security panel into the Security category; stop asking users to pick between multiple upload/encryption methods.
+- Replaced the single-column stage + 9-item bottom dock with a grouped left glass rail (Account / Developer / System) and a right content pane. Rail thumb uses one shared layoutId with spring 380/21/0.8; items use tap spring 600/16; same gradient/inset/rim/shadow recipe as EnterpriseSidebar and the auth switcher. On mobile the rail becomes a sticky horizontal glass strip.
+- Moved VaultSecurityPanel into renderSecuritySection and removed the global footer copy.
+- Upload friction: `getUploadKeySelection` now defaults to `always_saved` with no prompt unless the user explicitly configures an advanced mode in Encryption settings. Fixed a second path in BYOKContext that was reading the raw stored preference (`always_prompt`) and re-opening the dialog despite the new default.
+- Copy updated in BYOKSettingsCard: plain explanation that uploads just use the account key, with "Ask each upload" as an explicit opt-in.
+- Vercel READY.

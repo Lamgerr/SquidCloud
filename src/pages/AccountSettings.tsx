@@ -621,6 +621,42 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
     display: none;
   }
 }
+
+/* ── settings shell: grouped glass rail + calm content pane ─────── */
+.tv-layout{display:grid;grid-template-columns:228px minmax(0,1fr);gap:38px;max-width:1180px;margin:0 auto;
+  padding:104px 28px 72px;min-height:100vh}
+.tv-rail{position:sticky;top:104px;align-self:start;display:flex;flex-direction:column;gap:18px;padding:9px;border-radius:22px;
+  background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-2,#0e1110));
+  border:1px solid var(--sa-line,#1f2221);
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.07),0 24px 54px -24px rgba(0,0,0,.8)}
+.tv-rail-group{display:flex;flex-direction:column;gap:3px}
+.tv-rail-label{padding:0 12px 7px;font:400 10px/1 var(--sa-mono,ui-monospace,monospace);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--sa-dim,#62655f)}
+.tv-rail-item{position:relative;display:flex;align-items:center;gap:11px;min-height:40px;padding:0 12px;border:0;
+  border-radius:14px;background:transparent;color:var(--sa-mute,#8d8f89);font:inherit;font-size:13px;cursor:pointer;
+  text-align:left;transition:color .18s;-webkit-tap-highlight-color:transparent}
+.tv-rail-item:hover,.tv-rail-item[aria-selected="true"]{color:var(--sa-text,#e8e7e1)}
+.tv-rail-thumb{position:absolute;inset:0;border-radius:14px;
+  background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-3,#141816));
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.08),0 0 0 1px rgba(232,231,225,.1),0 6px 18px -6px rgba(0,0,0,.55)}
+.tv-rail-item svg,.tv-rail-text{position:relative;z-index:1}
+.tv-rail-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tv-pane{min-width:0;max-width:760px;padding-bottom:40px}
+.tv-pane-head{margin-bottom:26px}
+.tv-pane-head h1{margin:0;font-size:clamp(28px,4vw,40px);font-weight:300;letter-spacing:-.04em;line-height:1.05}
+.tv-pane-sub{margin:9px 0 0;font-size:12px;color:var(--sa-mute,#8d8f89)}
+@media(max-width:880px){
+  .tv-layout{display:block;padding:86px 16px 40px}
+  .tv-rail{position:sticky;top:68px;z-index:30;flex-direction:row;align-items:center;gap:4px;padding:5px;
+    border-radius:999px;overflow-x:auto;scrollbar-width:none;margin-bottom:26px}
+  .tv-rail::-webkit-scrollbar{display:none}
+  .tv-rail-group{flex-direction:row;gap:3px}
+  .tv-rail-label{display:none}
+  .tv-rail-item{height:36px;padding:0 12px;border-radius:999px;white-space:nowrap;flex:none}
+  .tv-rail-thumb{border-radius:999px}
+  .tv-rail-text{font-size:12px}
+  .tv-pane{max-width:100%}
+}
 ${ PAGES_POLISH }
 `;
 
@@ -694,6 +730,12 @@ const SETTINGS_CATEGORIES = [
 ] as const;
 
 type SettingsCategory = typeof SETTINGS_CATEGORIES[number]['id'];
+
+const SETTINGS_GROUPS: { label: string; ids: SettingsCategory[] }[] = [
+  { label: 'Account', ids: ['profile', 'security', 'plans', 'byok'] },
+  { label: 'Developer', ids: ['developer', 'webhooks', 'devices', 'migration'] },
+  { label: 'System', ids: ['preferences'] },
+];
 const SECTION_IDS: SettingsCategory[] = SETTINGS_CATEGORIES.map((c) => c.id);
 
 type Tone = 'neutral' | 'ok' | 'warn' | 'err';
@@ -1621,6 +1663,9 @@ const AccountSettings = () => {
             )}
           </TvPod>
         )}
+
+        {/* Vault security belongs with the rest of account security. */}
+        <VaultSecurityPanel userId={user?.id || ''} />
       </>
     );
   }
@@ -1897,6 +1942,12 @@ const AccountSettings = () => {
   const jellySpring = reduce
     ? { duration: 0.01 }
     : { type: 'spring' as const, stiffness: 460, damping: 22, mass: 0.8 };
+  const thumbSpring = reduce
+    ? { duration: 0.01 }
+    : { type: 'spring' as const, stiffness: 380, damping: 21, mass: 0.8 };
+  const tapSpring = reduce
+    ? { duration: 0.01 }
+    : { type: 'spring' as const, stiffness: 600, damping: 16 };
 
   return (
     <AppShell>
@@ -1935,80 +1986,54 @@ const AccountSettings = () => {
           </div>
         </header>
 
-        {/* ── Single-Column tvOS Stage ── */}
-        <main className="tv-stage">
-          <div className="tv-title-bar">
-            <h1 className="tv-title">{current.label}</h1>
-            <span className="sa-mono" style={{ fontSize: 12, color: 'var(--tv-mute)' }}>
-              {user?.email}
-            </span>
-          </div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeCategory}
-              className="tv-stack"
-              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.985 }}
-              animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-              exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }}
-              transition={jellySpring}
-            >
-              {sectionRenderers[activeCategory]()}
-            </motion.div>
-          </AnimatePresence>
-        </main>
-
-        {/* ── Rounded Floating Dock Navigation ── */}
-        <div className="tv-dock-wrap">
-          <nav
-            className="tv-dock"
-            role="tablist"
-            aria-label="Settings navigation"
-            onKeyDown={onDockKey}
-          >
-            {SETTINGS_CATEGORIES.map((cat) => {
-              const Icon = cat.icon;
-              const active = activeCategory === cat.id;
-              return (
-                <motion.button
-                  key={cat.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  tabIndex={active ? 0 : -1}
-                  className="tv-dock-item"
-                  whileHover={reduce ? undefined : { scale: 1.05 }}
-                  whileTap={reduce ? undefined : { scaleX: 0.91, scaleY: 0.84 }}
-                  transition={jellySpring}
-                  onClick={() => {
-                    setActiveCategory(cat.id);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="tv-dock-pill"
-                      className="tv-dock-thumb"
-                      transition={
-                        reduce
-                          ? { duration: 0.01 }
-                          : { type: 'spring', stiffness: 380, damping: 21, mass: 0.8 }
-                      }
-                    />
-                  )}
-                  <span className="tv-dock-content">
-                    <Icon className="h-3.5 w-3.5" />
-                    <span className="tv-dock-label">{cat.label}</span>
-                  </span>
-                </motion.button>
-              );
-            })}
+        {/* ── Settings shell: grouped glass rail + content pane ── */}
+        <div className="tv-layout">
+          <nav className="tv-rail" role="tablist" aria-label="Settings navigation" aria-orientation="vertical" onKeyDown={onDockKey}>
+            {SETTINGS_GROUPS.map((group) => (
+              <div className="tv-rail-group" key={group.label}>
+                <span className="tv-rail-label">{group.label}</span>
+                {group.ids.map((id) => {
+                  const cat = SETTINGS_CATEGORIES.find((c) => c.id === id)!;
+                  const Icon = cat.icon;
+                  const active = activeCategory === id;
+                  return (
+                    <motion.button
+                      key={id} type="button" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
+                      className="tv-rail-item"
+                      whileHover={reduce ? undefined : { x: 2 }}
+                      whileTap={reduce ? undefined : { scale: 0.97 }}
+                      transition={reduce ? { duration: 0.01 } : tapSpring}
+                      onClick={() => { setActiveCategory(id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    >
+                      {active && <motion.span layoutId="tv-rail-thumb" className="tv-rail-thumb" transition={thumbSpring} />}
+                      <Icon className="h-4 w-4" strokeWidth={1.7} />
+                      <span className="tv-rail-text">{cat.label}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
-        </div>
-      </div>
 
-      <div style={{ maxWidth: 560, margin: '0 auto 24px', padding: '0 16px' }}>
-        <VaultSecurityPanel userId={user?.id || ''} />
+          <main className="tv-pane">
+            <div className="tv-pane-head">
+              <h1>{current.label}</h1>
+              <p className="tv-pane-sub">{user?.email}</p>
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeCategory}
+                className="tv-stack"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                transition={{ duration: reduce ? 0.01 : 0.18, ease: [0.16, 1, 0.3, 1] }}
+              >
+                {sectionRenderers[activeCategory]()}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
       </div>
 
       {/* ── Dialogs ── */}

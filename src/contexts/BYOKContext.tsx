@@ -130,10 +130,9 @@ export function BYOKProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unregister = registerKeySelectionHandler((request) => {
-      const { shouldPrompt } = getUploadKeySelection();
+      const { shouldPrompt, mode } = getUploadKeySelection();
 
-      if (!shouldPrompt && settings?.keySelectionPreference) {
-        const mode = settings.keySelectionPreference;
+      if (!shouldPrompt) {
         if (mode === 'always_saved') return Promise.resolve({ mode: 'saved', dontAskAgain: true });
         if (mode === 'always_unique') return Promise.resolve({ mode: 'unique', dontAskAgain: true });
         if (mode === 'always_custom') {
@@ -156,7 +155,7 @@ export function BYOKProvider({ children }: { children: React.ReactNode }) {
     });
 
     return unregister;
-  }, [getUploadKeySelection, settings?.keySelectionPreference]);
+  }, [getUploadKeySelection]);
 
   useEffect(() => {
     const unregister = registerMandatoryBYOKSetupHandler(() => {
@@ -213,10 +212,9 @@ export function BYOKProvider({ children }: { children: React.ReactNode }) {
     fileName: string,
     fileSize: number
   ): Promise<KeySelectionResult | null> => {
-    const { shouldPrompt } = getUploadKeySelection();
+    const { shouldPrompt, mode } = getUploadKeySelection();
 
-    if (!shouldPrompt && settings?.keySelectionPreference) {
-      const mode = settings.keySelectionPreference;
+    if (!shouldPrompt) {
       if (mode === 'always_saved') return { mode: 'saved', dontAskAgain: true };
       if (mode === 'always_unique') return { mode: 'unique', dontAskAgain: true };
       if (mode === 'always_custom') {
@@ -234,7 +232,7 @@ export function BYOKProvider({ children }: { children: React.ReactNode }) {
       setPendingKeySelection({ fileName, fileSize, resolve });
       setShowUploadKeyDialog(true);
     });
-  }, [getUploadKeySelection, settings?.keySelectionPreference]);
+  }, [getUploadKeySelection]);
 
   const handleKeySelectionConfirm = useCallback(async (result: KeySelectionResult) => {
     setShowUploadKeyDialog(false);
