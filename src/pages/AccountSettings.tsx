@@ -626,9 +626,9 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
 
 /* ── settings shell: grouped glass rail + calm content pane ─────── */
 .tv-layout{display:grid;grid-template-columns:196px minmax(0,720px);justify-content:center;gap:56px;
-  max-width:1120px;margin:0 auto;padding:112px 28px 88px;min-height:100vh;align-items:start}
+  max-width:1120px;margin:0 auto;padding:72px 28px 64px;min-height:100vh;align-content:start;align-items:start}
 /* No enclosing rectangle — the rail is just floating text with a glass thumb. */
-.tv-rail{position:sticky;top:112px;align-self:start;display:flex;flex-direction:column;gap:22px;
+.tv-rail{position:sticky;top:72px;align-self:start;display:flex;flex-direction:column;gap:22px;
   padding:2px 0;background:transparent;border:0;box-shadow:none}
 /* Single source of truth for the rail surface: no box at any width.
    Beats the global [role="tablist"] skin in squid-app.tsx. */
@@ -655,7 +655,7 @@ html.sq-app-root .tv-root .tv-rail[role="tablist"]::before{display:none!importan
 .tv-pane-head h1{margin:0;font-size:clamp(28px,4vw,40px);font-weight:300;letter-spacing:-.04em;line-height:1.05}
 .tv-pane-sub{margin:9px 0 0;font-size:12px;color:var(--sa-mute,#8d8f89)}
 @media(max-width:880px){
-  .tv-layout{display:block;padding:86px 16px 40px}
+  .tv-layout{display:block;padding:72px 16px 40px}
   .tv-rail{position:sticky;top:68px;z-index:30;flex-direction:row;align-items:center;gap:4px;
     overflow-x:auto;scrollbar-width:none;margin-bottom:26px}
   .tv-rail::-webkit-scrollbar{display:none}

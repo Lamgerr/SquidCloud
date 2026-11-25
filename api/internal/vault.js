@@ -21,6 +21,20 @@ export default async function handler(req, res) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // Public share decrypt logging. Uses the live table's ip_address column;
+  // the stale RPC inserts actor_ip which does not exist in production.
+  if (body.op === 'share-decrypt-log') {
+    const { error } = await admin.from('share_decrypt_logs').insert({
+      share_id: String(body.shareId || ''),
+      success: body.success === true,
+      failure_reason: body.failureReason || null,
+      user_agent: String(body.userAgent || ''),
+      ip_address: null,
+    });
+    if (error) return send(res, { error: error.message }, 500);
+    return send(res, { ok: true });
+  }
+
   // Public maintenance status needs no session.
   if (body.op === 'maintenance-mode' && body.value === undefined) {
     const { data } = await admin.from('system_settings')

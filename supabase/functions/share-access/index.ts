@@ -85,6 +85,21 @@ serve(async (req) => {
       });
       if (checkError) return json({ error: checkError.message }, 500);
 
+      // Non-secret diagnostics: distinguish a mistyped link password from a
+      // stale/rotated access code. Never logs the password or code itself.
+      if (!accessCheck?.allowed) {
+        const { data: dbg } = await supabase.from('shares')
+          .select('access_code, share_secret_hash').eq('share_id', shareId).maybeSingle();
+        console.log('[share-access] rejected', {
+          shareId,
+          reason: accessCheck?.reason,
+          passwordProvided: !!password,
+          passwordLength: password?.length || 0,
+          accessCodeSet: !!dbg?.access_code,
+          accessCodeLength: dbg?.access_code?.length || 0,
+          shareSecretSet: !!dbg?.share_secret_hash,
+        });
+      }
       return json(accessCheck);
     }
 

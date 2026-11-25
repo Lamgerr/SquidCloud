@@ -1593,12 +1593,16 @@ export async function logShareDecryptAttempt(
   failureReason?: string
 ): Promise<void> {
   try {
-    await supabase.rpc('log_share_decrypt_attempt', {
-      p_share_id: shareId,
-      p_success: success,
-      p_failure_reason: failureReason || null,
-      p_ip: null,
-      p_user_agent: navigator.userAgent,
+    await fetch('/api/internal/vault', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        op: 'share-decrypt-log',
+        shareId,
+        success,
+        failureReason: failureReason || null,
+        userAgent: navigator.userAgent,
+      }),
     });
   } catch (error) {
     console.error("Failed to log decrypt attempt:", error);

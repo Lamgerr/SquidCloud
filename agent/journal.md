@@ -258,3 +258,9 @@
 - Added BFF op vault-master-meta (service role) returning encrypted_master_key/kdf_salt/kdf_iterations. VaultUnlockDialog now derives PBKDF2 key from entered password and unwrapKey()s the master key; falls back to BYOK hash then legacy vaults table. Verified unwrap roundtrip locally with WebCrypto.
 - AccountSettings layout: removed inline styles on .tv-root and nav.tv-rail, removed the mobile rail box geometry, added one authoritative high-specificity rule for .tv-rail[role=tablist] (transparent, no border/radius/padding/shadow), made .tv-root transparent so the document-sized .sa ambient wash shows, simplified PAGES_POLISH.
 - Vercel READY.
+
+## 2026-11-25 — Screenshot verification, share errors, MCP auth
+- Verified latest settings screenshot pixel-by-pixel: no viewport seam, no enclosing rail rectangle. Remaining visual issue is sparse top whitespace; tightened .tv-layout padding and sticky rail offset.
+- share_decrypt_logs 42703: live table has ip_address, not actor_ip. Could not push migration (remote history mismatch), so routed logging through BFF op share-decrypt-log inserting ip_address; verified unauth call 200.
+- wrong_password: tested live RPC and edge function with the stored access_code — both return allowed. Added non-secret diagnostics (lengths/booleans only) to share-access and redeployed to identify what users are actually submitting.
+- OpenCode Supabase MCP: OAuth redirect URI rejected by Supabase. Switched to oauth:false + scoped PAT header in ~/.config/opencode/opencode.jsonc; verified connected via `opencode mcp list`.
