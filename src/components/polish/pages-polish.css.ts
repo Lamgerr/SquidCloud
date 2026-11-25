@@ -8,12 +8,8 @@
 export const PAGES_POLISH = `
 /* ── one palette: the dashboard's green-tinted near-black ───────── */
 .tv-root, .dv-root {
-  background-color: var(--sa-bg, #090b0a) !important;
-  background-image:
-    radial-gradient(65% 45% at 88% 0%, rgba(232,231,225,.035), transparent 70%),
-    radial-gradient(55% 40% at -8% 100%, rgba(134,195,161,.04), transparent 72%) !important;
-  background-size: 100% 100% !important;
-  background-repeat: no-repeat !important;
+  background: var(--sa-bg, #090b0a) !important;
+  background-image: none !important;
   color: var(--sa-text, #e8e7e1) !important;
   font-family: var(--sa-f, -apple-system, system-ui, sans-serif) !important;
   -webkit-font-smoothing: antialiased;

@@ -11,10 +11,25 @@ const send = (res, body, status = 200) => res.status(status).json(body);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, { error: 'method' }, 405);
-  const auth = String(req.headers.authorization || '');
-  if (!auth.startsWith('Bearer ')) return send(res, { error: 'unauthorized' }, 401);
   if (!SUPABASE_URL || !SERVICE) return send(res, { error: 'not configured' }, 503);
 
+  let body = {};
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {}); } catch { return send(res, { error: 'bad request' }, 400); }
+
+  // Service-role client with no user JWT: bypasses RLS for privileged writes.
+  const admin = createClient(SUPABASE_URL, SERVICE, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  // Public maintenance status needs no session.
+  if (body.op === 'maintenance-mode' && body.value === undefined) {
+    const { data } = await admin.from('system_settings')
+      .select('setting_value').eq('setting_key', 'maintenance_mode').maybeSingle();
+    return send(res, { setting_value: data?.setting_value || { enabled: false, message: 'System is under maintenance. Please check back later.' } });
+  }
+
+  const auth = String(req.headers.authorization || '');
+  if (!auth.startsWith('Bearer ')) return send(res, { error: 'unauthorized' }, 401);
   const token = auth.slice(7);
   const supabase = createClient(SUPABASE_URL, SERVICE, {
     global: { headers: { Authorization: `Bearer ${token}` } },
@@ -22,9 +37,6 @@ export default async function handler(req, res) {
   });
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return send(res, { error: 'unauthorized' }, 401);
-
-  let body = {};
-  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {}); } catch { return send(res, { error: 'bad request' }, 400); }
 
   // Identity is ALWAYS from the verified session; body userId is rejected.
   if ('userId' in body || 'user_id' in body || 'owner_id' in body) return send(res, { error: 'identity fields rejected' }, 400);
@@ -42,6 +54,36 @@ export default async function handler(req, res) {
   if (op === 'ktl-head') {
     const { data } = await supabase.from('zk_ktl').select('seq, hash').eq('user_id', user.id).order('seq', { ascending: false }).limit(1).maybeSingle();
     return send(res, { head: data || null });
+  }
+
+  // Maintenance status is public to read, admin-only to change. It is served
+  // by the BFF so anon never touches system_settings directly.
+  if (op === 'maintenance-mode') {
+    const { data: profile } = await admin.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+    if (!profile?.is_admin) return send(res, { error: 'forbidden' }, 403);
+    const { error } = await admin.from('system_settings')
+      .update({ setting_value: body.value, updated_by: user.id, updated_at: new Date().toISOString() })
+      .eq('setting_key', 'maintenance_mode');
+    if (error) return send(res, { error: error.message }, 500);
+    return send(res, { ok: true });
+  }
+
+  // Security events are written with the service role so anon RLS/grants
+  // never leak into the client. Identity comes from the verified token.
+  if (op === 'security-event') {
+    const ev = body.event || {};
+    const { error: insertError } = await admin.from('security_events').insert({
+      event_type: ev.event_type || 'suspicious_activity',
+      user_id: user.id,
+      timestamp: ev.timestamp || new Date().toISOString(),
+      ip_address: ev.ip_address || '',
+      user_agent: ev.user_agent || '',
+      metadata: ev.metadata || {},
+      risk_level: ev.risk_level || 'low',
+      status: ev.status || 'success',
+    });
+    if (insertError) return send(res, { error: insertError.message }, 500);
+    return send(res, { ok: true });
   }
 
   // Destructive vault reset runs only through this BFF. The browser never

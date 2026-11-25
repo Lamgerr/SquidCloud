@@ -2037,7 +2037,7 @@ const AccountSettings = () => {
     <AppShell>
       <style>{TV_CSS}</style>
 
-      <div className="tv-root">
+      <div className="tv-root" style={{ background: 'var(--sa-bg, #090b0a)', backgroundImage: 'none', minHeight: '100vh' }}>
         {/* ── Minimal Floating HUD ── */}
         <header className="tv-hud">
           <Link to="/dashboard" className="tv-pill-btn sm" aria-label="Back to dashboard">
@@ -2072,7 +2072,7 @@ const AccountSettings = () => {
 
         {/* ── Settings shell: grouped glass rail + content pane ── */}
         <div className="tv-layout">
-          <nav className="tv-rail" role="tablist" aria-label="Settings navigation" aria-orientation="vertical" onKeyDown={onDockKey}>
+          <nav className="tv-rail" style={{ background: 'transparent', border: 0, boxShadow: 'none' }} role="tablist" aria-label="Settings navigation" aria-orientation="vertical" onKeyDown={onDockKey}>
             {SETTINGS_GROUPS.map((group) => (
               <div className="tv-rail-group" key={group.label}>
                 <span className="tv-rail-label">{group.label}</span>

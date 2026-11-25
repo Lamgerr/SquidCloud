@@ -238,3 +238,11 @@
 - Edge 403 traced to a self-imposed 10-minute JWT-age requirement that was not requested; removed. Gates kept: verified email, TOTP aal2 if enrolled, passkey flag if registered, typed ERASE. Added explicit error codes.
 - Layout seam: `html.sq-app-root body::before` is `position:fixed`; in full-page rendering it covers only the first viewport, producing the horizontal line. Hidden it for pages containing .tv-root/.dv-root and set the wash directly on those roots with background-size:100% 100%. Forced .tv-rail transparent/borderless to remove the rectangle at all widths.
 - Vercel READY, edge redeployed.
+
+## 2026-11-25 — Vault unlock / RLS errors / maintenance / layout debug pass
+- Vault unlock: verifyVaultPassword() read `vaults.password_hash`, which is a legacy table; the actual vault passphrase is stored as account_key_hash + account_key_salt in user_encryption_settings. VaultUnlockDialog now verifies with verifyKeyHash(password, base64ToArrayBuffer(salt), hash), falls back to legacy verifier only when no BYOK row exists, then derives the in-memory key with unlockVault().
+- security_events 42501: client direct insert used anon key; policy requires auth.uid()=user_id. Routed through BFF op security-event using a dedicated service-role client with no user JWT (the original BFF client had global user Authorization, so RLS still applied).
+- maintenance_mode 42501: direct anon SELECT on system_settings. BFF now serves public maintenance status with service-role admin client (no auth required); updates require is_admin. Verified live: public read 200, unauth event write 401.
+- Layout: global body::before was position:fixed so it ended at the first viewport; changed to absolute and set html body background. Removed all gradients from settings roots and added inline overrides to .tv-root and .tv-rail so the rectangle/seam cannot come back from stale CSS.
+- Vault reset success now calls supabase.auth.signOut() and redirects to /auth?reason=vault-reset.
+- Vercel READY.

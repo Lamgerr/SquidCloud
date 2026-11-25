@@ -87,8 +87,11 @@ export default function VaultRecoveryCard({ emailVerified = true, totpEnabled = 
       if (!resp.ok || payload?.error) throw new Error(payload?.error || `Reset failed (${resp.status})`);
       await new Promise((r) => setTimeout(r, reduce ? 10 : 500));
       setStep(STEPS.length);
-      toast({ title: 'Vault erased', description: 'Your account is ready for a fresh setup.' });
-      window.setTimeout(() => window.location.assign('/auth?tab=signup'), reduce ? 0 : 900);
+      toast({ title: 'Vault erased', description: 'Please sign in again to set up your new vault.' });
+      // The destructive operation invalidates the current session: force a
+      // real re-authentication instead of leaving a stale client session.
+      await supabase.auth.signOut();
+      window.setTimeout(() => window.location.assign('/auth?reason=vault-reset'), reduce ? 0 : 900);
     } catch (e: any) {
       setStep(-1);
       setBusy(false);

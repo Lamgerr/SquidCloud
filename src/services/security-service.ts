@@ -117,11 +117,22 @@ class SecurityService {
         timestamp: new Date().toISOString()
       };
 
-      const { error } = await supabase
-        .from('security_events')
-        .insert(securityEvent);
-
-      if (error) throw error;
+      // Write through the BFF with the service role. A direct anon insert
+      // fails RLS/grants and floods the console with 42501 errors.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+      const resp = await fetch('/api/internal/vault', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ op: 'security-event', event: securityEvent }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err?.error || `Security event failed (${resp.status})`);
+      }
 
       // Check for threat patterns
       await this.analyzeThreatPatterns(securityEvent);

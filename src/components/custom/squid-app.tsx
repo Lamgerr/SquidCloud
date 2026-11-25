@@ -160,8 +160,9 @@ html.sq-app-root[data-scale="large"] { --sq-scale: 1.18; }
 html.sq-app-root[data-scale="xlarge"] { --sq-scale: 1.32; }
 
 /* Ambient depth wash — neutral, very quiet, behind everything */
+html.sq-app-root body { background: var(--sa-bg) !important; }
 html.sq-app-root body::before {
-  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: -1;
   background:
     radial-gradient(65% 45% at 88% -12%, var(--sa-accent-soft), transparent 70%),
     radial-gradient(55% 40% at -8% 108%, rgba(232,231,225,0.025), transparent 72%);

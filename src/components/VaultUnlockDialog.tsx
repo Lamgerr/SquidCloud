@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Lock, X, Shield } from '@/lib/icon-map';
 import { unlockVault } from '@/lib/zk-vault-session';
 import { verifyVaultPassword } from '@/lib/zk-vault-verify';
+import { verifyKeyHash, base64ToArrayBuffer } from '@/services/byok-encryption';
+import { supabase } from '@/integrations/supabase/client';
 import { useShake } from '@/hooks/use-shake';
 
 interface Props {
@@ -23,7 +25,18 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
     if (!password) return;
     setBusy(true); setError('');
     try {
-      const ok = await verifyVaultPassword(userId, password);
+      // The real vault passphrase is the BYOK account key passphrase stored
+      // in user_encryption_settings (Argon2 hash). `vaults` is a legacy table.
+      const { data: enc } = await supabase
+        .from('user_encryption_settings')
+        .select('settings').eq('user_id', userId).maybeSingle();
+      const cfg = enc?.settings as any;
+      let ok = false;
+      if (cfg?.account_key_hash && cfg?.account_key_salt) {
+        ok = await verifyKeyHash(password, base64ToArrayBuffer(cfg.account_key_salt), cfg.account_key_hash);
+      } else {
+        ok = await verifyVaultPassword(userId, password);
+      }
       if (!ok) throw new Error('Incorrect vault password');
       await unlockVault(password, userId);
       setPassword('');
