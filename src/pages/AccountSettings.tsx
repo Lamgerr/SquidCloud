@@ -33,6 +33,7 @@ import {
   AppShell, Spinner, Ico, useHashState, useDocTitle,
 } from '@/components/custom/squid-app';
 import VaultUnlockDialog from '@/components/VaultUnlockDialog';
+import VaultSecurityPanel from '@/components/VaultSecurityPanel';
 import { isVaultUnlocked, lockVault } from '@/lib/zk-vault-session';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2002,6 +2003,10 @@ const AccountSettings = () => {
             })}
           </nav>
         </div>
+      </div>
+
+      <div style={{ maxWidth: 560, margin: '0 auto 24px', padding: '0 16px' }}>
+        <VaultSecurityPanel userId={user?.id || ''} />
       </div>
 
       {/* ── Dialogs ── */}

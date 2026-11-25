@@ -9,6 +9,7 @@ class MainActivity : BridgeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         registerPlugin(SharedReceiverPlugin::class.java)
         registerPlugin(NativeDownloaderPlugin::class.java)
+        registerPlugin(SecureKeyStorePlugin::class.java)
         super.onCreate(savedInstanceState)
     }
 }

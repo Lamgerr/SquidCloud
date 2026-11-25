@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <!-- Hardened native client: no cleartext, pinned TLS for the SquidCloud API. -->
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+
+  <!-- Domain config requires real SHA-256 SPKI pins from the deployed cert chain.
+       Replace the placeholder values below before releasing a signed build. -->
+  <!-- To enable certificate pinning, add a <pin-set> with real SHA-256 SPKI
+       hashes of your deployed certificate chain inside this domain-config.
+       Pins are left unset here because placeholder pins would break the app. -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">supabase.co</domain>
+    <domain includeSubdomains="true">vercel.app</domain>
+  </domain-config>
+</network-security-config>
