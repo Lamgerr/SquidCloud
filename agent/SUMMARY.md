@@ -1,7 +1,7 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- **Auth page rebuilt for the third time, now strictly monochrome and minimal.** True-black background, SF/system font, centered single column, large tight-tracked headline, plain hairline fields, one solid white pill CTA, grayscale circular OAuth buttons, text-only mode switch. No aurora, no accent color, no decorative art, no spring motion. All auth behavior preserved verbatim. Deleted the animated stage/ritual components.
+- **Auth page: strict monochrome, now consistent with the dashboard.** Uses the same `sa-*` tokens (`#090b0a` green-tinted black, bone-white text, muted grays, hairlines) plus a faint green ambient wash. Centered single column, SF/system type, one white pill CTA, bare underline fields, 180ms fades. Duplicate logo removed; passkey uses lucide `Fingerprint`; OAuth marks are clean monochrome SVGs. All auth behavior preserved verbatim.
 - **37 UI/UX skills installed globally** (`ui-ux-pro-max`, design-system/ui-styling/brand, 20 animation skills, `motion-doctrine`). Sources verified 100K+ GitHub stars.
 - Earlier: public clean repo `Lamgerr/SquidCloud` (`fresh-main`), release v13.0.38, hardened Supabase backend, sealed previews, security modules, CI gates. Vercel build READY.
 
@@ -14,6 +14,6 @@
 
 ## Queued next
 1. Await user verdict on `/auth`.
-2. If accepted: apply the same monochrome restraint to `AccountSettings` and `DeveloperAPI`.
+2. If accepted: apply the same restraint to `AccountSettings` and `DeveloperAPI`.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
