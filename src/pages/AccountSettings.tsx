@@ -79,7 +79,7 @@ html.sq-app-root .tv-root {
     radial-gradient(60% 45% at 50% -10%, rgba(28, 32, 29, 0.45), transparent 70%),
     var(--tv-bg);
   color: var(--tv-ink);
-  padding: 24px clamp(16px, 4vw, 40px) 132px;
+  padding: 16px clamp(16px, 4vw, 40px) 88px;
   font-family: var(--sa-f, 'Hanken Grotesk', system-ui, -apple-system, sans-serif);
 }
 @supports (transition-timing-function: linear(0, 1)) {
@@ -626,22 +626,22 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
 
 /* ── settings shell: grouped glass rail + calm content pane ─────── */
 .tv-layout{display:grid;grid-template-columns:196px minmax(0,720px);justify-content:center;gap:56px;
-  max-width:1120px;margin:0 auto;padding:72px 28px 64px;min-height:100vh;align-content:start;align-items:start}
+  max-width:1120px;margin:0 auto;padding:56px 28px 56px;min-height:100vh;align-content:start;align-items:start}
 /* No enclosing rectangle — the rail is just floating text with a glass thumb. */
-.tv-rail{position:sticky;top:72px;align-self:start;display:flex;flex-direction:column;gap:22px;
+.tv-rail{position:sticky;top:72px;align-self:start;display:flex;flex-direction:column;gap:10px;
   padding:2px 0;background:transparent;border:0;box-shadow:none}
 /* Single source of truth for the rail surface: no box at any width.
    Beats the global [role="tablist"] skin in squid-app.tsx. */
 html.sq-app-root .tv-root .tv-rail[role="tablist"]{
-  position:sticky;top:112px;align-self:start;display:flex;flex-direction:column;gap:22px;
+  position:sticky;top:56px;align-self:start;display:flex;flex-direction:column;gap:10px;
   padding:0;margin:0;background:transparent!important;border:0!important;border-radius:0!important;
   box-shadow:none!important;backdrop-filter:none!important;
 }
 html.sq-app-root .tv-root .tv-rail[role="tablist"]::before{display:none!important}
 .tv-rail-group{display:flex;flex-direction:column;gap:2px}
-.tv-rail-label{padding:0 12px 8px;font:400 10px/1 var(--sa-mono,ui-monospace,monospace);letter-spacing:.14em;
+.tv-rail-label{padding:0 12px 5px;font:400 10px/1 var(--sa-mono,ui-monospace,monospace);letter-spacing:.14em;
   text-transform:uppercase;color:var(--sa-dim,#62655f)}
-.tv-rail-item{position:relative;display:flex;align-items:center;gap:11px;min-height:38px;padding:0 12px;border:0;
+.tv-rail-item{position:relative;display:flex;align-items:center;gap:11px;min-height:34px;padding:0 12px;border:0;
   border-radius:12px;background:transparent;color:var(--sa-mute,#8d8f89);font:inherit;font-size:13px;cursor:pointer;
   text-align:left;transition:color .18s;-webkit-tap-highlight-color:transparent}
 .tv-rail-item:hover,.tv-rail-item[aria-selected="true"]{color:var(--sa-text,#e8e7e1)}

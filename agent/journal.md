@@ -264,3 +264,9 @@
 - share_decrypt_logs 42703: live table has ip_address, not actor_ip. Could not push migration (remote history mismatch), so routed logging through BFF op share-decrypt-log inserting ip_address; verified unauth call 200.
 - wrong_password: tested live RPC and edge function with the stored access_code — both return allowed. Added non-secret diagnostics (lengths/booleans only) to share-access and redeployed to identify what users are actually submitting.
 - OpenCode Supabase MCP: OAuth redirect URI rejected by Supabase. Switched to oauth:false + scoped PAT header in ~/.config/opencode/opencode.jsonc; verified connected via `opencode mcp list`.
+
+## 2026-11-25 — Live X11 verification + dedicated computer-use MCP
+- User enabled X11 (Termux X11 + XFCE) with Zen browser running and asked for real browser testing.
+- Popular computer-use tools failed on this host: agent-browser (android-arm64 unsupported), orca (CLI absent), open-computer-use (Go binary SIGSYS under Termux seccomp), Playwright MCP (launches fresh Firefox/Zen profile, cannot attach to existing Firefox browser).
+- Built `~/.local/lib/x11-computer/server.mjs` with @modelcontextprotocol/sdk exposing list_windows/activate_window/screenshot/click/type/key/scroll via wmctrl/xdotool/import; configured as global MCP `x11-computer` and disabled Playwright fresh-browser server. Attached to the user's existing Zen window.
+- Live inspection via browser console showed settings shell started at y=160 with rail height 458; System item clipped and content too low. Compacted rail and reduced shell padding; screenshot through x11-computer MCP confirms System fully visible, no seam and no rail box.
