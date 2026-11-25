@@ -1,21 +1,20 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- Vault unlock now routes passphrase verification through the BFF (`vault-pass-meta`), eliminating the Firefox CORS block. Client receives only the Argon2 hash+salt and verifies locally.
-- Vault unlock verifies the real BYOK account-key passphrase (legacy fallback retained).
-- Security events and maintenance status route through the BFF service-role client; no anon 42501 errors.
-- Vault reset forces sign-out/re-login.
-- Layout seam eliminated: ambient wash moved from a viewport-fixed body pseudo-element to the full-document `.sa` shell; settings roots use document-sized wash; rail forced transparent.
-- BFF actual responses fixed (no more 300s timeout); edge 403 gate removed.
-- Vercel READY.
+- **Vault unlock root cause fixed with live evidence**: the affected user has no BYOK hash and no `vaults` row, but has a `master_keys` row created from the **account sign-in password**. The dialog now fetches master-key metadata through the BFF and verifies by unwrapping the master key with a PBKDF2-derived key from the entered password. BYOK and legacy verifiers remain as fallbacks. Local WebCrypto roundtrip verified.
+- **AccountSettings layout rebuilt from the root**: removed conflicting inline styles and the mobile rail box; one authoritative high-specificity rule keeps the rail transparent/borderless; `.tv-root` is transparent so the full-document `.sa` ambient wash shows.
+- BFF routing, reset reauth, security-event and maintenance fixes from prior passes remain. Vercel READY.
+
+## Important usage note
+- The vault passphrase is the **account sign-in password** used at master-key setup, not a separately chosen BYOK passphrase unless one was explicitly created in Encryption.
 
 ## Blocked / known
 - Supabase service-role key from old history still live (user deprioritized rotation).
-- Realtime websocket errors come from other Supabase channels (signals/support/share surveillance), not the routes changed here; left untouched.
+- Realtime websocket errors from other Supabase channels remain unchanged.
 - No local browser rendering; user verifies visually.
 
 ## Queued next
-1. User retest: vault unlock, layout seam, reset flow.
-2. If realtime websocket errors remain disruptive, migrate those channels to BFF polling or disable them.
+1. User retest: unlock with account sign-in password; inspect layout.
+2. If unlock still fails, add BFF-side diagnostics to report which verifier branch fired.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
