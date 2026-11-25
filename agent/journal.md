@@ -169,3 +169,12 @@
 - Deleted old local dir cloudbliss-storage-fresh-main (rm -rf) and deleted remote repos Lamgerr/cloudbliss-storage and Lamgerr/cloudbliss-storage-clean via GitHub API (204 each; verified 404 afterwards).
 - Final: one active repo (SquidCloud, public, fresh-main, 0 PR refs), new local repo clean.
 - REMAINING BLOCKER: credential rotation — Supabase service-role key from leaked history still valid (REST 200, exp 2035). Repo is structurally clean but leaked values are not dead.
+
+## 2026-11-25 — Auth rebuild from scratch + UI/UX skill library
+- User rejected the previous auth result as "generic AI slop": an animated panel bolted onto the old form. Decision: replace the entire visual layer, keep every handler/effect byte-identical.
+- Installed skills via `node node_modules/skills/bin/cli.mjs add <repo> -g -y` (npm `skills@1.9.0` installed locally; npx shim was broken). Sources verified: nextlevelbuilder/ui-ux-pro-max-skill 153,991 stars; leonxlnx/taste-skill 121,365; emilkowalski/skills 59,415; heygen-com/hyperframes 89,891. Skipped uizze/uizze (137 stars) and designed-by-ai/skills (42 stars) per find-skills quality bar. 37 skills now indexed by OpenCode; PromptScript adapter "failed to install" messages were global-install no-ops only.
+- Ran ui-ux-pro-max `--design-system` for the auth page; applied its checks (SVG icons only, 44px touch targets, visible focus, reduced motion, 4.5:1 CTA label, no excessive animation) and choreograph rules (one entrance per container, overlap phases, no uniform stagger).
+- Auth.tsx logic preserved by splicing the exact logic block from the old file into a new prefix/suffix; only additive change is `passkeySuccess` visual state. All 6 effects, 6 handlers, strength calc, view derivation, redirect logic, INK modal, toasts and doc title intact.
+- AuthIdentityStage rewritten: aurora blobs, animated wave field, drifting motes, ghost wordmark, pointer-reactive luminous seed with orbiting rings/satellites, floating glass status notes, mode-aware copy.
+- PasskeyRitual rewritten: glass trigger row + full-screen scan ritual with converging rings, drawn fingerprint, progress arc, four overlapping phases and a seal/check finish. Moved `<style>` outside the overlay after catching that the trigger was unstyled until activation.
+- Build: Vercel `READY`. Not visually verified in-browser here; user will test.
