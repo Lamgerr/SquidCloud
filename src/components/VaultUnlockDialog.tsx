@@ -4,6 +4,7 @@ import { Lock, X, Shield } from '@/lib/icon-map';
 import { unlockVault } from '@/lib/zk-vault-session';
 import { verifyVaultPassword } from '@/lib/zk-vault-verify';
 import { verifyKeyHash, base64ToArrayBuffer } from '@/services/byok-encryption';
+import { deriveKeyFromPassword, unwrapKey } from '@/lib/key-derivation';
 import { supabase } from '@/integrations/supabase/client';
 import { useShake } from '@/hooks/use-shake';
 
@@ -29,19 +30,38 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
       // in user_encryption_settings (Argon2 hash). `vaults` is a legacy table.
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not signed in');
-      const resp = await fetch('/api/internal/vault', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ op: 'vault-pass-meta' }),
-      });
-      if (!resp.ok) throw new Error('Could not load vault settings');
-      const meta = await resp.json();
+      const post = async (op: string) => {
+        const r = await fetch('/api/internal/vault', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ op }),
+        });
+        if (!r.ok) throw new Error(`Vault verification failed (${r.status})`);
+        return r.json();
+      };
+
       let ok = false;
-      if (meta.account_key_hash && meta.account_key_salt) {
-        ok = await verifyKeyHash(password, base64ToArrayBuffer(meta.account_key_salt), meta.account_key_hash);
-      } else {
-        ok = await verifyVaultPassword(userId, password);
+      // 1. Real vault: master key wrapped with a password-derived key.
+      const master = await post('vault-master-meta');
+      if (master.encrypted_master_key && master.kdf_salt) {
+        try {
+          const [wrapped, iv] = String(master.encrypted_master_key).split(':');
+          const { key: passwordKey } = await deriveKeyFromPassword(
+            password, base64ToArrayBuffer(master.kdf_salt), Number(master.kdf_iterations) || 100000,
+          );
+          await unwrapKey(wrapped, iv, passwordKey);
+          ok = true;
+        } catch { ok = false; }
       }
+      // 2. BYOK account-key hash fallback.
+      if (!ok) {
+        const meta = await post('vault-pass-meta');
+        if (meta.account_key_hash && meta.account_key_salt) {
+          ok = await verifyKeyHash(password, base64ToArrayBuffer(meta.account_key_salt), meta.account_key_hash);
+        }
+      }
+      // 3. Legacy vaults table fallback.
+      if (!ok) ok = await verifyVaultPassword(userId, password);
       if (!ok) throw new Error('Incorrect vault password');
       await unlockVault(password, userId);
       setPassword('');

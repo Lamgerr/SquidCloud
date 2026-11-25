@@ -68,6 +68,19 @@ export default async function handler(req, res) {
     return send(res, { ok: true });
   }
 
+  // Master-key metadata is the real vault verifier. The master key is wrapped
+  // with a PBKDF2 key derived from the account sign-in password.
+  if (op === 'vault-master-meta') {
+    const { data } = await admin.from('master_keys')
+      .select('encrypted_master_key, kdf_salt, kdf_iterations')
+      .eq('user_id', user.id).order('key_version', { ascending: false }).limit(1).maybeSingle();
+    return send(res, {
+      encrypted_master_key: data?.encrypted_master_key || null,
+      kdf_salt: data?.kdf_salt || null,
+      kdf_iterations: data?.kdf_iterations || 100000,
+    });
+  }
+
   // Vault passphrase verification metadata (hash + salt only, never key).
   // Returned by the BFF so the browser never opens a Supabase REST socket.
   if (op === 'vault-pass-meta') {

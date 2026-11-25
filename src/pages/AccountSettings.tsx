@@ -630,6 +630,14 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
 /* No enclosing rectangle — the rail is just floating text with a glass thumb. */
 .tv-rail{position:sticky;top:112px;align-self:start;display:flex;flex-direction:column;gap:22px;
   padding:2px 0;background:transparent;border:0;box-shadow:none}
+/* Single source of truth for the rail surface: no box at any width.
+   Beats the global [role="tablist"] skin in squid-app.tsx. */
+html.sq-app-root .tv-root .tv-rail[role="tablist"]{
+  position:sticky;top:112px;align-self:start;display:flex;flex-direction:column;gap:22px;
+  padding:0;margin:0;background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+html.sq-app-root .tv-root .tv-rail[role="tablist"]::before{display:none!important}
 .tv-rail-group{display:flex;flex-direction:column;gap:2px}
 .tv-rail-label{padding:0 12px 8px;font:400 10px/1 var(--sa-mono,ui-monospace,monospace);letter-spacing:.14em;
   text-transform:uppercase;color:var(--sa-dim,#62655f)}
@@ -648,10 +656,8 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
 .tv-pane-sub{margin:9px 0 0;font-size:12px;color:var(--sa-mute,#8d8f89)}
 @media(max-width:880px){
   .tv-layout{display:block;padding:86px 16px 40px}
-  .tv-rail{position:sticky;top:68px;z-index:30;flex-direction:row;align-items:center;gap:4px;padding:5px;
-    border-radius:999px;overflow-x:auto;scrollbar-width:none;margin-bottom:26px;
-    background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-2,#0e1110));
-    border:1px solid var(--sa-line,#1f2221);box-shadow:inset 0 1px 0 rgba(232,231,225,.06)}
+  .tv-rail{position:sticky;top:68px;z-index:30;flex-direction:row;align-items:center;gap:4px;
+    overflow-x:auto;scrollbar-width:none;margin-bottom:26px}
   .tv-rail::-webkit-scrollbar{display:none}
   .tv-rail-group{flex-direction:row;gap:3px}
   .tv-rail-label{display:none}
@@ -2037,7 +2043,7 @@ const AccountSettings = () => {
     <AppShell>
       <style>{TV_CSS}</style>
 
-      <div className="tv-root" style={{ background: 'var(--sa-bg, #090b0a)', backgroundImage: 'none', minHeight: '100vh' }}>
+      <div className="tv-root">
         {/* ── Minimal Floating HUD ── */}
         <header className="tv-hud">
           <Link to="/dashboard" className="tv-pill-btn sm" aria-label="Back to dashboard">
@@ -2072,7 +2078,7 @@ const AccountSettings = () => {
 
         {/* ── Settings shell: grouped glass rail + content pane ── */}
         <div className="tv-layout">
-          <nav className="tv-rail" style={{ background: 'transparent', border: 0, boxShadow: 'none' }} role="tablist" aria-label="Settings navigation" aria-orientation="vertical" onKeyDown={onDockKey}>
+          <nav className="tv-rail" role="tablist" aria-label="Settings navigation" aria-orientation="vertical" onKeyDown={onDockKey}>
             {SETTINGS_GROUPS.map((group) => (
               <div className="tv-rail-group" key={group.label}>
                 <span className="tv-rail-label">{group.label}</span>

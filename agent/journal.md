@@ -252,3 +252,9 @@
 - Realtime websocket error originates from other Supabase channels (signals/support/share surveillance), not the maintenance hook which was already made BFF-only. Not changed here.
 - Layout seam: `body::before` with position:fixed only covers first viewport; changing to absolute did not help because body is not a positioning context. Final fix: disable body::before globally for sq-app-root and paint the wash on `.sa` (the full-document shell) with background-size:100% 100%; settings roots carry the same document-sized wash.
 - Vercel READY. Verified: vault-pass-meta unauth 401, maintenance public 200.
+
+## 2026-11-25 — Master-key root cause and settings shell cleanup
+- Live data for the affected user: user_encryption_settings.settings has no account_key_hash; vaults table empty; master_keys row exists (created 15:37 via account sign-in password). Therefore all previous verifiers were checking stores that do not hold this user's vault password.
+- Added BFF op vault-master-meta (service role) returning encrypted_master_key/kdf_salt/kdf_iterations. VaultUnlockDialog now derives PBKDF2 key from entered password and unwrapKey()s the master key; falls back to BYOK hash then legacy vaults table. Verified unwrap roundtrip locally with WebCrypto.
+- AccountSettings layout: removed inline styles on .tv-root and nav.tv-rail, removed the mobile rail box geometry, added one authoritative high-specificity rule for .tv-rail[role=tablist] (transparent, no border/radius/padding/shadow), made .tv-root transparent so the document-sized .sa ambient wash shows, simplified PAGES_POLISH.
+- Vercel READY.
