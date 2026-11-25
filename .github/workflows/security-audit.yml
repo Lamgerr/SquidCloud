@@ -2,7 +2,7 @@ name: Security Invariant Audit
 
 on:
   push:
-    branches: [main]
+    branches: [fresh-main, main]
   pull_request:
   schedule:
     - cron: '0 6 * * *'
@@ -15,6 +15,10 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high || true
+      - name: License check
+        run: test -f LICENSE && grep -q "SQUIDCLOUD PUBLIC LICENSE" LICENSE
       - name: Secret scan (no keys/tokens in source)
         run: |
           if grep -rInE 'ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|sb_secret_[A-Za-z0-9]{20,}' \

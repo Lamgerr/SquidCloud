@@ -1,0 +1,25 @@
+# Security-sensitive paths require review from the maintainers.
+* @Lamgerr
+
+# Crypto, vault, and key management — highest review bar.
+/src/lib/zk/ @Lamgerr
+/src/lib/zk-crypto.ts @Lamgerr
+/src/lib/zk-vault-session.ts @Lamgerr
+/src/lib/zk-vault-verify.ts @Lamgerr
+/src/lib/zk-mode.ts @Lamgerr
+/src/lib/encryption.ts @Lamgerr
+/src/lib/encryption-v3.ts @Lamgerr
+
+# Backend schema + edge functions.
+/supabase/migrations/ @Lamgerr
+/supabase/functions/ @Lamgerr
+/supabase/config.toml @Lamgerr
+
+# Auth + session.
+/src/contexts/AuthContext.tsx @Lamgerr
+/src/services/secure-key-manager.ts @Lamgerr
+/middleware.ts @Lamgerr
+
+# CI security gates themselves.
+/.github/workflows/security-audit.yml @Lamgerr
+/scripts/security-audit.sql @Lamgerr

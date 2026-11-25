@@ -19,6 +19,10 @@
       "destination": "/api/epub-proxy"
     },
     {
+      "source": "/api/internal/:path*",
+      "destination": "/api/internal/[path]"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
