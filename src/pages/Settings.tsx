@@ -37,6 +37,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const ST_CSS = `
+.st-content{max-width:900px;margin:0 auto;text-align:left}
+.st-root :is(h1,h2,h3){color:var(--sa-text,#e8e7e1)!important}
+.st-root :is(p,span,li){color:var(--sa-mute,#8d8f89)}
+.st-root [class*="text-blue-"],
+.st-root [class*="text-purple-"],
+.st-root [class*="text-emerald-"],
+.st-root [class*="text-amber-"],
+.st-root [class*="text-red-"]{color:var(--sa-mute,#8d8f89)!important}
+.st-root [class*="bg-blue-"],
+.st-root [class*="bg-purple-"],
+.st-root [class*="bg-emerald-"],
+.st-root [class*="bg-amber-"],
+.st-root [class*="bg-red-"]{background-color:var(--sa-bg-3,#141816)!important;border-color:var(--sa-line,#1f2221)!important}
+.st-root [class*="border-emerald"],
+.st-root [class*="border-amber"],
+.st-root [class*="border-blue"]{border-color:var(--sa-line,#1f2221)!important}
+.st-root :is([class*="rounded-xl"],[class*="rounded-2xl"]){border-radius:16px!important}
+.st-panel{border:1px solid var(--sa-line,#1f2221)!important;border-radius:16px!important;background:var(--sa-bg-2,#0e1110)!important;box-shadow:none!important}
+.st-stat{border:1px solid var(--sa-line,#1f2221);border-radius:12px;background:var(--sa-bg-2,#0e1110);padding:14px}
+.st-head{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+`;
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -262,7 +286,8 @@ const Settings = () => {
   // Mobile UI
   if (isMobile) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] pb-24">
+      <div className="st-root min-h-screen bg-[#0a0a0f] pb-24">
+        <style>{ST_CSS}</style>
         {/* Mobile Header */}
         <div className="sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
           <div className="bg-background/95 backdrop-blur-xl border-b border-muted/30">
@@ -456,24 +481,14 @@ const Settings = () => {
   }
   
   return (
-    <div className="min-h-screen bg-background">
+    <PageFrame title="Security Settings" subtitle="Configure BYOK, passkeys, and hardened decryption policies from one control center." wide>
+      <style>{ST_CSS}</style>
+      <div className="st-root st-content">
       {isMobile && <MobileNavHeader onSearchClick={() => {}} onMenuClick={() => {}} />}
-      
-      <div className="container mx-auto max-w-5xl px-4 py-6">
-        <div className="mb-6 overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-r from-card via-card to-muted/30 p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Security Settings</h1>
-                <p className="mt-1 text-sm text-muted-foreground/80">
-                  Configure BYOK, passkeys, and hardened decryption policies from one control center.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+
+        <div className="st-panel mb-6 p-6">
+          <div className="st-head">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant={securityScore >= 75 ? 'default' : 'secondary'} className={securityScore >= 75 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : ''}>
                 Security score: {securityScore}%
               </Badge>
@@ -484,19 +499,19 @@ const Settings = () => {
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-border/40 bg-muted/25 p-3.5">
+            <div className="st-stat">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/60">BYOK Status</p>
               <p className="mt-1 text-sm font-medium text-foreground">
                 {byokLoading ? 'Loading...' : byokSettings?.isEnabled ? (hasSessionKey ? 'Unlocked in session' : 'Enabled (locked)') : 'Not enabled'}
               </p>
             </div>
-            <div className="rounded-xl border border-border/40 bg-muted/25 p-3.5">
+            <div className="st-stat">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/60">Passkey</p>
               <p className="mt-1 text-sm font-medium text-foreground">
                 {isCheckingPasskey ? 'Checking...' : hasPasskey ? 'Registered' : passkeyAvailable ? 'Available to enable' : 'Unsupported device'}
               </p>
             </div>
-            <div className="rounded-xl border border-border/40 bg-muted/25 p-3.5">
+            <div className="st-stat">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/60">Decryption Policy</p>
               <p className="mt-1 text-sm font-medium">
                 {byokSettings?.strictMode ? 'Strict mode active' : 'Standard mode'}
@@ -747,7 +762,7 @@ const Settings = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageFrame>
   );
 };
 

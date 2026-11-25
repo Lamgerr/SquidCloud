@@ -1,20 +1,70 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { GlassNav, type GlassNavItem } from '@/components/layout/GlassNav';
+import { PageFrame } from '@/components/layout/PageFrame';
 import {
-  ArrowLeft, Repeat, Book, Activity, Code, Copy, CheckCircle2,
-  ExternalLink, Shield, Zap, Clock, AlertCircle, Terminal,
+  ArrowLeft, Repeat, Book, Activity, Code, Copy, Shield, Zap, Terminal,
 } from '@/lib/icon-map';
 import { useToast } from '@/hooks/use-toast';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { WebhookManager } from '@/components/WebhookManager';
 import { WebhookUsageChart } from '@/components/WebhookUsageChart';
 import { WebhookEventLogs } from '@/components/WebhookEventLogs';
 
 const WEBHOOK_BASE_URL = 'https://aouqcwbdoyrccjcrhzzi.supabase.co/functions/v1/webhook-dispatch';
+
+const WB_CSS = `
+.wb-tabs [role="tabpanel"]{margin-top:0!important}
+.wb-back{display:flex;justify-content:center;margin-bottom:16px}
+.wb-back button{display:grid;place-items:center;width:32px;height:32px;
+  border:1px solid var(--sa-line,#1f2221);border-radius:8px;
+  background:var(--sa-bg-2,#0e1110);color:var(--sa-text,#e8e7e1);cursor:pointer}
+.wb-back button:hover{background:var(--sa-bg-3,#141816)}
+.wb-back svg{width:15px;height:15px}
+.wb-panel{padding:20px;border:1px solid var(--sa-line,#1f2221);border-radius:16px}
+.wb-h2{margin:0 0 4px;font-size:15px;font-weight:400;color:var(--sa-text,#e8e7e1)}
+.wb-p{margin:0 0 16px;font-size:12px;line-height:1.6;color:var(--sa-mute,#8d8f89)}
+.wb-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media(max-width:720px){.wb-grid{grid-template-columns:1fr}}
+.wb-feature{padding:16px;border:1px solid var(--sa-line,#1f2221);border-radius:12px}
+.wb-feature>svg{width:18px;height:18px;color:var(--sa-text,#e8e7e1);margin-bottom:8px}
+.wb-h3{margin:0 0 4px;font-size:13px;font-weight:400;color:var(--sa-text,#e8e7e1)}
+.wb-note{margin:0;font-size:11px;line-height:1.6;color:var(--sa-mute,#8d8f89)}
+.wb-subpanel{padding:16px;border:1px solid var(--sa-line,#1f2221);border-radius:12px;margin-bottom:20px}
+.wb-inline{font:400 11px/1.4 var(--sa-mono,monospace);color:var(--sa-text,#e8e7e1)}
+.wb-inline-dim{font:400 11px/1.4 var(--sa-mono,monospace);color:var(--sa-mute,#8d8f89)}
+.wb-chip,.wb-event-badge{border:1px solid var(--sa-line,#1f2221)!important;
+  background:var(--sa-bg-2,#0e1110)!important;color:var(--sa-mute,#8d8f89)!important;
+  font:400 10px/1.4 var(--sa-mono,monospace)!important;border-radius:6px!important;padding:2px 6px!important}
+.wb-ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.wb-li{display:flex;gap:8px;font-size:12px;line-height:1.6;color:var(--sa-mute,#8d8f89)}
+.wb-num{font:400 10px/1.6 var(--sa-mono,monospace);color:var(--sa-dim,#62655f);width:14px;flex:none}
+.wb-code{position:relative}
+.wb-pre{margin:0;padding:16px;border:1px solid var(--sa-line,#1f2221);border-radius:12px;
+  background:var(--sa-bg,#090b0a);overflow-x:auto;
+  font:400 11px/1.7 var(--sa-mono,monospace);color:var(--sa-mute,#8d8f89)}
+.wb-copy{position:absolute;top:12px;right:12px;display:grid;place-items:center;
+  width:28px;height:28px;border:1px solid var(--sa-line,#1f2221);border-radius:8px;
+  background:var(--sa-bg-2,#0e1110);color:var(--sa-mute,#8d8f89);cursor:pointer}
+.wb-copy:hover{color:var(--sa-text,#e8e7e1);background:var(--sa-bg-3,#141816)}
+.wb-copy svg{width:14px;height:14px}
+.wb-stack{display:grid;gap:12px;margin-bottom:20px}
+.wb-tpl{border:1px solid var(--sa-line,#1f2221);border-radius:12px;overflow:hidden}
+.wb-tpl-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 16px;border-bottom:1px solid var(--sa-line,#1f2221)}
+.wb-tpl-pre{margin:0;padding:16px;overflow-x:auto;background:var(--sa-bg,#090b0a);
+  font:400 11px/1.7 var(--sa-mono,monospace);color:var(--sa-mute,#8d8f89)}
+.wb-group{margin-bottom:24px}
+.wb-group:last-child{margin-bottom:0}
+.wb-group h3{margin:0 0 8px;font-size:13px;font-weight:400;color:var(--sa-mute,#8d8f89)}
+.wb-events{display:grid;gap:8px}
+.wb-event-row{display:flex;align-items:flex-start;gap:12px;padding:12px;
+  border:1px solid var(--sa-line,#1f2221);border-radius:10px}
+.wb-event-desc{margin:0;font-size:11px;color:var(--sa-mute,#8d8f89)}
+.wb-event-payload{display:block;margin-top:4px;
+  font:400 10px/1.5 var(--sa-mono,monospace);color:var(--sa-dim,#62655f)}
+`;
 
 const templateExamples = [
   {
@@ -25,7 +75,7 @@ const templateExamples = [
       url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK',
       events: ['file.uploaded', 'file.deleted', 'file.shared'],
       payload: {
-        text: '📁 File {{event_name}}: {{file_name}} was {{action}}',
+        text: ' File {{event_name}}: {{file_name}} was {{action}}',
       },
     }, null, 2),
   },
@@ -179,9 +229,16 @@ const eventReference = [
   },
 ];
 
+const NAV: { value: string; label: string; icon: React.ReactNode }[] = [
+  { value: 'overview', label: 'Overview', icon: <Activity /> },
+  { value: 'webhooks', label: 'Webhooks', icon: <Repeat /> },
+  { value: 'docs', label: 'Docs', icon: <Book /> },
+  { value: 'logs', label: 'Event Logs', icon: <Terminal /> },
+  { value: 'events', label: 'Events Reference', icon: <Code /> },
+];
+
 const WebhooksPage = () => {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -190,196 +247,178 @@ const WebhooksPage = () => {
     toast({ title: label, description: 'Copied to clipboard' });
   };
 
+  const navItems: GlassNavItem[] = NAV.map((n) => ({
+    key: n.value,
+    label: n.label,
+    icon: n.icon,
+    active: activeTab === n.value,
+    onClick: () => setActiveTab(n.value),
+  }));
+
   return (
-    <div className="min-h-screen bg-[#0A0E1A]">
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(-1)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-            <ArrowLeft className="w-4 h-4 text-white/60" />
+    <PageFrame
+      title="Webhooks"
+      subtitle="Event-driven notifications for your SquidCloud account"
+      items={navItems}
+      layoutId="webhooks-tabs"
+      wide
+    >
+      <style>{WB_CSS}</style>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="wb-tabs">
+        <div className="wb-back">
+          <button onClick={() => navigate(-1)} aria-label="Back">
+            <ArrowLeft />
           </button>
-          <div>
-            <h1 className="text-lg font-semibold text-white/90">Webhooks</h1>
-            <p className="text-sm text-white/40">Event-driven notifications for your SquidCloud account</p>
-          </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          {!isMobile && (
-            <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl">
-              <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-[#4FC3F7]/10 data-[state=active]:text-[#4FC3F7]">Overview</TabsTrigger>
-              <TabsTrigger value="webhooks" className="rounded-lg data-[state=active]:bg-[#4FC3F7]/10 data-[state=active]:text-[#4FC3F7]">Webhooks</TabsTrigger>
-              <TabsTrigger value="docs" className="rounded-lg data-[state=active]:bg-[#4FC3F7]/10 data-[state=active]:text-[#4FC3F7]">Docs</TabsTrigger>
-              <TabsTrigger value="logs" className="rounded-lg data-[state=active]:bg-[#4FC3F7]/10 data-[state=active]:text-[#4FC3F7]">Event Logs</TabsTrigger>
-              <TabsTrigger value="events" className="rounded-lg data-[state=active]:bg-[#4FC3F7]/10 data-[state=active]:text-[#4FC3F7]">Events Reference</TabsTrigger>
-            </TabsList>
-          )}
+        <TabsContent value="overview">
+          <div className="wb-panel">
+            <h2 className="wb-h2">Usage &amp; Analytics</h2>
+            <p className="wb-p">Real-time webhook dispatch metrics from your account</p>
+            <WebhookUsageChart />
+          </div>
 
-          {isMobile && (
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-              {['overview', 'webhooks', 'docs', 'logs', 'events'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={cn(
-                    'shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                    activeTab === tab ? 'bg-[#4FC3F7]/10 text-[#4FC3F7] border border-[#4FC3F7]/20' : 'bg-white/5 text-white/50 border border-white/10',
-                  )}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
+          <div className="wb-grid" style={{ marginTop: 12 }}>
+            <div className="wb-feature">
+              <Terminal />
+              <h3 className="wb-h3">Quick Start</h3>
+              <p className="wb-note">Create your first webhook in under 2 minutes. Subscribe to file events and get notified instantly.</p>
+            </div>
+            <div className="wb-feature">
+              <Shield />
+              <h3 className="wb-h3">Signed Payloads</h3>
+              <p className="wb-note">Every webhook includes HMAC-SHA256 signatures so you can verify the request came from SquidCloud.</p>
+            </div>
+            <div className="wb-feature">
+              <Zap />
+              <h3 className="wb-h3">Automatic Retries</h3>
+              <p className="wb-note">Failed deliveries are retried 3 times with exponential backoff. No manual intervention needed.</p>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="webhooks">
+          <div className="wb-panel">
+            <WebhookManager open={true} onClose={() => {}} standalone />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="docs">
+          <div className="wb-panel" style={{ marginBottom: 12 }}>
+            <h2 className="wb-h2">How Webhooks Work</h2>
+            <p className="wb-p">
+              Webhooks are HTTP callbacks that SquidCloud sends to your endpoint when specific events occur.
+              When an event matching your subscription fires, we send an HTTP POST request to your configured URL
+              with a JSON payload describing the event.
+            </p>
+
+            <div className="wb-subpanel">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <code className="wb-inline">POST</code>
+                <code className="wb-inline-dim">{'->'} your-endpoint.com/webhook</code>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Badge variant="outline" className="wb-chip">Content-Type: application/json</Badge>
+                <Badge variant="outline" className="wb-chip">X-SquidCloud-Signature: HMAC-SHA256</Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="wb-panel" style={{ marginBottom: 12 }}>
+            <h2 className="wb-h2">Setup Guides</h2>
+            <p className="wb-p">Step-by-step tutorials for common use cases</p>
+            <div className="wb-stack" style={{ marginBottom: 0 }}>
+              {setupGuides.map(guide => (
+                <div key={guide.title} className="wb-subpanel" style={{ marginBottom: 0 }}>
+                  <h3 className="wb-h3">{guide.title}</h3>
+                  <ol className="wb-ol">
+                    {guide.steps.map((step, i) => (
+                      <li key={i} className="wb-li">
+                        <span className="wb-num">{i + 1}.</span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               ))}
             </div>
-          )}
+          </div>
 
-          <TabsContent value="overview" className="space-y-6 mt-0">
-            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5">
-              <h2 className="text-base font-semibold text-white/80 mb-1">Usage & Analytics</h2>
-              <p className="text-sm text-white/40 mb-4">Real-time webhook dispatch metrics from your account</p>
-              <WebhookUsageChart />
+          <div className="wb-panel" style={{ marginBottom: 12 }}>
+            <h2 className="wb-h2">Signature Verification</h2>
+            <p className="wb-p">Always verify webhook signatures to ensure requests are from SquidCloud.</p>
+            <div className="wb-code">
+              <pre className="wb-pre">{signingCode}</pre>
+              <button
+                onClick={() => copyToClipboard(signingCode, 'Code copied!')}
+                className="wb-copy"
+                aria-label="Copy code"
+              >
+                <Copy />
+              </button>
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-4">
-                <Terminal className="w-5 h-5 text-[#4FC3F7] mb-2" />
-                <h3 className="text-sm font-semibold text-white/80 mb-1">Quick Start</h3>
-                <p className="text-xs text-white/40">Create your first webhook in under 2 minutes. Subscribe to file events and get notified instantly.</p>
-              </div>
-              <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-4">
-                <Shield className="w-5 h-5 text-[#4FC3F7] mb-2" />
-                <h3 className="text-sm font-semibold text-white/80 mb-1">Signed Payloads</h3>
-                <p className="text-xs text-white/40">Every webhook includes HMAC-SHA256 signatures so you can verify the request came from SquidCloud.</p>
-              </div>
-              <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-4">
-                <Zap className="w-5 h-5 text-[#4FC3F7] mb-2" />
-                <h3 className="text-sm font-semibold text-white/80 mb-1">Automatic Retries</h3>
-                <p className="text-xs text-white/40">Failed deliveries are retried 3 times with exponential backoff. No manual intervention needed.</p>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="webhooks" className="mt-0">
-            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5">
-              <WebhookManager open={true} onClose={() => {}} standalone />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="docs" className="space-y-6 mt-0">
-            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5">
-              <h2 className="text-base font-semibold text-white/80 mb-1">How Webhooks Work</h2>
-              <p className="text-sm text-white/40 mb-4">
-                Webhooks are HTTP callbacks that SquidCloud sends to your endpoint when specific events occur.
-                When an event matching your subscription fires, we send an HTTP POST request to your configured URL
-                with a JSON payload describing the event.
-              </p>
-
-              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <code className="text-xs font-mono text-[#4FC3F7]">POST</code>
-                  <code className="text-xs font-mono text-white/40">{'->'} your-endpoint.com/webhook</code>
-                </div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className="text-[10px] border-white/10 text-white/40 bg-transparent">Content-Type: application/json</Badge>
-                  <Badge variant="outline" className="text-[10px] border-white/10 text-white/40 bg-transparent">X-SquidCloud-Signature: HMAC-SHA256</Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5">
-              <h2 className="text-base font-semibold text-white/80 mb-1">Setup Guides</h2>
-              <p className="text-sm text-white/40 mb-4">Step-by-step tutorials for common use cases</p>
-              <div className="space-y-4">
-                {setupGuides.map(guide => (
-                  <div key={guide.title} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
-                    <h3 className="text-sm font-semibold text-white/70 mb-2">{guide.title}</h3>
-                    <ol className="space-y-1.5">
-                      {guide.steps.map((step, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-white/50">
-                          <span className="text-[10px] font-mono text-[#4FC3F7]/60 w-4 shrink-0 mt-0.5">{i + 1}.</span>
-                          {step}
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5">
-              <h2 className="text-base font-semibold text-white/80 mb-3">Signature Verification</h2>
-              <p className="text-sm text-white/40 mb-4">Always verify webhook signatures to ensure requests are from SquidCloud.</p>
-              <div className="relative">
-                <pre className="bg-[#0A0E1A] border border-white/[0.06] rounded-xl p-4 overflow-x-auto text-xs font-mono text-white/60 leading-relaxed">
-                  {signingCode}
-                </pre>
-                <button
-                  onClick={() => copyToClipboard(signingCode, 'Code copied!')}
-                  className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5 text-white/40" />
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5">
-              <h2 className="text-base font-semibold text-white/80 mb-1">Templates</h2>
-              <p className="text-sm text-white/40 mb-4">Ready-to-use examples for popular integrations</p>
-              <div className="space-y-4">
-                {templateExamples.map(template => (
-                  <div key={template.name} className="bg-white/[0.03] border border-white/[0.06] rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-                      <div>
-                        <h3 className="text-sm font-semibold text-white/70">{template.name}</h3>
-                        <p className="text-xs text-white/40">{template.description}</p>
-                      </div>
-                      <button
-                        onClick={() => copyToClipboard(template.code, 'Template copied!')}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-white/40" />
-                      </button>
+          <div className="wb-panel">
+            <h2 className="wb-h2">Templates</h2>
+            <p className="wb-p">Ready-to-use examples for popular integrations</p>
+            <div className="wb-stack" style={{ marginBottom: 0 }}>
+              {templateExamples.map(template => (
+                <div key={template.name} className="wb-tpl">
+                  <div className="wb-tpl-head">
+                    <div>
+                      <h3 className="wb-h3">{template.name}</h3>
+                      <p className="wb-note">{template.description}</p>
                     </div>
-                    <pre className="p-4 overflow-x-auto text-xs font-mono text-white/50 leading-relaxed bg-[#0A0E1A]">{template.code}</pre>
+                    <button
+                      onClick={() => copyToClipboard(template.code, 'Template copied!')}
+                      className="wb-copy" style={{ position: 'static' }}
+                      aria-label={`Copy ${template.name} template`}
+                    >
+                      <Copy />
+                    </button>
                   </div>
-                ))}
-              </div>
+                  <pre className="wb-tpl-pre">{template.code}</pre>
+                </div>
+              ))}
             </div>
-          </TabsContent>
+          </div>
+        </TabsContent>
 
-          <TabsContent value="logs" className="mt-0">
-            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5">
-              <h2 className="text-base font-semibold text-white/80 mb-1">Webhook Event Logs</h2>
-              <p className="text-sm text-white/40 mb-4">View all webhook delivery attempts with status and timing</p>
-              <WebhookEventLogs />
-            </div>
-          </TabsContent>
+        <TabsContent value="logs">
+          <div className="wb-panel">
+            <h2 className="wb-h2">Webhook Event Logs</h2>
+            <p className="wb-p">View all webhook delivery attempts with status and timing</p>
+            <WebhookEventLogs />
+          </div>
+        </TabsContent>
 
-          <TabsContent value="events" className="mt-0">
-            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5">
-              <h2 className="text-base font-semibold text-white/80 mb-1">Event Reference</h2>
-              <p className="text-sm text-white/40 mb-4">Complete list of available webhook events and their payloads</p>
-              <div className="space-y-6">
-                {eventReference.map(group => (
-                  <div key={group.group}>
-                    <h3 className="text-sm font-semibold text-white/60 mb-2">{group.group}</h3>
-                    <div className="space-y-2">
-                      {group.events.map(event => (
-                        <div key={event.id} className="flex items-start gap-3 bg-white/[0.03] border border-white/[0.06] rounded-lg p-3">
-                          <Badge className="shrink-0 mt-0.5 text-[10px] font-mono bg-[#4FC3F7]/10 text-[#4FC3F7] border-[#4FC3F7]/20">{event.id}</Badge>
-                          <div className="min-w-0">
-                            <p className="text-xs text-white/60">{event.description}</p>
-                            <code className="text-[10px] text-white/30 font-mono block mt-1">{event.payload}</code>
-                          </div>
+        <TabsContent value="events">
+          <div className="wb-panel">
+            <h2 className="wb-h2">Event Reference</h2>
+            <p className="wb-p">Complete list of available webhook events and their payloads</p>
+            <div>
+              {eventReference.map(group => (
+                <div key={group.group} className="wb-group">
+                  <h3>{group.group}</h3>
+                  <div className="wb-events">
+                    {group.events.map(event => (
+                      <div key={event.id} className="wb-event-row">
+                        <Badge variant="outline" className="wb-event-badge">{event.id}</Badge>
+                        <div style={{ minWidth: 0 }}>
+                          <p className="wb-event-desc">{event.description}</p>
+                          <code className="wb-event-payload">{event.payload}</code>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </PageFrame>
   );
 };
 

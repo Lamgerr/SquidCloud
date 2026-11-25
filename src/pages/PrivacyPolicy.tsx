@@ -4,10 +4,29 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageFrame } from '@/components/layout/PageFrame';
 import privacyPdf from '../../cx/SquidCloud-Privacy-Policy-Final (1).pdf';
 
 const linkClass = 'text-primary underline underline-offset-4 hover:opacity-80';
 const sectionTitleClass = 'text-xl font-semibold md:text-2xl';
+
+const PP_CSS = `
+.pp-content{max-width:760px;margin:0 auto;text-align:left}
+.pp-content h2{font-size:20px;line-height:1.3;color:var(--sa-text,#e8e7e1)}
+.pp-content h3{color:var(--sa-text,#e8e7e1)}
+.pp-content :is(p,li,td){color:var(--sa-mute,#8d8f89);line-height:1.8}
+.pp-content :is(.font-semibold,.font-medium){color:var(--sa-text,#e8e7e1)!important}
+.pp-content :is(strong,th){color:var(--sa-text,#e8e7e1);font-weight:500}
+.pp-content a{color:var(--sa-text,#e8e7e1);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--sa-line-2,#2f3230)}
+.pp-content :is(hr,[data-orientation="horizontal"]){border-color:var(--sa-line,#1f2221)}
+.pp-note,.pp-warn{padding:20px;border:1px solid var(--sa-line,#1f2221);border-radius:16px;background:var(--sa-bg-2,#0e1110)}
+.pp-note p,.pp-warn p{color:var(--sa-mute,#8d8f89)}
+.pp-note svg,.pp-warn svg{color:var(--sa-mute,#8d8f89)}
+.pp-warn :is(p){font-weight:400}
+.pp-content table{border:1px solid var(--sa-line,#1f2221);border-radius:12px;overflow:hidden}
+.pp-content :is(th,td){border-color:var(--sa-line,#1f2221)}
+.pp-download{display:flex;justify-content:center;margin-bottom:32px}
+`;
 
 const PrivacyPolicy = () => {
   const downloadPDF = () => {
@@ -20,27 +39,15 @@ const PrivacyPolicy = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
-        <Card className="mb-8">
-          <CardHeader className="gap-4 pb-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-2">
-                <CardTitle className="flex items-center gap-2 text-3xl font-bold md:text-4xl">
-                  <Shield className="h-6 w-6 text-primary" />
-                  Privacy Policy
-                </CardTitle>
-                <CardDescription className="text-sm text-muted-foreground md:text-base">
-                  v3.0 · Effective 14 September 2026
-                </CardDescription>
-              </div>
-              <Button onClick={downloadPDF} className="w-full md:w-auto">
-                <Download className="mr-2 h-4 w-4" />
-                Download PDF
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+    <PageFrame title="Privacy Policy" subtitle="v3.0 · Effective 14 September 2026">
+      <style>{PP_CSS}</style>
+      <div className="pp-content">
+        <div className="pp-download">
+          <Button onClick={downloadPDF}>
+            <Download className="mr-2 h-4 w-4" />
+            Download PDF
+          </Button>
+        </div>
 
         <div className="space-y-8 text-sm leading-7 text-foreground md:text-base">
 
@@ -117,7 +124,7 @@ const PrivacyPolicy = () => {
 
           <section className="space-y-4">
             <h2 className={sectionTitleClass}>4. What we never do</h2>
-            <div className="rounded-lg border-l-4 border-primary bg-muted/40 p-4">
+            <div className="pp-note">
               <ul className="list-disc space-y-2 pl-6">
                 <li>Sell your personal data.</li>
                 <li>Share your information with advertisers or data brokers.</li>
@@ -296,7 +303,7 @@ const PrivacyPolicy = () => {
 
           <Separator />
 
-          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4">
+          <div className="pp-warn">
             <div className="flex items-start gap-3">
               <MessageCircle className="mt-0.5 h-4 w-4 text-destructive" />
               <div>
@@ -309,7 +316,7 @@ const PrivacyPolicy = () => {
             </div>
           </div>
 
-          <Card className="border-primary/30 bg-primary/5">
+          <Card className="pp-note">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Mail className="h-5 w-5 text-primary" />
@@ -343,7 +350,7 @@ const PrivacyPolicy = () => {
           </Card>
         </div>
       </div>
-    </div>
+    </PageFrame>
   );
 };
 

@@ -1,16 +1,46 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFileRequestBySlug, submitFileRequest, uploadFile } from '@/lib/api';
 import { Inbox, Upload, Check, AlertCircle, Loader2, Globe, Clock, FileText, HardDrive, X } from '@/lib/icon-map';
 import { formatBytes } from '@/lib/api';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const FR_CSS = `
+.fr-body{max-width:560px;margin:0 auto;text-align:center}
+.fr-mark{width:52px;height:52px;margin:0 auto 20px;display:grid;place-items:center;border:1px solid var(--sa-line,#1f2221);border-radius:15px;color:var(--sa-mute,#8d8f89)}
+.fr-mark svg{width:22px;height:22px;stroke-width:1.6}
+.fr-panel{border:1px solid var(--sa-line,#1f2221);border-radius:16px;background:var(--sa-bg-2,#0e1110);padding:24px;text-align:left}
+.fr-title{margin:0;font-size:20px;font-weight:400;letter-spacing:-.03em;color:var(--sa-text,#e8e7e1)}
+.fr-desc{margin:8px 0 0;font-size:13px;line-height:1.6;color:var(--sa-mute,#8d8f89)}
+.fr-badges{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:20px}
+.fr-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--sa-line,#1f2221);border-radius:999px;font-size:11px;color:var(--sa-mute,#8d8f89)}
+.fr-badge svg{width:12px;height:12px}
+.fr-notice{padding:14px;border:1px solid var(--sa-line,#1f2221);border-radius:12px;background:var(--sa-bg,#090b0a);text-align:center}
+.fr-notice p{margin:0;font-size:13px;color:var(--sa-text,#e8e7e1)}
+.fr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}
+.fr-label{display:block;margin-bottom:8px;font-size:11px;color:var(--sa-mute,#8d8f89)}
+.fr-input{width:100%;height:42px;padding:0 12px;background:var(--sa-bg,#090b0a);border:1px solid var(--sa-line,#1f2221);border-radius:10px;color:var(--sa-text,#e8e7e1);font-size:13px}
+.fr-input::placeholder{color:var(--sa-dim,#62655f)}
+.fr-drop{display:block;padding:28px 16px;border:1px dashed var(--sa-line,#1f2221);border-radius:12px;text-align:center;cursor:pointer;transition:border-color .18s,background .18s}
+.fr-drop:hover{border-color:var(--sa-rim,#2f3230);background:var(--sa-bg-3,#141816)}
+.fr-drop.off{cursor:not-allowed;opacity:.6}
+.fr-drop svg{width:26px;height:26px;margin-bottom:8px;color:var(--sa-mute,#8d8f89)}
+.fr-drop p{margin:0;font-size:13px;color:var(--sa-text,#e8e7e1)}
+.fr-drop small{display:block;margin-top:6px;font-size:11px;color:var(--sa-dim,#62655f)}
+.fr-file{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--sa-line,#1f2221);border-radius:10px;background:var(--sa-bg,#090b0a)}
+.fr-file-n{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;color:var(--sa-text,#e8e7e1)}
+.fr-file-n svg{flex:none;color:var(--sa-mute,#8d8f89)}
+.fr-file-n span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr-file-n em{font-style:normal;font-size:11px;color:var(--sa-dim,#62655f)}
+.fr-remove{display:grid;place-items:center;width:24px;height:24px;flex:none;border:0;background:transparent;color:var(--sa-mute,#8d8f89);cursor:pointer}
+.fr-remove:hover{color:var(--sa-text,#e8e7e1)}
+.fr-cta{width:100%;height:44px;margin-top:20px}
+.fr-foot{margin-top:28px;font-size:11px;color:var(--sa-dim,#62655f)}
+`;
 
 interface FileRequestData {
   id: string;
@@ -172,201 +202,170 @@ const FileRequestPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Loading upload request...</p>
+      <PageFrame title="File Upload Request" subtitle="Loading upload request…">
+        <style>{FR_CSS}</style>
+        <div className="fr-body">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto" />
         </div>
-      </div>
+      </PageFrame>
     );
   }
 
   if (error || !request) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
-            <CardTitle>Link Expired or Invalid</CardTitle>
-            <CardDescription>
-              This upload request link is no longer accepting files. Contact the sender for a new link.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <PageFrame title="Link Expired or Invalid" subtitle="This upload request link is no longer accepting files. Contact the sender for a new link.">
+        <style>{FR_CSS}</style>
+        <div className="fr-body">
+          <div className="fr-mark"><AlertCircle className="h-6 w-6" /></div>
+        </div>
+      </PageFrame>
     );
   }
 
   if (uploadComplete) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4 animate-fade-in-scale">
-              <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
-            </div>
-            <CardTitle>Files Submitted!</CardTitle>
-            <CardDescription>
-              Your files have been uploaded successfully. The owner will be notified.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
-              {selectedFiles.length} file(s) submitted to "{request.title}"
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <PageFrame title="Files Submitted!" subtitle="Your files have been uploaded successfully. The owner will be notified.">
+        <style>{FR_CSS}</style>
+        <div className="fr-body">
+          <div className="fr-mark"><Check className="h-6 w-6" /></div>
+          <p className="fr-desc">
+            {selectedFiles.length} file(s) submitted to "{request.title}"
+          </p>
+        </div>
+      </PageFrame>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b bg-card/50 py-4">
-        <div className="max-w-2xl mx-auto px-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Inbox className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-sm font-semibold">File Upload Request</h1>
-            <p className="text-xs text-muted-foreground">Secured by SquidCloud</p>
-          </div>
+    <PageFrame title="File Upload Request" subtitle="Secured by SquidCloud">
+      <style>{FR_CSS}</style>
+      <div className="fr-body">
+        <div className="fr-panel">
+          <div className="fr-mark"><Inbox className="h-5 w-5" /></div>
+          <h2 className="fr-title">{request.title}</h2>
+          {request.description && (
+            <p className="fr-desc">{request.description}</p>
+          )}
         </div>
-      </header>
 
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8 space-y-6 animate-fade-in">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">{request.title}</CardTitle>
-            {request.description && (
-              <CardDescription>{request.description}</CardDescription>
+        <div className="fr-panel" style={{ marginTop: 12 }}>
+          <div className="fr-badges">
+            {request.max_files > 0 && (
+              <span className="fr-badge">
+                <FileText className="w-3 h-3" />
+                Max {request.max_files} files
+              </span>
             )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {request.max_files > 0 && (
-                <Badge variant="secondary" className="gap-1">
-                  <FileText className="w-3 h-3" />
-                  Max {request.max_files} files
-                </Badge>
-              )}
-              {request.max_size_per_file > 0 && (
-                <Badge variant="secondary" className="gap-1">
-                  <HardDrive className="w-3 h-3" />
-                  Max {formatBytes(request.max_size_per_file)} each
-                </Badge>
-              )}
-              {request.expires_at && (
-                <Badge variant="outline" className="gap-1">
-                  <Clock className="w-3 h-3" />
-                  Expires {new Date(request.expires_at).toLocaleDateString()}
-                </Badge>
-              )}
-              {request.allowed_types && request.allowed_types.length > 0 && (
-                <Badge variant="outline" className="gap-1">
-                  <Globe className="w-3 h-3" />
-                  {request.allowed_types.join(', ')}
-                </Badge>
-              )}
-            </div>
-
-            {authRequired && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Sign in required</AlertTitle>
-                <AlertDescription>
-                  <p>Uploads for this request need an authenticated account.</p>
-                  <Button size="sm" variant="outline" className="mt-3" onClick={handleSignIn}>
-                    Sign in to upload
-                  </Button>
-                </AlertDescription>
-              </Alert>
+            {request.max_size_per_file > 0 && (
+              <span className="fr-badge">
+                <HardDrive className="w-3 h-3" />
+                Max {formatBytes(request.max_size_per_file)} each
+              </span>
             )}
+            {request.expires_at && (
+              <span className="fr-badge">
+                <Clock className="w-3 h-3" />
+                Expires {new Date(request.expires_at).toLocaleDateString()}
+              </span>
+            )}
+            {request.allowed_types && request.allowed_types.length > 0 && (
+              <span className="fr-badge">
+                <Globe className="w-3 h-3" />
+                {request.allowed_types.join(', ')}
+              </span>
+            )}
+          </div>
 
-            {/* Uploader info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Your name (optional)</Label>
-                <Input
-                  placeholder="Name"
-                  value={uploaderName}
-                  onChange={e => setUploaderName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Your email (optional)</Label>
-                <Input
-                  type="email"
-                  placeholder="email@example.com"
-                  value={uploaderEmail}
-                  onChange={e => setUploaderEmail(e.target.value)}
-                />
-              </div>
+          {authRequired && (
+            <div className="fr-notice">
+              <p>Uploads for this request need an authenticated account.</p>
+              <Button size="sm" variant="outline" className="mt-3" onClick={handleSignIn}>
+                Sign in to upload
+              </Button>
             </div>
+          )}
 
-            {/* File selection */}
-            <div className="space-y-2">
-              <Label>Files</Label>
-              <div
-                className={`border-2 border-dashed border-border/60 rounded-xl p-6 text-center transition-all duration-150 ${canUpload ? 'cursor-pointer hover:border-primary/50 hover:bg-primary/[0.03] active:scale-[0.99]' : 'cursor-not-allowed opacity-70'}`}
-                onClick={handlePickFiles}
-              >
-                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm font-medium">Click to select files</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {request.allowed_types?.length ? request.allowed_types.join(', ') : 'Any file type'} accepted
-                </p>
-                <input
-                  id="file-input"
-                  type="file"
-                  multiple
-                  className="hidden"
-                  disabled={!canUpload || uploading}
-                  onChange={handleFileSelect}
-                />
-              </div>
-
-              {selectedFiles.length > 0 && (
-                <div className="space-y-1.5">
-                  {selectedFiles.map((file, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2 text-sm">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                        <span className="truncate">{file.name}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">{formatBytes(file.size)}</span>
-                      </div>
-                      <button
-                        onClick={() => removeFile(i)}
-                        aria-label={`Remove ${file.name}`}
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-90 transition-all shrink-0 ml-2"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+          <div className="fr-grid">
+            <div>
+              <label className="fr-label">Your name (optional)</label>
+              <Input
+                className="fr-input"
+                placeholder="Name"
+                value={uploaderName}
+                onChange={e => setUploaderName(e.target.value)}
+              />
             </div>
+            <div>
+              <label className="fr-label">Your email (optional)</label>
+              <Input
+                className="fr-input"
+                type="email"
+                placeholder="email@example.com"
+                value={uploaderEmail}
+                onChange={e => setUploaderEmail(e.target.value)}
+              />
+            </div>
+          </div>
 
-            <Button
-              onClick={handleSubmit}
-              className="w-full"
-              disabled={uploading || selectedFiles.length === 0 || !canUpload}
+          <div>
+            <label className="fr-label">Files</label>
+            <div
+              className={`fr-drop${canUpload ? '' : ' off'}`}
+              onClick={handlePickFiles}
             >
-              {uploading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {uploadProgress}</>
-              ) : (
-                <><Upload className="w-4 h-4 mr-2" /> Upload {selectedFiles.length > 0 ? `(${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''})` : ''}</>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      </main>
+              <Upload className="h-7 w-7 mx-auto" />
+              <p>Click to select files</p>
+              <small>
+                {request.allowed_types?.length ? request.allowed_types.join(', ') : 'Any file type'} accepted
+              </small>
+              <input
+                id="file-input"
+                type="file"
+                multiple
+                className="hidden"
+                disabled={!canUpload || uploading}
+                onChange={handleFileSelect}
+              />
+            </div>
 
-      <footer className="py-6 text-center text-xs text-muted-foreground border-t">
-        Powered by SquidCloud · Zero-Knowledge Cloud Infrastructure
-      </footer>
-    </div>
+            {selectedFiles.length > 0 && (
+              <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                {selectedFiles.map((file, i) => (
+                  <div key={i} className="fr-file">
+                    <div className="fr-file-n">
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>{file.name}</span>
+                      <em>{formatBytes(file.size)}</em>
+                    </div>
+                    <button
+                      onClick={() => removeFile(i)}
+                      aria-label={`Remove ${file.name}`}
+                      className="fr-remove"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Button
+            onClick={handleSubmit}
+            className="fr-cta"
+            disabled={uploading || selectedFiles.length === 0 || !canUpload}
+          >
+            {uploading ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {uploadProgress}</>
+            ) : (
+              <><Upload className="w-4 h-4 mr-2" /> Upload {selectedFiles.length > 0 ? `(${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''})` : ''}</>
+            )}
+          </Button>
+        </div>
+
+        <p className="fr-foot">Powered by SquidCloud · Zero-Knowledge Cloud Infrastructure</p>
+      </div>
+    </PageFrame>
   );
 };
 

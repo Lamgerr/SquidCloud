@@ -31,6 +31,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import { GlassNav, type GlassNavItem } from '@/components/layout/GlassNav';
 
 /**
  * NavIconButton — reusable icon-only nav item with tooltip
@@ -202,36 +203,25 @@ const MainHeader: React.FC = () => {
 
           {/* ── Desktop nav ── */}
           {!isMobile && (
-            <nav className="flex items-center gap-1" role="navigation" aria-label="Main navigation">
+            <nav className="flex items-center gap-2" role="navigation" aria-label="Main navigation">
               {user ? (
                 <>
-                  {/* Primary nav group */}
-                  <div className="flex items-center gap-0.5 px-1">
-                    <NavIconButton to="/dashboard" icon={<LayoutDashboard />} label="Dashboard" isActive={isActiveRoute('/dashboard')} />
-                    <NavIconButton to="/analytics" icon={<BarChart3 />} label="Analytics" isActive={isActiveRoute('/analytics')} />
-                    <NavIconButton to="/settings/account" icon={<Settings />} label="Settings" isActive={isActiveRoute('/settings')} />
-                  </div>
+                  <GlassNav
+                    layoutId="main-header-thumb"
+                    items={([
+                      { key: 'dashboard', label: 'Files', icon: <LayoutDashboard />, to: '/dashboard', active: isActiveRoute('/dashboard') },
+                      { key: 'analytics', label: 'Insights', icon: <BarChart3 />, to: '/analytics', active: isActiveRoute('/analytics') },
+                      { key: 'security', label: 'Security', icon: <Lock />, to: '/security', active: isActiveRoute('/security') },
+                      { key: 'settings', label: 'Settings', icon: <Settings />, to: '/settings/account', active: isActiveRoute('/settings') },
+                    ] as GlassNavItem[])}
+                  />
 
-                  <div className="w-px h-5 bg-border/50 mx-1.5" aria-hidden="true" />
-
-                  {/* Security */}
-                  <NavIconButton to="/security" icon={<Lock />} label="Security" isActive={isActiveRoute('/security')} />
-
-                  <div className="w-px h-5 bg-border/50 mx-1.5" aria-hidden="true" />
-
-                  {/* AI */}
-                  <div className="flex items-center gap-0.5 px-1">
+                  <div className="flex items-center gap-0.5 pl-1">
                     <NavIconButton
                       onClick={() => window.dispatchEvent(new Event('openSquidAI'))}
-                      icon={<Sparkles className="text-primary" />}
+                      icon={<Sparkles className="text-muted-foreground" />}
                       label="Squid AI (⌘K)"
                     />
-                  </div>
-
-                  <div className="w-px h-5 bg-border/50 mx-1.5" aria-hidden="true" />
-
-                  {/* Signals + Avatar */}
-                  <div className="flex items-center gap-0.5 pl-1">
                     <SignalsBell />
                     
                     <DropdownMenu>

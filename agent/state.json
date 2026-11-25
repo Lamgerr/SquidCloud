@@ -1,5 +1,5 @@
 {
-  "goal": "Auth page: very minimal monochrome Apple-like interface (user rejected animated/ember version)",
+  "goal": "All non-marketing pages redesigned with shared floating glass navigation and symmetric monochrome shells",
   "goal_source": "interactive query from human (404 on squidcloud-cluster legacy chunk downloads; deprecate deepread/books UI)",
   "last_actions": [
     "2026-11-24: Launched two read-only audits (client key handling; Supabase DB/functions) plus independent repo/CLI checks.",
@@ -61,7 +61,9 @@
     "2026-11-25: Installed dedicated computer-use tooling for OpenCode CLI: agent-browser unsupported on android-arm64; orca CLI absent; open-computer-use binary blocked by seccomp. Built local x11-computer MCP server using @modelcontextprotocol/sdk wrapping wmctrl/xdotool/import; configured globally, connected, and attached to existing Zen window (no fresh profile).",
     "2026-11-26: Diagnosed and patched shared-file wrong_password: users were pasting the 64-char share secret into the password field. share-access edge function now accepts either access_code or share_secret_hash and re-runs all other guards; labels clarified. Verified both credentials accepted, wrong still rejected.",
     "2026-11-26: Added global all-pages-clean.css scoped by data-sq-clean/data-sq-page in App.tsx to every route except /, /pricing, /checkout. Neutralises hardcoded GitHub/navy palettes, blue/violet/green accents and white tints; one hairline border/tier, quiet headings, one focus ring. Verified live in existing Zen browser on share guard and webhooks pages.",
-    "2026-11-26: Fixed global layer side effects: opaque bg-black mapping made dialog backdrops solid; added scoped translucent overlay rule with blur. Removed focus outline/box-shadow and ring colors from inputs/selects/textareas so no white outlines. Vercel READY."
+    "2026-11-26: Fixed global layer side effects: opaque bg-black mapping made dialog backdrops solid; added scoped translucent overlay rule with blur. Removed focus outline/box-shadow and ring colors from inputs/selects/textareas so no white outlines. Vercel READY.",
+    "2026-11-26: Wrote short design doc docs/superpowers/specs/2026-11-26-all-pages-redesign-design.md. Added shared GlassNav (layoutId spring 380/21/0.8, tap 600/16) and PageFrame symmetric shell; wired GlassNav into global MainHeader.",
+    "2026-11-26: Applied shared design to 34 pages across four parallel groups (public/auth, workbench, docs/legal, viewers/editors) with logic preserved. Fixed input selection/focus outlines with input-specific ::selection/focus rules. Removed emoji from user-visible copy. Vercel READY; verified Profile and Webhooks live via X11."
   ],
   "key_numbers": {
     "audits": 2,
@@ -80,5 +82,5 @@
     "Supabase service-role key from old history still live; user explicitly deprioritized rotation.",
     "vault-reset edge function is not implemented; recovery UI will report failure until an authorized purge endpoint exists."
   ],
-  "next": "Continue page-by-page visual QA with direct X11; deepen layouts for any page that still looks off."
+  "next": "Continue live QA on remaining pages; deepen any page that still looks inconsistent."
 }

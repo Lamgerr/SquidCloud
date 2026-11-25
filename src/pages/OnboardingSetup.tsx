@@ -100,6 +100,30 @@ const OB_CSS = `
 }
 `;
 
+const OB_UI_CSS = `
+.ob-ui :is(h2,h3){color:var(--sa-text,#e8e7e1)!important}
+.ob-ui :is(p,span,label){color:var(--sa-mute,#8d8f89)}
+.ob-ui label{font-weight:500}
+.ob-ui input{background:var(--sa-bg,#090b0a)!important;border:1px solid var(--sa-line,#1f2221)!important;color:var(--sa-text,#e8e7e1)!important;border-radius:10px!important}
+.ob-ui :is(button,[role="button"]){border-radius:10px}
+.ob-cta{background:var(--sa-text,#e8e7e1)!important;color:var(--sa-bg,#090b0a)!important;border-color:var(--sa-text,#e8e7e1)!important;box-shadow:none!important}
+.ob-cta svg{color:inherit!important}
+.ob-ui [class*="text-primary"],
+.ob-ui [class*="text-white"]{color:var(--sa-text,#e8e7e1)!important}
+.ob-ui [class*="text-emerald"],
+.ob-ui [class*="text-amber"],
+.ob-ui [class*="text-red"]{color:var(--sa-mute,#8d8f89)!important}
+.ob-ui [class*="bg-emerald"],
+.ob-ui [class*="bg-amber"],
+.ob-ui [class*="bg-red"]{background-color:var(--sa-bg-3,#141816)!important;border-color:var(--sa-line,#1f2221)!important}
+.ob-ui [class*="border-emerald"],
+.ob-ui [class*="border-amber"],
+.ob-ui [class*="border-primary"]{border-color:var(--sa-line,#1f2221)!important}
+.ob-step-on{background:var(--sa-text,#e8e7e1)!important;box-shadow:none!important}
+.ob-step-done{background:var(--sa-dim,#62655f)!important}
+.ob-step-todo{background:var(--sa-line,#1f2221)!important}
+`;
+
 const STEP_NAMES = ['Profile', 'Workspace', 'Security'];
 
 const LOADING_LINES = ['Preparing your vault…', 'Checking security…', 'Almost there…'];
@@ -574,7 +598,7 @@ function BYOKSetupDialog({ open, onOpenChange, onComplete }: {
           <Button
             onClick={handleSetup}
             disabled={isLoading || password.length < 8 || password !== confirmPassword}
-            className="bg-amber-600 hover:bg-amber-500 text-white"
+            className="ob-cta"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Set Up Key
@@ -809,32 +833,34 @@ export default function OnboardingSetup() {
   if (phase === 'setup') {
     return (
       <MotionConfig reducedMotion="user">
-      <div className="fixed inset-0 overflow-y-auto bg-[#0a0a0f]">
+      <div className="ob-ui fixed inset-0 overflow-y-auto bg-[#0a0a0f]">
         <style>{OB_CSS}</style>
+        <style>{OB_UI_CSS}</style>
         <div
           className="fixed inset-0 z-0 ob-kenburns motion-reduce:animate-none"
           style={{
             backgroundImage: 'url(/artwork.png)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(60px) saturate(0.5)',
+            filter: 'blur(60px) grayscale(1)',
             transform: 'scale(1.1)',
           }}
         />
         <div className="fixed inset-0 z-[1]" style={{
-          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.8) 100%)',
+          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.85) 100%)',
         }} />
         <div className="fixed inset-0 z-[1] bg-black/50" />
 
         <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4 sm:p-8">
           <div
-            className="w-full max-w-md rounded-[24px] overflow-hidden"
+            className="w-full max-w-md overflow-hidden"
             style={{
-              background: 'rgba(15,15,25,0.6)',
+              background: 'rgba(14,17,16,0.78)',
               backdropFilter: 'blur(30px)',
               WebkitBackdropFilter: 'blur(30px)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 40px 80px rgba(0,0,0,0.5)',
+              border: '1px solid #1f2221',
+              borderRadius: 16,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.45)',
             }}
           >
             {/* Step indicator */}
@@ -846,8 +872,7 @@ export default function OnboardingSetup() {
                       key={s}
                       className={cn(
                         'h-1 rounded-full transition-all duration-500',
-                        s === step ? 'w-8 bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.45)]' :
-                        s < step ? 'w-6 bg-white/30' : 'w-6 bg-white/10'
+                        s === step ? 'ob-step-on w-8' : s < step ? 'ob-step-done w-6' : 'ob-step-todo w-6'
                       )}
                     />
                   ))}
@@ -933,7 +958,7 @@ export default function OnboardingSetup() {
                   <Button
                     onClick={() => goStep(step + 1)}
                     disabled={!canContinueStep()}
-                    className="flex-1 h-10 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="ob-cta flex-1 h-10 text-sm font-medium active:scale-[0.99] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     Continue
                     <ChevronRight className="w-4 h-4 ml-1" />
@@ -942,7 +967,7 @@ export default function OnboardingSetup() {
                   <Button
                     onClick={handleComplete}
                     disabled={saving || celebrating}
-                    className="flex-1 h-10 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all disabled:opacity-80"
+                    className="ob-cta flex-1 h-10 text-sm font-medium active:scale-[0.99] transition-all disabled:opacity-80"
                   >
                     {saving ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Finalizing…</>

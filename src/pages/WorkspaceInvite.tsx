@@ -4,6 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const WI_CSS = `
+.wi-body{max-width:460px;margin:0 auto;text-align:center}
+.wi-msg{margin:0 auto 24px;font-size:14px;line-height:1.6;color:var(--sa-mute,#8d8f89)}
+.wi-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.wi-id{margin-top:20px;font:400 11px/1.5 var(--sa-mono,ui-monospace,monospace);color:var(--sa-dim,#62655f);overflow-wrap:anywhere}
+`;
 
 const WorkspaceInvite: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -87,10 +95,10 @@ const WorkspaceInvite: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-border/60 bg-card/80 p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-foreground">Workspace Invite</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+    <PageFrame title="Workspace Invite" subtitle="Review and accept your invitation.">
+      <style>{WI_CSS}</style>
+      <div className="wi-body">
+        <p className="wi-msg">
           {authLoading && 'Loading...'}
           {!authLoading && status === 'idle' && !user && 'Sign in to accept this workspace invite.'}
           {status === 'accepting' && 'Accepting your invite...'}
@@ -98,7 +106,7 @@ const WorkspaceInvite: React.FC = () => {
           {status === 'error' && (message || 'Unable to accept this invite.')}
         </p>
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="wi-actions">
           {!authLoading && !user && token && (
             <Button onClick={handleSignIn}>Sign in to accept</Button>
           )}
@@ -111,12 +119,10 @@ const WorkspaceInvite: React.FC = () => {
         </div>
 
         {workspaceId && (
-          <p className="mt-4 text-xs text-muted-foreground">
-            Workspace ID: {workspaceId}
-          </p>
+          <p className="wi-id">Workspace ID: {workspaceId}</p>
         )}
       </div>
-    </div>
+    </PageFrame>
   );
 };
 

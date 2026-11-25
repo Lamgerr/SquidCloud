@@ -3,6 +3,21 @@ import { ArrowLeft, HardDrive, Copy, Check, Monitor, Server, Smartphone, Downloa
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { Helmet } from 'react-helmet';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const FS_CSS = `
+.fs-content{max-width:760px;margin:0 auto;text-align:left}
+.fs-back{display:flex;justify-content:center;margin-bottom:24px}
+.fs-card{padding:18px;border:1px solid var(--sa-line,#1f2221);border-radius:16px;background:var(--sa-bg-2,#0e1110)}
+.fs-status{display:inline-block;margin-top:8px;padding:2px 8px;border:1px solid var(--sa-line,#1f2221);border-radius:999px;font:400 10px/1.4 var(--sa-mono,ui-monospace,monospace);letter-spacing:.04em;color:var(--sa-mute,#8d8f89)}
+.fs-content :is(h2,h3){color:var(--sa-text,#e8e7e1)}
+.fs-content :is(p,li,td){color:var(--sa-mute,#8d8f89);line-height:1.75}
+.fs-content pre{background:var(--sa-bg,#090b0a);border:1px solid var(--sa-line,#1f2221);border-radius:12px;color:var(--sa-text,#e8e7e1)}
+.fs-content code{font-family:var(--sa-mono,ui-monospace,monospace);color:var(--sa-text,#e8e7e1)}
+.fs-content svg{color:var(--sa-mute,#8d8f89)}
+.fs-content a{color:var(--sa-text,#e8e7e1);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--sa-line-2,#2f3230)}
+.fs-quick{margin-bottom:32px}
+`;
 
 const platformDocs = `
 ## Linux / macOS
@@ -174,25 +189,17 @@ export default function SquidFSPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageFrame title="SquidFS" subtitle="Mount SquidCloud storage as a local filesystem">
+      <style>{FS_CSS}</style>
       <Helmet>
         <title>SquidFS - Mount as Local Disk - SquidCloud</title>
       </Helmet>
 
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
-        <div className="flex items-center gap-3 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="shrink-0">
+      <div className="fs-content">
+        <div className="fs-back">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-              <HardDrive className="h-5 w-5 text-[#4FC3F7]" />
-              SquidFS
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Mount SquidCloud storage as a local filesystem
-            </p>
-          </div>
         </div>
 
         {/* Platform Grid */}
@@ -203,19 +210,17 @@ export default function SquidFSPage() {
             { icon: Globe, label: 'Windows', method: 'WebDAV', status: 'available' },
             { icon: Smartphone, label: 'Termux', method: 'WebDAV', status: 'available' },
           ].map(({ icon: Icon, label, method, status }) => (
-            <div key={label} className="rounded-lg border border-border bg-card p-4 text-center">
+            <div key={label} className="fs-card text-center">
               <Icon className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">{label}</p>
               <p className="text-xs text-muted-foreground">{method}</p>
-              <span className="inline-block mt-1.5 px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
-                {status}
-              </span>
+              <span className="fs-status">{status}</span>
             </div>
           ))}
         </div>
 
         {/* Quick Install */}
-        <div className="rounded-lg border border-border bg-card p-5 mb-8">
+        <div className="fs-card fs-quick">
           <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
             <Download className="h-4 w-4 text-[#4FC3F7]" />
             Quick Install
@@ -235,7 +240,7 @@ export default function SquidFSPage() {
             { icon: Globe, label: 'WebDAV Fallback', desc: 'Works everywhere including Windows and Termux' },
             { icon: Lock, label: 'V3 HKDF Encryption', desc: 'Per-file and per-chunk key derivation' },
           ].map(({ icon: Icon, label, desc }) => (
-            <div key={label} className="rounded-lg border border-border bg-card p-4">
+            <div key={label} className="fs-card">
               <Icon className="h-4 w-4 text-[#4FC3F7] mb-2" />
               <p className="text-sm font-medium text-foreground">{label}</p>
               <p className="text-xs text-muted-foreground mt-1">{desc}</p>
@@ -279,12 +284,12 @@ export default function SquidFSPage() {
           <p className="text-xs text-muted-foreground">
             <Link to="/" className="hover:text-foreground transition-colors">SquidCloud</Link>
             {' '}| SquidFS{' '}
-            <a href="https://github.com/NaveenSingh9999/squidfs" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 text-[#4FC3F7]/80 hover:text-[#4FC3F7] transition-colors">
+            <a href="https://github.com/NaveenSingh9999/squidfs" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 transition-colors">
               View on GitHub
             </a>
           </p>
         </div>
       </div>
-    </div>
+    </PageFrame>
   );
 }

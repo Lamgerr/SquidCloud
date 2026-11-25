@@ -10,6 +10,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const SP_CSS = `
+.sp-root{max-width:1080px;margin:0 auto;text-align:left}
+.sp-head{display:flex;justify-content:center;margin-bottom:24px}
+.sp-root :is(h1,h2,h3){color:var(--sa-text,#e8e7e1)}
+.sp-root :is(p,span,td){line-height:1.6}
+.sp-root [class*="rounded-lg"]{border-radius:12px}
+.sp-root [class*="text-blue-"],
+.sp-root [class*="text-amber-"],
+.sp-root [class*="text-green-"],
+.sp-root [class*="text-emerald-"],
+.sp-root [class*="text-red-"]{color:var(--sa-mute,#8d8f89)!important}
+.sp-root [class*="bg-blue-"],
+.sp-root [class*="bg-amber-"],
+.sp-root [class*="bg-green-"],
+.sp-root [class*="bg-emerald-"],
+.sp-root [class*="bg-red-"]{background-color:var(--sa-bg-4,#1b201d)!important;color:var(--sa-mute,#8d8f89)!important}
+.sp-root [class*="border-blue-"],
+.sp-root [class*="border-amber-"],
+.sp-root [class*="border-green-"],
+.sp-root [class*="border-emerald-"],
+.sp-root [class*="border-red-"]{border-color:var(--sa-line,#1f2221)!important}
+.sp-root [class*="bg-primary"]{background-color:var(--sa-bg-4,#1b201d)!important;color:var(--sa-text,#e8e7e1)!important}
+`;
 
 interface Ticket {
   id: string;
@@ -155,7 +180,8 @@ export default function SupportPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="sp-root flex min-h-screen items-center justify-center">
+        <style>{SP_CSS}</style>
         <Card className="max-w-md p-8 text-center">
           <CardHeader>
             <CardTitle className="text-2xl">Sign in to get support</CardTitle>
@@ -170,13 +196,10 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold md:text-3xl">Support</h1>
-            <p className="text-sm text-muted-foreground">We're here to help. Open a ticket and a human will get back to you.</p>
-          </div>
+    <PageFrame title="Support" subtitle="We're here to help. Open a ticket and a human will get back to you." wide>
+      <style>{SP_CSS}</style>
+      <div className="sp-root">
+        <div className="sp-head">
           <Button onClick={() => setShowNewTicket(true)}>
             <Plus className="mr-2 h-4 w-4" />
             New Ticket
@@ -324,6 +347,6 @@ export default function SupportPage() {
           </div>
         </div>
       </div>
-    </div>
+    </PageFrame>
   );
 }

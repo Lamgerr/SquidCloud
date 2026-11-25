@@ -20,6 +20,44 @@ import { buildPublicUrl } from '@/lib/appLinks';
 import EnhancedInstantPreviewModal from '@/components/EnhancedInstantPreviewModal';
 import { backgroundDownloadService } from '@/services/backgroundDownload';
 
+const SHARE_CSS = `
+.sf-root{background:var(--sa-bg,#090b0a);color:var(--sa-text,#e8e7e1)}
+.sf-center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 20px}
+.sf-bg{background:var(--sa-bg,#090b0a)}
+.sf-surface{background:var(--sa-bg-2,#0e1110);border:1px solid var(--sa-line,#1f2221)}
+.sf-surface-2{background:var(--sa-bg-3,#141816);border:1px solid var(--sa-line,#1f2221)}
+.sf-ink{color:var(--sa-text,#e8e7e1)}
+.sf-mute{color:var(--sa-mute,#8d8f89)}
+.sf-dim{color:var(--sa-dim,#62655f)}
+.sf-line{border-color:var(--sa-line,#1f2221)}
+.sf-divide>*:not([hidden])~*:not([hidden]){border-color:var(--sa-line,#1f2221)}
+.sf-tint{background:var(--sa-bg-3,#141816)}
+.sf-alert{background:var(--sa-bg-3,#141816);border:1px solid var(--sa-line,#1f2221);color:var(--sa-text,#e8e7e1)}
+.sf-mark{width:72px;height:72px;margin:0 auto;display:grid;place-items:center;border:1px solid var(--sa-line,#1f2221);border-radius:20px;color:var(--sa-mute,#8d8f89)}
+.sf-spin{width:24px;height:24px;border:1px solid var(--sa-line,#1f2221);border-top-color:var(--sa-text,#e8e7e1);border-radius:50%;animation:sf-spin .8s linear infinite}
+@keyframes sf-spin{to{transform:rotate(360deg)}}
+.sf-input{height:44px;padding:0 12px;background:var(--sa-bg,#090b0a);border:1px solid var(--sa-line,#1f2221);border-radius:10px;color:var(--sa-text,#e8e7e1);font-size:14px;outline:none}
+.sf-input::placeholder,.sf-ph::placeholder{color:var(--sa-dim,#62655f)}
+.sf-focus:focus{border-color:var(--sa-rim,#2f3230)}
+.sf-cta{background:var(--sa-text,#e8e7e1);color:var(--sa-bg,#090b0a);border:1px solid var(--sa-text,#e8e7e1);font-weight:500}
+.sf-cta-hover:hover{background:var(--sa-text-2,#fcfbf8);border-color:var(--sa-text-2,#fcfbf8)}
+.sf-cta:disabled{opacity:.45;cursor:not-allowed}
+.sf-oncta{color:var(--sa-bg,#090b0a)}
+.sf-outline{background:transparent;border:1px solid var(--sa-line,#1f2221);color:var(--sa-text,#e8e7e1)}
+.sf-outline:hover{background:var(--sa-bg-3,#141816)}
+.sf-hover:hover{background:var(--sa-bg-3,#141816)}
+.sf-active:active{background:var(--sa-bg-4,#1b201d)}
+.sf-hover-ink:hover{color:var(--sa-text,#e8e7e1)}
+.sf-backdrop{background:rgba(3,4,3,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.sf-col{max-width:560px;margin:0 auto;padding:48px 20px;display:grid;gap:16px}
+.sf-title{font-size:20px;font-weight:400;letter-spacing:-.03em;color:var(--sa-text,#e8e7e1)}
+.sf-note{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--sa-line,#1f2221);border-radius:12px;background:var(--sa-bg-2,#0e1110);font-size:13px;color:var(--sa-text,#e8e7e1)}
+.sf-iconbtn{display:grid;place-items:center;width:32px;height:32px;flex:none;border:1px solid var(--sa-line,#1f2221);border-radius:9px;background:var(--sa-bg-3,#141816);color:var(--sa-mute,#8d8f89)}
+.sf-iconbtn:hover{color:var(--sa-text,#e8e7e1)}
+.sf-sheet{width:100%;max-width:440px;padding:24px;background:var(--sa-bg-2,#0e1110);border:1px solid var(--sa-line,#1f2221);border-radius:16px}
+@media(max-width:720px){.sf-center{padding:24px 16px}.sf-col{max-width:100%}}
+`;
+
 interface SharedFileData {
   file_id: string; file_name: string; file_type: string;
   file_size: number; file_created_at: string; file_updated_at: string;
@@ -276,20 +314,21 @@ const SharePage: React.FC = () => {
   // ─── Loading ──────────────────────────────────────────────────────────
   if (loading || guardLoading) {
     return (
-      <div className={cn("bg-[#0D1117] flex items-center justify-center", isMobile ? "fixed inset-0 z-50" : "min-h-screen")}
+      <div className={cn("sf-root flex items-center justify-center", isMobile ? "fixed inset-0 z-50" : "min-h-screen")}
         style={isMobile ? { paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' } : {}}
         key="loading">
+          <style>{SHARE_CSS}</style>
         <div className="flex flex-col items-center gap-5">
           <div className="relative w-16 h-16">
-            <div className="absolute inset-0 rounded-full bg-[#58A6FF]/10 animate-ping" style={{ animationDuration: '2s' }} />
-            <div className="absolute inset-[4px] rounded-full bg-[#58A6FF]/20 animate-pulse" style={{ animationDuration: '1.5s' }} />
-            <div className="absolute inset-[8px] rounded-full bg-[#1C2128] border border-[#2D333B] flex items-center justify-center">
-              <Lock className="w-6 h-6 text-[#58A6FF]" />
+            <div className="absolute inset-0 rounded-full sf-tint animate-ping" style={{ animationDuration: '2s' }} />
+            <div className="absolute inset-[4px] rounded-full sf-tint animate-pulse" style={{ animationDuration: '1.5s' }} />
+            <div className="absolute inset-[8px] rounded-full sf-surface-2 border sf-line flex items-center justify-center">
+              <Lock className="w-6 h-6 sf-ink" />
             </div>
           </div>
           <div className="flex flex-col items-center gap-1">
-            <p className="text-[14px] text-[#8B949E] animate-pulse" style={{ animationDuration: '1.5s' }}>Opening secure link...</p>
-            <p className="text-[11px] text-[#484F58]">Establishing encrypted connection</p>
+            <p className="text-[14px] sf-mute animate-pulse" style={{ animationDuration: '1.5s' }}>Opening secure link...</p>
+            <p className="text-[11px] sf-dim">Establishing encrypted connection</p>
           </div>
         </div>
       </div>
@@ -300,29 +339,30 @@ const SharePage: React.FC = () => {
   if (error || !fileData) {
     const isBurn = error?.includes('burned');
     const Icon = isBurn ? Flame : AlertCircle;
-    const iconColor = isBurn ? 'text-[#DA3633]' : 'text-[#F85149]';
-    const bgColor = isBurn ? 'bg-[#DA3633]/10' : 'bg-[#F85149]/10';
+    const iconColor = isBurn ? 'sf-ink' : 'sf-ink';
+    const bgColor = isBurn ? 'sf-alert' : 'sf-alert';
     const title = isBurn ? 'Self-Destructed' : 'File Unavailable';
 
     return (
-      <div className={cn("bg-[#0D1117] flex items-center justify-center", isMobile ? "fixed inset-0 z-50" : "min-h-screen")}
+      <div className={cn("sf-root flex items-center justify-center", isMobile ? "fixed inset-0 z-50" : "min-h-screen")}
         style={isMobile ? { paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' } : {}}
         key="error">
+          <style>{SHARE_CSS}</style>
         <div className="w-full max-w-sm text-center space-y-6 px-6">
           <div className={cn('mx-auto w-20 h-20 rounded-[28px] flex items-center justify-center', bgColor)}>
             <Icon className={cn('w-10 h-10', iconColor)} />
           </div>
           <div className="space-y-2">
-            <h2 className={cn("font-semibold text-[#E6EDF3]", isMobile ? 'text-[22px]' : 'text-xl')}>{title}</h2>
-            <p className={cn("text-[#8B949E] leading-relaxed", isMobile ? 'text-[14px]' : 'text-sm')}>{error || 'This file is no longer available.'}</p>
+            <h1 className={cn("sf-title sf-ink", isMobile ? 'text-[22px]' : 'text-xl')}>{title}</h1>
+            <p className={cn("sf-mute leading-relaxed", isMobile ? 'text-[14px]' : 'text-sm')}>{error || 'This file is no longer available.'}</p>
             {isBurn && (
-              <div className="mt-3 px-4 py-3 rounded-xl bg-[#DA3633]/10 border border-[#DA3633]/30">
-                <p className="text-xs text-[#DA3633]">This link has been destroyed after download. Ask the sender to re-share.</p>
+              <div className="mt-3 px-4 py-3 rounded-xl sf-alert border sf-line">
+                <p className="text-xs sf-ink">This link has been destroyed after download. Ask the sender to re-share.</p>
               </div>
             )}
           </div>
           <Button variant="outline" onClick={() => navigate('/')}
-            className={cn("border-[#2D333B] text-[#E6EDF3] hover:bg-[#1C2128]", isMobile ? 'h-12 rounded-2xl px-8' : '')}>
+            className={cn("sf-line sf-ink sf-hover", isMobile ? 'h-12 rounded-2xl px-8' : '')}>
             <Home className="w-4 h-4 mr-2" /> Go Home
           </Button>
         </div>
@@ -336,8 +376,8 @@ const SharePage: React.FC = () => {
     const isCountry = guardBlocked === 'country_blocked';
     const isDevice = guardBlocked === 'device_mismatch';
     const GuardIcon = isPassword ? Lock : isCountry ? Globe : isDevice ? Smartphone : ShieldAlert;
-    const gColor = isPassword ? 'text-[#58A6FF]' : isCountry ? 'text-[#F85149]' : isDevice ? 'text-[#BC8CFF]' : 'text-[#F85149]';
-    const gBg = isPassword ? 'bg-[#58A6FF]/10' : isCountry ? 'bg-[#F85149]/10' : isDevice ? 'bg-[#BC8CFF]/10' : 'bg-[#F85149]/10';
+    const gColor = isPassword ? 'sf-ink' : isCountry ? 'sf-ink' : isDevice ? 'sf-ink' : 'sf-ink';
+    const gBg = isPassword ? 'sf-tint' : isCountry ? 'sf-alert' : isDevice ? 'sf-alert' : 'sf-alert';
     const gTitle = isPassword ? 'Password Required' : isCountry ? 'Region Locked' : isDevice ? 'Device Mismatch' : 'Access Denied';
     const gDesc = isPassword ? 'Enter the link password, or paste the encryption key from the link.' :
       isCountry ? 'The owner restricted access to specific countries.' :
@@ -345,24 +385,25 @@ const SharePage: React.FC = () => {
       "You don't have access to this file.";
 
     return (
-      <div className={cn("min-h-screen bg-[#0D1117] flex flex-col", isMobile ? "fixed inset-0 z-50" : "items-center justify-center p-6")}
+      <div className={cn("min-h-screen sf-root flex flex-col", isMobile ? "fixed inset-0 z-50" : "items-center justify-center p-6")}
         style={isMobile ? { paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' } : {}}
         key="guard">
+          <style>{SHARE_CSS}</style>
         {isMobile && (
-          <div className="flex items-center justify-between px-4 h-12 border-b border-[#2D333B]">
-            <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl bg-[#161B22] border border-[#2D333B] flex items-center justify-center text-[#8B949E]">
+          <div className="flex items-center justify-between px-4 h-12 border-b sf-line">
+            <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl sf-surface border sf-line flex items-center justify-center sf-mute">
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <span className="text-[14px] font-medium text-[#768390]">Secure Link</span>
+            <span className="text-[14px] font-medium sf-mute">Secure Link</span>
             <div className="w-9" />
           </div>
         )}
-        <div className={cn("flex flex-col items-center px-6", isMobile ? "flex-1 justify-center -mt-8" : "w-full max-w-sm text-center space-y-6")}>
+        <div className={cn("flex flex-col items-center px-6", isMobile ? "flex-1 justify-center" : "w-full max-w-sm text-center space-y-6")}>
           <div className={cn('w-20 h-20 rounded-[28px] flex items-center justify-center mb-5', gBg)}>
             <GuardIcon className={cn('w-10 h-10', gColor)} />
           </div>
-          <h1 className={cn("font-bold text-[#E6EDF3] text-center", isMobile ? 'text-[22px]' : 'text-xl')}>{gTitle}</h1>
-          <p className={cn("text-[#8B949E] text-center leading-relaxed", isMobile ? 'text-[14px] max-w-xs' : 'text-sm max-w-sm')}>{gDesc}</p>
+          <h1 className={cn("font-bold sf-ink text-center", isMobile ? 'text-[22px]' : 'text-xl')}>{gTitle}</h1>
+          <p className={cn("sf-mute text-center leading-relaxed", isMobile ? 'text-[14px] max-w-xs' : 'text-sm max-w-sm')}>{gDesc}</p>
 
           {isPassword && (
             <div className={cn("space-y-3", isMobile ? 'w-full max-w-sm mt-6' : 'max-w-xs mx-auto')}>
@@ -370,12 +411,12 @@ const SharePage: React.FC = () => {
                 onChange={e => { setPasswordInput(e.target.value); setPasswordError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
                 className={cn(
-                  "bg-[#161B22] border-[#2D333B] text-[#E6EDF3] placeholder:text-[#484F58] focus:border-[#58A6FF]/50",
+                  "sf-surface sf-line sf-ink sf-ph sf-focus",
                   isMobile ? 'h-12 text-center text-[16px] rounded-2xl' : 'h-11 text-center text-[15px] rounded-xl'
                 )} autoFocus />
-              {passwordError && <p className="text-xs text-[#F85149] text-center">{passwordError}</p>}
+              {passwordError && <p className="text-xs sf-ink text-center">{passwordError}</p>}
               <Button onClick={handlePasswordSubmit} disabled={!passwordInput.trim()}
-                className={cn("w-full bg-[#58A6FF] hover:bg-[#58A6FF]/90 text-white font-semibold", isMobile ? 'h-12 rounded-2xl text-[15px]' : 'h-11 rounded-xl')}>
+                className={cn("w-full sf-cta sf-cta-hover sf-oncta font-semibold", isMobile ? 'h-12 rounded-2xl text-[15px]' : 'h-11 rounded-xl')}>
                 <Lock className="w-4 h-4 mr-2" /> Unlock
               </Button>
             </div>
@@ -383,7 +424,7 @@ const SharePage: React.FC = () => {
 
           {!isPassword && (
             <Button onClick={() => navigate('/')} variant="outline"
-              className={cn("border-[#2D333B] text-[#E6EDF3]", isMobile ? 'mt-6 h-11 px-6 rounded-2xl' : '')}>
+              className={cn("sf-line sf-ink", isMobile ? 'mt-6 h-11 px-6 rounded-2xl' : '')}>
               <Home className="w-4 h-4 mr-2" /> Go Home
             </Button>
           )}
@@ -394,10 +435,11 @@ const SharePage: React.FC = () => {
 
   if (!guardChecked) {
     return (
-      <div className="min-h-screen bg-[#0D1117] flex items-center justify-center p-6" key="checking">
+      <div className="min-h-screen sf-root flex items-center justify-center p-6" key="checking">
+        <style>{SHARE_CSS}</style>
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-5 h-5 text-[#58A6FF] animate-spin" />
-          <p className="text-sm text-[#8B949E]">Checking access...</p>
+          <Loader2 className="w-5 h-5 sf-ink animate-spin" />
+          <p className="text-sm sf-mute">Checking access...</p>
         </div>
       </div>
     );
@@ -409,49 +451,49 @@ const SharePage: React.FC = () => {
     const inner = (
       <>
         {burnNotice && (
-          <div className={cn("flex items-center gap-2.5 bg-[#DA3633]/10 border border-[#DA3633]/30",
+          <div className={cn("flex items-center gap-2.5 sf-alert border sf-line",
             isMobile ? 'mx-4 mt-3 px-4 py-2.5 rounded-2xl' : 'px-4 py-3 rounded-xl')}>
-            <Flame className="w-5 h-5 text-[#DA3633] shrink-0" />
-            <span className="text-sm text-[#DA3633] font-medium">Self-destructs after first download</span>
+            <Flame className="w-5 h-5 sf-ink shrink-0" />
+            <span className="text-sm sf-ink font-medium">Self-destructs after first download</span>
           </div>
         )}
 
-        <div className={cn("bg-[#161B22] border border-[#2D333B]", isMobile ? 'mx-4 mt-3 p-4 rounded-2xl' : 'rounded-2xl p-6')}>
+        <div className={cn("sf-surface border sf-line", isMobile ? 'mx-4 mt-3 p-4 rounded-2xl' : 'rounded-2xl p-6')}>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#1C2128] border border-[#2D333B] flex items-center justify-center shrink-0">
-              <Folder className="w-7 h-7 text-[#8B949E]" />
+            <div className="w-14 h-14 rounded-2xl sf-surface-2 border sf-line flex items-center justify-center shrink-0">
+              <Folder className="w-7 h-7 sf-mute" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-[#E6EDF3]">{cleanFolder}</h1>
-              <p className="text-sm text-[#768390] mt-1">{folderFiles.length} file{folderFiles.length !== 1 ? 's' : ''}</p>
+              <h1 className="text-lg font-semibold sf-ink">{cleanFolder}</h1>
+              <p className="text-sm sf-mute mt-1">{folderFiles.length} file{folderFiles.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
         </div>
 
         {loadingFolder ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-5 h-5 text-[#58A6FF] animate-spin" />
+            <Loader2 className="w-5 h-5 sf-ink animate-spin" />
           </div>
         ) : folderFiles.length === 0 ? (
           <div className="text-center py-16">
-            <Folder className="w-10 h-10 mx-auto mb-3 text-[#484F58]" />
-            <p className="text-sm text-[#768390]">Empty folder</p>
+            <Folder className="w-10 h-10 mx-auto mb-3 sf-dim" />
+            <p className="text-sm sf-mute">Empty folder</p>
           </div>
         ) : (
-          <div className={cn("divide-y divide-[#2D333B]", isMobile ? 'mx-4 space-y-1.5' : 'bg-[#161B22] border border-[#2D333B] rounded-2xl overflow-hidden')}>
+          <div className={cn("divide-y sf-divide", isMobile ? 'mx-4 space-y-1.5' : 'sf-surface border sf-line rounded-2xl overflow-hidden')}>
             {folderFiles.map((f) => (
               <div key={f.file_id} className={cn("flex items-center gap-3 transition-colors group",
-                isMobile ? 'px-4 py-3.5 rounded-2xl bg-[#161B22] border border-[#2D333B]' : 'px-5 py-4 hover:bg-[#1C2128]')}>
+                isMobile ? 'px-4 py-3.5 rounded-2xl sf-surface border sf-line' : 'px-5 py-4 sf-hover')}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#E6EDF3] truncate">{getCleanFileName(f.file_name)}</p>
-                  <p className="text-xs text-[#768390] mt-0.5">{formatFileSize(f.file_size)}</p>
+                  <p className="text-sm font-medium sf-ink truncate">{getCleanFileName(f.file_name)}</p>
+                  <p className="text-xs sf-mute mt-0.5">{formatFileSize(f.file_size)}</p>
                 </div>
                 <button onClick={() => handleDownload(f.file_id, f.file_name, undefined)}
                   disabled={downloading === f.file_id}
                   className={cn("shrink-0 transition-colors",
                     isMobile
-                      ? 'h-10 w-10 rounded-xl bg-[#1C2128] border border-[#2D333B] flex items-center justify-center text-[#8B949E] active:bg-[#2D333B]'
-                      : 'h-8 px-3 rounded-lg border border-[#2D333B] text-[#8B949E] hover:text-[#E6EDF3] text-sm flex items-center gap-1.5'
+                      ? 'h-10 w-10 rounded-xl sf-surface-2 border sf-line flex items-center justify-center sf-mute sf-active'
+                      : 'h-8 px-3 rounded-lg border sf-line sf-mute sf-hover-ink text-sm flex items-center gap-1.5'
                   )}>
                   {downloading === f.file_id
                     ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -467,14 +509,15 @@ const SharePage: React.FC = () => {
 
     if (isMobile) {
       return (
-        <div className="fixed inset-0 z-50 bg-[#0D1117] flex flex-col pb-safe overflow-y-auto scrollbar-thin"
+        <div className="fixed inset-0 z-50 sf-root flex flex-col pb-safe overflow-y-auto scrollbar-thin"
           style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
           key="mobile-folder">
-          <div className="flex items-center px-4 h-12 border-b border-[#2D333B]">
-            <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl bg-[#161B22] border border-[#2D333B] flex items-center justify-center text-[#8B949E]">
+            <style>{SHARE_CSS}</style>
+          <div className="flex items-center px-4 h-12 border-b sf-line">
+            <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl sf-surface border sf-line flex items-center justify-center sf-mute">
               <X className="w-4 h-4" />
             </button>
-            <span className="ml-3 text-[15px] font-medium text-[#E6EDF3]">Shared Folder</span>
+            <span className="ml-3 text-[15px] font-medium sf-ink">Shared Folder</span>
           </div>
           <div className="flex-1 pb-6">{inner}</div>
         </div>
@@ -482,8 +525,9 @@ const SharePage: React.FC = () => {
     }
 
     return (
-      <div className="min-h-screen bg-[#0D1117]" key="desktop-folder">
-        <div className="max-w-2xl mx-auto px-6 py-10 space-y-4">{inner}</div>
+      <div className="min-h-screen sf-root" key="desktop-folder">
+        <style>{SHARE_CSS}</style>
+        <div className="sf-col">{inner}</div>
       </div>
     );
   }
@@ -495,42 +539,42 @@ const SharePage: React.FC = () => {
     <>
       {/* Notices */}
       {burnNotice && (
-        <div className={cn("flex items-center gap-2.5 bg-[#DA3633]/10 border border-[#DA3633]/30",
+        <div className={cn("flex items-center gap-2.5 sf-alert border sf-line",
           isMobile ? 'px-4 py-3 rounded-2xl' : 'px-4 py-3 rounded-xl')}>
-          <Flame className="w-5 h-5 text-[#DA3633] shrink-0" />
-          <span className="text-sm text-[#DA3633] font-medium">Self-destructs after download</span>
+          <Flame className="w-5 h-5 sf-ink shrink-0" />
+          <span className="text-sm sf-ink font-medium">Self-destructs after download</span>
         </div>
       )}
       {watermarkActive && (
-        <div className={cn("flex items-center gap-2.5 bg-[#58A6FF]/10 border border-[#58A6FF]/20",
+        <div className={cn("flex items-center gap-2.5 sf-tint border sf-line",
           isMobile ? 'px-4 py-3 rounded-2xl' : 'px-4 py-3 rounded-xl')}>
-          <Droplets className="w-5 h-5 text-[#58A6FF] shrink-0" />
-          <span className="text-sm text-[#58A6FF] font-medium">Watermarked with your email</span>
+          <Droplets className="w-5 h-5 sf-ink shrink-0" />
+          <span className="text-sm sf-ink font-medium">Watermarked with your email</span>
         </div>
       )}
       {fd!.share_expires_at && (
-        <div className={cn("flex items-center gap-2.5 bg-[#8B949E]/10 border border-[#8B949E]/20",
+        <div className={cn("flex items-center gap-2.5 sf-tint border sf-line",
           isMobile ? 'px-4 py-3 rounded-2xl' : 'px-4 py-3 rounded-xl')}>
-          <Calendar className="w-4 h-4 text-[#8B949E] shrink-0" />
-          <span className="text-sm text-[#8B949E]">Expires {formatDate(fd!.share_expires_at)}</span>
+          <Calendar className="w-4 h-4 sf-mute shrink-0" />
+          <span className="text-sm sf-mute">Expires {formatDate(fd!.share_expires_at)}</span>
         </div>
       )}
 
       {/* File Card */}
-      <div className={cn("bg-[#161B22] border border-[#2D333B]", isMobile ? 'p-5 rounded-3xl' : 'p-6 rounded-2xl')}>
+      <div className={cn("sf-surface border sf-line", isMobile ? 'p-5 rounded-3xl' : 'p-6 rounded-2xl')}>
         <div className={cn("flex items-start gap-4", isMobile ? '' : 'gap-5')}>
-          <div className={cn("rounded-2xl bg-[#1C2128] border border-[#2D333B] flex items-center justify-center shrink-0",
+          <div className={cn("rounded-2xl sf-surface-2 border sf-line flex items-center justify-center shrink-0",
             isMobile ? 'w-16 h-16' : 'w-16 h-16')}>
-            <File className="w-8 h-8 text-[#8B949E]" />
+            <File className="w-8 h-8 sf-mute" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className={cn("font-semibold text-[#E6EDF3] break-words", isMobile ? 'text-[17px] leading-snug' : 'text-lg')}>{cleanName}</h1>
-            <div className={cn("flex items-center gap-2 flex-wrap text-[#768390]", isMobile ? 'mt-1.5' : 'mt-1.5')}>
+            <h1 className={cn("font-semibold sf-ink break-words", isMobile ? 'text-[17px] leading-snug' : 'text-lg')}>{cleanName}</h1>
+            <div className={cn("flex items-center gap-2 flex-wrap sf-mute", isMobile ? 'mt-1.5' : 'mt-1.5')}>
               <span className={isMobile ? 'text-[12px]' : 'text-sm'}>{formatFileSize(fd!.file_size)}</span>
               {fd!.is_encrypted && (
                 <>
-                  <span className="text-[#484F58]">·</span>
-                  <span className={cn("flex items-center gap-1 text-[#58A6FF]", isMobile ? 'text-[11px]' : 'text-sm')}>
+                  <span className="sf-dim">·</span>
+                  <span className={cn("flex items-center gap-1 sf-ink", isMobile ? 'text-[11px]' : 'text-sm')}>
                     <Lock className="w-3.5 h-3.5" /> Encrypted
                   </span>
                 </>
@@ -539,19 +583,19 @@ const SharePage: React.FC = () => {
 
             {/* Email collection */}
             {fd!.share_require_email && (
-              <div className={cn("bg-[#1C2128] border border-[#2D333B]", isMobile ? 'mt-4 p-4 rounded-2xl' : 'mt-4 p-4 rounded-xl')}>
-                <p className={cn("font-medium text-[#E6EDF3] mb-2 flex items-center gap-1.5",
+              <div className={cn("sf-surface-2 border sf-line", isMobile ? 'mt-4 p-4 rounded-2xl' : 'mt-4 p-4 rounded-xl')}>
+                <p className={cn("font-medium sf-ink mb-2 flex items-center gap-1.5",
                   isMobile ? 'text-[12px]' : 'text-xs')}>
-                  <Mail className="w-3.5 h-3.5 text-[#58A6FF]" /> Email required to download
+                  <Mail className="w-3.5 h-3.5 sf-ink" /> Email required to download
                 </p>
                 <div className="flex gap-2">
                   <Input type="email" placeholder="your@email.com" value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleEmailSubmit()}
-                    className={cn("flex-1 bg-[#0D1117] border-[#2D333B] text-[#E6EDF3] placeholder:text-[#484F58] focus:border-[#58A6FF]/50",
+                    className={cn("flex-1 sf-root sf-line sf-ink sf-ph sf-focus",
                       isMobile ? 'h-10 text-[14px] rounded-xl' : 'h-9 text-sm rounded-xl')} />
                   <Button onClick={handleEmailSubmit} disabled={!emailInput.trim()}
-                    className={cn("bg-[#58A6FF] hover:bg-[#58A6FF]/90", isMobile ? 'h-10 px-4 rounded-xl' : 'h-9 px-4 rounded-xl')}>
+                    className={cn("sf-cta sf-cta-hover", isMobile ? 'h-10 px-4 rounded-xl' : 'h-9 px-4 rounded-xl')}>
                     <Check className="w-4 h-4" />
                   </Button>
                 </div>
@@ -562,7 +606,7 @@ const SharePage: React.FC = () => {
             <div className={cn("flex gap-3", isMobile ? 'mt-5' : 'mt-5')}>
               {canPreview(fd!.file_type, fd!.file_name) && (
                 <Button variant="outline" onClick={() => { if (isBYOKFile && !resolvedKey) { setByokPromptOpen(true); return; } setPreviewOpen(true); }}
-                  className={cn("border-[#2D333B] text-[#E6EDF3] hover:bg-[#1C2128]", isMobile ? 'flex-1 h-12 rounded-2xl text-[14px]' : 'flex-1 h-11 rounded-xl')}>
+                  className={cn("sf-line sf-ink sf-hover", isMobile ? 'flex-1 h-12 rounded-2xl text-[14px]' : 'flex-1 h-11 rounded-xl')}>
                   <Eye className="w-4 h-4 mr-2" /> Preview
                 </Button>
               )}
@@ -571,8 +615,8 @@ const SharePage: React.FC = () => {
                   "font-semibold",
                   isMobile ? (canPreview(fd!.file_type, fd!.file_name) ? 'flex-1 h-12 rounded-2xl text-[14px]' : 'w-full h-12 rounded-2xl text-[14px]') : (canPreview(fd!.file_type, fd!.file_name) ? 'flex-1 h-11 rounded-xl' : 'w-full h-11 rounded-xl'),
                   downloading === fd!.file_id
-                    ? 'bg-[#58A6FF]/30 text-[#8B949E] cursor-not-allowed'
-                    : 'bg-[#58A6FF] hover:bg-[#58A6FF]/90 text-white'
+                    ? 'sf-tint sf-mute cursor-not-allowed'
+                    : 'sf-cta sf-cta-hover sf-oncta'
                 )}>
                 {downloading === fd!.file_id ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Decrypting...</>
@@ -582,14 +626,14 @@ const SharePage: React.FC = () => {
               </Button>
             </div>
             {fd!.share_view_only && (
-              <p className={cn("text-[#8B949E] text-center mt-3", isMobile ? 'text-[11px]' : 'text-xs')}>View only — downloads disabled</p>
+              <p className={cn("sf-mute text-center mt-3", isMobile ? 'text-[11px]' : 'text-xs')}>View only — downloads disabled</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Properties */}
-      <div className={cn("bg-[#161B22] border border-[#2D333B] overflow-hidden divide-y divide-[#2D333B]",
+      <div className={cn("sf-surface border sf-line overflow-hidden divide-y sf-divide",
         isMobile ? 'rounded-2xl' : 'rounded-2xl')}>
         {[
           { label: 'Type', value: fd!.file_type },
@@ -599,8 +643,8 @@ const SharePage: React.FC = () => {
           { label: 'Shared', value: fd!.share_created_at ? formatDate(fd!.share_created_at) : '—' },
         ].map((row, i) => (
           <div key={i} className="flex items-center justify-between px-5 py-3.5">
-            <span className={cn("text-[#768390]", isMobile ? 'text-[12px]' : 'text-sm')}>{row.label}</span>
-            <span className={cn("font-medium text-[#E6EDF3]", isMobile ? 'text-[12px]' : 'text-sm')}>{row.value}</span>
+            <span className={cn("sf-mute", isMobile ? 'text-[12px]' : 'text-sm')}>{row.label}</span>
+            <span className={cn("font-medium sf-ink", isMobile ? 'text-[12px]' : 'text-sm')}>{row.value}</span>
           </div>
         ))}
       </div>
@@ -610,15 +654,16 @@ const SharePage: React.FC = () => {
   // ─── Mobile single file layout ────────────────────────────────────────
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#0D1117] flex flex-col"
+      <div className="fixed inset-0 z-50 sf-root flex flex-col"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         key="mobile-file">
+          <style>{SHARE_CSS}</style>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 h-12 border-b border-[#2D333B]">
-          <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl bg-[#161B22] border border-[#2D333B] flex items-center justify-center text-[#8B949E]">
+        <div className="flex items-center justify-between px-4 h-12 border-b sf-line">
+          <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl sf-surface border sf-line flex items-center justify-center sf-mute">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-[14px] font-medium text-[#768390]">Shared File</span>
+          <span className="text-[14px] font-medium sf-mute">Shared File</span>
           <div className="w-9" />
         </div>
 
@@ -628,24 +673,24 @@ const SharePage: React.FC = () => {
 
         {/* BYOK Bottom Sheet */}
         {byokPromptOpen && (
-          <div className="absolute inset-0 z-50 bg-black/60 flex items-end justify-center" onClick={() => { setByokPromptOpen(false); setByokKeyInput(''); }}>
+          <div className="absolute inset-0 z-50 sf-backdrop flex items-end justify-center" onClick={() => { setByokPromptOpen(false); setByokKeyInput(''); }}>
             <div onClick={e => e.stopPropagation()}
-              className="w-full max-w-lg bg-[#161B22] rounded-t-3xl border-t border-[#2D333B] p-6 pb-10 space-y-4">
+              className="w-full max-w-lg sf-surface rounded-t-3xl border-t sf-line p-6 pb-10 space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#58A6FF]/10 flex items-center justify-center">
-                  <Lock className="w-5 h-5 text-[#58A6FF]" />
+                <div className="w-10 h-10 rounded-xl sf-tint flex items-center justify-center">
+                  <Lock className="w-5 h-5 sf-ink" />
                 </div>
                 <div>
-                  <h3 className="text-[16px] font-semibold text-[#E6EDF3]">Encryption Key Required</h3>
-                  <p className="text-[12px] text-[#768390]">Paste the encryption key from the share link</p>
+                  <h3 className="text-[16px] font-semibold sf-ink">Encryption Key Required</h3>
+                  <p className="text-[12px] sf-mute">Paste the encryption key from the share link</p>
                 </div>
               </div>
               <Input type="password" placeholder="Encryption key" value={byokKeyInput}
                 onChange={e => setByokKeyInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleBYOKSubmit()}
-                className="h-11 rounded-xl bg-[#0D1117] border-[#2D333B] text-[#E6EDF3] placeholder:text-[#484F58] focus:border-[#58A6FF]/50" autoFocus />
+                className="h-11 rounded-xl sf-root sf-line sf-ink sf-ph sf-focus" autoFocus />
                 <Button onClick={handleBYOKSubmit} disabled={!byokKeyInput.trim()}
-                  className="flex-1 h-11 rounded-xl bg-[#58A6FF] hover:bg-[#58A6FF]/90 text-white font-semibold">Unlock</Button>
+                  className="flex-1 h-11 rounded-xl sf-cta sf-cta-hover sf-oncta font-semibold">Unlock</Button>
             </div>
           </div>
         )}
@@ -673,30 +718,31 @@ const SharePage: React.FC = () => {
 
   // ─── Desktop single file ──────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0D1117]" key="desktop-file">
+    <div className="min-h-screen sf-root" key="desktop-file">
+      <style>{SHARE_CSS}</style>
       {byokPromptOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => { setByokPromptOpen(false); setByokKeyInput(''); }}>
-          <div onClick={e => e.stopPropagation()} className="w-full max-w-sm bg-[#161B22] border border-[#2D333B] rounded-2xl p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 sf-backdrop flex items-center justify-center p-4" onClick={() => { setByokPromptOpen(false); setByokKeyInput(''); }}>
+          <div onClick={e => e.stopPropagation()} className="w-full max-w-sm sf-surface border sf-line rounded-2xl p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#58A6FF]/10 flex items-center justify-center">
-                <Lock className="w-5 h-5 text-[#58A6FF]" />
+              <div className="w-10 h-10 rounded-xl sf-tint flex items-center justify-center">
+                <Lock className="w-5 h-5 sf-ink" />
               </div>
               <div>
-                <h3 className="font-semibold text-[15px] text-[#E6EDF3]">Encryption key required</h3>
-                <p className="text-sm text-[#768390]">Paste the encryption key from the share link</p>
+                <h3 className="font-semibold text-[15px] sf-ink">Encryption key required</h3>
+                <p className="text-sm sf-mute">Paste the encryption key from the share link</p>
               </div>
             </div>
             <Input type="password" placeholder="Encryption key" value={byokKeyInput}
               onChange={e => setByokKeyInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleBYOKSubmit()}
-              className="h-10 rounded-xl bg-[#0D1117] border-[#2D333B] text-[#E6EDF3] placeholder:text-[#484F58] focus:border-[#58A6FF]/50" autoFocus />
+              className="h-10 rounded-xl sf-root sf-line sf-ink sf-ph sf-focus" autoFocus />
                 <Button onClick={handleBYOKSubmit} disabled={!byokKeyInput.trim()}
-                  className="flex-1 bg-[#58A6FF] hover:bg-[#58A6FF]/90 text-white font-semibold">Unlock</Button>
+                  className="flex-1 sf-cta sf-cta-hover sf-oncta font-semibold">Unlock</Button>
           </div>
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-6 py-10 space-y-4">
+      <div className="sf-col">
         {fileContent}
       </div>
 

@@ -2,21 +2,65 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSignals } from '@/hooks/useSignals';
-import { Bell, Check, Inbox, Trash2 } from '@/lib/icon-map';
+import { GlassNav, type GlassNavItem } from '@/components/layout/GlassNav';
+import { PageFrame } from '@/components/layout/PageFrame';
+import { AlertTriangle, Bell, Check, Inbox, Trash2 } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 
 const SEVERITY_DOT: Record<string, string> = {
-  info: 'bg-sky-400',
-  warning: 'bg-amber-400',
-  urgent: 'bg-red-500',
+  info: 'sg-dot-info',
+  warning: 'sg-dot-warning',
+  urgent: 'sg-dot-urgent',
 };
+
+const SG_CSS = `
+.sg-actions{display:flex;justify-content:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.sg-act{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;
+  border:1px solid var(--sa-line,#1f2221);border-radius:8px;background:transparent;
+  color:var(--sa-mute,#8d8f89);font:400 12px/1 var(--sa-f,-apple-system,sans-serif);cursor:pointer}
+.sg-act:hover{color:var(--sa-text,#e8e7e1);background:var(--sa-bg-2,#0e1110)}
+.sg-act svg{width:14px;height:14px}
+.sg-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  padding:72px 0;text-align:center;border:1px solid var(--sa-line,#1f2221);border-radius:16px}
+.sg-empty>svg{width:40px;height:40px;color:var(--sa-dim,#62655f)}
+.sg-empty-t{margin:0;font-size:13px;color:var(--sa-mute,#8d8f89)}
+.sg-empty-s{margin:4px 0 0;font-size:11px;color:var(--sa-dim,#62655f)}
+.sg-list{border:1px solid var(--sa-line,#1f2221);border-radius:16px;overflow:hidden}
+.sg-row{position:relative;display:flex;align-items:flex-start;gap:12px;padding:16px;
+  cursor:pointer;border-bottom:1px solid var(--sa-line,#1f2221)}
+.sg-row:last-child{border-bottom:0}
+.sg-row:hover{background:var(--sa-bg-2,#0e1110)}
+.sg-row-unread{background:var(--sa-bg-2,#0e1110)}
+.sg-dot{width:7px;height:7px;border-radius:50%;flex:none;margin-top:6px}
+.sg-dot-info{background:var(--sa-dim,#62655f)}
+.sg-dot-warning{background:var(--sa-mute,#8d8f89)}
+.sg-dot-urgent{background:var(--sa-text,#e8e7e1)}
+.sg-main{min-width:0;flex:1}
+.sg-line{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sg-title{margin:0;font-size:13px;font-weight:400;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:var(--sa-text,#e8e7e1)}
+.sg-title-read{color:var(--sa-mute,#8d8f89)}
+.sg-time{font-size:11px;color:var(--sa-dim,#62655f);flex:none}
+.sg-body{margin:4px 0 0;font-size:11px;line-height:1.5;color:var(--sa-mute,#8d8f89);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sg-tags{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.sg-tag{padding:2px 6px;border-radius:5px;background:var(--sa-bg-3,#141816);
+  color:var(--sa-mute,#8d8f89);font:400 10px/1.3 var(--sa-f,-apple-system,sans-serif);
+  text-transform:uppercase;letter-spacing:.04em}
+.sg-tag-urgent{color:var(--sa-text,#e8e7e1)}
+.sg-clear{opacity:0;align-self:center;padding:6px;border:0;border-radius:8px;
+  background:transparent;color:var(--sa-mute,#8d8f89);cursor:pointer;transition:opacity .18s}
+.sg-row:hover .sg-clear,.sg-clear:focus-visible{opacity:1}
+.sg-clear:hover{color:var(--sa-text,#e8e7e1);background:var(--sa-bg-3,#141816)}
+.sg-clear svg{width:15px;height:15px}
+`;
 
 type Tab = 'all' | 'unread' | 'urgent';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'unread', label: 'Unread' },
-  { id: 'urgent', label: 'Urgent' },
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'all', label: 'All', icon: <Inbox /> },
+  { id: 'unread', label: 'Unread', icon: <Bell /> },
+  { id: 'urgent', label: 'Urgent', icon: <AlertTriangle /> },
 ];
 
 export default function SignalsPage() {
@@ -36,117 +80,92 @@ export default function SignalsPage() {
     if (s.link) navigate(s.link);
   };
 
+  const navItems: GlassNavItem[] = TABS.map((t) => ({
+    key: t.id,
+    label: t.label,
+    icon: t.icon,
+    active: tab === t.id,
+    onClick: () => setTab(t.id),
+  }));
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-2xl px-4 py-6 md:py-10">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 text-primary">
-              <Bell className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">Signals</h1>
-              <p className="text-xs text-muted-foreground">
-                {unreadCount > 0 ? `${unreadCount} unread` : 'You\'re all caught up'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <button
-                onClick={() => void markAllRead()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-primary hover:bg-accent/50 border border-border/50 transition-colors"
-              >
-                <Check className="w-3.5 h-3.5" />
-                Mark all read
-              </button>
-            )}
-            {signals.length > 0 && (
-              <button
-                onClick={() => void clearAll()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 border border-red-500/20 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Clear all
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/40 mb-4 w-fit">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                'px-4 py-1.5 rounded-lg text-xs font-medium transition-all',
-                tab === t.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground/80'
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center border border-dashed border-border/50 rounded-2xl">
-            <Inbox className="w-10 h-10 text-muted-foreground/30" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">No signals here</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">
-                {tab === 'all' ? 'Signals from CloudBliss and SquidVeil will appear here.' : 'Nothing matches this filter.'}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="border border-border/50 rounded-2xl overflow-hidden divide-y divide-border/40 bg-card/30">
-            {filtered.map((s) => (
-              <div
-                key={s.id}
-                className={cn(
-                  'group relative flex items-start gap-3 px-4 py-4 cursor-pointer transition-colors hover:bg-accent/40',
-                  !s.read_at && 'bg-primary/[0.03]'
-                )}
-                onClick={() => void handleItemClick(s)}
-              >
-                <span className={cn('mt-1.5 w-2 h-2 rounded-full shrink-0', SEVERITY_DOT[s.severity])} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className={cn('text-sm font-medium truncate', !s.read_at ? 'text-foreground' : 'text-muted-foreground')}>
-                      {s.title}
-                    </p>
-                    <span className="text-[11px] text-muted-foreground shrink-0">{timeAgo(s.created_at)}</span>
-                  </div>
-                  {s.body && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.body}</p>}
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
-                      {s.service_id}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
-                      {s.type.replace(/_/g, ' ')}
-                    </span>
-                    {s.severity === 'urgent' && (
-                      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-500">
-                        urgent
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void clear(s.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 self-center"
-                  aria-label="Clear signal"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
+    <PageFrame
+      title="Signals"
+      subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'You\'re all caught up'}
+      items={navItems}
+      layoutId="signals-tabs"
+    >
+      <style>{SG_CSS}</style>
+      <div className="sg-actions">
+        {unreadCount > 0 && (
+          <button
+            onClick={() => void markAllRead()}
+            className="sg-act"
+          >
+            <Check />
+            Mark all read
+          </button>
+        )}
+        {signals.length > 0 && (
+          <button
+            onClick={() => void clearAll()}
+            className="sg-act"
+          >
+            <Trash2 />
+            Clear all
+          </button>
         )}
       </div>
-    </div>
+
+      {filtered.length === 0 ? (
+        <div className="sg-empty">
+          <Inbox />
+          <div>
+            <p className="sg-empty-t">No signals here</p>
+            <p className="sg-empty-s">
+              {tab === 'all' ? 'Signals from CloudBliss and SquidVeil will appear here.' : 'Nothing matches this filter.'}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="sg-list">
+          {filtered.map((s) => (
+            <div
+              key={s.id}
+              className={cn('sg-row', !s.read_at && 'sg-row-unread')}
+              onClick={() => void handleItemClick(s)}
+            >
+              <span className={cn('sg-dot', SEVERITY_DOT[s.severity])} />
+              <div className="sg-main">
+                <div className="sg-line">
+                  <p className={cn('sg-title', !s.read_at ? '' : 'sg-title-read')}>
+                    {s.title}
+                  </p>
+                  <span className="sg-time">{timeAgo(s.created_at)}</span>
+                </div>
+                {s.body && <p className="sg-body">{s.body}</p>}
+                <div className="sg-tags">
+                  <span className="sg-tag">{s.service_id}</span>
+                  <span className="sg-tag">{s.type.replace(/_/g, ' ')}</span>
+                  {s.severity === 'urgent' && (
+                    <span className="sg-tag sg-tag-urgent">urgent</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void clear(s.id);
+                }}
+                className="sg-clear"
+                aria-label="Clear signal"
+              >
+                <Trash2 />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </PageFrame>
   );
 }

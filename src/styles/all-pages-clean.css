@@ -225,3 +225,26 @@
   --tw-ring-color: transparent !important;
   box-shadow: none !important;
 }
+
+/* Selection and focus inside text fields must never paint a white/lime ring. */
+:root[data-sq-clean="on"] :is(input, textarea, select, [contenteditable="true"])::selection,
+:root[data-sq-clean="on"] :is(input, textarea, select, [contenteditable="true"])::-moz-selection {
+  background: #2f3230 !important;
+  color: #e8e7e1 !important;
+}
+:root[data-sq-clean="on"] :is(input, textarea, select, [contenteditable="true"]):focus,
+:root[data-sq-clean="on"] :is(input, textarea, select, [contenteditable="true"]):focus-visible {
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  --tw-ring-color: transparent !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  border-color: #2f3230 !important;
+}
+:root[data-sq-clean="on"] input:-webkit-autofill,
+:root[data-sq-clean="on"] input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #e8e7e1 !important;
+  -webkit-box-shadow: 0 0 0 1000px #0e1110 inset !important;
+  caret-color: #e8e7e1 !important;
+}

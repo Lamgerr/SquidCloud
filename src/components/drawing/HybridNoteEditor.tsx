@@ -87,7 +87,7 @@ export default function HybridNoteEditor() {
       setCurrentId(id);
       localStorage.setItem(CURRENT_KEY, id);
     }
-    setStatus("Saved ✓");
+    setStatus("Saved");
     window.setTimeout(() => setStatus(""), 1200);
   }, [currentId]);
 
@@ -294,8 +294,8 @@ export default function HybridNoteEditor() {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
-        background: "#0c0d12",
-        color: "#e6e8ef",
+        background: "#090b0a",
+        color: "#e8e7e1",
         fontFamily: "system-ui, sans-serif",
       }}
     >
@@ -306,11 +306,11 @@ export default function HybridNoteEditor() {
           alignItems: "center",
           gap: 12,
           padding: "8px 14px",
-          background: "#101116",
-          borderBottom: "1px solid #1c1d24",
+          background: "#0e1110",
+          borderBottom: "1px solid #1f2221",
         }}
       >
-        <Link to="/" style={{ color: "#8a8fa3", textDecoration: "none", fontSize: 13 }}>
+        <Link to="/" style={{ color: "#8d8f89", textDecoration: "none", fontSize: 13 }}>
           ← App
         </Link>
         <input
@@ -323,9 +323,9 @@ export default function HybridNoteEditor() {
           style={{
             background: "transparent",
             border: "none",
-            color: "#fff",
+            color: "#e8e7e1",
             fontSize: 15,
-            fontWeight: 600,
+            fontWeight: 500,
             outline: "none",
             width: 220,
           }}
@@ -334,9 +334,9 @@ export default function HybridNoteEditor() {
           value={currentId}
           onChange={(e) => switchNote(e.target.value)}
           style={{
-            background: "#191a21",
-            color: "#e6e8ef",
-            border: "1px solid #2a2a33",
+            background: "#141816",
+            color: "#e8e7e1",
+            border: "1px solid #2f3230",
             borderRadius: 8,
             padding: "5px 8px",
           }}
@@ -366,7 +366,7 @@ export default function HybridNoteEditor() {
           />
         </label>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, opacity: 0.7 }}>{status}</span>
+        <span style={{ fontSize: 12, color: "#8d8f89" }}>{status}</span>
       </div>
 
       {/* body */}
@@ -403,7 +403,7 @@ export default function HybridNoteEditor() {
             minWidth: 0,
             position: "relative",
             background:
-              "repeating-conic-gradient(#2a2b33 0% 25%, #25262e 0% 50%) 50% / 24px 24px",
+              "repeating-conic-gradient(#111312 0% 25%, #0d0f0e 0% 50%) 50% / 24px 24px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -434,10 +434,10 @@ export default function HybridNoteEditor() {
                   minHeight: b.h,
                   border:
                     selectedBlock === b.id
-                      ? "1px dashed #3b5bff"
+                      ? "1px dashed #8d8f89"
                       : "1px solid transparent",
                   borderRadius: 6,
-                  background: "rgba(255,255,255,0.02)",
+                  background: "#101210",
                   padding: 6,
                   boxSizing: "border-box",
                 }}
@@ -472,9 +472,9 @@ export default function HybridNoteEditor() {
                       width: 20,
                       height: 20,
                       borderRadius: "50%",
-                      border: "none",
-                      background: "#ff5252",
-                      color: "#fff",
+                      border: "1px solid #2f3230",
+                      background: "#1b201d",
+                      color: "#e8e7e1",
                       cursor: "pointer",
                       fontSize: 11,
                       lineHeight: "20px",
@@ -494,9 +494,9 @@ export default function HybridNoteEditor() {
 }
 
 const hdrBtn: React.CSSProperties = {
-  background: "#191a21",
-  color: "#e6e8ef",
-  border: "1px solid #2a2a33",
+  background: "#141816",
+  color: "#e8e7e1",
+  border: "1px solid #2f3230",
   borderRadius: 8,
   padding: "6px 12px",
   cursor: "pointer",

@@ -7,6 +7,28 @@ import { ArrowLeft, Shield, Loader2, X } from '@/lib/icon-map';
 import { Button } from '@/components/ui/button';
 import MfaChallengeScreen from '@/components/MfaChallengeScreen';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const CA_CSS = `
+.ca-body{max-width:460px;margin:0 auto;text-align:center}
+.ca-mark{width:56px;height:56px;margin:0 auto;display:grid;place-items:center;border:1px solid var(--sa-line,#1f2221);border-radius:16px;color:var(--sa-text,#e8e7e1)}
+.ca-mark svg{width:28px;height:28px;stroke-width:1.6}
+.ca-back{display:flex;justify-content:center;margin-bottom:24px}
+.ca-link{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;padding:4px 2px;color:var(--sa-mute,#8d8f89);font:400 12px/1 var(--sa-f,-apple-system,sans-serif);cursor:pointer}
+.ca-link:hover{color:var(--sa-text,#e8e7e1)}
+.ca-scopes{display:grid;gap:8px;margin:0 0 24px}
+.ca-scope{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--sa-line,#1f2221);border-radius:10px;background:var(--sa-bg-2,#0e1110);text-align:left}
+.ca-scope svg{width:16px;height:16px;flex:none;color:var(--sa-mute,#8d8f89)}
+.ca-scope span{font-size:13px;color:var(--sa-text,#e8e7e1)}
+.ca-actions{display:grid;gap:8px}
+.ca-cta{width:100%;height:44px}
+.ca-cancel{width:100%;padding:10px 16px;border:0;background:transparent;color:var(--sa-mute,#8d8f89);font:400 13px/1 var(--sa-f,-apple-system,sans-serif);cursor:pointer}
+.ca-cancel:hover{color:var(--sa-text,#e8e7e1)}
+.ca-error{margin-top:16px;display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--sa-line,#1f2221);border-radius:10px;background:var(--sa-bg-2,#0e1110);text-align:left}
+.ca-error svg{width:16px;height:16px;flex:none;color:var(--sa-mute,#8d8f89)}
+.ca-error span{font-size:13px;line-height:1.5;color:var(--sa-text,#e8e7e1)}
+.ca-foot{margin-top:32px;text-align:center;font-size:11px;color:var(--sa-dim,#62655f)}
+`;
 
 const SCOPES = [
   'Read and write your files',
@@ -172,16 +194,16 @@ const CliAuthorize = () => {
   }
 
   return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <div className="flex flex-1 items-center justify-center p-6">
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-sm mx-auto text-center"
-          >
-            <div className="grid h-14 w-14 mx-auto place-items-center rounded-full bg-primary/10 mb-5">
-              <svg viewBox="0 0 24 24" className="h-7 w-7 text-primary" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <PageFrame title="Authorized" subtitle="You can close this tab.">
+      <style>{CA_CSS}</style>
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        className="ca-body"
+      >
+        <div className="ca-mark">
+          <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <motion.circle
                   cx="12" cy="12" r="10"
                   initial={reduce ? { pathLength: 1 } : { pathLength: 0 }}
@@ -194,61 +216,49 @@ const CliAuthorize = () => {
                   animate={{ pathLength: 1 }}
                   transition={{ duration: 0.4, ease: 'easeOut', delay: 0.3 }}
                 />
-              </svg>
-            </div>
-            <h2 className="text-xl font-bold tracking-tight mb-1.5">Authorized</h2>
-            <p className="text-sm text-muted-foreground">You can close this tab.</p>
-          </motion.div>
+            </svg>
         </div>
-      </div>
+      </motion.div>
+    </PageFrame>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <div className="flex flex-1 items-center justify-center p-6 md:p-8">
-        <motion.div
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-sm mx-auto"
-        >
-          <div className="mb-6">
-            <button
-              onClick={() => navigate('/', { replace: true })}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors press-effect"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back to SquidCloud
-            </button>
-          </div>
+    <PageFrame title="Authorize squidcloudctl?" subtitle="A CLI tool is requesting access to your SquidCloud account">
+      <style>{CA_CSS}</style>
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        className="ca-body"
+      >
+        <div className="ca-back">
+          <button
+            onClick={() => navigate('/', { replace: true })}
+            className="ca-link press-effect"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to SquidCloud
+          </button>
+        </div>
 
-          <div className="space-y-1 mb-8">
-            <h1 className="text-2xl font-bold tracking-tight">
-              Authorize squidcloudctl?
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              A CLI tool is requesting access to your SquidCloud account
-            </p>
-          </div>
-
-          <div className="stagger-children mb-8 space-y-2">
+        <div className="ca-scopes">
             {SCOPES.map((scope) => (
               <div
                 key={scope}
-                className="flex items-center gap-3 rounded-lg border border-border/50 bg-card/50 px-3.5 py-2.5"
+                className="ca-scope"
               >
-                <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm text-foreground">{scope}</span>
+                <Shield className="h-4 w-4 shrink-0" />
+                <span>{scope}</span>
               </div>
             ))}
           </div>
 
-          <div className="space-y-2.5">
+        <div className="ca-actions">
             <Button
               onClick={handleAuthorize}
               disabled={loading}
-              className="w-full h-11 rounded-xl"
+              className="ca-cta"
               loading={loading}
             >
               {loading ? 'Authorizing\u2026' : 'Authorize Access'}
@@ -256,7 +266,7 @@ const CliAuthorize = () => {
 
             <button
               onClick={() => window.close()}
-              className="w-full rounded-xl px-6 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors press-effect"
+              className="ca-cancel press-effect"
             >
               Cancel
             </button>
@@ -269,20 +279,19 @@ const CliAuthorize = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
-                className="mt-4 flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-3"
+                className="ca-error"
               >
-                <X className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <span className="text-sm text-destructive leading-snug">{error}</span>
+                <X className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <p className="mt-8 text-center text-[11px] text-muted-foreground">
-            You can revoke access anytime in Account Settings
-          </p>
-        </motion.div>
-      </div>
-    </div>
+        <p className="ca-foot">
+          You can revoke access anytime in Account Settings
+        </p>
+      </motion.div>
+    </PageFrame>
   );
 };
 

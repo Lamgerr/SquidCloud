@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   AppShell, TopBar, Spinner, Note, Ico, btn, useDocTitle,
 } from '@/components/custom/squid-app';
+import { PageFrame } from '@/components/layout/PageFrame';
 
 /* ═══════════════════════════════════════════════════════════════
    OAUTH CONSENT — SquidCloud as identity provider (OAuth 2.1).
@@ -30,16 +31,19 @@ const SCOPES_HINT: Record<string, string> = {
 };
 
 const OV_CSS = `
-.ov { min-height: calc(100vh / var(--sa-zoom, 1) - 48px); display: flex; align-items: center; justify-content: center; padding: 32px var(--sa-gut) 48px; }
-.ov-card { width: 100%; max-width: 400px; display: grid; gap: 18px; padding: 24px 28px; border: 1px solid var(--sa-line); border-radius: 10px; background: var(--sa-bg-2); text-align: left; }
-.ov-eyebrow { font: 400 11px/1 var(--sa-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sa-mute); display: inline-flex; align-items: center; gap: 8px; }
-.ov-client { font: 400 30px/1.1 var(--sa-f); letter-spacing: -0.03em; color: var(--sa-text); }
-.ov-copy { font-size: 14px; line-height: 1.55; color: var(--sa-text-2); }
-.ov-scope { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--sa-line); border-radius: 5px; background: var(--sa-bg); font-size: 13px; color: var(--sa-text); }
-.ov-scope-k { font: 400 12px/1 var(--sa-mono); color: var(--sa-text); }
-.ov-scope-d { color: var(--sa-mute); font-size: 12px; }
-.ov-uri { font: 400 12px/1.4 var(--sa-mono); color: var(--sa-mute); word-break: break-all; }
-.ov-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+.ov-frame.pf-root { min-height: 0; }
+.ov-frame .pf-inner { padding: 32px 24px 56px; }
+.ov-card { width: 100%; max-width: 440px; margin: 0 auto; display: grid; gap: 18px; padding: 26px 28px; border: 1px solid var(--sa-line, #1f2221); border-radius: 16px; background: var(--sa-bg-2, #0e1110); text-align: left; }
+.ov-eyebrow { font: 400 11px/1 var(--sa-mono, ui-monospace, monospace); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sa-mute, #8d8f89); display: inline-flex; align-items: center; gap: 8px; }
+.ov-client { margin: 0; font: 400 26px/1.15 var(--sa-f, -apple-system, sans-serif); letter-spacing: -0.03em; color: var(--sa-text, #e8e7e1); }
+.ov-copy { font-size: 14px; line-height: 1.55; color: var(--sa-text-2, var(--sa-mute, #8d8f89)); }
+.ov-scope { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--sa-line, #1f2221); border-radius: 10px; background: var(--sa-bg, #090b0a); font-size: 13px; color: var(--sa-text, #e8e7e1); }
+.ov-scope svg { color: var(--sa-mute, #8d8f89); }
+.ov-scope-k { font: 400 12px/1 var(--sa-mono, ui-monospace, monospace); color: var(--sa-text, #e8e7e1); }
+.ov-scope-d { color: var(--sa-mute, #8d8f89); font-size: 12px; }
+.ov-uri { font: 400 12px/1.5 var(--sa-mono, ui-monospace, monospace); color: var(--sa-mute, #8d8f89); word-break: break-all; }
+.ov-actions { display: flex; gap: 8px; justify-content: center; margin-top: 4px; }
+.ov-card .sa-note.err { color: var(--sa-text, #e8e7e1); border-color: var(--sa-line, #1f2221); background: var(--sa-bg, #090b0a); }
 `;
 
 export default function OAuthConsentPage() {
@@ -126,7 +130,7 @@ export default function OAuthConsentPage() {
     <AppShell>
       <style>{OV_CSS}</style>
       <TopBar home="/" crumbs={[{ label: 'oauth' }, { label: 'consent' }]} />
-      <div className="ov">
+      <PageFrame title="Authorize application" subtitle="Review the permissions this app is requesting." className="ov-frame">
         <div className="ov-card">
           {loading && (
             <div className="ov-copy" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -146,7 +150,7 @@ export default function OAuthConsentPage() {
                 <Ico.Lock size={13} /> oauth consent
               </span>
               <div>
-                <h1 className="ov-client">{details.client.name}</h1>
+                <h2 className="ov-client">{details.client.name}</h2>
                 <p className="ov-copy" style={{ margin: '10px 0 0' }}>
                   This application is requesting authorization to access your SquidCloud
                   account.
@@ -186,7 +190,7 @@ export default function OAuthConsentPage() {
             </>
           )}
         </div>
-      </div>
+      </PageFrame>
     </AppShell>
   );
 }

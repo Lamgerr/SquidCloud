@@ -7,6 +7,36 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const EMBED_CSS = `
+.emb-root{background:var(--sa-bg,#090b0a);color:var(--sa-text,#e8e7e1)}
+.emb-dark,.emb-light{background:var(--sa-bg,#090b0a);color:var(--sa-text,#e8e7e1)}
+.emb-center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.emb-spin{width:28px;height:28px;border:1px solid var(--sa-line,#1f2221);border-top-color:var(--sa-text,#e8e7e1);border-radius:50%;animation:emb-spin .8s linear infinite}
+@keyframes emb-spin{to{transform:rotate(360deg)}}
+.emb-icon{width:48px;height:48px;display:grid;place-items:center;border:1px solid var(--sa-line,#1f2221);border-radius:14px;color:var(--sa-mute,#8d8f89);background:var(--sa-bg-2,#0e1110)}
+.emb-msg{margin:0;font-size:14px;color:var(--sa-text,#e8e7e1);text-align:center}
+.emb-sub{margin:0;font-size:12px;color:var(--sa-dim,#62655f);text-align:center}
+.emb-file{min-height:100vh;display:flex;flex-direction:column}
+.emb-stage{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.emb-surface{background:var(--sa-bg-2,#0e1110);border:1px solid var(--sa-line,#1f2221);overflow:hidden}
+.emb-audio{width:100%;max-width:420px;padding:24px;background:var(--sa-bg-2,#0e1110);border:1px solid var(--sa-line,#1f2221);border-radius:16px}
+.emb-dl{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:var(--sa-text,#e8e7e1);color:var(--sa-bg,#090b0a);font-size:12px;text-decoration:none}
+.emb-brand{padding:12px;text-align:center;font-size:10px;color:var(--sa-dim,#62655f)}
+.emb-list{display:grid;gap:4px}
+.emb-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px}
+.emb-row:hover{background:var(--sa-bg-3,#141816)}
+.emb-row p{margin:0;font-size:13px;color:var(--sa-text,#e8e7e1)}
+.emb-row small{font-size:11px;color:var(--sa-dim,#62655f)}
+.emb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.emb-tile{padding:14px;background:var(--sa-bg-2,#0e1110);border:1px solid var(--sa-line,#1f2221)}
+.emb-tile:hover{background:var(--sa-bg-3,#141816)}
+.emb-tile p{margin:0;font-size:12px;color:var(--sa-text,#e8e7e1)}
+.emb-tile small{font-size:10px;color:var(--sa-dim,#62655f)}
+.emb-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.emb-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 16px;text-align:center;color:var(--sa-mute,#8d8f89)}
+`;
 import {
   FileText, Folder, Image, Video, Music, Download,
   ExternalLink, Lock, AlertCircle,
@@ -71,35 +101,24 @@ const EmbedPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className={cn(
-        'min-h-screen flex items-center justify-center',
-        theme === 'dark' ? 'bg-[#0d1117] text-white' : 'bg-gray-50 text-gray-900',
-      )}>
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <p className="text-sm opacity-60">Loading embed...</p>
+      <PageFrame title="Embed" subtitle="Loading embed…">
+        <style>{EMBED_CSS}</style>
+        <div className="emb-center" style={{ minHeight: 0 }}>
+          <div className="emb-spin" />
         </div>
-      </div>
+      </PageFrame>
     );
   }
 
   if (error || !embedData) {
     return (
-      <div className={cn(
-        'min-h-screen flex items-center justify-center p-8',
-        theme === 'dark' ? 'bg-[#0d1117] text-white' : 'bg-gray-50 text-gray-900',
-      )}>
-        <div className="flex flex-col items-center gap-3 text-center max-w-sm">
-          <div className={cn(
-            'w-12 h-12 rounded-xl flex items-center justify-center',
-            theme === 'dark' ? 'bg-white/5' : 'bg-gray-200',
-          )}>
-            <Lock className="w-5 h-5 opacity-40" />
-          </div>
-          <p className="text-sm font-medium opacity-80">{error || 'Embed not available'}</p>
-          <p className="text-xs opacity-40">This content is private or has been removed.</p>
+      <PageFrame title="Embed unavailable" subtitle={error || 'Embed not available'}>
+        <style>{EMBED_CSS}</style>
+        <div className="emb-center" style={{ minHeight: 0 }}>
+          <div className="emb-icon"><Lock className="w-5 h-5" /></div>
+          <p className="emb-sub" style={{ marginTop: 12 }}>This content is private or has been removed.</p>
         </div>
-      </div>
+      </PageFrame>
     );
   }
 
@@ -151,8 +170,9 @@ function FileEmbedView({ fileId, theme, borderRadius, showBranding }: {
 
   if (!file) {
     return (
-      <div className={cn('min-h-screen flex items-center justify-center', theme === 'dark' ? 'bg-[#0d1117]' : 'bg-gray-50')}>
-        <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <div className={cn('emb-root emb-center', theme === 'dark' ? 'emb-dark' : 'emb-light')}>
+        <style>{EMBED_CSS}</style>
+        <div className="emb-spin" />
       </div>
     );
   }
@@ -163,17 +183,12 @@ function FileEmbedView({ fileId, theme, borderRadius, showBranding }: {
   const isPdf = file.type?.includes('pdf');
 
   return (
-    <div className={cn(
-      'min-h-screen flex flex-col',
-      theme === 'dark' ? 'bg-[#0d1117] text-white' : 'bg-gray-50 text-gray-900',
-    )} style={{ borderRadius }}>
-      <div className="flex-1 flex items-center justify-center p-4">
+    <div className={cn('emb-root emb-file', theme === 'dark' ? 'emb-dark' : 'emb-light')} style={{ borderRadius }}>
+      <style>{EMBED_CSS}</style>
+      <div className="emb-stage">
         {isImage ? (
           <div className="max-w-full max-h-full">
-            <div className={cn(
-              'rounded-lg overflow-hidden',
-              theme === 'dark' ? 'bg-[#161b22]' : 'bg-white shadow-sm',
-            )} style={{ borderRadius }}>
+            <div className="emb-surface" style={{ borderRadius }}>
               <img
                 src={`/api/serve-file/${fileId}`}
                 alt={file.name}
@@ -189,10 +204,7 @@ function FileEmbedView({ fileId, theme, borderRadius, showBranding }: {
             style={{ borderRadius }}
           />
         ) : isAudio ? (
-          <div className={cn(
-            'w-full max-w-md p-6 rounded-xl',
-            theme === 'dark' ? 'bg-[#161b22]' : 'bg-white shadow-sm',
-          )} style={{ borderRadius }}>
+          <div className="emb-audio" style={{ borderRadius }}>
             <div className="flex items-center gap-3 mb-4">
               <Music className="w-5 h-5 opacity-60" />
               <div>
@@ -209,16 +221,13 @@ function FileEmbedView({ fileId, theme, borderRadius, showBranding }: {
             style={{ borderRadius }}
           />
         ) : (
-          <div className={cn(
-            'flex flex-col items-center gap-3 p-8 rounded-xl',
-            theme === 'dark' ? 'bg-[#161b22]' : 'bg-white shadow-sm',
-          )} style={{ borderRadius }}>
+          <div className="emb-audio" style={{ borderRadius, display: 'grid', justifyItems: 'center', gap: 12 }}>
             <FileText className="w-8 h-8 opacity-40" />
             <p className="text-sm font-medium">{file.name}</p>
             <p className="text-xs opacity-50">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
             <a
               href={`/api/serve-file/${fileId}?download=true`}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+              className="emb-dl"
             >
               <Download className="w-3 h-3" />
               Download
@@ -227,8 +236,8 @@ function FileEmbedView({ fileId, theme, borderRadius, showBranding }: {
         )}
       </div>
       {showBranding && (
-        <div className="text-center py-2">
-          <p className="text-[10px] opacity-30">Powered by SquidCloud</p>
+        <div className="emb-brand">
+          <p>Powered by SquidCloud</p>
         </div>
       )}
     </div>
@@ -263,66 +272,59 @@ function FolderEmbedView({ folderId, theme, layout, borderRadius, showBranding }
 
   if (loading) {
     return (
-      <div className={cn('min-h-screen flex items-center justify-center', theme === 'dark' ? 'bg-[#0d1117]' : 'bg-gray-50')}>
-        <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <div className={cn('emb-root emb-center', theme === 'dark' ? 'emb-dark' : 'emb-light')}>
+        <style>{EMBED_CSS}</style>
+        <div className="emb-spin" />
       </div>
     );
   }
 
   return (
-    <div className={cn(
-      'min-h-screen',
-      theme === 'dark' ? 'bg-[#0d1117] text-white' : 'bg-gray-50 text-gray-900',
-    )}>
+    <div className={cn('emb-root', theme === 'dark' ? 'emb-dark' : 'emb-light')}>
+      <style>{EMBED_CSS}</style>
       <div className="p-4">
         {files.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Folder className="w-8 h-8 opacity-30 mb-2" />
-            <p className="text-sm opacity-50">This folder is empty</p>
+          <div className="emb-empty">
+            <Folder className="w-8 h-8 mb-2" />
+            <p>This folder is empty</p>
           </div>
         ) : layout === 'list' ? (
-          <div className="space-y-1">
+          <div className="emb-list">
             {files.map(f => (
-              <div key={f.id} className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
-                theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-gray-100',
-              )} style={{ borderRadius: borderRadius / 2 }}>
+              <div key={f.id} className="emb-row" style={{ borderRadius: borderRadius / 2 }}>
                 <FileIcon type={f.type} theme={theme} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{f.name}</p>
-                  <p className="text-xs opacity-40">{(f.size / 1024 / 1024).toFixed(1)} MB</p>
+                  <p>{f.name}</p>
+                  <small>{(f.size / 1024 / 1024).toFixed(1)} MB</small>
                 </div>
               </div>
             ))}
           </div>
         ) : layout === 'gallery' ? (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="emb-gallery">
             {files.filter(f => f.type?.startsWith('image/')).map(f => (
-              <div key={f.id} className="aspect-square rounded-lg overflow-hidden" style={{ borderRadius }}>
+              <div key={f.id} className="emb-tile aspect-square" style={{ borderRadius }}>
                 <img src={`/api/serve-file/${f.id}`} alt={f.name} className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="emb-grid">
             {files.map(f => (
-              <div key={f.id} className={cn(
-                'p-3 rounded-xl transition-colors',
-                theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-white hover:bg-gray-100 shadow-sm',
-              )} style={{ borderRadius }}>
-                <div className="flex items-center gap-2 mb-2">
+              <div key={f.id} className="emb-tile" style={{ borderRadius }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                   <FileIcon type={f.type} theme={theme} />
                 </div>
-                <p className="text-xs font-medium truncate">{f.name}</p>
-                <p className="text-[10px] opacity-40 mt-0.5">{(f.size / 1024 / 1024).toFixed(1)} MB</p>
+                <p>{f.name}</p>
+                <small>{(f.size / 1024 / 1024).toFixed(1)} MB</small>
               </div>
             ))}
           </div>
         )}
       </div>
       {showBranding && (
-        <div className="text-center py-3">
-          <p className="text-[10px] opacity-30">Powered by SquidCloud</p>
+        <div className="emb-brand">
+          <p>Powered by SquidCloud</p>
         </div>
       )}
     </div>

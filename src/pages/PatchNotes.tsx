@@ -21,6 +21,25 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileScrollToTop from '@/components/MobileScrollToTop';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const PN_CSS = `
+.pn-root{max-width:860px;margin:0 auto;text-align:left}
+.pn-back{display:flex;justify-content:center;margin-bottom:24px}
+.pn-root :is(h1,h2,h3,h4){color:var(--sa-text,#e8e7e1)}
+.pn-root :is(p,li,td){color:var(--sa-mute,#8d8f89);line-height:1.75}
+.pn-root [class*="bg-purple-"],
+.pn-root [class*="bg-blue-"],
+.pn-root [class*="bg-green-"],
+.pn-root [class*="bg-red-"],
+.pn-root [class*="bg-amber-"]{background-color:var(--sa-bg-4,#1b201d)!important;color:var(--sa-mute,#8d8f89)!important;border-color:var(--sa-line,#1f2221)!important}
+.pn-root [class*="text-primary"]{color:var(--sa-mute,#8d8f89)!important}
+.pn-root :is(pre,code){font-family:var(--sa-mono,ui-monospace,monospace)}
+.pn-root .prose :is(h1,h2,h3,h4,p,li,strong){color:var(--sa-text,#e8e7e1)}
+.pn-note-card{cursor:pointer;border:1px solid var(--sa-line,#1f2221)!important;border-radius:16px!important;background:var(--sa-bg-2,#0e1110)!important;box-shadow:none!important;transition:border-color .15s}
+.pn-note-card:hover{border-color:var(--sa-line-2,#2f3230)!important}
+.pn-date{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--sa-mute,#8d8f89)}
+`;
 
 interface PatchNote {
   id: string;
@@ -111,7 +130,7 @@ Dispersed uploads now genuinely leave your device. Encrypted pieces go out over 
       tags: ['bugfix', 'cli', 'authentication', 'critical'],
       content: `# CLI Authentication System Fix v1.0.6
 
-## 🔧 Critical Bug Fixes
+## Critical Bug Fixes
 
 **Release Date:** October 7, 2025  
 **Version:** 1.0.6  
@@ -119,28 +138,28 @@ Dispersed uploads now genuinely leave your device. Encrypted pieces go out over 
 
 ---
 
-## 🐛 Bugs Fixed
+## Bugs Fixed
 
-### 1. Login Accepted Any API Key ❌
+### 1. Login Accepted Any API Key
 
 **Problem:** Login command would accept literally any string as valid:
 \`\`\`bash
 squidlab-sdk login --api-key "fake"
-# ✅ Login successful!  (WRONG!)
+# Login successful!  (WRONG!)
 \`\`\`
 
-**Fix:** ✅
+**Fix:**
 - Added API key format validation (must start with \`cb_\`)
 - Makes actual API call to \`/whoami\` endpoint to verify key
 - Shows user account information before saving
 - Asks "Is this the correct account?" for confirmation
 
-### 2. Whoami Returned Undefined ❌
+### 2. Whoami Returned Undefined
 
 **Problem:**
 \`\`\`bash
 squidlab-sdk whoami
-# 👤 Current User:
+# Current User:
 #    Email: undefined
 #    ID: undefined
 #    Created: Invalid Date
@@ -151,39 +170,39 @@ squidlab-sdk whoami
 - Wrong authorization headers
 - Config not loading properly
 
-**Fix:** ✅
+**Fix:**
 - Created new \`/whoami\` endpoint in cloudbliss-api
 - Updated to correct URL: \`/functions/v1/cloudbliss-api/whoami\`
 - Fixed headers: \`X-SquidCloud-Key\` instead of \`Bearer\`
 - Fixed config loading with error handling
 
-### 3. Files List Crashed ❌
+### 3. Files List Crashed
 
 **Problem:**
 \`\`\`bash
 squidlab-sdk api:files:list
-# 📁 Files (undefined total):
-# ❌ Error: Cannot read properties of undefined (reading 'forEach')
+# Files (undefined total):
+# Error: Cannot read properties of undefined (reading 'forEach')
 \`\`\`
 
-**Fix:** ✅
+**Fix:**
 - Fixed API base URL
 - Added null/undefined checks
 - Shows "No files found" instead of crashing
 - Handles different response structures gracefully
 
-### 4. Config Not Persisted ❌
+### 4. Config Not Persisted
 
 **Problem:** Login succeeded but commands still said "Not logged in"
 
-**Fix:** ✅
+**Fix:**
 - Fixed \`loadConfig()\` to properly read JSON
 - Fixed \`saveConfig()\` to create directory recursively
 - Saves user info along with API key
 
 ---
 
-## ✨ New Features
+## New Features
 
 ### Account Confirmation During Login
 
@@ -192,13 +211,13 @@ Login now shows your account details:
 \`\`\`bash
 squidlab-sdk login
 
-🔐 SquidCloud API Login
+ SquidCloud API Login
 ? Enter your API key (starts with cb_): [hidden]
-🔍 Validating API key...
+ Validating API key...
 
-✅ API Key Valid!
+ API Key Valid!
 
-👤 Account Information:
+ Account Information:
    Email: user@example.com
    Name: John Doe
    User ID: abc123
@@ -212,10 +231,10 @@ squidlab-sdk login
 Better guidance when login fails:
 
 \`\`\`bash
-❌ Login failed!
+ Login failed!
    Error: Invalid API key
 
-💡 Make sure you:
+ Make sure you:
    1. Have a valid API key from https://squidcloud.inflate.live
    2. The API key starts with cb_
    3. The API key is active and not revoked
@@ -226,19 +245,19 @@ Better guidance when login fails:
 \`\`\`bash
 squidlab-sdk whoami
 
-👤 Current User:
+ Current User:
    Email: user@example.com
    Name: John Doe
    ID: abc123
    Created: 10/7/2025
    Storage Used: 0.05 GB
 
-📝 Logged in since: 10/7/2025, 2:30:45 PM
+ Logged in since: 10/7/2025, 2:30:45 PM
 \`\`\`
 
 ---
 
-## 🔧 Technical Changes
+##  Technical Changes
 
 ### Edge Function: New /whoami Endpoint
 
@@ -279,51 +298,51 @@ headers: { 'X-SquidCloud-Key': apiKey } // CORRECT!
 
 ### CLI: Enhanced Login Flow
 
-1. ✅ Validate format (\`cb_*\`)
-2. ✅ Test with real API call
-3. ✅ Show account info
-4. ✅ Ask for confirmation
-5. ✅ Save config with user data
-6. ✅ Better error messages
+1.  Validate format (\`cb_*\`)
+2.  Test with real API call
+3.  Show account info
+4.  Ask for confirmation
+5.  Save config with user data
+6.  Better error messages
 
 ---
 
-## 📊 Impact
+##  Impact
 
 | Issue | Severity | Status |
 |-------|----------|--------|
-| Login accepts fake keys | 🔴 Critical | ✅ Fixed |
-| Whoami shows undefined | 🔴 Critical | ✅ Fixed |
-| Files list crashes | 🔴 Critical | ✅ Fixed |
-| Config not saved | 🟡 High | ✅ Fixed |
+| Login accepts fake keys |  Critical |  Fixed |
+| Whoami shows undefined |  Critical |  Fixed |
+| Files list crashes |  Critical |  Fixed |
+| Config not saved |  High |  Fixed |
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 All authentication flows now work correctly:
 
 \`\`\`bash
 # Test 1: Invalid key (should fail)
 squidlab-sdk login --api-key "fake"
-# ❌ Login failed! Invalid API key ✓
+#  Login failed! Invalid API key 
 
 # Test 2: Valid key (should succeed)
 squidlab-sdk login
-# ✅ Login successful! ✓
+#  Login successful! 
 
 # Test 3: Whoami (should show info)
 squidlab-sdk whoami
-# 👤 Current User: user@example.com ✓
+# Current User: user@example.com 
 
 # Test 4: List files (should work)
 squidlab-sdk api:files:list
-# 📁 Files (3 total): ✓
+#  Files (3 total): 
 \`\`\`
 
 ---
 
-## 📚 Documentation
+##  Documentation
 
 New comprehensive guide: \`squidlab-sdk/CLI_AUTH_FIX.md\`
 
@@ -337,7 +356,7 @@ Covers:
 
 ---
 
-## ⚠️ Breaking Changes
+## ️ Breaking Changes
 
 ### For Developers
 
@@ -366,17 +385,17 @@ squidlab-sdk login
 
 ---
 
-## 🔒 Security Improvements
+##  Security Improvements
 
-✅ **API keys validated** before saving  
-✅ **Account confirmation** prevents wrong key usage  
-✅ **Better error messages** (no key leakage)  
-✅ **Config file protected** (user-only read)  
-✅ **Keys hashed on server** (SHA-256)  
+ **API keys validated** before saving  
+ **Account confirmation** prevents wrong key usage  
+ **Better error messages** (no key leakage)  
+ **Config file protected** (user-only read)  
+ **Keys hashed on server** (SHA-256)  
 
 ---
 
-**All critical authentication bugs have been fixed! 🎉**
+**All critical authentication bugs have been fixed! **
 
 The CLI now properly validates API keys, shows user info, and handles all edge cases gracefully.
 `
@@ -399,7 +418,7 @@ The CLI now properly validates API keys, shows user info, and handles all edge c
       tags: ['cli', 'api', 'automation', 'developer-tools'],
       content: `# CLI API Commands v1.1.0
 
-## 🚀 New Feature: CLI API Access
+##  New Feature: CLI API Access
 
 **Release Date:** October 7, 2025  
 **Version:** 1.1.0  
@@ -407,11 +426,11 @@ The CLI now properly validates API keys, shows user info, and handles all edge c
 
 ---
 
-## 📋 Overview
+##  Overview
 
 Users can now interact with the SquidCloud API directly from the command line without writing code or using curl. This release adds comprehensive CLI commands for file management, API keys, and storage monitoring.
 
-## ✨ New Commands
+##  New Commands
 
 ### Authentication Commands
 
@@ -479,7 +498,7 @@ squidlab-sdk api:storage:info
 squidlab-sdk api:storage:info --json
 \`\`\`
 
-## 🎯 Use Cases
+##  Use Cases
 
 ### 1. Automated Backups
 
@@ -525,7 +544,7 @@ if usage > 80:
     send_alert(f"Storage {usage:.1f}% full!")
 \`\`\`
 
-## 📚 Documentation
+##  Documentation
 
 ### New Documentation Files
 
@@ -545,7 +564,7 @@ if usage > 80:
    - Integrated into help system
    - Live at: /help/docs/squidlab-sdk-complete
 
-## 🔧 Technical Details
+##  Technical Details
 
 ### Configuration Storage
 
@@ -569,17 +588,17 @@ squidlab-sdk api:files:list --json | jq '.data[].name'
 squidlab-sdk api:storage:info --json | jq '.used'
 \`\`\`
 
-## ✨ Key Features
+##  Key Features
 
-✅ **No curl needed** - Direct API access from CLI  
-✅ **Persistent authentication** - Login once, use everywhere  
-✅ **JSON output** - Perfect for scripting and automation  
-✅ **Environment variables** - CI/CD friendly  
-✅ **Interactive prompts** - User-friendly for manual operations  
-✅ **Progress indicators** - Visual feedback for uploads  
-✅ **Error handling** - Clear error messages  
+ **No curl needed** - Direct API access from CLI  
+ **Persistent authentication** - Login once, use everywhere  
+ **JSON output** - Perfect for scripting and automation  
+ **Environment variables** - CI/CD friendly  
+ **Interactive prompts** - User-friendly for manual operations  
+ **Progress indicators** - Visual feedback for uploads  
+ **Error handling** - Clear error messages  
 
-## 📊 Command Summary
+##  Command Summary
 
 **Total Commands Added:** 15+
 
@@ -591,7 +610,7 @@ squidlab-sdk api:storage:info --json | jq '.used'
 - **Storage:** 1 command (info)
 - **Extension Dev:** 4 commands (create, build, convert, publish)
 
-## 🎓 Quick Start
+##  Quick Start
 
 \`\`\`bash
 # 1. Install (if not already installed)
@@ -606,7 +625,7 @@ squidlab-sdk api:storage:info
 squidlab-sdk whoami
 \`\`\`
 
-## 🔗 Learn More
+##  Learn More
 
 - **Full CLI Guide:** /squidlab-sdk/CLI_API_GUIDE.md
 - **Quick Reference:** /squidlab-sdk/CLI_QUICK_REFERENCE.md
@@ -614,7 +633,7 @@ squidlab-sdk whoami
 
 ---
 
-**The SquidLab SDK CLI now provides complete API access without curl! 🎉**
+**The SquidLab SDK CLI now provides complete API access without curl! **
 `
     },
     {
@@ -634,7 +653,7 @@ squidlab-sdk whoami
       tags: ['documentation', 'security', 'sdk', 'encryption'],
       content: `# Documentation System v1.0.0
 
-## 🎉 Major Release: Complete Documentation System
+##  Major Release: Complete Documentation System
 
 **Release Date:** October 6, 2025  
 **Version:** 1.0.0  
@@ -642,11 +661,11 @@ squidlab-sdk whoami
 
 ---
 
-## 📋 Overview
+##  Overview
 
 This release introduces a comprehensive documentation and help system for SquidCloud, featuring detailed technical documentation, security guides, API references, and developer resources.
 
-## ✨ New Features
+## New Features
 
 ### 1. Documentation Hub
 
@@ -687,7 +706,7 @@ Updated all URLs and email addresses:
 - **Support Email:** support@inflate.live
 - **Product Email:** hello@inflate.live
 
-## 🔧 Technical Implementation
+##  Technical Implementation
 
 ### Routes Added
 
@@ -702,7 +721,7 @@ Updated all URLs and email addresses:
 - react-syntax-highlighter
 - @types/react-syntax-highlighter
 
-## 📊 Content Statistics
+##  Content Statistics
 
 **Documentation Coverage:**
 - 9 major sections
@@ -711,7 +730,7 @@ Updated all URLs and email addresses:
 - 100+ API endpoints documented
 - Security compliance for FIPS, NIST, GDPR, HIPAA, PCI DSS
 
-## 📝 Files Created/Modified
+##  Files Created/Modified
 
 ### New Files
 - src/pages/PatchNotes.tsx
@@ -743,7 +762,7 @@ For detailed documentation, visit: [squidcloud.inflate.live/help/docs](https://s
       tags: ['security', 'extensions', 'admin', 'approval'],
       content: `# Extension Lab Security v0.9.0
 
-## 🔒 Security Release
+##  Security Release
 
 This release focused on implementing a comprehensive security and approval system for the Extension Lab.
 
@@ -811,43 +830,38 @@ For complete documentation, see [Extension Lab Guide](/help/docs/extensions).`
 
   if (currentNote) {
     return (
-      <div className="container mx-auto p-4 md:p-8 max-w-7xl">
+      <PageFrame title={currentNote.title} subtitle={currentNote.description}>
+        <style>{PN_CSS}</style>
+        <div className="pn-root">
         {isMobile && <MobileScrollToTop />}
         
-        <Button
-          variant="ghost"
-          onClick={() => {
-            setCurrentNote(null);
-            navigate('/help/docs/notes');
-          }}
-          className="mb-6"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Patch Notes
-        </Button>
+        <div className="pn-back">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setCurrentNote(null);
+              navigate('/help/docs/notes');
+            }}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Patch Notes
+          </Button>
+        </div>
 
         <Card className="mb-6">
           <CardHeader>
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge className={getTypeBadgeColor(currentNote.type)}>
-                    {currentNote.type.toUpperCase()}
-                  </Badge>
-                  <Badge variant="outline">v{currentNote.version}</Badge>
-                </div>
-                <CardTitle className="text-3xl mb-2">{currentNote.title}</CardTitle>
-                <CardDescription className="text-lg">{currentNote.description}</CardDescription>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                  <Calendar className="h-4 w-4" />
-                  <span>{new Date(currentNote.date).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}</span>
-                </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge className={getTypeBadgeColor(currentNote.type)}>
+                {currentNote.type.toUpperCase()}
+              </Badge>
+              <Badge variant="outline">v{currentNote.version}</Badge>
+              <div className="pn-date">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>{new Date(currentNote.date).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}</span>
               </div>
             </div>
           </CardHeader>
@@ -911,23 +925,16 @@ For complete documentation, see [Extension Lab Guide](/help/docs/extensions).`
             </Badge>
           ))}
         </div>
-      </div>
+        </div>
+      </PageFrame>
     );
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8 max-w-7xl">
+    <PageFrame title="Patch Notes" subtitle="Stay up to date with the latest features, improvements, and bug fixes">
+      <style>{PN_CSS}</style>
+      <div className="pn-root">
       {isMobile && <MobileScrollToTop />}
-      
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <FileText className="h-8 w-8 text-primary" />
-          <h1 className="text-4xl font-bold">Patch Notes</h1>
-        </div>
-        <p className="text-muted-foreground text-lg">
-          Stay up to date with the latest features, improvements, and bug fixes
-        </p>
-      </div>
 
       <Card className="mb-6">
         <CardContent className="pt-6">
@@ -948,7 +955,7 @@ For complete documentation, see [Extension Lab Guide](/help/docs/extensions).`
         {filteredNotes.map((note) => (
           <Card
             key={note.id}
-            className="cursor-pointer hover:shadow-lg transition-shadow"
+            className="pn-note-card"
             onClick={() => navigate(`/help/docs/notes/${note.id}`)}
           >
             <CardHeader>
@@ -1004,7 +1011,8 @@ For complete documentation, see [Extension Lab Guide](/help/docs/extensions).`
           </Card>
         )}
       </div>
-    </div>
+      </div>
+    </PageFrame>
   );
 };
 

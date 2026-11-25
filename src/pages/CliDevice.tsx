@@ -6,6 +6,25 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Smartphone, Loader2, X, Check } from '@/lib/icon-map';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const CLI_CSS = `
+.cl-body{max-width:420px;margin:0 auto;text-align:center}
+.cl-mark{width:56px;height:56px;margin:0 auto;display:grid;place-items:center;border:1px solid var(--sa-line,#1f2221);border-radius:16px;color:var(--sa-text,#e8e7e1)}
+.cl-mark svg{width:24px;height:24px;stroke-width:1.6}
+.cl-back{display:flex;justify-content:center;margin-bottom:24px}
+.cl-link{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;padding:4px 2px;color:var(--sa-mute,#8d8f89);font:400 12px/1 var(--sa-f,-apple-system,sans-serif);cursor:pointer}
+.cl-link:hover{color:var(--sa-text,#e8e7e1)}
+.cl-form{display:block}
+.cl-input{width:100%;height:52px;padding:0 14px;background:var(--sa-bg,#090b0a);border:1px solid var(--sa-line,#1f2221);border-radius:10px;color:var(--sa-text,#e8e7e1);font:500 18px/1 var(--sa-mono,ui-monospace,monospace);letter-spacing:.28em;text-align:center;outline:none}
+.cl-input::placeholder{color:var(--sa-dim,#62655f)}
+.cl-input:focus{border-color:var(--sa-rim,#2f3230)}
+.cl-cta{width:100%;height:44px}
+.cl-error{margin-top:16px;display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--sa-line,#1f2221);border-radius:10px;background:var(--sa-bg-2,#0e1110);text-align:left}
+.cl-error svg{width:16px;height:16px;flex:none;color:var(--sa-mute,#8d8f89)}
+.cl-error span{font-size:13px;line-height:1.5;color:var(--sa-text,#e8e7e1)}
+.cl-foot{margin-top:32px;text-align:center;font-size:11px;color:var(--sa-dim,#62655f)}
+`;
 
 const CODE_LENGTH = 8;
 
@@ -114,56 +133,42 @@ const CliDevice = () => {
 
   if (connected) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <div className="flex flex-1 items-center justify-center p-6">
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-sm mx-auto text-center"
-          >
-            <div className="grid h-14 w-14 mx-auto place-items-center rounded-full bg-primary/10 mb-5">
-              <Check className="h-7 w-7 text-primary" />
-            </div>
-            <h2 className="text-xl font-bold tracking-tight mb-1.5">Device connected</h2>
-            <p className="text-sm text-muted-foreground">Your device has been linked. You can close this tab.</p>
-          </motion.div>
-        </div>
-      </div>
+      <PageFrame title="Device connected" subtitle="Your device has been linked. You can close this tab.">
+        <style>{CLI_CSS}</style>
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          className="cl-body"
+        >
+          <div className="cl-mark"><Check className="h-6 w-6" /></div>
+        </motion.div>
+      </PageFrame>
     );
   }
 
   const displayCode = digits.join('');
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <div className="flex flex-1 items-center justify-center p-6 md:p-8">
-        <motion.div
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-sm mx-auto"
-        >
-          <div className="mb-6">
-            <button
-              onClick={() => navigate('/', { replace: true })}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors press-effect"
-            >
+    <PageFrame title="Connect a device" subtitle="Enter the 8-character code shown on your device">
+      <style>{CLI_CSS}</style>
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        className="cl-body"
+      >
+        <div className="cl-back">
+          <button
+            onClick={() => navigate('/', { replace: true })}
+            className="cl-link press-effect"
+          >
               <ArrowLeft className="h-3.5 w-3.5" />
               Back to SquidCloud
             </button>
-          </div>
+        </div>
 
-          <div className="space-y-1 mb-8">
-            <h1 className="text-2xl font-bold tracking-tight">
-              Connect a device
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Enter the 8-character code shown on your device
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="cl-form">
             <div className="relative">
               <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
@@ -179,18 +184,14 @@ const CliDevice = () => {
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 placeholder="XXXXXXXX"
-                className={[
-                  'w-full h-12 rounded-xl border bg-muted/30 pl-10 pr-4 text-center text-lg font-mono font-semibold tracking-[0.3em] text-foreground placeholder:text-muted-foreground/40 outline-none transition-all duration-200',
-                  'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
-                  error ? 'border-destructive/50 focus-visible:border-destructive/50 focus-visible:ring-destructive/20' : 'border-border/50',
-                ].join(' ')}
+                className="cl-input"
               />
             </div>
 
             <Button
               type="submit"
               disabled={deviceCode.length !== CODE_LENGTH || loading}
-              className="w-full h-11 rounded-xl"
+              className="cl-cta"
               loading={loading}
             >
               {loading ? 'Connecting\u2026' : 'Connect Device'}
@@ -204,20 +205,19 @@ const CliDevice = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
-                className="mt-4 flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-3"
+                className="cl-error"
               >
-                <X className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <X className="mt-0.5 h-4 w-4 shrink-0" />
                 <span className="text-sm text-destructive leading-snug">{error}</span>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <p className="mt-8 text-center text-[11px] text-muted-foreground">
-            Codes expire after a few minutes
-          </p>
-        </motion.div>
-      </div>
-    </div>
+        <p className="cl-foot">
+          Codes expire after a few minutes
+        </p>
+      </motion.div>
+    </PageFrame>
   );
 };
 

@@ -3,10 +3,26 @@ import { Download, ExternalLink, FileText, Mail, Heart, MessageCircle } from '@/
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { PageFrame } from '@/components/layout/PageFrame';
 import termsPdf from '../../cx/SquidCloud-Terms-of-Service-Final (1).pdf';
 
 const linkClass = 'text-primary underline underline-offset-4 hover:opacity-80';
 const sectionTitleClass = 'text-xl font-semibold md:text-2xl';
+
+const TOS_CSS = `
+.tos-content{max-width:760px;margin:0 auto;text-align:left}
+.tos-content h2{font-size:20px;line-height:1.3;color:var(--sa-text,#e8e7e1)}
+.tos-content :is(p,li){color:var(--sa-mute,#8d8f89);line-height:1.8}
+.tos-content :is(.font-semibold,.font-medium){color:var(--sa-text,#e8e7e1)!important}
+.tos-content :is(strong){color:var(--sa-text,#e8e7e1);font-weight:500}
+.tos-content a{color:var(--sa-text,#e8e7e1);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--sa-line-2,#2f3230)}
+.tos-content :is(hr,[data-orientation="horizontal"]){border-color:var(--sa-line,#1f2221)}
+.tos-note{padding:20px;border:1px solid var(--sa-line,#1f2221);border-radius:16px;background:var(--sa-bg-2,#0e1110)}
+.tos-note p{color:var(--sa-mute,#8d8f89)}
+.tos-note svg{color:var(--sa-mute,#8d8f89)}
+.tos-download{display:flex;justify-content:center;margin-bottom:32px}
+.tos-contact{margin-top:8px}
+`;
 
 const TermsOfService = () => {
   const downloadPDF = () => {
@@ -19,31 +35,19 @@ const TermsOfService = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
-        <Card className="mb-8">
-          <CardHeader className="gap-4 pb-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-2">
-                <CardTitle className="flex items-center gap-2 text-3xl font-bold md:text-4xl">
-                  <FileText className="h-6 w-6 text-primary" />
-                  Terms of Service
-                </CardTitle>
-                <CardDescription className="text-sm text-muted-foreground md:text-base">
-                  v3.0 · Effective 14 September 2026
-                </CardDescription>
-              </div>
-              <Button onClick={downloadPDF} className="w-full md:w-auto">
-                <Download className="mr-2 h-4 w-4" />
-                Download PDF
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+    <PageFrame title="Terms of Service" subtitle="v3.0 · Effective 14 September 2026">
+      <style>{TOS_CSS}</style>
+      <div className="tos-content">
+        <div className="tos-download">
+          <Button onClick={downloadPDF}>
+            <Download className="mr-2 h-4 w-4" />
+            Download PDF
+          </Button>
+        </div>
 
         <div className="space-y-8 text-sm leading-7 text-foreground md:text-base">
 
-          <div className="rounded-lg border border-primary/40 bg-primary/5 p-5">
+          <div className="tos-note">
             <div className="flex items-start gap-3">
               <Heart className="mt-0.5 h-5 w-5 text-primary" />
               <div>
@@ -96,7 +100,7 @@ const TermsOfService = () => {
               <li><strong>Taxes:</strong> If applicable, taxes are your responsibility.</li>
             </ul>
 
-            <div className="rounded-lg border border-primary/40 bg-primary/5 p-5">
+            <div className="tos-note">
               <div className="flex items-start gap-3">
                 <MessageCircle className="mt-0.5 h-5 w-5 text-primary" />
                 <div>
@@ -327,7 +331,7 @@ const TermsOfService = () => {
 
           <Separator />
 
-          <Card className="border-primary/30 bg-primary/5">
+          <Card className="tos-note tos-contact">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Mail className="h-5 w-5 text-primary" />
@@ -361,7 +365,7 @@ const TermsOfService = () => {
           </Card>
         </div>
       </div>
-    </div>
+    </PageFrame>
   );
 };
 

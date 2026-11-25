@@ -278,3 +278,10 @@
 ## 2026-11-26 — Dialog backdrop and input outline fixes
 - Global cleanup layer mapped `bg-black/*` to an opaque color, flattening Radix/custom dialog backdrops into solid panels. Added a later, more specific rule for fixed inset-0 bg-black overlays: rgba(3,4,3,.62) + blur.
 - Global focus rule drew a 1px bright outline on inputs; removed outline/box-shadow for input/textarea/select and neutralised ring-white/ring-2/ring-primary. Vercel READY.
+
+## 2026-11-26 — All-pages redesign with shared floating glass navigation
+- Brainstorming + design-doctrine loaded; user gave a direct build instruction (opted out of approval round). Short design doc committed at docs/superpowers/specs/2026-11-26-all-pages-redesign-design.md.
+- Created src/components/layout/GlassNav.tsx (floating glass capsule, layoutId thumb spring 380/21/0.8, tap 600/16) and PageFrame.tsx (centred symmetric shell with one leading heading). Wired GlassNav into MainHeader so every page with the global header gets the same bar.
+- Added input-specific ::selection/focus/caret rules to all-pages-clean.css to kill the white/lime outline on text selection.
+- Four parallel agents applied the shared design to 34 pages (public/auth, workbench, docs/legal, viewers/editors), preserving all handlers/effects/API calls. GlassNav used for existing tabs/sections with unique layoutIds;PageFrame used for simple pages.
+- Removed emoji from user-visible strings/code samples to satisfy zero-emoji rule. Vercel READY. Live X11 verification: Profile and Webhooks render centred, symmetric, monochrome with the glass bar.

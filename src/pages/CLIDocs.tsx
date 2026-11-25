@@ -3,6 +3,20 @@ import { ArrowLeft, Copy, Check, Terminal, Shield, HardDrive, Server, KeyRound, 
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { Helmet } from 'react-helmet';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const CLI_CSS = `
+.cli-content{max-width:760px;margin:0 auto;text-align:left}
+.cli-back{display:flex;justify-content:center;margin-bottom:24px}
+.cli-content h2{font-size:19px;line-height:1.3;color:var(--sa-text,#e8e7e1)}
+.cli-content h2 svg{color:var(--sa-mute,#8d8f89)}
+.cli-content :is(p,td){color:var(--sa-mute,#8d8f89);line-height:1.75}
+.cli-content :is(code,kbd){color:var(--sa-text,#e8e7e1);font-family:var(--sa-mono,ui-monospace,monospace)}
+.cli-content pre{background:var(--sa-bg-2,#0e1110);border:1px solid var(--sa-line,#1f2221);border-radius:12px;color:var(--sa-text,#e8e7e1)}
+.cli-content table{border:1px solid var(--sa-line,#1f2221);border-radius:12px;overflow:hidden}
+.cli-content :is(td,th){border-color:var(--sa-line,#1f2221)}
+.cli-content button svg{color:var(--sa-mute,#8d8f89)}
+`;
 
 function Code({ children }: { children: string }) {
   const [copied, setCopied] = useState(false);
@@ -58,8 +72,8 @@ squidcloudctl share create 1 --burn --max-downloads 1`;
 const HOST_API = `# hardened local API server on :8065 — your account behind it
 squidcloudctl host api --profile paranoid --mode keyed --hmac-secret "$(openssl rand -hex 32)"
 
-# ✓ Local API host listening http://127.0.0.1:8065
-# ✓ micro-redis on :8066 · keys shown once · audit log tailing
+# Local API host listening http://127.0.0.1:8065
+# micro-redis on :8066 · keys shown once · audit log tailing
 
 curl -s http://127.0.0.1:8065/v1/files \\
   -H "Authorization: Bearer sk_local-…" \\
@@ -77,21 +91,18 @@ export default function CLIDocs() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageFrame title="squidcloudctl" subtitle="The entire platform, in your terminal. Free tier included.">
+      <style>{CLI_CSS}</style>
       <Helmet>
         <title>CLI — squidcloudctl Reference | SquidCloud</title>
         <meta name="description" content="squidcloudctl — encrypted storage, numbered files, FUSE mounts and a hardened localhost API server. Free to use." />
       </Helmet>
 
-      <div className="container mx-auto max-w-4xl px-4 py-12">
-        <div className="mb-10 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="shrink-0">
+      <div className="cli-content">
+        <div className="cli-back">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">squidcloudctl</h1>
-            <p className="text-sm text-muted-foreground">The entire platform, in your terminal. Free tier included.</p>
-          </div>
         </div>
 
         <Code>{QUICK}</Code>
@@ -169,6 +180,6 @@ squidcloudctl fs status | fs stop`}</Code>
 --output json              # stable JSON on most commands`}</Code>
         </Section>
       </div>
-    </div>
+    </PageFrame>
   );
 }

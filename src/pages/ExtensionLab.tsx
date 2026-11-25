@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Package, 
-  Download, 
-  Star, 
-  Search, 
-  Plus,
-  Sparkles,
-  Code,
-  Zap
+import { GlassNav, type GlassNavItem } from '@/components/layout/GlassNav';
+import { PageFrame } from '@/components/layout/PageFrame';
+import {
+  Package, Download, Star, Search, Plus, Sparkles, Code,
 } from '@/lib/icon-map';
 import { useToast } from '@/hooks/use-toast';
 
@@ -32,6 +24,48 @@ interface Extension {
   is_verified: boolean;
 }
 
+const EX_CSS = `
+.ex-tabs [role="tabpanel"]{margin-top:0!important}
+.ex-search{position:relative;max-width:420px;margin:0 auto 20px}
+.ex-search>svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  width:16px;height:16px;color:var(--sa-mute,#8d8f89)}
+.ex-input{width:100%;height:38px;padding:0 12px 0 36px;
+  border:1px solid var(--sa-line,#1f2221);border-radius:8px;
+  background:var(--sa-bg-2,#0e1110);color:var(--sa-text,#e8e7e1);
+  font:400 12px/1 var(--sa-f,-apple-system,sans-serif)}
+.ex-input::placeholder{color:var(--sa-dim,#62655f)}
+.ex-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media(max-width:900px){.ex-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.ex-grid{grid-template-columns:1fr}}
+.ex-card{padding:16px;border:1px solid var(--sa-line,#1f2221);border-radius:12px;
+  background:var(--sa-bg,#090b0a)}
+.ex-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ex-who{display:flex;align-items:center;gap:10px;min-width:0}
+.ex-icon{display:grid;place-items:center;width:36px;height:36px;flex:none;
+  border:1px solid var(--sa-line,#1f2221);border-radius:8px;color:var(--sa-text,#e8e7e1);overflow:hidden}
+.ex-icon svg{width:16px;height:16px}
+.ex-icon img{width:36px;height:36px;object-fit:cover}
+.ex-name{display:flex;align-items:center;gap:6px;margin:0;
+  font-size:13px;font-weight:400;color:var(--sa-text,#e8e7e1)}
+.ex-name svg{width:14px;height:14px;color:var(--sa-mute,#8d8f89)}
+.ex-author{margin:2px 0 0;font-size:11px;color:var(--sa-dim,#62655f)}
+.ex-badge{border:1px solid var(--sa-line,#1f2221)!important;
+  background:var(--sa-bg-2,#0e1110)!important;color:var(--sa-mute,#8d8f89)!important;
+  font:400 10px/1.4 var(--sa-f,-apple-system,sans-serif)!important;
+  border-radius:6px!important;padding:2px 6px!important;text-transform:none!important}
+.ex-desc{margin:16px 0;font-size:11px;line-height:1.6;color:var(--sa-mute,#8d8f89)}
+.ex-stats{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}
+.ex-stats-left{display:flex;align-items:center;gap:14px;font-size:11px;color:var(--sa-dim,#62655f)}
+.ex-stats-left span{display:flex;align-items:center;gap:5px}
+.ex-stats-left svg{width:13px;height:13px;color:var(--sa-mute,#8d8f89)}
+.ex-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  width:100%;height:34px;border:1px solid var(--sa-line,#1f2221);border-radius:8px;
+  background:var(--sa-bg-2,#0e1110);color:var(--sa-text,#e8e7e1);
+  font:400 12px/1 var(--sa-f,-apple-system,sans-serif);cursor:pointer}
+.ex-btn:hover{background:var(--sa-bg-3,#141816)}
+.ex-btn svg{width:14px;height:14px}
+`;
+
 export default function ExtensionLab() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -39,6 +73,7 @@ export default function ExtensionLab() {
   const [installedExtensions, setInstalledExtensions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState('all');
 
   useEffect(() => {
     loadExtensions();
@@ -99,7 +134,7 @@ export default function ExtensionLab() {
       if (error) throw error;
 
       setInstalledExtensions([...installedExtensions, extensionId]);
-      
+
       toast({
         title: 'Extension Installed',
         description: 'Extension has been successfully installed'
@@ -129,7 +164,7 @@ export default function ExtensionLab() {
       if (error) throw error;
 
       setInstalledExtensions(installedExtensions.filter(id => id !== extensionId));
-      
+
       toast({
         title: 'Extension Uninstalled',
         description: 'Extension has been removed'
@@ -151,126 +186,95 @@ export default function ExtensionLab() {
 
   const categories = ['all', ...new Set(extensions.map(e => e.category))];
 
+  const navItems: GlassNavItem[] = categories.map(cat => ({
+    key: cat,
+    label: cat,
+    icon: cat === 'all' ? <Package /> : <Code />,
+    active: activeCategory === cat,
+    onClick: () => setActiveCategory(cat),
+  }));
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center">
-              <Package className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Extension Lab</h1>
-              <p className="text-slate-400">Extend SquidCloud with powerful extensions</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search extensions..."
-              className="pl-10 bg-slate-800/50 border-slate-700 text-white"
-            />
-          </div>
-        </div>
-
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="bg-slate-800/50 border-slate-700">
-            {categories.map(cat => (
-              <TabsTrigger key={cat} value={cat} className="capitalize">
-                {cat}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {categories.map(category => (
-            <TabsContent key={category} value={category} className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredExtensions
-                  .filter(ext => category === 'all' || ext.category === category)
-                  .map(extension => {
-                    const isInstalled = installedExtensions.includes(extension.id);
-                    
-                    return (
-                      <Card key={extension.id} className="bg-slate-800/50 border-slate-700 hover:border-slate-600 transition-all">
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              {extension.icon_url ? (
-                                <img src={extension.icon_url} alt={extension.name} className="w-10 h-10 rounded-lg" />
-                              ) : (
-                                <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center">
-                                  <Code className="w-5 h-5 text-primary" />
-                                </div>
-                              )}
-                              <div>
-                                <CardTitle className="text-white flex items-center gap-2">
-                                  {extension.name}
-                                  {extension.is_verified && (
-                                    <Sparkles className="w-4 h-4 text-blue-400" />
-                                  )}
-                                </CardTitle>
-                                <p className="text-xs text-slate-400">by {extension.author}</p>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              v{extension.version}
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <CardDescription className="text-slate-400 mb-4">
-                            {extension.description}
-                          </CardDescription>
-                          
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-4 text-xs text-slate-500">
-                              <span className="flex items-center gap-1">
-                                <Download className="w-3 h-3" />
-                                {extension.downloads}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                                {extension.rating.toFixed(1)} ({extension.total_ratings})
-                              </span>
-                            </div>
-                            <Badge className="text-xs capitalize">{extension.category}</Badge>
-                          </div>
-
-                          {isInstalled ? (
-                            <Button 
-                              onClick={() => uninstallExtension(extension.id)}
-                              variant="destructive" 
-                              size="sm" 
-                              className="w-full"
-                            >
-                              Uninstall
-                            </Button>
-                          ) : (
-                            <Button 
-                              onClick={() => installExtension(extension.id)}
-                              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] transition-all"
-                              size="sm"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Install
-                            </Button>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-              </div>
-            </TabsContent>
-          ))}
-        </Tabs>
+    <PageFrame
+      title="Extension Lab"
+      subtitle="Extend SquidCloud with powerful extensions."
+      items={navItems}
+      layoutId="extension-categories"
+      wide
+    >
+      <style>{EX_CSS}</style>
+      <div className="ex-search">
+        <Search />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search extensions..."
+          className="ex-input"
+        />
       </div>
-    </div>
+
+      <Tabs value={activeCategory} onValueChange={setActiveCategory} className="ex-tabs">
+        {categories.map(category => (
+          <TabsContent key={category} value={category}>
+            <div className="ex-grid">
+              {filteredExtensions
+                .filter(ext => category === 'all' || ext.category === category)
+                .map(extension => {
+                  const isInstalled = installedExtensions.includes(extension.id);
+
+                  return (
+                    <div key={extension.id} className="ex-card">
+                      <div className="ex-head">
+                        <div className="ex-who">
+                          {extension.icon_url ? (
+                            <div className="ex-icon"><img src={extension.icon_url} alt={extension.name} /></div>
+                          ) : (
+                            <div className="ex-icon"><Code /></div>
+                          )}
+                          <div>
+                            <h3 className="ex-name">
+                              {extension.name}
+                              {extension.is_verified && <Sparkles />}
+                            </h3>
+                            <p className="ex-author">by {extension.author}</p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="ex-badge">v{extension.version}</Badge>
+                      </div>
+
+                      <p className="ex-desc">{extension.description}</p>
+
+                      <div className="ex-stats">
+                        <div className="ex-stats-left">
+                          <span><Download />{extension.downloads}</span>
+                          <span><Star />{extension.rating.toFixed(1)} ({extension.total_ratings})</span>
+                        </div>
+                        <Badge variant="outline" className="ex-badge">{extension.category}</Badge>
+                      </div>
+
+                      {isInstalled ? (
+                        <button
+                          onClick={() => uninstallExtension(extension.id)}
+                          className="ex-btn"
+                        >
+                          Uninstall
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => installExtension(extension.id)}
+                          className="ex-btn"
+                        >
+                          <Plus />
+                          Install
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
+    </PageFrame>
   );
 }

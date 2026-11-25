@@ -18,6 +18,28 @@ import {
   ExternalLink,
   AlertTriangle,
 } from '@/lib/icon-map';
+import { GlassNav } from '@/components/layout/GlassNav';
+
+const SV_CSS = `
+.sv-root :is(h1,h2,h3,h4){color:var(--sa-text,#e8e7e1)!important}
+.sv-root :is(p,li,td){color:var(--sa-mute,#8d8f89)!important;line-height:1.75}
+.sv-root strong{color:var(--sa-text,#e8e7e1)!important;font-weight:500}
+.sv-root :is(pre,code){font-family:var(--sa-mono,ui-monospace,monospace)}
+.sv-root pre{background:var(--sa-bg,#090b0a)!important;border:1px solid var(--sa-line,#1f2221);border-radius:10px}
+.sv-root table{border:1px solid var(--sa-line,#1f2221);border-radius:12px;overflow:hidden}
+.sv-root :is(th,td){border-color:var(--sa-line,#1f2221)}
+.sv-info,.sv-warning,.sv-tip{display:flex;gap:12px;padding:16px;margin:16px 0;border:1px solid var(--sa-line,#1f2221)!important;border-radius:12px!important;background:var(--sa-bg-2,#0e1110)!important}
+.sv-info :is(p),.sv-warning :is(p),.sv-tip :is(p){color:var(--sa-mute,#8d8f89)!important}
+.sv-info svg,.sv-warning svg,.sv-tip svg{color:var(--sa-mute,#8d8f89)!important}
+.sv-inline{color:var(--sa-text,#e8e7e1)!important;background:var(--sa-bg-3,#141816);border:1px solid var(--sa-line,#1f2221);border-radius:5px;padding:1px 5px;font-size:13px;font-family:var(--sa-mono,ui-monospace,monospace)}
+.sv-code-h{background:var(--sa-bg-3,#141816)!important;border-bottom:1px solid var(--sa-line,#1f2221)!important}
+.sv-strip{display:flex;justify-content:center;margin-bottom:32px}
+.sv-root [class*="text-amber"],
+.sv-root [class*="text-red"]{color:var(--sa-mute,#8d8f89)!important}
+.sv-root [class*="bg-amber"],
+.sv-root [class*="bg-red"]{background-color:var(--sa-bg-4,#1b201d)!important;color:var(--sa-mute,#8d8f89)!important}
+.sv-root a{color:var(--sa-text,#e8e7e1)}
+`;
 
 type Section = {
   id: string;
@@ -43,7 +65,7 @@ function CodeBlock({ code, lang = 'bash' }: { code: string; lang?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="relative group">
-      <div className="flex items-center justify-between px-4 py-1.5 bg-white/5 border-b border-white/10 rounded-t-lg">
+      <div className="sv-code-h flex items-center justify-between px-4 py-1.5 rounded-t-lg">
         <span className="text-[11px] text-white/40 font-mono uppercase tracking-wider">{lang}</span>
         <button
           onClick={() => {
@@ -64,7 +86,7 @@ function CodeBlock({ code, lang = 'bash' }: { code: string; lang?: string }) {
 }
 
 function InlineCode({ children }: { children: React.ReactNode }) {
-  return <code className="text-[#4FC3F7] bg-white/5 px-1.5 py-0.5 rounded text-[13px] font-mono">{children}</code>;
+  return <code className="sv-inline">{children}</code>;
 }
 
 function PropTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
@@ -93,14 +115,10 @@ function PropTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
 }
 
 function InfoBox({ children, variant = 'info' }: { children: React.ReactNode; variant?: 'info' | 'warning' | 'tip' }) {
-  const colors = {
-    info: 'border-blue-500/20 bg-blue-500/5 text-blue-300/80',
-    warning: 'border-amber-500/20 bg-amber-500/5 text-amber-300/80',
-    tip: 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300/80',
-  };
+  const tone = { info: 'sv-info', warning: 'sv-warning', tip: 'sv-tip' }[variant];
   return (
-    <div className={cn('flex items-start gap-3 rounded-xl border p-4 my-4', colors[variant])}>
-      {variant === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />}
+    <div className={cn(tone, 'items-start')}>
+      {variant === 'warning' && <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
       <p className="text-sm leading-relaxed">{children}</p>
     </div>
   );
@@ -1586,7 +1604,8 @@ export default function SquidVeilDocs() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
+    <div className="sv-root min-h-screen bg-[#0a0a0f]">
+      <style>{SV_CSS}</style>
       <div className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex items-center gap-3 h-14">
@@ -1673,6 +1692,22 @@ export default function SquidVeilDocs() {
           </aside>
 
           <main className="flex-1 min-w-0 py-8 pb-24">
+            <div className="sv-strip">
+              <GlassNav
+                layoutId="sv-docs-thumb"
+                ariaLabel="SquidVeil documentation sections"
+                items={filteredCategories.map((cat) => {
+                  const Icon = cat.icon;
+                  return {
+                    key: cat.id,
+                    label: cat.title,
+                    icon: <Icon className="h-3.5 w-3.5" />,
+                    active: activeSection === cat.id,
+                    onClick: () => { scrollToSection(cat.id); toggleCategory(cat.id); },
+                  };
+                })}
+              />
+            </div>
             {filteredCategories.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <Search className="h-10 w-10 text-white/20 mb-4" />

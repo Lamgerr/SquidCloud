@@ -11,9 +11,10 @@ import {
   getArticlesByCategory,
 } from './docs';
 import {
-  AppShell, TopBar, Wrap, PageHead, Pill, Kbd, Empty, Ico, UnderlineTabs,
+  AppShell, TopBar, Wrap, PageHead, Pill, Kbd, Empty, Ico,
   btn, useDocTitle, useSearchShortcut,
 } from '@/components/custom/squid-app';
+import { GlassNav } from '@/components/layout/GlassNav';
 
 /* ═══════════════════════════════════════════════════════════════
    DOCUMENTATION
@@ -91,6 +92,11 @@ const DOC_CSS = `
 .doc-pn span { display: block; margin-top: 8px; font: 500 13.5px/1.35 var(--sa-f); color: var(--sa-text); }
 .doc-pn .nx { text-align: right; grid-column: 2; }
 .dc-count { display: flex; align-items: center; gap: 8px; margin: 16px 0 24px; font-size: 12.5px; color: var(--sa-mute); }
+.dc-filter { display: flex; justify-content: center; margin: 4px 0 24px; }
+.dc-side { border-right: 1px solid var(--sa-line); padding-right: 16px; margin-right: 0; }
+.dc-tile, .dl-row, .doc-pn a, .dc .sa-panel { border-radius: 12px; }
+.dc-tile, .dl-row { border-color: var(--sa-line); }
+.dc .sa-panel { border: 1px solid var(--sa-line); }
 `;
 
 const slugify = (s: string) =>
@@ -474,16 +480,31 @@ const Documentation = () => {
               </Link>
             </div>
 
-            <UnderlineTabs
-              label="Filter by category"
-              idPrefix="doccat"
-              value={selectedCategory}
-              onChange={setSelectedCategory}
-              tabs={[
-                { id: 'all', label: 'All', count: docArticles.length },
-                ...docCategories.map((c) => ({ id: c.id, label: c.title, count: getArticlesByCategory(c.id).length })),
-              ]}
-            />
+            <div className="dc-filter">
+              <GlassNav
+                layoutId="doccat-thumb"
+                ariaLabel="Filter by category"
+                items={[
+                  {
+                    key: 'all',
+                    label: 'All',
+                    icon: <Book className="h-3.5 w-3.5" />,
+                    active: selectedCategory === 'all',
+                    onClick: () => setSelectedCategory('all'),
+                  },
+                  ...docCategories.map((c) => {
+                    const Icon = c.icon;
+                    return {
+                      key: c.id,
+                      label: c.title,
+                      icon: <Icon className="h-3.5 w-3.5" />,
+                      active: selectedCategory === c.id,
+                      onClick: () => setSelectedCategory(c.id),
+                    };
+                  }),
+                ]}
+              />
+            </div>
 
             <div className="dc-count" aria-live="polite">
               <span>

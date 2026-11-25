@@ -51,6 +51,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { GlassNav } from '@/components/layout/GlassNav';
 
 interface EditorTab {
   id: string;
@@ -73,6 +74,18 @@ interface FileNode {
   parentPath: string;
   realFile?: any;
 }
+
+/* Visual-only chrome layer: one near-black tier, bone ink, one hairline. */
+const CBCODE_CSS = `
+.cbcode-root{background:var(--sa-bg,#090b0a);color:var(--sa-text,#e8e7e1)}
+.cbcode-root .cbcode-viewnav{flex:0 1 auto;min-width:0;padding:3px;background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-2,#0e1110));border:1px solid var(--sa-line,#1f2221);box-shadow:none}
+.cbcode-root .cbcode-viewnav .gnav-item{min-height:28px;padding:0 10px;font-size:12px;gap:6px}
+.cbcode-root .cbcode-viewnav .gnav-thumb{background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-3,#141816));border-color:var(--sa-rim,#2f3230);box-shadow:inset 0 1px 0 rgba(232,231,225,.07)}
+.cbcode-root .cbcode-icon{color:var(--sa-mute,#8d8f89)}
+.cbcode-root .cbcode-dirty{background:var(--sa-text,#e8e7e1);opacity:.8}
+.cbcode-root .cbcode-unsaved{color:var(--sa-text,#e8e7e1)}
+@media(prefers-reduced-motion:reduce){.cbcode-root *{animation:none!important}}
+`;
 
 const CbCode = () => {
   const { folderId } = useParams();
@@ -517,7 +530,7 @@ const CbCode = () => {
       if (saveReason === 'manual') {
         toast({
           title: "File Saved",
-          description: `${tab.name} saved successfully ✅`,
+          description: `${tab.name} saved successfully `,
         });
       }
 
@@ -865,29 +878,29 @@ const CbCode = () => {
   const getFileIcon = (filename: string, isFolder: boolean, expanded?: boolean) => {
     if (isFolder) {
       return expanded ? 
-        <ChevronDown className="w-4 h-4 text-primary/80" /> : 
-        <ChevronRight className="w-4 h-4 text-primary/80" />;
+        <ChevronDown className="w-4 h-4 cbcode-icon" /> : 
+        <ChevronRight className="w-4 h-4 cbcode-icon" />;
     }
     
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
       case 'js':
       case 'jsx':
-        return <FileCode className="w-4 h-4 text-amber-500" />;
+        return <FileCode className="w-4 h-4 cbcode-icon" />;
       case 'ts':
       case 'tsx':
-        return <FileCode className="w-4 h-4 text-sky-500" />;
+        return <FileCode className="w-4 h-4 cbcode-icon" />;
       case 'json':
-        return <FileJson className="w-4 h-4 text-emerald-500" />;
+        return <FileJson className="w-4 h-4 cbcode-icon" />;
       case 'md':
         return <FileText className="w-4 h-4 text-muted-foreground" />;
       case 'html':
-        return <FileCode className="w-4 h-4 text-orange-500" />;
+        return <FileCode className="w-4 h-4 cbcode-icon" />;
       case 'css':
       case 'scss':
-        return <FileCode className="w-4 h-4 text-violet-500" />;
+        return <FileCode className="w-4 h-4 cbcode-icon" />;
       case 'py':
-        return <FileCode className="w-4 h-4 text-lime-500" />;
+        return <FileCode className="w-4 h-4 cbcode-icon" />;
       default:
         return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
@@ -904,8 +917,8 @@ const CbCode = () => {
           <div
             className={`flex items-center gap-2 p-2 text-sm rounded-lg cursor-pointer group transition-colors ${
               activeTab === node.id
-                ? 'bg-primary/15 text-primary'
-                : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+                ? 'bg-muted/30 text-foreground'
+                : 'text-muted-foreground hover:bg-muted/20 hover:text-foreground'
             }`}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
           >
@@ -921,7 +934,7 @@ const CbCode = () => {
               }}
             >
               {node.type === 'folder' && (
-                <Folder className="w-4 h-4 text-primary/80" />
+                <Folder className="w-4 h-4 cbcode-icon" />
               )}
               {getFileIcon(node.name, node.type === 'folder', node.expanded)}
               <span className="truncate flex-1">{node.name}</span>
@@ -935,9 +948,10 @@ const CbCode = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="cbcode-root min-h-screen bg-background flex items-center justify-center">
+        <style>{CBCODE_CSS}</style>
         <div className="text-center">
-          <Code className="w-12 h-12 text-primary mx-auto mb-4 animate-pulse" />
+          <Code className="w-12 h-12 cbcode-icon mx-auto mb-4" />
           <p className="text-muted-foreground">Loading cbCode IDE...</p>
         </div>
       </div>
@@ -945,9 +959,10 @@ const CbCode = () => {
   }
 
   return (
-    <div className="h-screen bg-background p-4 lg:p-6">
+    <div className="cbcode-root h-screen bg-background p-4 lg:p-6">
+      <style>{CBCODE_CSS}</style>
       <div className="mx-auto grid h-full w-full max-w-[1800px] grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-border/50 bg-card/70 shadow-sm backdrop-blur-xl">
+        <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-border/50 bg-card/70 backdrop-blur-xl">
           <div className="flex h-14 items-center justify-between border-b border-border/50 px-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold tracking-tight">cbCode IDE</p>
@@ -1026,7 +1041,7 @@ const CbCode = () => {
           </div>
         </aside>
 
-        <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-border/50 bg-card/60 shadow-sm backdrop-blur-xl">
+        <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-border/50 bg-card/60 backdrop-blur-xl">
           <div className="flex h-12 items-center justify-between border-b border-border/50 px-3">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="rounded-full px-2.5 py-0.5 text-[11px]">
@@ -1037,14 +1052,27 @@ const CbCode = () => {
               </Badge>
             </div>
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 rounded-lg"
-                onClick={() => setShowTerminal(prev => !prev)}
-              >
-                {showTerminal ? 'Hide Console' : 'Console'}
-              </Button>
+              <GlassNav
+                items={[
+                  {
+                    key: 'editor',
+                    label: 'Editor',
+                    icon: <Code className="h-3.5 w-3.5" />,
+                    active: !showTerminal,
+                    onClick: () => setShowTerminal(false),
+                  },
+                  {
+                    key: 'console',
+                    label: 'Console',
+                    icon: <FileText className="h-3.5 w-3.5" />,
+                    active: showTerminal,
+                    onClick: () => setShowTerminal(true),
+                  },
+                ]}
+                layoutId="cbcode-view"
+                className="cbcode-viewnav"
+                ariaLabel="Editor view"
+              />
               <Button
                 variant="ghost"
                 size="sm"
@@ -1097,7 +1125,7 @@ const CbCode = () => {
                   tabIndex={0}
                   className={`group mr-1 inline-flex h-8 min-w-0 items-center gap-2 rounded-lg px-2.5 text-xs transition-colors ${
                     activeTab === tab.id
-                      ? 'bg-background text-foreground shadow-sm'
+                      ? 'bg-background text-foreground'
                       : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
                   }`}
                   onClick={() => setActiveTab(tab.id)}
@@ -1110,7 +1138,7 @@ const CbCode = () => {
                 >
                   {getFileIcon(tab.name, false)}
                   <span className="max-w-[170px] truncate">{tab.name}</span>
-                  {tab.isDirty && <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />}
+                  {tab.isDirty && <span className="h-1.5 w-1.5 rounded-full cbcode-dirty" />}
                   <button
                     type="button"
                     className="opacity-0 transition-opacity group-hover:opacity-100"
@@ -1139,7 +1167,7 @@ const CbCode = () => {
             ) : (
               <div className="flex h-full items-center justify-center bg-muted/20">
                 <div className="rounded-2xl border border-border/60 bg-card/70 p-8 text-center">
-                  <Code className="mx-auto mb-4 h-12 w-12 text-primary/70" />
+                  <Code className="mx-auto mb-4 h-12 w-12 cbcode-icon" />
                   <h3 className="text-lg font-semibold">cbCode IDE</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Open a file to start editing with autosave, snapshots, and session restore.
@@ -1196,7 +1224,7 @@ const CbCode = () => {
                   {currentTab.isDirty && (
                     <>
                       <span>•</span>
-                      <span className="text-orange-500">Unsaved</span>
+                      <span className="cbcode-unsaved">Unsaved</span>
                     </>
                   )}
                 </>

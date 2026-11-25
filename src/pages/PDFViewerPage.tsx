@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PDFSecurityService } from '@/services/pdfSecurity';
 import { Loader } from '@/components/ui/Loader';
 import { cn } from '@/lib/utils';
+import { GlassNav } from '@/components/layout/GlassNav';
 import { usePDFLazyLoad } from '@/hooks/use-pdf-lazy-load';
 import {
   ZoomIn,
@@ -39,6 +40,20 @@ import {
   Layers,
   X
 } from '@/lib/icon-map';
+
+/* Visual-only viewer chrome: near-black, bone ink, one hairline, no accents. */
+const PDFV_CSS = `
+.pdfv-root{background:var(--sa-bg,#090b0a);color:var(--sa-text,#e8e7e1)}
+.pdfv-root .gnav.pdfv-modes{padding:3px;background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-2,#0e1110));border:1px solid var(--sa-line,#1f2221);box-shadow:none}
+.pdfv-root .gnav.pdfv-modes .gnav-item{min-height:28px;padding:0 10px;font-size:12px;gap:6px}
+.pdfv-root .gnav.pdfv-modes .gnav-thumb{background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-3,#141816));border-color:var(--sa-rim,#2f3230);box-shadow:inset 0 1px 0 rgba(232,231,225,.07)}
+.pdfv-root .pdfv-on{background:var(--sa-bg-4,#1b201d)!important;color:var(--sa-text,#e8e7e1)!important;border-color:var(--sa-rim,#2f3230)!important;box-shadow:none!important}
+.pdfv-root .pdfv-clear:hover{background:var(--sa-bg-4,#1b201d)!important;color:var(--sa-text,#e8e7e1)!important}
+.pdfv-root .pdfv-canvas{border-color:var(--sa-line,#1f2221)!important}
+.pdfv-root .pdfv-swatch-on{border-color:var(--sa-text,#e8e7e1)!important}
+.pdfv-root .pdfv-size{accent-color:var(--sa-text,#e8e7e1)}
+@media(prefers-reduced-motion:reduce){.pdfv-root *{animation:none!important}}
+`;
 
 const PDFViewerPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -705,10 +720,11 @@ const PDFViewerPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6 animate-in fade-in-0 duration-200">
-          <div className="rounded-full bg-destructive/10 p-4 w-16 h-16 mx-auto mb-4">
-            <FileText className="w-8 h-8 text-destructive" />
+      <div className="pdfv-root min-h-screen bg-background flex items-center justify-center">
+        <style>{PDFV_CSS}</style>
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="rounded-full bg-muted/30 p-4 w-16 h-16 mx-auto mb-4">
+            <FileText className="w-8 h-8 text-muted-foreground" />
           </div>
           <h1 className="text-2xl font-bold mb-2">Unable to load PDF</h1>
           <p className="text-muted-foreground mb-6">{error}</p>
@@ -729,9 +745,10 @@ const PDFViewerPage: React.FC = () => {
 
   return (
     <div className={cn(
-      "min-h-screen flex flex-col transition-colors duration-150",
+      "pdfv-root min-h-screen flex flex-col transition-colors duration-150",
       "bg-background"
     )}>
+      <style>{PDFV_CSS}</style>
       {/* Clean Modern Header */}
       <header className={cn(
         "border-b sticky top-0 z-50 transition-colors duration-150",
@@ -758,7 +775,7 @@ const PDFViewerPage: React.FC = () => {
               </TooltipProvider>
               
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <FileText className="w-5 h-5 flex-shrink-0 text-primary" />
+                <FileText className="w-5 h-5 flex-shrink-0 text-muted-foreground" />
                 <div className="flex-1 min-w-0">
                   <h1 className="text-base font-medium truncate text-foreground">
                     {fileName}
@@ -800,8 +817,8 @@ const PDFViewerPage: React.FC = () => {
                       size="sm"
                       onClick={togglePresentationMode}
                       className={cn(
-                        "h-9 w-9 p-0 hover:bg-gray-700",
-                        presentationMode && "bg-blue-600 hover:bg-blue-700"
+                        "h-9 w-9 p-0",
+                        presentationMode && "pdfv-on"
                       )}
                     >
                       <Presentation className="w-4 h-4" />
@@ -820,8 +837,8 @@ const PDFViewerPage: React.FC = () => {
                         size="sm"
                         onClick={toggleDrawTools}
                         className={cn(
-                          "h-9 px-2.5 gap-1.5 hover:bg-gray-700",
-                          showDrawTools && "bg-green-600 hover:bg-green-700"
+                          "h-9 px-2.5 gap-1.5",
+                          showDrawTools && "pdfv-on"
                         )}
                       >
                         <Highlighter className="w-4 h-4" />
@@ -1035,7 +1052,7 @@ const PDFViewerPage: React.FC = () => {
 
           {/* Search Results Banner */}
           {searchResults.length > 0 && !presentationMode && (
-            <div className="mt-2 p-2 rounded-lg text-sm border bg-primary/10 border-primary/30 text-primary">
+            <div className="mt-2 p-2 rounded-lg text-sm border bg-muted/30 border-border text-foreground">
               Found {searchResults.length} result(s) - 
               <button 
                 onClick={() => setSearchResults([])}
@@ -1053,64 +1070,34 @@ const PDFViewerPage: React.FC = () => {
                 {/* Drawing Mode */}
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-card-foreground">Mode:</span>
-                  <div className="flex gap-1">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDrawingMode('pen')}
-                            className={cn(
-                              "h-8 w-8 p-0",
-                              drawingMode === 'pen' ? "bg-primary text-primary-foreground" : ""
-                            )}
-                          >
-                            <Type className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Pen</p></TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDrawingMode('highlighter')}
-                            className={cn(
-                              "h-8 w-8 p-0",
-                              drawingMode === 'highlighter' ? "bg-primary text-primary-foreground" : ""
-                            )}
-                          >
-                            <Highlighter className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Highlighter</p></TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDrawingMode('eraser')}
-                            className={cn(
-                              "h-8 w-8 p-0",
-                              drawingMode === 'eraser' ? "bg-destructive text-destructive-foreground" : ""
-                            )}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Eraser</p></TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
+                  <GlassNav
+                    items={[
+                      {
+                        key: 'pen',
+                        label: 'Pen',
+                        icon: <Type className="w-4 h-4" />,
+                        active: drawingMode === 'pen',
+                        onClick: () => setDrawingMode('pen'),
+                      },
+                      {
+                        key: 'highlighter',
+                        label: 'Highlighter',
+                        icon: <Highlighter className="w-4 h-4" />,
+                        active: drawingMode === 'highlighter',
+                        onClick: () => setDrawingMode('highlighter'),
+                      },
+                      {
+                        key: 'eraser',
+                        label: 'Eraser',
+                        icon: <X className="w-4 h-4" />,
+                        active: drawingMode === 'eraser',
+                        onClick: () => setDrawingMode('eraser'),
+                      },
+                    ]}
+                    layoutId="pdfv-draw-mode"
+                    className="pdfv-modes"
+                    ariaLabel="Drawing mode"
+                  />
                 </div>
 
                 {/* Color Picker */}
@@ -1124,7 +1111,7 @@ const PDFViewerPage: React.FC = () => {
                           onClick={() => setBrushColor(color)}
                           className={cn(
                             "w-7 h-7 rounded-full border-2 transition-all",
-                            brushColor === color ? "border-primary scale-110" : "border-border hover:border-ring"
+                            brushColor === color ? "pdfv-swatch-on scale-110" : "border-border hover:border-ring"
                           )}
                           style={{ backgroundColor: color }}
                         />
@@ -1142,7 +1129,7 @@ const PDFViewerPage: React.FC = () => {
                     max="20"
                     value={brushSize}
                     onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                    className="w-24 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                    className="pdfv-size w-24 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
                   />
                   <span className="text-xs text-muted-foreground w-8">{brushSize}px</span>
                 </div>
@@ -1172,7 +1159,7 @@ const PDFViewerPage: React.FC = () => {
                           variant="ghost"
                           size="sm"
                           onClick={clearAllAnnotations}
-                          className="h-8 px-2 text-xs hover:bg-destructive hover:text-destructive-foreground"
+                          className="pdfv-clear h-8 px-2 text-xs"
                         >
                           Clear All
                         </Button>
@@ -1208,7 +1195,7 @@ const PDFViewerPage: React.FC = () => {
                       className={cn(
                         "w-full p-2 rounded-lg border-2 transition-all duration-150 group",
                         currentPage === pageNum
-                          ? "border-primary bg-primary/10" 
+                          ? "pdfv-swatch-on bg-muted/30" 
                           : "border-border hover:border-ring hover:bg-muted/50"
                       )}
                     >
@@ -1227,7 +1214,7 @@ const PDFViewerPage: React.FC = () => {
                       </div>
                       <p className={cn(
                         "text-xs text-center font-medium",
-                        currentPage === pageNum ? "text-primary" : "text-muted-foreground"
+                        currentPage === pageNum ? "text-foreground" : "text-muted-foreground"
                       )}>
                         {pageNum}
                       </p>
@@ -1279,7 +1266,7 @@ const PDFViewerPage: React.FC = () => {
                         onMouseUp={stopDrawing}
                         onMouseLeave={stopDrawing}
                         className={cn(
-                          "shadow-2xl rounded-lg border border-gray-700 transition-all duration-150",
+                          "shadow-2xl rounded-lg border pdfv-canvas transition-all duration-150",
                           renderingPages.has(pageNum) && "opacity-50",
                           presentationMode && showDrawTools && "cursor-crosshair"
                         )}
@@ -1316,7 +1303,7 @@ const PDFViewerPage: React.FC = () => {
                     onMouseUp={stopDrawing}
                     onMouseLeave={stopDrawing}
                     className={cn(
-                      "shadow-2xl rounded-lg border border-gray-700",
+                      "shadow-2xl rounded-lg border pdfv-canvas",
                       presentationMode && showDrawTools && "cursor-crosshair"
                     )}
                     style={{
@@ -1329,10 +1316,10 @@ const PDFViewerPage: React.FC = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full">
-              <div className="rounded-full bg-destructive/10 p-4 mb-4">
-                <FileText className="w-8 h-8 text-destructive" />
+              <div className="rounded-full bg-muted/30 p-4 mb-4">
+                <FileText className="w-8 h-8 text-muted-foreground" />
               </div>
-              <p className="text-sm mb-4 text-gray-400">
+              <p className="text-sm mb-4 text-muted-foreground">
                 Failed to load PDF document
               </p>
               <Button onClick={handleGoBack}>

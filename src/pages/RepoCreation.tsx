@@ -8,6 +8,20 @@ import { Check, AlertCircle, KeyRound, Lock, ShieldCheck } from '@/lib/icon-map'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { PageFrame } from '@/components/layout/PageFrame';
+
+const RC_CSS = `
+.rc-panel{max-width:440px;margin:0 auto;text-align:left}
+.rc-mark{width:48px;height:48px;margin:0 auto 24px;display:grid;place-items:center;border:1px solid var(--sa-line,#1f2221);border-radius:14px;color:var(--sa-mute,#8d8f89)}
+.rc-mark svg{width:20px;height:20px;stroke-width:1.6}
+.rc-panel [role="progressbar"]{height:4px;border-radius:999px;background:var(--sa-line,#1f2221);overflow:hidden}
+.rc-panel [role="progressbar"] > span,.rc-panel [role="progressbar"] > div{background:var(--sa-text,#e8e7e1)}
+.rc-state{padding:24px;border:1px solid var(--sa-line,#1f2221);border-radius:16px;background:var(--sa-bg-2,#0e1110);text-align:center}
+.rc-state :is(p){color:var(--sa-mute,#8d8f89)}
+.rc-state :is(p.font-medium){color:var(--sa-text,#e8e7e1)}
+.rc-state svg{color:var(--sa-mute,#8d8f89)}
+.rc-state :is(div[class*="bg-"]){background:var(--sa-bg-3,#141816);border-color:var(--sa-line,#1f2221)}
+`;
 
 // Create repos using Supabase Functions to avoid CORS
 const createReposWithRetry = async (
@@ -142,26 +156,15 @@ const RepoCreation = () => {
   }, [count, navigate, toast, password]);
 
   return (
-    <div className="h-full flex items-center justify-center p-4">
-      <Card className={`w-full ${isMobile ? 'max-w-[90%]' : 'max-w-md'} shadow-lg`}>
-        <CardHeader className={isMobile ? 'px-4 py-4' : ''}>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-            </div>
-            <CardTitle className="text-xl">Secure Vault Setup</CardTitle>
-          </div>
-          <CardDescription className="text-sm">
-            Creating distributed secure vaults for your encrypted files
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className={isMobile ? 'px-4 pb-4' : ''}>
-          <div className="space-y-5">
+    <PageFrame title="Secure Vault Setup" subtitle="Creating distributed secure vaults for your encrypted files">
+      <style>{RC_CSS}</style>
+      <div className="rc-panel">
+        <div className="rc-mark"><ShieldCheck className="h-5 w-5" /></div>
+        <div className="space-y-5">
             <Progress value={progress} className="w-full h-2" />
             
             {creating ? (
-              <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
+              <div className="rc-state flex flex-col items-center justify-center py-6 px-4 text-center">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Loader size="xl" />
                 </div>
@@ -171,7 +174,7 @@ const RepoCreation = () => {
                 </p>
               </div>
             ) : error ? (
-              <div className="bg-destructive/10 p-5 rounded-lg text-center">
+              <div className="rc-state p-5 text-center">
                 <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
                   <AlertCircle className="h-8 w-8 text-destructive" />
                 </div>
@@ -187,7 +190,7 @@ const RepoCreation = () => {
                 </Button>
               </div>
             ) : vaults.length > 0 ? (
-              <div className="bg-green-50 dark:bg-green-900/20 p-5 rounded-lg text-center">
+              <div className="rc-state p-5 text-center">
                 <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
                   <Check className="h-8 w-8 text-green-500" />
                 </div>
@@ -217,10 +220,9 @@ const RepoCreation = () => {
                 </Button>
               </div>
             ) : null}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </PageFrame>
   );
 };
 
