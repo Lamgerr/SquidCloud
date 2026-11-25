@@ -1,5 +1,5 @@
 {
-  "goal": "Auth page rebuilt from scratch (premium split-stage + choreographed passkey ritual); UI/UX skill library installed",
+  "goal": "Auth page: very minimal monochrome Apple-like interface (user rejected animated/ember version)",
   "goal_source": "interactive query from human (404 on squidcloud-cluster legacy chunk downloads; deprecate deepread/books UI)",
   "last_actions": [
     "2026-11-24: Launched two read-only audits (client key handling; Supabase DB/functions) plus independent repo/CLI checks.",
@@ -31,7 +31,8 @@
     "2026-11-25: Completed items 2/3/4: VaultSecurityPanel UI (device enrollment, social recovery shares, ratchet) in AccountSettings; recreated bip39.ts lost in migration; EDGE-FUNCTION-AUTH-INVENTORY.md maps all 34 verify_jwt=false functions; hardened native client = Android Keystore plugin (non-exportable, biometric) + Capacitor wrapper + network_security_config (no cleartext, backup off, pins documented). Vercel READY, pushed.",
     "2026-11-25: Installed 37 agent skills globally via skills CLI 1.9.0 (ui-ux-pro-max + design-system/ui-styling/brand/design/slides/banner-design; 20 Emil Kowalski animation skills incl. choreograph, animate, gesture, learn-taste; motion-doctrine). Verified all source repos 100K+ GitHub stars. PromptScript adapter reported global-install no-ops only; OpenCode indexed the skills.",
     "2026-11-25: Rejected prior bolted-on auth panel as generic. Rebuilt Auth.tsx visual layer completely while preserving all 13 states, 6 effects and every handler verbatim (only additive visual state passkeySuccess). New design: editorial split stage, warm ember CTA, bare underline inputs, circular OAuth orbs, no boxes/white tint/green accent, reduced-motion + visible focus.",
-    "2026-11-25: Rewrote AuthIdentityStage (aurora, drifting motes, pointer-reactive luminous seed, floating glass status notes) and PasskeyRitual (glass trigger + full-screen multi-phase scan/seal overlay). Applied ui-ux-pro-max and choreograph guidance: one entrance per container, overlap phases, no uniform stagger."
+    "2026-11-25: Rewrote AuthIdentityStage (aurora, drifting motes, pointer-reactive luminous seed, floating glass status notes) and PasskeyRitual (glass trigger + full-screen multi-phase scan/seal overlay). Applied ui-ux-pro-max and choreograph guidance: one entrance per container, overlap phases, no uniform stagger.",
+    "2026-11-25: User rejected the ember/aurora/ritual auth as \"shitty ui ux\" and specified the actual target: very minimal, clean, fully monochromatic, Apple-Inc-level cleanliness. Rebuilt Auth.tsx visual layer a third time: centered single column on true black, SF/system font, one white pill CTA, hairline fields, grayscale only, plain 180ms opacity transitions, no art/no color/no spring motion. Removed AuthIdentityStage.tsx and PasskeyRitual.tsx; passkey is now a quiet underlined row with a subtle breathing icon while waiting. All auth logic preserved verbatim again. Vercel READY."
   ],
   "key_numbers": {
     "audits": 2,
@@ -49,5 +50,5 @@
     "No live browser QA available in this environment; only Vercel build verification. User visually tests.",
     "Supabase service-role key from old history still live; user explicitly deprioritized rotation."
   ],
-  "next": "Await user visual verdict on /auth. If accepted, apply the same from-scratch treatment to AccountSettings and DeveloperAPI; otherwise iterate on Auth only."
+  "next": "Await user visual verdict on /auth. If accepted, apply the same monochrome restraint to AccountSettings and DeveloperAPI."
 }

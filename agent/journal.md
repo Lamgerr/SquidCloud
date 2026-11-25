@@ -178,3 +178,10 @@
 - AuthIdentityStage rewritten: aurora blobs, animated wave field, drifting motes, ghost wordmark, pointer-reactive luminous seed with orbiting rings/satellites, floating glass status notes, mode-aware copy.
 - PasskeyRitual rewritten: glass trigger row + full-screen scan ritual with converging rings, drawn fingerprint, progress arc, four overlapping phases and a seal/check finish. Moved `<style>` outside the overlay after catching that the trigger was unstyled until activation.
 - Build: Vercel `READY`. Not visually verified in-browser here; user will test.
+
+## 2026-11-25 — Auth pivot: pure monochrome minimalism
+- User rejected the playful ember/aurora version outright. Explicit target: "very minimal, clean interface, full monochromatic apple inc like cleaniness and neat interface." Decision: discard the art direction entirely rather than tune it.
+- Third full visual rebuild of Auth.tsx, logic spliced verbatim again. Palette now strictly grayscale: #000 background, #f5f5f7 text, #86868b/#6e6e73 muted, rgba(255,255,255,.13) hairlines. System SF Pro font stack. Centered 372px column, large semibold tight-tracked headline, small plain labels, hairline-only fields, one solid white pill CTA (black text), three monochrome circular OAuth buttons, plain text mode switch with 1px underline.
+- Motion reduced to 180ms opacity fades and a 1px underline slide; one subtle breathing fingerprint while waiting for a passkey. prefers-reduced-motion fully honored.
+- Deleted AuthIdentityStage.tsx and PasskeyRitual.tsx (superseded). Build initially failed on duplicate viewAnim from the prior splice; removed the stale declaration. Vercel READY.
+- Lesson recorded: user does not want decorative animation or accent color on auth. Minimalism means removing elements, not restyling them.
