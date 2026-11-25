@@ -15,6 +15,7 @@ import { isVaultUnlocked, getVaultFileMeta, decryptVaultBytes } from '@/lib/zk-v
 import { supabase } from '@/integrations/supabase/client';
 import SealedPreview from './SealedPreview';
 import VaultUnlockDialog from './VaultUnlockDialog';
+import SealedPreview from './SealedPreview';
 
 // Viewers — one frame, type-specific body
 import CBVideoPlayer from './cbVideoPlayer';
@@ -27,8 +28,8 @@ import OptimizedPDFViewer from '@/components/OptimizedPDFViewer';
 import ModelViewer from '@/components/ModelViewer';
 import FontPreviewer from '@/components/FontPreviewer';
 import ArchiveViewerModal from '@/components/ArchiveViewerModal';
-import EnhancedMarkdownPreview from './EnhancedMarkdownPreview';
 import DeepReadReader from './DeepReadReader';
+import { markdownToSafeHtml } from './EnhancedMarkdownPreview';
 import { previewTabs, detectKind, type PreviewKind } from '@/services/preview-tabs';
 import { GRAIN_CSS } from './grain';
 import { DOCK_CSS, Icons } from '@/components/FloatingDock';   // the dashboard dock's own tokens + icons: identical look, zero drift
@@ -428,15 +429,17 @@ const Loading: React.FC = () => (
   <div className="pv-loading"><Loader size="lg" /><span>Decrypting preview…</span></div>
 );
 
-/** Text body read asynchronously — keeps the render path sync. */
+/** Markdown body rendered in a sealed sandbox: plaintext never enters the app DOM. */
 const MarkdownBody: React.FC<{ blob: Blob | null }> = ({ blob }) => {
-  const [text, setText] = useState('');
+  const [html, setHtml] = useState('');
   useEffect(() => {
     let alive = true;
-    if (blob) blob.text().then(t => { if (alive) setText(t); }).catch(() => {});
+    if (blob) blob.text()
+      .then(t => { if (alive) setHtml(markdownToSafeHtml(t)); })
+      .catch(() => {});
     return () => { alive = false; };
   }, [blob]);
-  return <div className="h-full overflow-auto p-8"><EnhancedMarkdownPreview content={text} /></div>;
+  return <SealedPreview html={html} title="Markdown preview" />;
 };
 
 export default EnhancedInstantPreviewModal;

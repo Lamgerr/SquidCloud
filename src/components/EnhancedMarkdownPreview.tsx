@@ -230,4 +230,9 @@ const EnhancedMarkdownPreview: React.FC<EnhancedMarkdownPreviewProps> = ({
   );
 };
 
+/** Sanitized HTML for the sealed preview frame — no script can run in the app origin. */
+export function markdownToSafeHtml(content: string): string {
+  return content ? sanitizeHtml(processMarkdown(content)) : '';
+}
+
 export default EnhancedMarkdownPreview;
