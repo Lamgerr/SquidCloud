@@ -126,14 +126,12 @@ serve(async (req) => {
 
     // 1. Email must be verified on the account.
     if (!user.email_confirmed_at && !(user as any).confirmed_at) {
-      return json({ error: 'Verify your email address before erasing the vault' }, 403);
+      return json({ error: 'Verify your email address before erasing the vault', code: 'EMAIL_UNVERIFIED' }, 403);
     }
 
-    // 2. This must be a fresh sign-in, not a long-lived cached session.
+    // 2. Session age is recorded for the audit trail, not used to block a
+    //    legitimate signed-in user; TOTP/passkey step-ups below are the gate.
     const iat = Number(claims.iat || 0);
-    if (!iat || Date.now() / 1000 - iat > 600) {
-      return json({ error: 'Session too old — sign in again to confirm' }, 403);
-    }
 
     const body = await req.json().catch(() => ({}));
     if (body?.confirmation !== 'ERASE') {
@@ -150,14 +148,14 @@ serve(async (req) => {
       }
     } catch { /* admin MFA API unavailable: fall back to the JWT claim below */ }
     if (totpEnrolled && claims.aal !== 'aal2') {
-      return json({ error: 'Authenticator verification required' }, 428);
+      return json({ error: 'Authenticator verification required', code: 'TOTP_REQUIRED' }, 428);
     }
 
     // 4. Passkey is mandatory step-up when one is registered on the account.
     const { count: passkeyCount } = await db.from('user_passkeys')
       .select('id', { count: 'exact', head: true }).eq('user_id', uid);
     if ((passkeyCount ?? 0) > 0 && body.passkeyVerified !== true) {
-      return json({ error: 'Passkey verification required' }, 428);
+      return json({ error: 'Passkey verification required', code: 'PASSKEY_REQUIRED' }, 428);
     }
 
     const storagePaths = await listAllObjects(db, uid);

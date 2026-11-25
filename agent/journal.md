@@ -231,3 +231,10 @@
 - Edge function gates: verified email, fresh JWT (<10min), TOTP aal2 when enrolled, passkeyVerified when a passkey exists; deletes file/folder/vault/key/share rows and all objects under the user's storage prefix. Deployed via supabase CLI (verify_jwt=true). Unauthenticated call verified 401.
 - Removed background-attachment:fixed from settings background to eliminate the visible horizontal seam.
 - Vercel READY. BFF endpoint returned curl 000 from this sandbox (network limitation), so live BFF response was not verified here.
+
+## 2026-11-25 — Root-cause debugging of BFF hang, edge 403, layout seam
+- Vercel logs: repeated `λ POST /api/internal/vault` with "Task timed out after 300 seconds". Supabase Management API logs endpoint (`/v1/projects/{ref}/analytics/endpoints/logs`) showed edge function responding 401/403 quickly. Conclusion: hang was inside the Vercel BFF, not Supabase.
+- Root cause in BFF: `const json = () => ({statusCode,...})` and `return json(...)` — Vercel Node handlers must call `res.status().json()`. Every path hung. Replaced all returns with `res.status(status).json(body)`. Verified live: POST without auth returns 401 instantly.
+- Edge 403 traced to a self-imposed 10-minute JWT-age requirement that was not requested; removed. Gates kept: verified email, TOTP aal2 if enrolled, passkey flag if registered, typed ERASE. Added explicit error codes.
+- Layout seam: `html.sq-app-root body::before` is `position:fixed`; in full-page rendering it covers only the first viewport, producing the horizontal line. Hidden it for pages containing .tv-root/.dv-root and set the wash directly on those roots with background-size:100% 100%. Forced .tv-rail transparent/borderless to remove the rectangle at all widths.
+- Vercel READY, edge redeployed.

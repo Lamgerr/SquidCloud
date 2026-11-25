@@ -10,8 +10,10 @@ export const PAGES_POLISH = `
 .tv-root, .dv-root {
   background-color: var(--sa-bg, #090b0a) !important;
   background-image:
-    radial-gradient(65% 45% at 88% -12%, rgba(232,231,225,.04), transparent 70%),
-    radial-gradient(55% 40% at -8% 108%, rgba(134,195,161,.045), transparent 72%) !important;
+    radial-gradient(65% 45% at 88% 0%, rgba(232,231,225,.035), transparent 70%),
+    radial-gradient(55% 40% at -8% 100%, rgba(134,195,161,.04), transparent 72%) !important;
+  background-size: 100% 100% !important;
+  background-repeat: no-repeat !important;
   color: var(--sa-text, #e8e7e1) !important;
   font-family: var(--sa-f, -apple-system, system-ui, sans-serif) !important;
   -webkit-font-smoothing: antialiased;
@@ -85,5 +87,19 @@ export const PAGES_POLISH = `
 .tv-dock-wrap, .dv-dock-wrap { animation: sq-tab-in .18s cubic-bezier(.16,1,.3,1) both !important; }
 @media (prefers-reduced-motion: reduce) {
   .tv-dock-wrap, .dv-dock-wrap { animation: none !important; }
+}
+
+/* The global ambient wash is viewport-fixed; on long settings pages it ends
+   at 100vh and leaves a horizontal seam. Settings paint their own wash. */
+html.sq-app-root:has(.tv-root) body::before,
+html.sq-app-root:has(.dv-root) body::before { display: none !important; }
+html.sq-app-root .sa:has(.tv-root), html.sq-app-root .sa:has(.dv-root) {
+  background: var(--sa-bg, #090b0a) !important;
+}
+/* No enclosing rectangle around the settings rail, at any width. */
+html.sq-app-root .tv-rail {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 `;
