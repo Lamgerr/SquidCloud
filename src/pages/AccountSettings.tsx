@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useShake } from '@/hooks/use-shake';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
@@ -35,6 +36,7 @@ import {
 } from '@/components/custom/squid-app';
 import VaultUnlockDialog from '@/components/VaultUnlockDialog';
 import VaultSecurityPanel from '@/components/VaultSecurityPanel';
+import VaultRecoveryCard from '@/components/VaultRecoveryCard';
 import { isVaultUnlocked, lockVault } from '@/lib/zk-vault-session';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -623,32 +625,33 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
 }
 
 /* ── settings shell: grouped glass rail + calm content pane ─────── */
-.tv-layout{display:grid;grid-template-columns:228px minmax(0,1fr);gap:38px;max-width:1180px;margin:0 auto;
-  padding:104px 28px 72px;min-height:100vh}
-.tv-rail{position:sticky;top:104px;align-self:start;display:flex;flex-direction:column;gap:18px;padding:9px;border-radius:22px;
-  background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-2,#0e1110));
-  border:1px solid var(--sa-line,#1f2221);
-  box-shadow:inset 0 1px 0 rgba(232,231,225,.07),0 24px 54px -24px rgba(0,0,0,.8)}
-.tv-rail-group{display:flex;flex-direction:column;gap:3px}
-.tv-rail-label{padding:0 12px 7px;font:400 10px/1 var(--sa-mono,ui-monospace,monospace);letter-spacing:.14em;
+.tv-layout{display:grid;grid-template-columns:196px minmax(0,720px);justify-content:center;gap:56px;
+  max-width:1120px;margin:0 auto;padding:112px 28px 88px;min-height:100vh;align-items:start}
+/* No enclosing rectangle — the rail is just floating text with a glass thumb. */
+.tv-rail{position:sticky;top:112px;align-self:start;display:flex;flex-direction:column;gap:22px;
+  padding:2px 0;background:transparent;border:0;box-shadow:none}
+.tv-rail-group{display:flex;flex-direction:column;gap:2px}
+.tv-rail-label{padding:0 12px 8px;font:400 10px/1 var(--sa-mono,ui-monospace,monospace);letter-spacing:.14em;
   text-transform:uppercase;color:var(--sa-dim,#62655f)}
-.tv-rail-item{position:relative;display:flex;align-items:center;gap:11px;min-height:40px;padding:0 12px;border:0;
-  border-radius:14px;background:transparent;color:var(--sa-mute,#8d8f89);font:inherit;font-size:13px;cursor:pointer;
+.tv-rail-item{position:relative;display:flex;align-items:center;gap:11px;min-height:38px;padding:0 12px;border:0;
+  border-radius:12px;background:transparent;color:var(--sa-mute,#8d8f89);font:inherit;font-size:13px;cursor:pointer;
   text-align:left;transition:color .18s;-webkit-tap-highlight-color:transparent}
 .tv-rail-item:hover,.tv-rail-item[aria-selected="true"]{color:var(--sa-text,#e8e7e1)}
-.tv-rail-thumb{position:absolute;inset:0;border-radius:14px;
+.tv-rail-thumb{position:absolute;inset:0;border-radius:12px;
   background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-3,#141816));
   box-shadow:inset 0 1px 0 rgba(232,231,225,.08),0 0 0 1px rgba(232,231,225,.1),0 6px 18px -6px rgba(0,0,0,.55)}
 .tv-rail-item svg,.tv-rail-text{position:relative;z-index:1}
 .tv-rail-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tv-pane{min-width:0;max-width:760px;padding-bottom:40px}
+.tv-pane{min-width:0;max-width:720px;padding-bottom:48px}
 .tv-pane-head{margin-bottom:26px}
 .tv-pane-head h1{margin:0;font-size:clamp(28px,4vw,40px);font-weight:300;letter-spacing:-.04em;line-height:1.05}
 .tv-pane-sub{margin:9px 0 0;font-size:12px;color:var(--sa-mute,#8d8f89)}
 @media(max-width:880px){
   .tv-layout{display:block;padding:86px 16px 40px}
   .tv-rail{position:sticky;top:68px;z-index:30;flex-direction:row;align-items:center;gap:4px;padding:5px;
-    border-radius:999px;overflow-x:auto;scrollbar-width:none;margin-bottom:26px}
+    border-radius:999px;overflow-x:auto;scrollbar-width:none;margin-bottom:26px;
+    background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-2,#0e1110));
+    border:1px solid var(--sa-line,#1f2221);box-shadow:inset 0 1px 0 rgba(232,231,225,.06)}
   .tv-rail::-webkit-scrollbar{display:none}
   .tv-rail-group{flex-direction:row;gap:3px}
   .tv-rail-label{display:none}
@@ -673,6 +676,29 @@ html.sq-app-root :is(.auth-left, .auth-hero, .auth-aside, [data-auth-left]) {
 .tv-enc-card :is(button,[role="switch"]){border-radius:999px!important}
 .tv-enc-card input{border-color:var(--sa-line,#1f2221)!important;background:var(--sa-bg,#090b0a)!important;color:var(--sa-text,#e8e7e1)!important}
 .tv-enc-card input:focus{border-color:var(--sa-text,#e8e7e1)!important}
+
+/* ── TOTP setup: a calm two-step panel ─────────────────────────── */
+.tv-totp{display:grid;gap:18px;padding:20px;border-radius:18px;
+  background:linear-gradient(180deg,var(--sa-bg-3,#141816),var(--sa-bg-2,#0e1110));
+  border:1px solid var(--sa-line,#1f2221);box-shadow:inset 0 1px 0 rgba(232,231,225,.06)}
+.tv-totp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.tv-totp-head b{display:block;font-size:14px;font-weight:500;color:var(--sa-text,#e8e7e1)}
+.tv-totp-head span:not(.tv-totp-step){display:block;margin-top:5px;font-size:12px;color:var(--sa-mute,#8d8f89)}
+.tv-totp-step{flex:none;font:400 10px/1 var(--sa-mono,monospace);letter-spacing:.12em;text-transform:uppercase;color:var(--sa-dim,#62655f)}
+.tv-totp-body{display:grid;grid-template-columns:180px minmax(0,1fr);gap:20px;align-items:center}
+.tv-qr-card{width:180px;height:180px;padding:12px;border-radius:16px;background:#fff;display:grid;place-items:center;
+  box-shadow:0 12px 32px -14px rgba(0,0,0,.8)}
+.tv-qr-card img{display:block;width:100%;height:100%}
+.tv-totp-label{margin:0 0 10px;font:400 10px/1 var(--sa-mono,monospace);letter-spacing:.12em;text-transform:uppercase;color:var(--sa-dim,#62655f)}
+.tv-totp-hint{margin:12px 0 0;font-size:11px;line-height:1.5;color:var(--sa-mute,#8d8f89)}
+.tv-totp-verify{border-top:1px solid var(--sa-line,#1f2221);padding-top:18px}
+.tv-otp{display:flex;gap:8px;flex-wrap:wrap}
+.tv-otp-cell{width:44px;height:52px;text-align:center;font:400 22px/1 var(--sa-mono,monospace);
+  color:var(--sa-text,#e8e7e1);background:var(--sa-bg,#090b0a);border:1px solid var(--sa-line,#1f2221);
+  border-radius:12px;outline:none;transition:border-color .18s,box-shadow .18s}
+.tv-otp-cell:focus{border-color:var(--sa-text,#e8e7e1);box-shadow:0 0 0 3px rgba(232,231,225,.06)}
+.tv-otp-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+@media(max-width:560px){.tv-totp-body{grid-template-columns:1fr}.tv-qr-card{margin:0 auto}.tv-otp-cell{width:38px;height:46px;font-size:19px}}
 ${ PAGES_POLISH }
 `;
 
@@ -756,6 +782,37 @@ const SECTION_IDS: SettingsCategory[] = SETTINGS_CATEGORIES.map((c) => c.id);
 
 type Tone = 'neutral' | 'ok' | 'warn' | 'err';
 
+function OtpInput({ value, onChange, onComplete }: {
+  value: string; onChange: (v: string) => void; onComplete?: () => void;
+}) {
+  const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const digits = Array.from({ length: 6 }, (_, i) => value[i] || '');
+  const setDigit = (i: number, raw: string) => {
+    const ch = raw.replace(/\D/g, '').slice(-1);
+    const next = [...digits];
+    next[i] = ch;
+    const joined = next.join('').slice(0, 6);
+    onChange(joined);
+    if (ch && i < 5) refs.current[i + 1]?.focus();
+    if (joined.length === 6) onComplete?.();
+  };
+  return (
+    <div className="tv-otp" role="group" aria-label="Six digit verification code">
+      {digits.map((d, i) => (
+        <input key={i} ref={(el) => { refs.current[i] = el; }} className="tv-otp-cell" inputMode="numeric"
+          autoComplete={i === 0 ? 'one-time-code' : 'off'} maxLength={1} value={d} aria-label={`Digit ${i + 1}`}
+          onChange={(e) => setDigit(i, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && !d && i > 0) { e.preventDefault(); refs.current[i - 1]?.focus(); }
+            if (e.key === 'ArrowLeft' && i > 0) refs.current[i - 1]?.focus();
+            if (e.key === 'ArrowRight' && i < 5) refs.current[i + 1]?.focus();
+            if (e.key === 'Enter' && value.length === 6) onComplete?.();
+          }} />
+      ))}
+    </div>
+  );
+}
+
 function TvBadge({ tone = 'neutral', dot, children }: { tone?: Tone; dot?: boolean; children: React.ReactNode }) {
   return (
     <span className={`tv-badge ${tone === 'neutral' ? '' : tone}`.trim()}>
@@ -824,6 +881,7 @@ const AccountSettings = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const reduce = !!useReducedMotion();
+  const { trigger: shake, shakeClass } = useShake();
 
   const [activeCategory, setActiveCategory] = useHashState<SettingsCategory>('section', 'profile', SECTION_IDS);
   const [vaultOpen, setVaultOpen] = useState(false);
@@ -1015,7 +1073,8 @@ const AccountSettings = () => {
         setMfaEnrollmentId('');
         loadMfaFactors();
       } else {
-        toast({ title: 'Invalid Code', description: 'Please check the code and try again', variant: 'destructive' });
+        shake();
+      toast({ title: 'Invalid Code', description: 'Please check the code and try again', variant: 'destructive' });
       }
     }
     setMfaVerifying(false);
@@ -1207,6 +1266,7 @@ const AccountSettings = () => {
       setConfirmPassword('');
       setChangingPassword(false);
     } catch (error: any) {
+      shake();
       toast({ title: 'Password change failed', description: error.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
@@ -1469,44 +1529,45 @@ const AccountSettings = () => {
           )}
 
           {mfaSetupMode && (
-            <div className="tv-mfa-flow">
-              <div className="tv-qr-dark" dangerouslySetInnerHTML={{ __html: mfaQrCode }} />
-              <div className="tv-secret-pill">
-                <code title={mfaSecret}>{mfaSecret}</code>
-                <button type="button" className="tv-pill-btn ghost icon sm" onClick={handleCopySecret} aria-label="Copy key">
-                  {secretCopied ? <Ico.Check size={13} /> : <Ico.Copy size={13} />}
-                </button>
+            <div className={`tv-totp ${shakeClass}`}>
+              <div className="tv-totp-head">
+                <div>
+                  <b>Set up authenticator</b>
+                  <span>Scan the code, then enter the six-digit code to confirm.</span>
+                </div>
+                <span className="tv-totp-step">Step 1 of 2</span>
               </div>
-              <input
-                className="tv-input sa-mono"
-                style={{ maxWidth: 220, height: 46, fontSize: 18, textAlign: 'center', letterSpacing: '0.38em' }}
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                value={mfaVerifyCode}
-                onChange={(e) => setMfaVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                onKeyDown={(e) => { if (e.key === 'Enter' && mfaVerifyCode.length === 6 && !mfaVerifying) handleVerifyMfa(); }}
-                placeholder="000000"
-                autoFocus
-              />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className="tv-pill-btn sm ghost"
-                  onClick={() => { setMfaSetupMode(false); setMfaVerifyCode(''); setMfaQrCode(''); setMfaSecret(''); setMfaEnrollmentId(''); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="tv-pill-btn sm lead"
-                  onClick={handleVerifyMfa}
-                  disabled={mfaVerifying || mfaVerifyCode.length !== 6}
-                >
-                  {mfaVerifying && <Spinner size={12} />}
-                  Verify
-                </button>
+
+              <div className="tv-totp-body">
+                <div className="tv-qr-card">
+                  <img src={mfaQrCode} alt="Authenticator QR code" />
+                </div>
+                <div className="tv-totp-side">
+                  <p className="tv-totp-label">Can’t scan? Use this key</p>
+                  <div className="tv-secret-pill">
+                    <code title={mfaSecret}>{mfaSecret}</code>
+                    <button type="button" className="tv-pill-btn ghost icon sm" onClick={handleCopySecret} aria-label="Copy key">
+                      {secretCopied ? <Ico.Check size={13} /> : <Ico.Copy size={13} />}
+                    </button>
+                  </div>
+                  <p className="tv-totp-hint">Codes refresh every 30 seconds. Never share this key.</p>
+                </div>
+              </div>
+
+              <div className="tv-totp-verify">
+                <p className="tv-totp-label">Verification code</p>
+                <OtpInput value={mfaVerifyCode} onChange={setMfaVerifyCode} onComplete={() => { if (!mfaVerifying && mfaVerifyCode.length === 6) handleVerifyMfa(); }} />
+                <div className="tv-otp-actions">
+                  <button type="button" className="tv-pill-btn sm ghost"
+                    onClick={() => { setMfaSetupMode(false); setMfaVerifyCode(''); setMfaQrCode(''); setMfaSecret(''); setMfaEnrollmentId(''); }}>
+                    Cancel
+                  </button>
+                  <button type="button" className="tv-pill-btn sm lead" onClick={handleVerifyMfa}
+                    disabled={mfaVerifying || mfaVerifyCode.length !== 6}>
+                    {mfaVerifying && <Spinner size={12} />}
+                    Verify & enable
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1592,6 +1653,7 @@ const AccountSettings = () => {
         >
           {changingPassword && (
             <form
+              className={shakeClass}
               style={{ display: 'grid', gap: 10 }}
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1943,6 +2005,7 @@ const AccountSettings = () => {
       <div className="tv-stack tv-enc">
         <BYOKSettingsCard className="tv-enc-card" />
         <SDESettingsCard className="tv-enc-card" />
+        <VaultRecoveryCard />
       </div>
     ),
     developer: renderDeveloperSection,

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Lock, X, Shield } from '@/lib/icon-map';
 import { unlockVault } from '@/lib/zk-vault-session';
 import { verifyVaultPassword } from '@/lib/zk-vault-verify';
+import { useShake } from '@/hooks/use-shake';
 
 interface Props {
   open: boolean;
@@ -16,6 +17,7 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const { trigger: shake, shakeClass } = useShake();
 
   const submit = async () => {
     if (!password) return;
@@ -28,6 +30,7 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
       onUnlocked?.();
       onClose();
     } catch {
+      shake();
       setError('Could not unlock the vault');
     } finally { setBusy(false); }
   };
@@ -36,7 +39,7 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
     <AnimatePresence>
       {open && (
         <motion.div className="vu-root" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <motion.div className="vu-card vu-glass"
+          <motion.div className={`vu-card vu-glass ${shakeClass}`}
             initial={{ opacity: 0, scale: 0.9, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: 8 }} transition={{ type: 'spring', stiffness: 420, damping: 28 }}>
             <div className="vu-ico"><Lock size={20} /></div>

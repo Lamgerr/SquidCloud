@@ -216,3 +216,10 @@
 - Encryption category: BYOK/SDESettingsCard were still on the old white/5 + amber/purple/emerald Tailwind look. Wrapped them with tv-enc/tv-enc-card and scoped overrides to monochrome glass, neutral icons/badges/inputs/pills.
 - Settings pages now carry the same faint bone-white + green ambient wash as auth and dashboard.
 - Vercel READY.
+
+## 2026-11-25 — Settings layout fix, TOTP redesign, shake, vault recovery UI
+- User repeated that the settings layout bug and rectangle rail were still wrong. Removed the enclosing rail container entirely (no background/border/shadow on desktop); items float with only a glass layoutId thumb on the active one. Shell is centred with 196px rail + 720px pane and a fixed column gap, so fields are no longer stretched. Mobile keeps a horizontal glass strip for usability.
+- TOTP screenshot showed literal "data:image/svg+xml;utf-8," above the QR: enrollment.totp.qr_code is a data URI, but it was injected with dangerouslySetInnerHTML. Replaced with `<img src={mfaQrCode}>`; rebuilt the flow as a two-step glass panel with QR card, copyable secret and six segmented OTP inputs (verified against mfaVerifyCode state).
+- Verified Apple/macOS password shake keyframes from CSS-Tricks (cubic-bezier(.36,.07,.19,.97), five damped oscillations). Added .shake-on to index.css and a useShake hook that replays on every error. Wired into Auth login, VaultUnlockDialog, MFA verify and AccountSettings password change.
+- Added VaultRecoveryCard to Encryption: explains forgotten vault passwords are unrecoverable, requires typed ERASE, then shows visible step-by-step formatting progress. SKIPPED — needs a human: no destructive purge endpoint was written or executed; the UI invokes vault-reset which does not exist yet.
+- Vercel READY.

@@ -13,6 +13,7 @@ import { getOAuthRedirectUrl, getPasswordRecoveryRedirectUrl } from '@/lib/appLi
 import { getClientIp } from '@/lib/clientIp';
 import { emitSignal } from '@/lib/api';
 import SquidLogo from '@/components/ui/SquidLogo';
+import { useShake } from '@/hooks/use-shake';
 import {
   AppShell, Spinner, Ico, useDocTitle,
 } from '@/components/custom/squid-app';
@@ -181,6 +182,7 @@ function Field({ id, label, icon, type = 'text', value, onChange, placeholder, a
 
 const Auth = () => {
   const reduce = !!useReducedMotion();
+  const { trigger: shake, shakeClass } = useShake();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -335,6 +337,7 @@ const Auth = () => {
         toast({ title: 'Account created', description: 'Welcome to SquidCloud!' });
       }
     } catch (error: any) {
+      shake();
       toast({ title: 'Authentication Failed', description: error?.message || 'Please check your credentials and try again.', variant: 'destructive' });
       if (isLogin) {
         setTimeout(async () => {
@@ -545,7 +548,7 @@ const Auth = () => {
                       type="email" placeholder="Email address" value={email} onChange={setEmail}
                       autoComplete={isLogin ? 'username' : 'email'} autoFocus={isLogin} />
 
-                    <div>
+                    <div className={shakeClass}>
                       <Field id="password" label="Password" icon={<Lock className="h-4 w-4" />}
                         type={showPassword ? 'text' : 'password'} placeholder="Password" value={password}
                         onChange={setPassword} autoComplete={isLogin ? 'current-password' : 'new-password'} end={eyeToggle} />
