@@ -1992,7 +1992,7 @@ const AccountSettings = () => {
                       transition={
                         reduce
                           ? { duration: 0.01 }
-                          : { type: 'spring', stiffness: 400, damping: 24, mass: 0.8 }
+                          : { type: 'spring', stiffness: 380, damping: 21, mass: 0.8 }
                       }
                     />
                   )}

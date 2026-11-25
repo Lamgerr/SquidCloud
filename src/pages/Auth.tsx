@@ -17,6 +17,10 @@ import {
   AppShell, Spinner, Ico, useDocTitle,
 } from '@/components/custom/squid-app';
 
+/* Same glass-segment vocabulary as EnterpriseSidebar. */
+const THUMB = { type: 'spring' as const, stiffness: 380, damping: 21, mass: 0.8 };
+const TAP = { type: 'spring' as const, stiffness: 600, damping: 16 };
+
 const AUTH_CSS = `
 .ax-root{
   --tx:var(--sa-text,#e8e7e1);--mute:var(--sa-mute,#8d8f89);--dim:var(--sa-dim,#62655f);
@@ -42,11 +46,17 @@ const AUTH_CSS = `
 .ax-title{margin:0;text-align:center;font-size:clamp(32px,5vw,46px);font-weight:600;letter-spacing:-.045em;line-height:1.06;color:var(--tx)}
 .ax-sub{margin:12px 0 0;text-align:center;font-size:14px;line-height:1.55;color:var(--mute)}
 
-.ax-modes{display:flex;justify-content:center;gap:22px;margin-top:30px}
-.ax-mode{position:relative;display:inline-flex;align-items:center;min-height:38px;padding:0 0 8px;border:0;
-  background:none;color:var(--mute);font:inherit;font-size:14px;cursor:pointer;transition:color .2s}
-.ax-mode[data-on="true"]{color:var(--tx)}
-.ax-mode-underline{position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--tx)}
+.ax-modes{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:26px;padding:4px;border-radius:999px;
+  background:var(--sa-bg-2,#0e1110);
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.05),0 0 0 1px var(--hair),0 12px 30px -18px rgba(0,0,0,.7)}
+.ax-mode{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 10px;
+  border:0;border-radius:999px;background:transparent;color:var(--mute);font:inherit;font-size:13px;cursor:pointer;
+  transition:color .18s;-webkit-tap-highlight-color:transparent}
+.ax-mode:hover,.ax-mode[data-on="true"]{color:var(--tx)}
+.ax-mode-thumb{position:absolute;inset:0;border-radius:999px;
+  background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-3,#141816));
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.08),0 0 0 1px rgba(232,231,225,.1),0 6px 18px -6px rgba(0,0,0,.55)}
+.ax-mode-label{position:relative;z-index:1}
 
 .ax-passkey{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:46px;margin-top:24px;
   padding:0 12px;border:0;border-bottom:1px solid var(--hair);background:transparent;color:var(--mute);
@@ -495,9 +505,12 @@ const Auth = () => {
                             setPassword('');
                             setShowPassword(false);
                           }}>
-                          {m === 'login' ? 'Sign in' : 'Create account'}
-                          {active && <motion.span layoutId="ax-mode-underline" className="ax-mode-underline"
-                            transition={reduce ? { duration: 0.01 } : { duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }} />}
+                          {active && <motion.span layoutId="ax-mode-thumb" className="ax-mode-thumb"
+                            transition={reduce ? { duration: 0.01 } : THUMB} />}
+                          <motion.span className="ax-mode-label"
+                            whileTap={reduce ? undefined : { scale: 0.92 }} transition={reduce ? { duration: 0.01 } : TAP}>
+                            {m === 'login' ? 'Sign in' : 'Create account'}
+                          </motion.span>
                         </button>
                       );
                     })}

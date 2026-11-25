@@ -192,3 +192,11 @@
 - Removed the centre logo mark; top-left brand stays. Replaced the malformed hand-written passkey SVG with lucide `Fingerprint`. Replaced Google/Discord marks with clean single-colour simple-icons paths; GitHub uses lucide `Github`.
 - Root cause of the stray rounded outline in the screenshot: the global `:focus-visible` rule included inputs, overriding the bare-field underline. Scoped it to buttons and links only.
 - Vercel READY.
+
+## 2026-11-25 — Glass spring vocabulary across auth + settings pages
+- User asked for the EnterpriseSidebar glass/spring feel on the auth mode switch and the same cleanliness on all pages they named.
+- Read EnterpriseSidebar.tsx: THUMB spring {380,21,0.8}, ICON_TAP {600,16}, one shared layoutId thumb, glass gradient `sa-bg-4 -> sa-bg-3` with inset highlight + 1px rim + lifted shadow, idle mute / active text, 1px focus outline.
+- Auth: replaced the 1px text underline with a two-cell glass capsule; thumb uses the exact THUMB spring, label uses TAP spring, same gradient/rim/shadow recipe, sa-* tokens.
+- pages-polish.css.ts: the old file had a blanket `box-shadow:none !important` that was destroying the glass depth on AccountSettings/DeveloperAPI. Rewrote as a light alignment layer — keep glass, align tokens/type/focus/entrance, neutralize only stray white surfaces and green action colors.
+- Unified AccountSettings dock thumbnail spring from 400/24/0.8 to 380/21/0.8. DeveloperAPI already used THUMB.
+- Vercel READY.
