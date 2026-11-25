@@ -27,13 +27,18 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
     try {
       // The real vault passphrase is the BYOK account key passphrase stored
       // in user_encryption_settings (Argon2 hash). `vaults` is a legacy table.
-      const { data: enc } = await supabase
-        .from('user_encryption_settings')
-        .select('settings').eq('user_id', userId).maybeSingle();
-      const cfg = enc?.settings as any;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not signed in');
+      const resp = await fetch('/api/internal/vault', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ op: 'vault-pass-meta' }),
+      });
+      if (!resp.ok) throw new Error('Could not load vault settings');
+      const meta = await resp.json();
       let ok = false;
-      if (cfg?.account_key_hash && cfg?.account_key_salt) {
-        ok = await verifyKeyHash(password, base64ToArrayBuffer(cfg.account_key_salt), cfg.account_key_hash);
+      if (meta.account_key_hash && meta.account_key_salt) {
+        ok = await verifyKeyHash(password, base64ToArrayBuffer(meta.account_key_salt), meta.account_key_hash);
       } else {
         ok = await verifyVaultPassword(userId, password);
       }

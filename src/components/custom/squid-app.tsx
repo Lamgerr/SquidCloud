@@ -161,12 +161,9 @@ html.sq-app-root[data-scale="xlarge"] { --sq-scale: 1.32; }
 
 /* Ambient depth wash — neutral, very quiet, behind everything */
 html.sq-app-root body { background: var(--sa-bg) !important; }
-html.sq-app-root body::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: -1;
-  background:
-    radial-gradient(65% 45% at 88% -12%, var(--sa-accent-soft), transparent 70%),
-    radial-gradient(55% 40% at -8% 108%, rgba(232,231,225,0.025), transparent 72%);
-}
+/* Ambient wash lives on .sa (the full-document shell), not on a fixed body
+   pseudo-element — a fixed layer ends at the first viewport and leaves a seam. */
+html.sq-app-root body::before { display: none !important; }
 html.sq-app-root.light body::before { opacity: 0.55; }
 
 /* Elevated surfaces: tonal gradient + rim + lifted shadow (real depth) */
@@ -383,7 +380,13 @@ html.sq-app-root .mono-aurora::before { display: none; }
 html.sq-app-root :is(.lg-entrance-fade, .lg-entrance-scale, .lg-entrance-slide, .lg-glass-enter, .animate-enter, .slide-fade-in) { animation-duration: 0.14s; }
 
 /* ── App shell ── */
-.sa { position: relative; min-height: calc(100vh / var(--sa-zoom, 1)); background: var(--sa-bg); color: var(--sa-text); font-family: var(--sa-f); font-size: 14px; line-height: 1.5; }
+.sa { position: relative; min-height: calc(100vh / var(--sa-zoom, 1));
+  background-color: var(--sa-bg);
+  background-image:
+    radial-gradient(65% 45% at 88% -12%, var(--sa-accent-soft), transparent 70%),
+    radial-gradient(55% 40% at -8% 108%, rgba(232,231,225,0.025), transparent 72%);
+  background-size: 100% 100%; background-repeat: no-repeat;
+  color: var(--sa-text); font-family: var(--sa-f); font-size: 14px; line-height: 1.5; }
 .sa *, .sa *::before, .sa *::after { box-sizing: border-box; }
 .sa a { color: inherit; }
 :where(.sa) a:focus-visible, :where(.sa) summary:focus-visible, :where(.sa) [role="tab"]:focus-visible,

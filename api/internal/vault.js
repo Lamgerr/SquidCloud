@@ -68,6 +68,18 @@ export default async function handler(req, res) {
     return send(res, { ok: true });
   }
 
+  // Vault passphrase verification metadata (hash + salt only, never key).
+  // Returned by the BFF so the browser never opens a Supabase REST socket.
+  if (op === 'vault-pass-meta') {
+    const { data } = await admin.from('user_encryption_settings')
+      .select('settings').eq('user_id', user.id).maybeSingle();
+    const cfg = data?.settings || {};
+    return send(res, {
+      account_key_hash: cfg.account_key_hash || null,
+      account_key_salt: cfg.account_key_salt || null,
+    });
+  }
+
   // Security events are written with the service role so anon RLS/grants
   // never leak into the client. Identity comes from the verified token.
   if (op === 'security-event') {

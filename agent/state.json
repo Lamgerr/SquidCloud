@@ -48,7 +48,10 @@
     "2026-11-25: security_events 42501 errors came from direct anon INSERTs. Routed security event logging through BFF with a separate service-role admin client (the user-JWT client still hit RLS).",
     "2026-11-25: system_settings maintenance_mode anon 42501 fixed by serving public status through BFF using service-role admin client; updates are admin-gated. Verified public read 200, unauth event write 401.",
     "2026-11-25: Layout seam/rail box: body::before was position:fixed (viewport only); changed to absolute + body background, removed page gradients, added inline overrides on .tv-root/.tv-rail so cached CSS cannot restore the box.",
-    "2026-11-25: Vault reset now signs the user out and redirects to /auth?reason=vault-reset to force re-authentication."
+    "2026-11-25: Vault reset now signs the user out and redirects to /auth?reason=vault-reset to force re-authentication.",
+    "2026-11-25: CORS regression fixed: VaultUnlockDialog no longer queries user_encryption_settings directly; it calls BFF op vault-pass-meta (service-role) which returns only the Argon2 hash+salt, and verifies locally. Restored supabase import needed for getSession().",
+    "2026-11-25: Layout seam root cause final: body::before was fixed (and absolute still resolved to viewport because body is not positioned). Moved ambient wash to .sa (full-document shell) with background-size 100% 100% and disabled body::before globally; settings roots also use document-sized wash.",
+    "2026-11-25: Reverted accidental version bump from local npm run build. Vercel READY; BFF vault-pass-meta 401 unauth, maintenance 200 public verified."
   ],
   "key_numbers": {
     "audits": 2,

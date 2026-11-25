@@ -246,3 +246,9 @@
 - Layout: global body::before was position:fixed so it ended at the first viewport; changed to absolute and set html body background. Removed all gradients from settings roots and added inline overrides to .tv-root and .tv-rail so the rectangle/seam cannot come back from stale CSS.
 - Vault reset success now calls supabase.auth.signOut() and redirects to /auth?reason=vault-reset.
 - Vercel READY.
+
+## 2026-11-25 — CORS regression + final layout seam root cause
+- Firefox reported CORS block on direct REST call to user_encryption_settings from VaultUnlockDialog. That call was introduced in the previous fix. Replaced with BFF op vault-pass-meta; BFF reads settings with service role and returns only account_key_hash + account_key_salt; client verifies with Argon2 locally. No direct Supabase REST from that component.
+- Realtime websocket error originates from other Supabase channels (signals/support/share surveillance), not the maintenance hook which was already made BFF-only. Not changed here.
+- Layout seam: `body::before` with position:fixed only covers first viewport; changing to absolute did not help because body is not a positioning context. Final fix: disable body::before globally for sq-app-root and paint the wash on `.sa` (the full-document shell) with background-size:100% 100%; settings roots carry the same document-sized wash.
+- Vercel READY. Verified: vault-pass-meta unauth 401, maintenance public 200.
