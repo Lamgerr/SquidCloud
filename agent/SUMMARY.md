@@ -1,19 +1,17 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- **Auth**: monochrome, dashboard-consistent, glass segmented switcher, Apple-style shake on failed sign-in, proper passkey/OAuth SVGs.
-- **AccountSettings**: centred shell, no boxed rail, TOTP panel with real QR + six-digit input, vault security in Security, encryption cards monochrome glass. Background seam (fixed attachment) removed.
-- **Vault reset is BFF-gated**: browser calls `POST /api/internal/vault` (`op: reset-vault`) with the session JWT; the BFF verifies identity and invokes the Supabase edge function server-side. No direct Supabase call from the client. Edge function requires verified email, fresh session, TOTP `aal2` if enrolled, passkey verification if registered, and typed `ERASE`; deletes folders, files, keys, shares and all storage objects under the user prefix. Deployed via Supabase CLI (`verify_jwt=true`, unauthenticated call returns 401).
-- **Skills**: 99 installed globally, including OWASP secure-agent-playbook, briiirussell cybersecurity skills, `headless-bff-architecture`, and the 37 UI/UX skills.
-- Repo public/clean, release v13.0.38. Vercel READY.
+- **BFF hang fixed**: `POST /api/internal/vault` was timing out because the handler returned objects instead of writing to `res`. All responses now use `res.status().json()`; live unauthenticated call returns 401 immediately.
+- **Vault reset gates corrected**: removed the self-imposed 10-minute session-age gate that produced edge 403. Keeps verified email, TOTP `aal2` when enrolled, passkey verification when registered, and typed `ERASE`. Edge function redeployed.
+- **Settings layout seam fixed**: the global `body::before` wash was viewport-fixed and ended at 100vh; it is now disabled on settings pages and the wash is painted on the page root. Rail forced transparent/borderless at all widths.
+- Auth and other settings UI work from earlier turns remains in place. Vercel READY.
 
 ## Blocked — needs a decision
 - Supabase service-role key from old history still live; user deprioritized rotation.
 - No local browser rendering; cannot self-verify visual quality.
-- BFF endpoint returned curl 000 from this sandbox (network limitation); its live response was not verified here. Edge function unauthenticated gate was verified.
 
 ## Queued next
-1. Await user verdict on the BFF-gated reset and settings layout.
-2. Apply the same BFF pattern to any other destructive Supabase operation if requested.
+1. User to retest the reset flow and screenshot the settings page.
+2. If reset returns 428, complete the requested TOTP/passkey step-up in the dialog.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
