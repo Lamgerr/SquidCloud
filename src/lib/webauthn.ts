@@ -38,6 +38,17 @@ function base64UrlToUint8Array(str: string): Uint8Array {
   return base64UrlToBytes(str);
 }
 
+
+async function getPublicKeyJwk(credential: PublicKeyCredential): Promise<JsonWebKey | null> {
+  try {
+    const att = credential.response as AuthenticatorAttestationResponse;
+    const spki = att.getPublicKey?.();
+    if (!spki) return null;
+    const key = await crypto.subtle.importKey('spki', spki, { name: 'ECDSA', namedCurve: 'P-256' }, true, []);
+    return await crypto.subtle.exportKey('jwk', key);
+  } catch { return null; }
+}
+
 export async function registerPasskey(
   userId: string,
   email: string,
@@ -90,6 +101,7 @@ export async function registerPasskey(
           response: { clientDataJSON, attestationObject },
           type: credential.type,
         },
+        publicKeyJwk: await getPublicKeyJwk(credential),
       },
     });
 
