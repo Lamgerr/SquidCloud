@@ -1,3 +1,4 @@
+import { V4_KEY_LABEL } from './e2e-upload-policy';
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileWithRes54, downloadFileWithRes54, isRawStorageRow, downloadRawStorageObject } from "./res54";
 import { decryptData, encryptData, generateEncryptionKey } from "./encryption";
@@ -816,11 +817,28 @@ export const uploadFile = async (
     // server only ever holds ciphertext it cannot decrypt.
     let zkMeta: { salt: string; iv: string } | null = null;
     let uploadSource = file;
+    let v4Salt: string | null = null;
+    let v4Meta: import('./e2e-v4-upload').V4UploadMeta | null = null;
     if (authUser) {
-      const sealed = await zkEncryptForUpload(file, authUser.id);
-      if (sealed) { uploadSource = sealed.file; zkMeta = sealed.meta; }
+      const { prepareV4Upload } = await import('./e2e-v4-upload');
+      const prepared = await prepareV4Upload(file, authUser.id);
+      if (prepared) {
+        uploadSource = prepared.file;
+        v4Salt = prepared.saltB64;
+        v4Meta = prepared.meta;
+      } else {
+        const sealed = await zkEncryptForUpload(file, authUser.id);
+        if (sealed) { uploadSource = sealed.file; zkMeta = sealed.meta; }
+      }
     }
-    const { id } = await uploadFileWithRes54(uploadSource, onProgress);
+    if (v4Meta) {
+      const { setPendingV4Meta } = await import('./res54');
+      setPendingV4Meta(v4Meta);
+    }
+    const { id, metadata } = await uploadFileWithRes54(uploadSource, onProgress, undefined, !!v4Meta);
+    if (v4Meta && authUser && id) {
+      await import('./e2e-v4-store').then(m => m.saveV4Meta(id, authUser.id, v4Meta!.saltB64)).catch(() => {});
+    }
     if (zkMeta && authUser) {
       await zkSaveMeta(id, authUser.id, zkMeta.salt, zkMeta.iv).catch(() => {});
     }

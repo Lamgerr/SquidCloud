@@ -1,3 +1,5 @@
+import { isLegacyManagedUpload, V4_KEY_LABEL } from './e2e-upload-policy';
+import { setPendingV4Meta, takePendingV4Meta, decryptV4File, isV4Sealed, type V4UploadMeta } from './e2e-v4-upload';
 import { supabase } from "@/integrations/supabase/client";
 import { decryptData, generateEncryptionKey, detectEncryptionVersion } from "./encryption";
 import { getLoadBalancer } from "@/services/load-balancer";
@@ -526,7 +528,8 @@ async function processChunksInParallel<T>(
 export const uploadFileWithRes54 = async (
   file: File,
   progressCallback?: (progress: number, stage: string, details?: any) => void,
-  providerId?: string
+  providerId?: string,
+  sealedV4 = false
 ): Promise<{ id: string, metadata: Res54FileMetadata, encryptionKey: string }> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Authentication required");
@@ -597,7 +600,10 @@ export const uploadFileWithRes54 = async (
   let metadata: Res54FileMetadata;
 
   const byokPolicy = await getBYOKRuntimePolicy(user.id);
-  const { encryptionKey } = await resolveUploadEncryptionKey(file, user.id, byokPolicy.enabled, totalChunks);
+  const pendingV4 = sealedV4 ? takePendingV4Meta() : null;
+  const { encryptionKey } = pendingV4
+    ? { encryptionKey: V4_KEY_LABEL }
+    : await resolveUploadEncryptionKey(file, user.id, byokPolicy.enabled, totalChunks);
 
   if (useStreamingUpload) {
     const chunkMetadata: ChunkMetadata[] = [];
@@ -626,7 +632,7 @@ export const uploadFileWithRes54 = async (
           const start = chunkIndex * chunkSize;
           const end = Math.min(start + chunkSize, file.size);
           const chunk = await readFileChunk(file, start, end);
-          const encrypted = await encryptChunkDispatch(chunk, metadata.encryptionKey, chunkIndex);
+          const encrypted = pendingV4 ? chunk : await encryptChunkDispatch(chunk, metadata.encryptionKey, chunkIndex);
           return { encrypted, index: chunkIndex };
         })
       );
@@ -670,7 +676,7 @@ export const uploadFileWithRes54 = async (
     progressCallback?.(50, 'encrypting');
     
     const encryptChunk = async (chunk: ArrayBuffer, index: number): Promise<ArrayBuffer> => {
-      const encryptedChunk = await encryptChunkDispatch(chunk, metadata.encryptionKey, index);
+      const encryptedChunk = pendingV4 ? chunk : await encryptChunkDispatch(chunk, metadata.encryptionKey, index);
       progressCallback?.(50 + ((index + 1) / chunks.length * 10), 'encrypting', { current: index + 1, total: chunks.length });
       return encryptedChunk;
     };
@@ -721,9 +727,14 @@ export const uploadFileWithRes54 = async (
   
   progressCallback?.(90, 'finalizing');
   
-  const isVaultManagedUpload = !byokPolicy.enabled;
+  const isVaultManagedUpload = isLegacyManagedUpload(metadata);
+  const isV4Upload = metadata.encryptionKey === V4_KEY_LABEL;
   const rawUploadKey = isVaultManagedUpload ? metadata.encryptionKey : null;
-  const dbEncryptionKey = byokPolicy.enabled ? 'sha256:byok_encrypted' : 'managed_key';
+  const dbEncryptionKey = isV4Upload ? V4_KEY_LABEL : byokPolicy.enabled ? 'sha256:byok_encrypted' : 'managed_key';
+  if (pendingV4) {
+    (metadata as any).v4 = pendingV4;
+    (metadata as any).fileSize = pendingV4.originalSize;
+  }
   const metadataString = JSON.stringify({
     ...metadata,
     encryptionKey: dbEncryptionKey,
@@ -1050,6 +1061,19 @@ export const downloadFileWithRes54 = async (
     const sortedChunks = downloadedChunks.sort((a, b) => a.index - b.index).map(chunk => chunk.data);
     if (sortedChunks.length !== metadata.chunks.length) throw new Error(`Download incomplete`);
 
+    // E2E v4: chunks are opaque slices of one whole-file ciphertext.
+    const v4Meta = (metadata as any).v4 as V4UploadMeta | undefined;
+    if (metadata.encryptionKey === V4_KEY_LABEL && v4Meta) {
+      const sealedBytes = sortedChunks.map(c => base64ToArrayBuffer(c));
+      const total = sealedBytes.reduce((n, b) => n + b.byteLength, 0);
+      const joined = new Uint8Array(total);
+      let off = 0;
+      for (const b of sealedBytes) { const u = new Uint8Array(b); for (let i = 0; i < u.length; i++) joined[off++] = u[i]; }
+      const plain = await decryptV4File(joined.buffer, session?.user?.id || '', v4Meta);
+      progressCallback?.(100, 'complete');
+      return new Blob([plain], { type: v4Meta.originalType || metadata.fileType });
+    }
+
     // Zero-chunk records: a 0-byte file legitimately has no chunks;
     // anything else with an empty chunk list is a broken upload record.
     if (sortedChunks.length === 0) {
@@ -1329,3 +1353,5 @@ export async function resolveFileKeyForShare(fileId: string, encryptionKey: stri
   if (encryptionKey === 'sha256:byok_encrypted' || encryptionKey === 'byok_encrypted') return null;
   return encryptionKey;
 }
+
+
