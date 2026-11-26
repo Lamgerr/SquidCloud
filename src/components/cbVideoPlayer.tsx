@@ -346,8 +346,25 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
     StreamDecryptorService.seedFileMeta(file.id, shareId).then(async () => {
       if (!cancelled) {
         if (isV4 && !(await Streamer.seedV4Key(file.id, v4Meta!))) {
-          setHasErrorTracked(true);
-          setErrorMessage('Unlock your vault to stream this encrypted video');
+          // No in-memory master (e.g. after a reload): ask for a vault unlock,
+          // then decrypt on the main thread so playback still works.
+          window.dispatchEvent(new CustomEvent('squidcloud:vault-unlock-required', {
+            detail: { files: [{ id: file.id, name: file.name }] },
+          }));
+          try {
+            const blob = await downloadFileWithRes54(file.id, undefined, shareId ? { shareId } : undefined);
+            if (!cancelled) {
+              const url = URL.createObjectURL(blob);
+              setV4BlobUrl(url);
+              streamReadyRef.current = true;
+              setStreamReady(true);
+              return;
+            }
+          } catch (err: any) {
+            if (cancelled) return;
+            setHasErrorTracked(true);
+            setErrorMessage('Unlock your vault to play this encrypted video: ' + (err?.message || ''));
+          }
         }
         streamReadyRef.current = true;
         setStreamReady(true);
@@ -427,7 +444,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
     setHasErrorTracked(false); setBuffering(true); setLoadPhase('connecting'); setRetryCount((r) => r + 1);
   };
 
-  const activeVideoSource = !streamReady ? null : isUnsupportedContainer ? transcodedUrl : `/virtual-stream/${file.id}?retry=${retryCount}&q=${encodeURIComponent(quality)}`;
+  const activeVideoSource = !streamReady ? null : v4BlobUrl ? v4BlobUrl : isUnsupportedContainer ? transcodedUrl : `/virtual-stream/${file.id}?retry=${retryCount}&q=${encodeURIComponent(quality)}`;
 
   /* ── transport ── */
   const ui = isAudio || controlsVisible || !playing || menuOpen || scrubbing;

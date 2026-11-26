@@ -358,3 +358,6 @@
 ## 2026-11-26 — SW v4 key seeding race
 - The 500 "Decrypt failed" came from the SW taking the legacy path because SET_V4 never arrived: navigator.serviceWorker.controller was null at seed time. seedV4Key now awaits navigator.serviceWorker.ready (5s cap), copies the master before transferring, and the player awaits it. Bumped SW CACHE_NAME to v14 to force update.
 - SW now returns a clear 503 "Vault key not available for this stream" when e2e_v4 metadata exists but no v4 key was seeded, instead of attempting legacy decryption and returning 500.
+
+## 2026-11-26 — v4 stream missing-key fallback
+- When the in-memory v4 master is absent (page reload / unlock via a non-master path), seedV4Key returns false and the SW would 503. Player now dispatches squidcloud:vault-unlock-required and falls back to main-thread decrypt + object URL so playback still works; streaming remains the primary path when the master is available.
