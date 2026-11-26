@@ -1561,29 +1561,25 @@ export async function getFileShareId(fileId: string): Promise<string | null> {
 }
 
 // Get shared file information (for public access)
-export async function getSharedFileInfo(shareId: string): Promise<any> {
+export async function getSharedFileInfo(shareId: string, credentials?: {
+  password?: string; country?: string; deviceFingerprint?: string;
+}): Promise<any> {
   try {
-    const { data, error } = await supabase
-      .rpc('get_shared_file_info', { share_id_param: shareId });
-
-    if (error) {
-      console.error("Error getting shared file info:", error);
-      throw error;
+    const resp = await fetch('/api/internal/vault', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'share-meta', shareId, ...credentials }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (payload?.allowed === false) {
+      const err: any = new Error(payload.reason || 'Access denied');
+      err.code = payload.reason;
+      throw err;
     }
-
-    if (!data || (Array.isArray(data) && data.length === 0)) {
-      throw new Error("Shared file not found or expired");
-    }
-
-    const raw = Array.isArray(data) ? data[0] : data;
-    if (!raw || typeof raw !== 'object') {
-      throw new Error('Invalid shared file payload');
-    }
-
-    // Strip the original file encryption_key (never expose it)
-    // BUT preserve shared_encryption_key which is the share-specific wrapped key
-    const { encryption_key: _ignored, ...safePayload } = raw as Record<string, unknown>;
-    return safePayload;
+    if (!resp.ok || payload?.error) throw new Error(payload?.error || `Share metadata failed (${resp.status})`);
+    const info = payload?.info;
+    if (!info || typeof info !== 'object') throw new Error('Invalid shared file payload');
+    return info;
   } catch (error: any) {
     console.error("Error getting shared file info:", error);
     throw new Error(error.message || "Failed to get shared file information");

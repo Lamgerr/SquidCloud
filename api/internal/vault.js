@@ -4,6 +4,7 @@
  * cookie; this function derives identity server-side and uses RLS.
  */
 import { createClient } from '@supabase/supabase-js';
+import { releaseShareMeta } from './share-meta-policy.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -20,6 +21,26 @@ export default async function handler(req, res) {
   const admin = createClient(SUPABASE_URL, SERVICE, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // Share metadata is public only after check_share_access passes. No anon RPC.
+  if (body.op === 'share-meta') {
+    const shareId = String(body.shareId || '');
+    if (!shareId) return send(res, { error: 'shareId required' }, 400);
+    const { data: access, error: accessError } = await admin.rpc('check_share_access', {
+      p_share_id: shareId,
+      p_password: body.password || null,
+      p_country: body.country || null,
+      p_device_fingerprint: body.deviceFingerprint || null,
+    });
+    if (accessError) return send(res, { error: accessError.message }, 500);
+    if (!access?.allowed) return send(res, { allowed: false, reason: access?.reason || 'access_denied' }, 403);
+    const { data: row, error: rowError } = await admin.rpc('get_shared_file_info', { share_id_param: shareId });
+    if (rowError) return send(res, { error: rowError.message }, 500);
+    const first = Array.isArray(row) ? row[0] : row;
+    const released = releaseShareMeta(access, first || {});
+    if (!released) return send(res, { allowed: false, reason: 'access_denied' }, 403);
+    return send(res, { allowed: true, info: released });
+  }
 
   // Public share decrypt logging. Uses the live table's ip_address column;
   // the stale RPC inserts actor_ip which does not exist in production.

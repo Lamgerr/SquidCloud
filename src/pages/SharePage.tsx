@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,6 +126,7 @@ const SharePage: React.FC = () => {
   const [guardChecked, setGuardChecked] = useState(false);
   const [guardBlocked, setGuardBlocked] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
+  const sharePasswordRef = useRef<string | undefined>(undefined);
   const [passwordError, setPasswordError] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [burnNotice, setBurnNotice] = useState(false);
@@ -184,6 +185,7 @@ const SharePage: React.FC = () => {
 
       setBurnNotice(!!result.burn_after_reading);
       setWatermarkActive(!!result.watermark_email);
+      sharePasswordRef.current = password;
       logShareView(actualShareId!, userCountry || undefined).catch(() => {});
       setGuardChecked(true);
       setGuardLoading(false);
@@ -200,7 +202,15 @@ const SharePage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const fileInfo = await getFileInfoById(actualShareId);
+      if (!guardChecked) {
+        const allowed = await runGuardCheck();
+        if (!allowed) return;
+      }
+      const fileInfo = await getFileInfoById(actualShareId, {
+        password: sharePasswordRef.current,
+        country: userCountry || undefined,
+        deviceFingerprint: getDeviceFingerprint(),
+      });
 
       if (fileInfo.shared_encryption_key && shareSecret) {
         const key = await unwrapKey(fileInfo.shared_encryption_key, shareSecret);
@@ -218,7 +228,6 @@ const SharePage: React.FC = () => {
         finally { setLoadingFolder(false); }
       }
 
-      if (!guardChecked) { await runGuardCheck(); }
     } catch {
       setError('File not found or link expired.');
       setGuardLoading(false);
