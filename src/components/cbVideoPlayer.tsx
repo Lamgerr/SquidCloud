@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { StreamDecryptorService } from '@/lib/videoStreamer';
 import { downloadFileWithRes54 } from '@/lib/res54';
 import { readV4Meta } from '@/lib/e2e-v4-preview';
+import { StreamDecryptorService as Streamer } from '@/lib/videoStreamer';
 
 interface CBVideoPlayerProps {
   file: { id: string; name: string; type: string; size: number };
@@ -334,38 +335,20 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   const [transcodedUrl, setTranscodedUrl] = useState<string | null>(null);
   const [streamReady, setStreamReady] = useState(false);
   const streamReadyRef = useRef(false);
-  const isV4 = useMemo(() => !!readV4Meta(file), [file]);
+  const v4Meta = useMemo(() => readV4Meta(file), [file]);
+  const isV4 = useMemo(() => !!v4Meta, [v4Meta]);
   const [v4BlobUrl, setV4BlobUrl] = useState<string | null>(null);
 
   /* ── stream prep / transcode / retry: unchanged logic ── */
   useEffect(() => {
-    // New E2E files cannot be decrypted by the service worker (no key there).
-    // Decrypt on the main thread and play from a local object URL instead.
-    if (isV4) {
-      let cancelled = false;
-      downloadFileWithRes54(file.id, undefined, shareId ? { shareId } : undefined)
-        .then((blob) => {
-          if (cancelled) return;
-          const url = URL.createObjectURL(blob);
-          setV4BlobUrl(url);
-          streamReadyRef.current = true;
-          setStreamReady(true);
-        })
-        .catch((err) => {
-          console.error('[Player] v4 prepare failed:', err);
-          if (!cancelled) {
-            streamReadyRef.current = true;
-            setStreamReady(true);
-            setHasErrorTracked(true);
-            setErrorMessage('Failed to prepare encrypted video: ' + (err?.message || 'unknown'));
-          }
-        });
-      return () => { cancelled = true; };
-    }
     StreamDecryptorService.initListener(shareId);
     let cancelled = false;
     StreamDecryptorService.seedFileMeta(file.id, shareId).then(() => {
       if (!cancelled) {
+        if (isV4 && !Streamer.seedV4Key(file.id, v4Meta!)) {
+          setHasErrorTracked(true);
+          setErrorMessage('Unlock your vault to stream this encrypted video');
+        }
         streamReadyRef.current = true;
         setStreamReady(true);
         if (hasErrorRef.current) { setHasErrorTracked(false); setBuffering(true); setRetryCount((r) => r + 1); }
@@ -412,7 +395,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
       const virtualStreamUrl = `/virtual-stream/${file.id}`;
       const inputName = `input.${file.name.split('.').pop() || 'avi'}`;
       const outputName = 'output.mp4';
-      await ffmpeg.writeFile(inputName, await fetchFile(isV4 && v4BlobUrl ? v4BlobUrl : virtualStreamUrl));
+      await ffmpeg.writeFile(inputName, await fetchFile(virtualStreamUrl));
       setTranscodeMessage('Running ultrafast local video conversion...');
       setTranscodeProgress(15);
       await ffmpeg.exec(['-i', inputName, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-c:a', 'aac', outputName]);
@@ -444,7 +427,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
     setHasErrorTracked(false); setBuffering(true); setLoadPhase('connecting'); setRetryCount((r) => r + 1);
   };
 
-  const activeVideoSource = !streamReady ? null : isV4 ? v4BlobUrl : isUnsupportedContainer ? transcodedUrl : `/virtual-stream/${file.id}?retry=${retryCount}&q=${encodeURIComponent(quality)}`;
+  const activeVideoSource = !streamReady ? null : isUnsupportedContainer ? transcodedUrl : `/virtual-stream/${file.id}?retry=${retryCount}&q=${encodeURIComponent(quality)}`;
 
   /* ── transport ── */
   const ui = isAudio || controlsVisible || !playing || menuOpen || scrubbing;

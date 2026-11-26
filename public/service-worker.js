@@ -18,6 +18,8 @@ const metaCache = new Map();
 const urlCache = new Map();
 const decryptCache = new Map();
 const inflight = new Map();
+// v4 master keys are session-only, never written to IDB or cache.
+const v4State = new Map();
 
 const DB_NAME = 'sq-stream-v2';
 const DB_VERSION = 1;
@@ -198,6 +200,85 @@ async function fetchDecrypt(fileId, chunkIdx, encryptionKey, urls) {
   return p;
 }
 
+
+/* ── E2E v4 byte-range decryption ── */
+const SEALED_HEADER = 43;
+const FRAME_OVERHEAD = 12 + 16; // IV + GCM tag
+
+function b64ToBytes(s) {
+  const bin = atob(s);
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+async function v4FileKey(v4) {
+  const material = await crypto.subtle.importKey('raw', v4.master, { name: 'HKDF' }, false, ['deriveKey']);
+  const info = new TextEncoder().encode(`squidcloud/e2e-v4/file|${v4.userId}|${v4.fileId}`);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: b64ToBytes(v4.saltB64), info },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt'],
+  );
+}
+
+function v4Aad(v4, index, total) {
+  return new TextEncoder().encode(
+    `e2e-v4|${v4.userId}|${v4.fileId}|${v4.saltB64}|1|${index}|${total}`,
+  );
+}
+
+async function fetchV4Range(fileId, meta, v4, urls, startByte, endByte) {
+  const chunkSize = v4.chunkSize;
+  const total = v4.totalChunks;
+  if (!chunkSize || !total) return null;
+  const last = Math.min(total - 1, Math.floor((meta.fileSize - 1) / chunkSize));
+  const firstFrame = Math.floor(startByte / chunkSize);
+  const lastFrame = endByte === undefined ? last : Math.min(last, Math.floor(endByte / chunkSize));
+  if (firstFrame > lastFrame) return null;
+
+  const key = await v4FileKey(v4);
+  const pieces = [];
+
+  for (let i = firstFrame; i <= lastFrame; i++) {
+    const plainLen = Math.min(chunkSize, meta.fileSize - i * chunkSize);
+    const sealedStart = SEALED_HEADER + i * (chunkSize + FRAME_OVERHEAD);
+    const sealedLen = FRAME_OVERHEAD + plainLen;
+    const c0 = Math.floor(sealedStart / meta.chunkSize);
+    const c1 = Math.floor((sealedStart + sealedLen - 1) / meta.chunkSize);
+
+    const part = new Uint8Array(sealedLen);
+    let filled = 0;
+    for (let c = c0; c <= c1; c++) {
+      if (!urls[c]) return null; // chunks still being prepared — caller retries
+      const r = await fetch(urls[c], { cache: 'no-store' });
+      if (!r.ok) throw new Error('B2 ' + r.status);
+      const bytes = new Uint8Array(await r.arrayBuffer());
+      const from = Math.max(0, sealedStart - c * meta.chunkSize);
+      const to = Math.min(bytes.length, sealedStart + sealedLen - c * meta.chunkSize);
+      for (let b = from; b < to; b++) part[filled++] = bytes[b];
+    }
+    if (filled !== sealedLen) return null;
+
+    const iv = part.slice(0, 12);
+    const ciphertext = part.slice(12);
+    const plain = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, additionalData: v4Aad(v4, i, total), tagLength: 128 },
+      key,
+      ciphertext,
+    );
+    pieces.push(new Uint8Array(plain));
+  }
+
+  const totalPlain = pieces.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(totalPlain);
+  let off = 0;
+  for (const p of pieces) { out.set(p, off); off += p.length; }
+  const from = startByte - firstFrame * chunkSize;
+  const to = endByte === undefined ? out.length : Math.min(out.length, endByte - firstFrame * chunkSize + 1);
+  return out.slice(from, to);
+}
+
 function findChunk(chunks, fileSize, chunkSize, startByte) {
   if (!Number.isFinite(chunkSize) || chunkSize <= 0 || !Number.isFinite(startByte) || startByte < 0) {
     console.warn('[SW] invalid chunk layout', { chunkSize, startByte, chunks: chunks?.length, fileSize });
@@ -250,17 +331,25 @@ self.addEventListener('fetch', (event) => {
         if (m) { startByte = parseInt(m[1], 10); if (m[2]) endByte = parseInt(m[2], 10); }
       }
 
-      const t = findChunk(meta.chunks, meta.fileSize, meta.chunkSize, startByte);
-      if (!t) return new Response('Range OOB', { status: 416 });
-
-      if (!urls[t.idx]) {
-        return new Response('Chunk not ready', { status: 503, headers: { 'Retry-After': '1' } });
+      let sliced;
+      const v4 = v4State.get(fileId);
+      if (v4) {
+        const v4Slice = await fetchV4Range(fileId, meta, v4, urls, startByte, endByte);
+        if (!v4Slice) {
+          return new Response('Chunks not ready', { status: 503, headers: { 'Retry-After': '1' } });
+        }
+        sliced = v4Slice;
+      } else {
+        const t = findChunk(meta.chunks, meta.fileSize, meta.chunkSize, startByte);
+        if (!t) return new Response('Range OOB', { status: 416 });
+        if (!urls[t.idx]) {
+          return new Response('Chunk not ready', { status: 503, headers: { 'Retry-After': '1' } });
+        }
+        const plain = await fetchDecrypt(fileId, t.idx, meta.encryptionKey, urls);
+        const locStart = startByte - t.off;
+        const locEnd = endByte !== undefined ? Math.min(plain.byteLength - 1, endByte - t.off) : plain.byteLength - 1;
+        sliced = plain.slice(locStart, locEnd + 1);
       }
-
-      const plain = await fetchDecrypt(fileId, t.idx, meta.encryptionKey, urls);
-      const locStart = startByte - t.off;
-      const locEnd = endByte !== undefined ? Math.min(plain.byteLength - 1, endByte - t.off) : plain.byteLength - 1;
-      const sliced = plain.slice(locStart, locEnd + 1);
       const respEnd = startByte + sliced.byteLength - 1;
 
       return new Response(sliced, {
@@ -287,6 +376,10 @@ self.addEventListener('message', (event) => {
   if (d.type === 'SET_META') {
     metaCache.set(d.fileId, d.meta);
     idbPut('meta', d.fileId, d.meta);
+  }
+
+  if (d.type === 'SET_V4') {
+    v4State.set(d.fileId, d.v4); // memory only — never persisted
   }
 
   if (d.type === 'SET_URLS') {

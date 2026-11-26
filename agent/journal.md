@@ -350,3 +350,7 @@
 - Vault unlock dialog z-index raised to 2147483600 so it sits above other overlays when the vault is locked.
 - Dashboard drag/drop now switches to the Files tab before processing the upload.
 - Note: /virtual-stream for legacy videos returns a 403 region-block page from middleware for India; that is a deliberate geo policy, not changed.
+
+## 2026-11-26 — Geo fix and real v4 range streaming
+- DB already had IN=allow in kza_geo_fence, but anon lacked EXECUTE on kza_check_country_block(text,text); middleware failed closed with 401 -> 403 "Region Blocked" for everyone. Granted anon execute on both overloads (read-only). Verified RPC returns blocked:false for IN and /virtual-stream returns 200.
+- Replaced the v4 full-download player hack with proper byte-range streaming: videoStreamer.seedV4Key posts the in-memory master to the SW (memory-only, never IDB); SW now decrypts v4 frames on demand using HKDF + per-frame AAD and returns 206 ranges. Legacy range path unchanged.

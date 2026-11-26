@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { fetchFileEncryptionKey } from '@/lib/secure-file-metadata';
+import { getV4Master } from '@/lib/e2e-v4-session';
 
 const PREFETCH_COUNT = 8;
 const BATCH_SIZE = 10;
@@ -12,6 +13,30 @@ export class StreamDecryptorService {
   static initListener(shareId?: string) {
     if (!('serviceWorker' in navigator) || this.isListening) return;
     this.isListening = true;
+  }
+
+/** Hand the in-memory v4 master to the service worker for this session so it
+ *  can decrypt byte ranges on demand instead of downloading the whole file. */
+  static seedV4Key(fileId: string, meta: {
+    fileId: string; saltB64: string; userId?: string; chunkSize?: number; totalChunks?: number;
+  }): boolean {
+    const master = getV4Master();
+    if (!master) return false;
+    const controller = navigator.serviceWorker?.controller;
+    if (!controller) return false;
+    controller.postMessage({
+      type: 'SET_V4',
+      fileId,
+      v4: {
+        fileId: meta.fileId,
+        saltB64: meta.saltB64,
+        userId: meta.userId || '',
+        chunkSize: meta.chunkSize || 1024 * 1024,
+        totalChunks: meta.totalChunks || 1,
+        master: master.buffer,
+      },
+    }, [master.buffer]);
+    return true;
   }
 
   static async seedFileMeta(fileId: string, shareId?: string): Promise<void> {
