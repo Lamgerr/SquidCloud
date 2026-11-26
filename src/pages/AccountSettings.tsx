@@ -1,4 +1,5 @@
 import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
+import { rewrapMasterKey } from '@/lib/master-key-rewrap';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -1257,6 +1258,36 @@ const AccountSettings = () => {
         password: currentPassword,
       });
       if (signInError) throw new Error('Current password is incorrect');
+
+      // Keep encrypted files readable: rewrap the same master key under the
+      // new password before changing the auth password. File keys unchanged.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && user) {
+        const resp = await fetch('/api/internal/vault', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ op: 'vault-master-meta' }),
+        });
+        const meta = await resp.json().catch(() => ({}));
+        if (resp.ok && meta?.encrypted_master_key && meta?.kdf_salt) {
+          const [wrapped, iv] = String(meta.encrypted_master_key).split(':');
+          const rewrapped = await rewrapMasterKey({
+            wrapped, iv, salt: meta.kdf_salt,
+            iterations: Number(meta.kdf_iterations) || 310000,
+            version: Number(meta.key_version) || 1,
+          }, currentPassword, newPassword);
+          if (!rewrapped.ok || !rewrapped.next) throw new Error('Could not rewrap your vault key');
+          const { error: keyError } = await supabase.from('master_keys').update({
+            encrypted_master_key: `${rewrapped.next.wrapped}:${rewrapped.next.iv}`,
+            kdf_salt: rewrapped.next.salt,
+            kdf_iterations: rewrapped.next.iterations,
+            key_version: rewrapped.next.version,
+            last_rotated: new Date().toISOString(),
+          }).eq('user_id', user.id).eq('key_version', Number(meta.key_version) || 1);
+          if (keyError) throw new Error(keyError.message);
+        }
+      }
+
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
       void emitSignal({

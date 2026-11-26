@@ -107,12 +107,13 @@ export default async function handler(req, res) {
   // with a PBKDF2 key derived from the account sign-in password.
   if (op === 'vault-master-meta') {
     const { data } = await admin.from('master_keys')
-      .select('encrypted_master_key, kdf_salt, kdf_iterations')
+      .select('encrypted_master_key, kdf_salt, kdf_iterations, key_version')
       .eq('user_id', user.id).order('key_version', { ascending: false }).limit(1).maybeSingle();
     return send(res, {
       encrypted_master_key: data?.encrypted_master_key || null,
       kdf_salt: data?.kdf_salt || null,
       kdf_iterations: data?.kdf_iterations || 100000,
+      key_version: data?.key_version || 1,
     });
   }
 
