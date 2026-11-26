@@ -285,3 +285,8 @@
 - Added input-specific ::selection/focus/caret rules to all-pages-clean.css to kill the white/lime outline on text selection.
 - Four parallel agents applied the shared design to 34 pages (public/auth, workbench, docs/legal, viewers/editors), preserving all handlers/effects/API calls. GlassNav used for existing tabs/sections with unique layoutIds;PageFrame used for simple pages.
 - Removed emoji from user-visible strings/code samples to satisfy zero-emoji rule. Vercel READY. Live X11 verification: Profile and Webhooks render centred, symmetric, monochrome with the glass bar.
+
+## 2026-11-26 — Full file pipeline research (no code changes)
+- Four read-only agents mapped upload/encryption, share/preview/download, key/auth/recovery, and canonical docs; the highest-severity claims were verified directly in source.
+- Verified: default upload sends raw AES key to store-file-key and falls back to writing it into files.tags/encryption_key; server KEK can be derived from leaked service-role key; passkey-auth returns a magic-link OTP without verifying WebAuthn assertion; anon can call get_shared_file_info which returns wrapped key/metadata before password; BYOK passphrase uses Math.random; RES54 v3 and SDE derive deterministic GCM nonces; SDE stores root DMS in DB; social recovery, KTL guard and ratchet are unwired/dead; sealed preview only covers some viewers.
+- Canonical E2E spec is explicitly "awaiting approval; no code written" while README/SECURITY-MODEL describe ZK as live. Recommendation is a phased path: P0 close account takeover and key leak, P1 make v3/E2E the default with client-only keys and enforced step-up, P2 wire recovery/KTL and finish sealed rendering, P3 codify CI invariants and docs.

@@ -1,5 +1,5 @@
 {
-  "goal": "All non-marketing pages redesigned with shared floating glass navigation and symmetric monochrome shells",
+  "goal": "Review full file pipeline and recommend E2E/security improvements",
   "goal_source": "interactive query from human (404 on squidcloud-cluster legacy chunk downloads; deprecate deepread/books UI)",
   "last_actions": [
     "2026-11-24: Launched two read-only audits (client key handling; Supabase DB/functions) plus independent repo/CLI checks.",
@@ -63,7 +63,9 @@
     "2026-11-26: Added global all-pages-clean.css scoped by data-sq-clean/data-sq-page in App.tsx to every route except /, /pricing, /checkout. Neutralises hardcoded GitHub/navy palettes, blue/violet/green accents and white tints; one hairline border/tier, quiet headings, one focus ring. Verified live in existing Zen browser on share guard and webhooks pages.",
     "2026-11-26: Fixed global layer side effects: opaque bg-black mapping made dialog backdrops solid; added scoped translucent overlay rule with blur. Removed focus outline/box-shadow and ring colors from inputs/selects/textareas so no white outlines. Vercel READY.",
     "2026-11-26: Wrote short design doc docs/superpowers/specs/2026-11-26-all-pages-redesign-design.md. Added shared GlassNav (layoutId spring 380/21/0.8, tap 600/16) and PageFrame symmetric shell; wired GlassNav into global MainHeader.",
-    "2026-11-26: Applied shared design to 34 pages across four parallel groups (public/auth, workbench, docs/legal, viewers/editors) with logic preserved. Fixed input selection/focus outlines with input-specific ::selection/focus rules. Removed emoji from user-visible copy. Vercel READY; verified Profile and Webhooks live via X11."
+    "2026-11-26: Applied shared design to 34 pages across four parallel groups (public/auth, workbench, docs/legal, viewers/editors) with logic preserved. Fixed input selection/focus outlines with input-specific ::selection/focus rules. Removed emoji from user-visible copy. Vercel READY; verified Profile and Webhooks live via X11.",
+    "2026-11-26: Research-only audit of full file pipeline via four parallel agents plus direct verification. Confirmed default RES54 path escrows raw AES keys to server (res54.ts:774-791), server KEK falls back to service-role key (store-file-key/index.ts:34-43), passkey-auth never verifies WebAuthn assertion and returns magic-link OTP (passkey-auth/index.ts:131-169), share metadata/key is anon-reachable before password (get_shared_file_info grant), BYOK passphrase uses Math.random, v3/SDE use deterministic nonces, and recovery/KTL/ratchet are largely unwired.",
+    "2026-11-26: Canonical spec is still marked FINAL MERGED DRAFT awaiting approval; README/SECURITY-MODEL describe ZK features as live. Doc contradictions catalogued; no code changed."
   ],
   "key_numbers": {
     "audits": 2,
@@ -82,5 +84,5 @@
     "Supabase service-role key from old history still live; user explicitly deprioritized rotation.",
     "vault-reset edge function is not implemented; recovery UI will report failure until an authorized purge endpoint exists."
   ],
-  "next": "Continue live QA on remaining pages; deepen any page that still looks inconsistent."
+  "next": "Deliver prioritized E2E/security roadmap; await approval before implementation."
 }

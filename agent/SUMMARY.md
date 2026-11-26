@@ -1,23 +1,20 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- Every non-marketing route (`/` and `/pricing` excluded; `/checkout` also excluded) now uses one shared floating glass navigation primitive (`GlassNav`) with layoutId spring thumb 380/21/0.8 and tap 600/16, plus `PageFrame` symmetric shells.
-- Global MainHeader upgraded to the glass bar, so all pages using it are consistent immediately.
-- 34 pages redesigned across public/auth, workbench, docs/legal, and viewer/editor groups with behavior preserved (no handler/effect/API changes).
-- Input selection/focus outlines fixed with input-specific selection/focus rules; emoji removed from visible copy.
-- Share guard accepts link password or encryption key; dialogs translucent; vault/share BFF flows working.
-- Vercel READY, pushed to `fresh-main`.
+- Full file pipeline reviewed: upload/encryption, storage, share/preview/download, key management, auth/recovery, and canonical security docs. High-severity claims were verified directly in source.
+- Wrote `docs/superpowers/specs/2026-11-26-file-pipeline-security-review.md` with current state, confirmed gaps, target architecture, and a four-phase roadmap. No product code changed.
+- Earlier: all non-marketing pages use shared floating glass navigation and symmetric monochrome shells; share guard accepts password or encryption key; vault/share BFF flows and UI fixes in place. Vercel READY.
 
-## In progress
-- Live QA of remaining pages; deepen layout where anything still looks inconsistent.
+## Critical finding
+- The product is **not fully E2E today**: default uploads send raw AES keys to the server (`res54.ts:774-791`), the server KEK can derive from the leaked service-role key, `passkey-auth` skips WebAuthn verification and returns an OTP, and anon can reach share metadata/wrapped key before the password check.
 
-## Blocked / needs data
-- Supabase migration-history mismatch blocks DB migrations; fixes done at BFF layer.
-- Supabase service-role key from old history still live (deprioritized).
-- Design-doctrine automated gates (contrast/state/responsive scripts) were not run in this pass; visual verification was via live browser screenshots.
+## Blocked / needs a decision
+- Supabase service-role key from old history remains live; user previously deprioritized rotation, but real E2E requires rotating it.
+- Migration-history mismatch blocks DB migrations; schema fixes currently done at BFF layer.
+- Canonical E2E spec is still marked awaiting approval while README describes ZK as live; docs need alignment after implementation.
 
 ## Queued next
-1. Spot-check more pages in the live browser and fix any asymmetry.
-2. Run the design gate scripts if the user wants formal verification.
+1. Phase 0 from the review: fix passkey auth, close anon share key leak, stop raw-key escrow for new uploads.
+2. Then crypto correctness and E2E usability phases.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
