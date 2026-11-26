@@ -1095,6 +1095,7 @@ export const downloadFileWithRes54 = async (
     // E2E v4: chunks are opaque slices of one whole-file ciphertext.
     const v4Meta = (metadata as any).v4 as V4UploadMeta | undefined;
     if (metadata.encryptionKey === V4_KEY_LABEL && v4Meta) {
+      if (!v4Meta.userId && file?.user_id) v4Meta.userId = String(file.user_id);
       const sealedBytes = sortedChunks.map(c => base64ToArrayBuffer(c));
       const total = sealedBytes.reduce((n, b) => n + b.byteLength, 0);
       const joined = new Uint8Array(total);
@@ -1387,6 +1388,9 @@ export const downloadV4Preview = async (
     v4 = parsed?.v4 as V4UploadMeta | undefined;
   } catch { throw new Error('Failed to parse chunk metadata'); }
   if (!metadata?.chunks?.length || !v4?.fileId) throw new Error('File has no v4 preview metadata');
+  // Older v4 metadata predates the uploader-id field; the owner id is the
+  // next best source for the AAD/HKDF binding.
+  if (!v4.userId && record?.user_id) v4 = { ...v4, userId: String(record.user_id) };
 
   const isPartial = metadata.chunks.length > maxChunks;
   const targets = isPartial ? metadata.chunks.slice(0, maxChunks) : metadata.chunks;

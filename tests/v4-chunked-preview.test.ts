@@ -76,3 +76,15 @@ test("legacy single-frame v4 is distinguished from chunked v4", async () => {
   expect(isChunkedV4Sealed(new Uint8Array([0, 0, 0]))).toBe(false);
   clearV4Master();
 });
+
+test("AAD uses the uploader id stored in metadata, not the viewer id", async () => {
+  setV4Master(crypto.getRandomValues(new Uint8Array(32)));
+  const payload = "shared-file-content-" + "X".repeat(V4_PLAINTEXT_CHUNK_SIZE);
+  const prepared = await prepareV4Upload(new File([payload], "shared.txt"), "uploader-user");
+  expect(prepared!.meta.userId).toBe("uploader-user");
+
+  // Viewer has a different (or empty) id; metadata carries the uploader id.
+  const plain = await decryptV4File(await prepared!.file.arrayBuffer(), "", prepared!.meta, ktl);
+  expect(decode(plain)).toBe(payload);
+  clearV4Master();
+});

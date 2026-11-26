@@ -8,6 +8,7 @@ export type V4FileMeta = {
   originalName?: string;
   originalType?: string;
   version: 4;
+  userId?: string;
   chunkSize?: number;
   totalChunks?: number;
 };

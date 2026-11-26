@@ -22,6 +22,7 @@ export type V4UploadMeta = {
   originalName: string;
   originalType: string;
   version: 4;
+  userId?: string;
   chunkSize?: number;
   totalChunks?: number;
 };
@@ -83,6 +84,7 @@ export async function prepareV4Upload(
     }),
     meta: {
       fileId, saltB64,
+      userId,
       originalSize: file.size,
       originalName: file.name,
       originalType: file.type,
@@ -105,10 +107,16 @@ export function isV4Sealed(bytes: Uint8Array): boolean {
   return hasMagic(bytes, CHUNKED_V4_MAGIC) || hasMagic(bytes, LEGACY_V4_MAGIC);
 }
 
+/** AAD and HKDF info are bound to the user who uploaded the file, which may
+ *  differ from the viewer for shared files or anonymous sessions. */
+function cryptoUserId(userId: string, meta: V4UploadMeta): string {
+  return meta.userId || userId;
+}
+
 async function fileKey(userId: string, meta: V4UploadMeta, salt: Uint8Array) {
   const master = getV4Master();
   if (!master) throw new Error('Vault locked');
-  return deriveV4FileKey(master.buffer as ArrayBuffer, userId, meta.fileId, salt);
+  return deriveV4FileKey(master.buffer as ArrayBuffer, cryptoUserId(userId, meta), meta.fileId, salt);
 }
 
 /** Decrypt every complete frame available in the supplied prefix. Used for
@@ -130,6 +138,7 @@ export async function decryptV4Prefix(
   if (!chunkSize || !totalChunks) throw new Error('Invalid v4 header');
 
   const key = await fileKey(userId, meta, salt);
+  const aadUserId = cryptoUserId(userId, meta);
   const pieces: Uint8Array[] = [];
   let offset = CHUNKED_HEADER_SIZE;
   for (let index = 0; index < totalChunks; index++) {
@@ -139,9 +148,13 @@ export async function decryptV4Prefix(
     if (offset + frameLength > bytes.length) break;
     const iv = bytes.slice(offset, offset + IV_BYTES);
     const ciphertext = bytes.slice(offset + IV_BYTES, offset + frameLength);
-    pieces.push(new Uint8Array(await decryptV4Chunk(
-      key, ciphertext, iv, makeV4Aad(userId, meta.fileId, v4SaltB64(salt), 1, index, totalChunks),
-    )));
+    try {
+      pieces.push(new Uint8Array(await decryptV4Chunk(
+        key, ciphertext, iv, makeV4Aad(aadUserId, meta.fileId, v4SaltB64(salt), 1, index, totalChunks),
+      )));
+    } catch {
+      throw new Error(`v4 chunk ${index} failed authentication — wrong key or AAD (file ${meta.fileId})`);
+    }
     offset += frameLength;
   }
   if (!pieces.length) throw new Error('No complete v4 chunk in the fetched prefix');
@@ -172,7 +185,7 @@ export async function decryptV4File(
   const iv = bytes.slice(LEGACY_V4_MAGIC.length + 32, LEGACY_HEADER_SIZE);
   const ciphertext = bytes.slice(LEGACY_HEADER_SIZE);
   const key = await fileKey(userId, meta, salt);
-  return decryptV4Chunk(key, ciphertext, iv, makeV4Aad(userId, meta.fileId, v4SaltB64(salt), 1, 0, 1));
+  return decryptV4Chunk(key, ciphertext, iv, makeV4Aad(cryptoUserId(userId, meta), meta.fileId, v4SaltB64(salt), 1, 0, 1));
 }
 
 export const V4_LABEL = V4_KEY_LABEL;

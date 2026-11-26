@@ -339,3 +339,8 @@
 ## 2026-11-26 — Legacy v4 preview fallback
 - "Not a chunked v4 file" came from previewing files uploaded before the chunked v4 format: they have v4 tags but a single whole-frame ciphertext.
 - Added exported isChunkedV4Sealed and made downloadV4Preview detect the old magic and fall back to downloadFileWithRes54 (full decrypt) for those files; new chunked files keep the prefix-only path.
+
+## 2026-11-26 — OperationError root cause in v4 decrypt
+- WebCrypto OperationError came from AAD/HKDF binding the viewer's user id instead of the uploader's. Shared files (and sessions without a user) therefore failed authentication.
+- Added userId to V4UploadMeta at upload; cryptoUserId() uses meta.userId first, falling back to record.user_id for older metadata and then to the passed id. Wrapped chunk decrypt failures with an explicit diagnostic message.
+- Verified with a RED-GREEN test that decrypting with an empty viewer id works when metadata carries the uploader id. 50 tests pass, gate passes, vercel READY.
