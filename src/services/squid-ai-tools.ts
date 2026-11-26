@@ -1,22 +1,11 @@
 import { assertClientKeyAvailable } from '@/lib/upload-guard';
 import { supabase } from '@/integrations/supabase/client';
-import { generateEncryptionKey, encryptData, decryptData } from '@/lib/encryption';
+import { decryptData } from '@/lib/encryption';
 import { emitWebhookEvent } from '@/lib/webhook-events';
 
 /* File keys are held in the server-side key vault, NEVER in files.encryption_key
    (a DB trigger hashes that column). These helpers use the same edge functions
    as the rest of the app so AI-created files are readable. */
-async function storeFileKey(fileId: string, key: string): Promise<boolean> { // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const { error } = await supabase.functions.invoke('store-file-key', { // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-      body: { fileId, key },
-    });
-    if (error) throw error;
-    return true;
-  } catch (e) { console.warn('[squid-ai] store-file-key failed', e); return false; }
-}
 async function fetchFileKey(fileId: string): Promise<string | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -202,54 +191,13 @@ export class SquidAITools {
     await assertClientKeyAvailable(user.id);
 
     try {
-      // Convert content to blob
+      // Route through the shared upload pipeline so the file receives a
+      // client-only v4 key (or a genuine BYOK key) — never an escrowed raw key.
       const blob = new Blob([content], { type: fileType || 'text/plain' });
       const file = new File([blob], fileName, { type: fileType || 'text/plain' });
-
-      // Generate encryption key
-      const encryptionKey = generateEncryptionKey();
-
-      // Read file as ArrayBuffer
-      const arrayBuffer = await file.arrayBuffer();
-
-      // Encrypt the file content
-      const encryptedData = await encryptData(arrayBuffer, encryptionKey);
-
-      // Convert encrypted data to blob for upload
-      const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
-
-      // Upload encrypted file to storage
-      const filePath = `${user.id}/${Date.now()}_${fileName}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('files')
-        .upload(filePath, encryptedBlob);
-
-      if (uploadError) throw uploadError;
-
-      // Create file record with encryption key
-      const { data: fileRecord, error: dbError } = await supabase
-        .from('files')
-        .insert({
-          user_id: user.id,
-          name: fileName,
-          size: blob.size, // Original size (not encrypted size)
-          type: fileType || 'text/plain',
-          storage_path: uploadData.path,
-          parent_folder: parentFolder || null,
-          is_deleted: false,
-          encrypted: true
-          // NOTE: never write the plaintext key here — a trigger hashes the column.
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
-      // Escrow the real key in the server-side vault so read/update can decrypt.
-      const keyStored = await storeFileKey(fileRecord.id, encryptionKey); // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
-      if (!keyStored) return { success: false, error: 'File uploaded but key escrow failed' };
-
-      return { success: true, fileId: fileRecord.id };
+      const { uploadFile } = await import('@/lib/api');
+      const created = await uploadFile(file, parentFolder || '');
+      return { success: true, fileId: created.id };
     } catch (error: any) {
       console.error('Create file error:', error);
       return { success: false, error: error.message };
@@ -272,24 +220,22 @@ export class SquidAITools {
 
     if (fileError) throw fileError;
 
-    // Download encrypted file from storage
+    // New writes use the RES54 pipeline and decrypt with the client-held key.
+    if (file.storage_path === 'res54_distributed') {
+      const { downloadFileWithRes54 } = await import('@/lib/res54');
+      const blob = await downloadFileWithRes54(fileId);
+      return new TextDecoder().decode(await blob.arrayBuffer());
+    }
+
+    // Legacy direct-storage rows still use the server-side key vault.
     const { data: encryptedContent, error: downloadError } = await supabase.storage
       .from('files')
       .download(file.storage_path);
-
     if (downloadError) throw downloadError;
-
-    // Fetch the real key from the server-side vault, not the hashed column
     const key = await fetchFileKey(fileId);
     if (!key) throw new Error('File key unavailable — this file may predate the key vault');
-
-    // Decrypt the file content
-    const encryptedText = await encryptedContent.text();
-    const decryptedBuffer = await decryptData(encryptedText, key);
-
-    // Convert ArrayBuffer to text
-    const decoder = new TextDecoder();
-    return decoder.decode(decryptedBuffer);
+    const decryptedBuffer = await decryptData(await encryptedContent.text(), key);
+    return new TextDecoder().decode(decryptedBuffer);
   }
 
   /**
@@ -310,43 +256,41 @@ export class SquidAITools {
         .eq('id', fileId)
         .eq('user_id', user.id)
         .single();
-
       if (fileError) throw fileError;
 
-      // Convert new content to ArrayBuffer
-      const encoder = new TextEncoder();
-      const contentBuffer = encoder.encode(newContent).buffer;
+      // Write the new content through the shared pipeline so it is encrypted
+      // with a client-held key (v4 or BYOK), never an escrowed raw key.
+      const blob = new Blob([newContent], { type: file.type || 'text/plain' });
+      const replacement = new File([blob], file.name, { type: file.type || 'text/plain' });
+      const { uploadFile } = await import('@/lib/api');
+      const created = await uploadFile(replacement, file.parent_folder || '');
 
-      // Prefer the real key from the vault (files.encryption_key is only a hash)
-      const encryptionKey = (await fetchFileKey(fileId)) || generateEncryptionKey();
+      const { data: newRow } = await supabase.from('files')
+        .select('storage_path, tags, encryption_key, encrypted_size')
+        .eq('id', created.id).single();
 
-      // Encrypt the new content
-      const encryptedData = await encryptData(contentBuffer, encryptionKey);
+      const { error: updateError } = await supabase.from('files').update({
+        size: newContent.length,
+        encrypted_size: newRow?.encrypted_size ?? null,
+        storage_path: newRow?.storage_path ?? 'res54_distributed',
+        tags: newRow?.tags ?? [],
+        encryption_key: newRow?.encryption_key ?? 'e2e_v4',
+      }).eq('id', fileId);
+      if (updateError) throw updateError;
 
-      // Convert encrypted data to blob
-      const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
+      // v4 metadata must follow the repointed chunks to the original file id.
+      const v4 = (newRow?.tags || []).map((t: any) => {
+        try { return JSON.parse(t)?.v4; } catch { return null; }
+      }).find(Boolean);
+      if (v4?.saltB64) {
+        const { saveV4Meta } = await import('@/lib/e2e-v4-store');
+        await saveV4Meta(fileId, user.id, v4.saltB64).catch(() => {});
+      }
 
-      // Update file in storage
-      const { error: uploadError } = await supabase.storage
-        .from('files')
-        .update(file.storage_path, encryptedBlob, {
-          upsert: true
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Ensure the key is in the vault when we generated a fresh one
-      await storeFileKey(fileId, encryptionKey); // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
-      await supabase
-        .from('files')
-        .update({
-          size: newContent.length, // Original size
-          encrypted_size: encryptedBlob.size
-        })
-        .eq('id', fileId);
-
+      await supabase.from('files').delete().eq('id', created.id);
       return { success: true };
     } catch (error: any) {
+      console.error('Update file error:', error);
       return { success: false, error: error.message };
     }
   }

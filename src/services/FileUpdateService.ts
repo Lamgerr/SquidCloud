@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { uploadFileWithRes54 } from '@/lib/res54';
 import { assertClientKeyAvailable } from '@/lib/upload-guard';
+import type { V4UploadMeta } from '@/lib/e2e-v4-upload';
 
 export interface FileUpdateResult {
   success: boolean;
@@ -60,15 +61,23 @@ export class FileUpdateService {
 
       await assertClientKeyAvailable(user.id);
 
+      const { prepareV4Upload } = await import('@/lib/e2e-v4-upload');
+      const prepared = await prepareV4Upload(updatedFile, user.id);
+      let v4Meta: V4UploadMeta | null = prepared ? prepared.meta : null;
+      let uploadSource = prepared ? prepared.file : updatedFile;
+
       // Re-encrypt + upload the new content. uploadFileWithRes54 also inserts a
       // fresh file record (with its own id/chunks); we treat that as a temporary
       // carrier and point the *existing* file record at its chunks/key below,
       // then delete the temporary record so we never create duplicates.
       const uploadResult = await uploadFileWithRes54(
-        updatedFile,
+        uploadSource,
         (progress, stage) => {
           console.log(`FileUpdateService: ${stage} - ${progress}%`);
-        }
+        },
+        undefined,
+        !!v4Meta,
+        v4Meta || undefined,
       );
 
       if (!uploadResult.id) {
@@ -105,28 +114,11 @@ export class FileUpdateService {
       // Remove the temporary duplicate record created by the upload step.
       await supabase.from('files').delete().eq('id', uploadResult.id);
 
-      // The vault row for the temp record cascaded away with the delete; the
-      // existing file now points at chunks encrypted with the NEW key, so
-      // re-store that key in the vault for the existing file. (BYOK uploads
-      // keep their key client-derived and skip the vault.)
-      if (uploadResult.encryptionKey === 'managed_key' && uploadResult.metadata?.encryptionKey) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const { error: storeError } = await supabase.functions.invoke('store-file-key', { // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
-          headers: { Authorization: `Bearer ${session?.access_token}` },
-          body: { fileId, key: uploadResult.metadata.encryptionKey },
-        });
-        if (storeError) {
-          console.warn('FileUpdateService: store-file-key failed; falling back to legacy tags key for updated file', storeError);
-          const legacyTags = JSON.stringify({
-            ...uploadResult.metadata,
-            encryptionKey: uploadResult.metadata.encryptionKey,
-          });
-          await supabase.from('files').update({ tags: [legacyTags] }).eq('id', fileId);
-        } else {
-          console.log('FileUpdateService: Vault key re-stored for updated file');
-        }
+      // The temp record cascaded away; v4 metadata follows the repointed chunks.
+      if (v4Meta) {
+        const { saveV4Meta } = await import('@/lib/e2e-v4-store');
+        await saveV4Meta(fileId, user.id, v4Meta.saltB64).catch(() => {});
       }
-
       console.log('FileUpdateService: File updated successfully');
 
       return {

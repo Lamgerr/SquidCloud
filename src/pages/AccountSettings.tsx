@@ -1368,7 +1368,8 @@ const AccountSettings = () => {
     setLoading(true);
     try {
       const result = await authenticateWithPasskey(user?.email || undefined);
-      if (result.success) toast({ title: 'Passkey verified' });
+      if (result.emailConfirmation) toast({ title: 'Check your email', description: 'Open the sign-in link we sent to finish verifying.' });
+      else if (result.success) toast({ title: 'Passkey verified' });
       else toast({ title: 'Verification failed', variant: 'destructive' });
     } catch (error: any) {
       toast({ title: 'Test failed', description: error.message, variant: 'destructive' });

@@ -52,6 +52,10 @@ export default function VaultRecoveryCard({ emailVerified = true, totpEnabled = 
     setVerifying('passkey');
     try {
       const result = await authenticateWithPasskey(userEmail);
+      if (result.emailConfirmation) {
+        toast({ title: 'Check your email', description: 'Open the sign-in link we sent, then retry this step.' });
+        return;
+      }
       if (!result.success) throw new Error('Passkey was not verified');
       setPasskeyDone(true);
     } catch (e: any) {

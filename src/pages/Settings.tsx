@@ -227,7 +227,9 @@ const Settings = () => {
 
       const result = await authenticateWithPasskey(user?.email || undefined);
 
-      if (result.success) {
+      if (result.emailConfirmation) {
+        toast({ title: "Check your email", description: "Open the sign-in link we sent to finish verifying." });
+      } else if (result.success) {
         toast({
           title: "Authentication successful!",
           description: "Your passkey is working correctly",
