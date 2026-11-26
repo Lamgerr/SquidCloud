@@ -5,18 +5,21 @@
  * or extensions running on the app page.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { isSealedReadyMessage } from '@/lib/sealed-preview-policy';
 
 type Kind = 'image' | 'video' | 'audio' | 'text' | 'font';
 
+const NONCE = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(36)).join('');
+
 const FRAME = `<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; media-src blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; object-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; media-src blob: data:; style-src 'unsafe-inline'; script-src 'nonce-${NONCE}'; object-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'">
 <style>html,body{margin:0;height:100%;background:#0c0d09;color:#e8e7e1;font:14px/1.6 system-ui;overflow:auto;display:flex;align-items:center;justify-content:center}body *{color:inherit}
 img,video{max-width:100%;max-height:100%;object-fit:contain}audio{width:min(560px,90%)}pre{margin:0;padding:24px;white-space:pre-wrap;word-break:break-word;font:13px/1.6 ui-monospace,monospace}
-@font-face{font-family:'SealedFont';src:url('blob:') format('truetype')}.sample{font-family:'SealedFont';font-size:34px;padding:32px;text-align:center}</style>
-</head><body><div id="c"></div><script>
+.sample{font-family:'SealedFont';font-size:34px;padding:32px;text-align:center}</style>
+</head><body><div id="c"></div><script nonce="${NONCE}">
 let url=null;
 addEventListener('message',async(e)=>{
-  if(!e.data||e.data.type!=='blob')return;
+  if(e.source!==parent||!e.data||e.data.type!=='blob')return;
   const {blob,kind,name}=e.data;
   if(url)URL.revokeObjectURL(url);
   url=URL.createObjectURL(blob);
@@ -36,7 +39,9 @@ export default function SealedMediaFrame({ blob, kind, name, className }: Props)
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const onMsg = (e: MessageEvent) => { if (e.data === 'sealed-ready') setReady(true); };
+    const onMsg = (e: MessageEvent) => {
+      if (isSealedReadyMessage(e, ref.current?.contentWindow ?? null)) setReady(true);
+    };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, []);

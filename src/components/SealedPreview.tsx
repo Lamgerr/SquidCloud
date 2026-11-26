@@ -5,9 +5,14 @@
  * is posted into the frame.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { isSealedReadyMessage } from '@/lib/sealed-preview-policy';
+
+/* A fresh nonce per document load: only the frame's own bootstrap script can
+   execute, even if sanitized markup were to contain a script tag. */
+const NONCE = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(36)).join('');
 
 const FRAME_HTML = `<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; script-src 'nonce-${NONCE}'; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <style>
 html,body{margin:0;height:100%;background:#0c0d09;color:#e8e7e1;font:14px/1.6 system-ui,sans-serif;overflow:auto}
 body *{color:inherit} a{color:#9fb3ff!important} code,pre{color:#e8e7e1!important}
@@ -15,8 +20,9 @@ body *{color:inherit} a{color:#9fb3ff!important} code,pre{color:#e8e7e1!importan
 a{color:#9fb3ff} pre{background:rgba(232,231,225,.06);padding:12px;border-radius:8px;overflow:auto}
 code{font-family:ui-monospace,monospace} table{border-collapse:collapse} td,th{border:1px solid rgba(232,231,225,.12);padding:6px}
 svg{color:#e8e7e1}
-</style></head><body><div id="c"></div><script>
+</style></head><body><div id="c"></div><script nonce="${NONCE}">
 addEventListener('message',(e)=>{
+  if(e.source!==parent)return;
   if(e.data&&e.data.type==='render'&&typeof e.data.html==='string'){
     document.getElementById('c').innerHTML=e.data.html;
   }
@@ -30,7 +36,9 @@ export default function SealedPreview({ html, className, title = 'Sealed preview
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const onMsg = (e: MessageEvent) => { if (e.data === 'sealed-ready') setReady(true); };
+    const onMsg = (e: MessageEvent) => {
+      if (isSealedReadyMessage(e, ref.current?.contentWindow ?? null)) setReady(true);
+    };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, []);

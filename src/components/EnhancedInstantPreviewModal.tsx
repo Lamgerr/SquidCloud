@@ -24,6 +24,7 @@ import OptimizedPDFViewer from '@/components/OptimizedPDFViewer';
 import ModelViewer from '@/components/ModelViewer';
 import DeepReadReader from './DeepReadReader';
 import { markdownToSafeHtml } from './EnhancedMarkdownPreview';
+import { assertNoAppOriginPreviewUrl } from '@/lib/sealed-preview-policy';
 import { previewTabs, detectKind, type PreviewKind } from '@/services/preview-tabs';
 import { GRAIN_CSS } from './grain';
 import { DOCK_CSS, Icons } from '@/components/FloatingDock';   // the dashboard dock's own tokens + icons: identical look, zero drift
@@ -176,7 +177,13 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
                   const plain = await decryptVaultBytes(await full.arrayBuffer(), user?.id || file.user_id || '', m.salt, m.iv);
                   out = new Blob([plain], { type: file.type || 'application/octet-stream' });
                 }
-                setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return URL.createObjectURL(out); });
+                setBlobUrl(prev => {
+                  if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev);
+                  // Only the model loader needs an app-origin object URL.
+                  // Every rendered preview kind receives the Blob directly and
+                  // creates its object URL inside a sealed frame.
+                  return kind === 'model' ? URL.createObjectURL(out) : null;
+                });
                 setDecodedBlob(out);
               }).catch(() => {});
           }
@@ -202,7 +209,10 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
           finalBlob = new Blob([plain], { type: file.type || 'application/octet-stream' });
         }
 
-        setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return URL.createObjectURL(finalBlob); });
+        setBlobUrl(prev => {
+          if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev);
+          return kind === 'model' ? URL.createObjectURL(finalBlob) : null;
+        });
         setDecodedBlob(finalBlob); setLoading(false);
       } catch (e: any) {
         if (loadGen.current === gen) { setError(e?.message || 'Unable to load preview'); setLoading(false); }
@@ -241,6 +251,10 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   if (!file) return null;
 
   const renderBody = () => {
+    // Fail closed: only the 3D loader may hold an app-origin object URL.
+    // Every other preview kind must receive the Blob and scope its own URL
+    // inside a sealed, opaque-origin frame.
+    if (kind !== 'model' && blobUrl) assertNoAppOriginPreviewUrl(blobUrl, window.location.origin);
     if (kind === 'video') {
       if (file?.encrypted && file?.storage_path === 'res54_distributed') return <CBVideoPlayer file={file} autoPlay className="h-full w-full" shareId={shareId} />;
       return decodedBlob ? <SealedMediaFrame blob={decodedBlob} kind="video" name={file.name} /> : <Loading />;
@@ -251,10 +265,10 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     if (kind === 'epub') return <DeepReadReader file={file} source="local" isOpen onClose={close} />;
     if (loading) return <Loading />;
     if (error) return <div className="pv-error"><AlertCircle size={28} /><p className="text-sm">{error}</p></div>;
-    if (!blobUrl && kind !== 'model') return <Loading />;
+    if (!decodedBlob && kind !== 'model') return <Loading />;
 
     switch (kind) {
-      case 'pdf': return <OptimizedPDFViewer file={file} blobUrl={blobUrl!} pdfBlob={decodedBlob!} onClose={close} onDownload={handleDownload} />;
+      case 'pdf': return <OptimizedPDFViewer file={file} blobUrl={null} pdfBlob={decodedBlob!} onClose={close} onDownload={handleDownload} />;
       case 'image': return <SealedMediaFrame blob={decodedBlob!} kind="image" name={file.name} />;
       case 'text': return <SealedMediaFrame blob={decodedBlob!} kind="text" name={file.name} />;
       case 'markdown': return <MarkdownBody blob={decodedBlob} />;
