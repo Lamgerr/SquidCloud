@@ -17,13 +17,22 @@ export class StreamDecryptorService {
 
 /** Hand the in-memory v4 master to the service worker for this session so it
  *  can decrypt byte ranges on demand instead of downloading the whole file. */
-  static seedV4Key(fileId: string, meta: {
+  static async seedV4Key(fileId: string, meta: {
     fileId: string; saltB64: string; userId?: string; chunkSize?: number; totalChunks?: number;
-  }): boolean {
+  }): Promise<boolean> {
     const master = getV4Master();
     if (!master) return false;
-    const controller = navigator.serviceWorker?.controller;
+    let reg: ServiceWorkerRegistration | null = null;
+    try {
+      reg = await Promise.race([
+        navigator.serviceWorker?.ready,
+        new Promise<null>((r) => setTimeout(() => r(null), 5000)),
+      ]) ?? null;
+    } catch { /* no SW support */ }
+    const controller = (reg as ServiceWorkerRegistration | null)?.active ?? navigator.serviceWorker?.controller;
     if (!controller) return false;
+    // Transfer a copy so the page's in-memory master stays usable.
+    const copy = master.slice();
     controller.postMessage({
       type: 'SET_V4',
       fileId,
@@ -33,9 +42,9 @@ export class StreamDecryptorService {
         userId: meta.userId || '',
         chunkSize: meta.chunkSize || 1024 * 1024,
         totalChunks: meta.totalChunks || 1,
-        master: master.buffer,
+        master: copy.buffer,
       },
-    }, [master.buffer]);
+    }, [copy.buffer]);
     return true;
   }
 

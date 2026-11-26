@@ -343,9 +343,9 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   useEffect(() => {
     StreamDecryptorService.initListener(shareId);
     let cancelled = false;
-    StreamDecryptorService.seedFileMeta(file.id, shareId).then(() => {
+    StreamDecryptorService.seedFileMeta(file.id, shareId).then(async () => {
       if (!cancelled) {
-        if (isV4 && !Streamer.seedV4Key(file.id, v4Meta!)) {
+        if (isV4 && !(await Streamer.seedV4Key(file.id, v4Meta!))) {
           setHasErrorTracked(true);
           setErrorMessage('Unlock your vault to stream this encrypted video');
         }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidcloud-v13.0.38-1795543193821'; // Dynamic cache name
+const CACHE_NAME = 'squidcloud-v14.0.0-1795713000000'; // Dynamic cache name
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -333,6 +333,9 @@ self.addEventListener('fetch', (event) => {
 
       let sliced;
       const v4 = v4State.get(fileId);
+      if (meta.encryptionKey === 'e2e_v4' && !v4) {
+        return new Response('Vault key not available for this stream', { status: 503, headers: { 'Retry-After': '1' } });
+      }
       if (v4) {
         const v4Slice = await fetchV4Range(fileId, meta, v4, urls, startByte, endByte);
         if (!v4Slice) {

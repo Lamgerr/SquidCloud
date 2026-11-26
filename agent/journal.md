@@ -354,3 +354,7 @@
 ## 2026-11-26 — Geo fix and real v4 range streaming
 - DB already had IN=allow in kza_geo_fence, but anon lacked EXECUTE on kza_check_country_block(text,text); middleware failed closed with 401 -> 403 "Region Blocked" for everyone. Granted anon execute on both overloads (read-only). Verified RPC returns blocked:false for IN and /virtual-stream returns 200.
 - Replaced the v4 full-download player hack with proper byte-range streaming: videoStreamer.seedV4Key posts the in-memory master to the SW (memory-only, never IDB); SW now decrypts v4 frames on demand using HKDF + per-frame AAD and returns 206 ranges. Legacy range path unchanged.
+
+## 2026-11-26 — SW v4 key seeding race
+- The 500 "Decrypt failed" came from the SW taking the legacy path because SET_V4 never arrived: navigator.serviceWorker.controller was null at seed time. seedV4Key now awaits navigator.serviceWorker.ready (5s cap), copies the master before transferring, and the player awaits it. Bumped SW CACHE_NAME to v14 to force update.
+- SW now returns a clear 503 "Vault key not available for this stream" when e2e_v4 metadata exists but no v4 key was seeded, instead of attempting legacy decryption and returning 500.
