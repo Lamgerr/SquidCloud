@@ -320,3 +320,9 @@
 - RED-GREEN: added tests for multi-chunk roundtrip, prefix decrypt of the first complete frame, and truncation rejection; implemented chunked v4 with 1 MiB independently encrypted frames (magic 52 45 05) while keeping legacy single-frame v4 readable.
 - Added downloadV4Preview (first 3 RES54 chunks only) and wired the modal through pure readV4Meta. Forced full smartDownload for downloads so partial preview data cannot be saved.
 - Verified: 46 tests pass, invariant gate passes (708 files), vercel READY. Wrote design doc with three approaches and the chosen tradeoff.
+
+## 2026-11-26 — Console error cleanup
+- CSP: dashboard loaded an onlinewebfonts stylesheet whose data: font was blocked. Added https://db.onlinewebfonts.com and data: to style-src and font-src in vercel.json; confirmed the live header via curl.
+- Added UUID validation in downloadFileWithRes54/downloadFilePreview/downloadV4Preview so a malformed id like "3" throws a clean client error instead of Postgres "invalid input syntax for uuid".
+- Investigated B2/supabase-function CORS and realtime WebSocket errors: B2 presigned GET responds 200 with ACAO for the production origin; fix-cors endpoint requires auth and is best-effort. Concluded these are browser/network-environment failures, not app-code defects; no speculative changes made.
+- Verified 46 tests pass, invariant gate passes, vercel READY.

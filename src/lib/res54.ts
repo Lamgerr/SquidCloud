@@ -18,6 +18,11 @@ const devLog = (...args: unknown[]) => {
   if (!isProductionBuild) console.log(...args);
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function assertFileId(fileId: string): void {
+  if (!UUID_RE.test(fileId)) throw new Error(`Invalid file id: ${fileId}`);
+}
+
 const devWarn = (...args: unknown[]) => {
   if (!isProductionBuild) console.warn(...args);
 };
@@ -1004,6 +1009,7 @@ export const downloadFileWithRes54 = async (
   progressOrOptions?: Res54ProgressCallback | Res54DownloadOptions | string,
   maybeOptions?: Res54DownloadOptions
 ): Promise<Blob> => {
+  assertFileId(fileId);
   const progressCallback: Res54ProgressCallback | undefined = typeof progressOrOptions === 'function' ? progressOrOptions : undefined;
   const options: Res54DownloadOptions = typeof progressOrOptions === 'function' ? (maybeOptions || {}) : typeof progressOrOptions === 'string' ? { fileName: progressOrOptions } : (progressOrOptions || {});
 
@@ -1281,6 +1287,7 @@ export interface FilePreviewResult {
 }
 
 export const downloadFilePreview = async (fileId: string, maxChunks: number = 3, options?: { fileRecord?: Record<string, any>; shareId?: string }): Promise<FilePreviewResult> => {
+  assertFileId(fileId);
   // ZK files are decrypted at the caller (preview modal / api.smartDownload)
   // through zk-mode; this function returns the stored bytes as-is.
 
@@ -1364,6 +1371,7 @@ export const downloadV4Preview = async (
   maxChunks = 3,
   options?: { fileRecord?: Record<string, any>; shareId?: string },
 ): Promise<{ blob: Blob; totalChunks: number; downloadedChunks: number; isPartial: boolean }> => {
+  assertFileId(fileId);
   const file = options?.fileRecord || (() => supabase.from('files').select('*').eq('id', fileId).single()
     .then(({ data, error }) => {
       if (error) throw error;

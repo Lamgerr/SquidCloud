@@ -2,11 +2,9 @@
   "goal": "Instant preview for new E2E v4 uploads fixed and upgraded to chunked frames",
   "goal_source": "User: \"do full work completely ... hundreds of user's files ... backward compatible only on read\"",
   "last_actions": [
-    "2026-11-26: Root cause: preview modal passed the literal e2e_v4 label as an AES key and legacy getVaultFileMeta returns null for v4 files.",
-    "Added pure readV4Meta detector; modal now uses downloadV4Preview which fetches only the first RES54 chunks and decrypts complete v4 frames.",
-    "New v4 writes use 1 MiB independently AEAD-encrypted frames (magic 52 45 05) with AAD binding frame index/total; old single-frame v4 stays readable.",
-    "Downloads force the full smartDownload path so a partial preview can never be saved as a truncated file.",
-    "46 tests pass, invariant gate passes, vercel READY; design doc at docs/superpowers/specs/2026-11-26-instant-preview-design.md."
+    "2026-11-26: Fixed console CSP errors: added db.onlinewebfonts.com to style-src/font-src and data: to font-src/style-src; verified header live on production.",
+    "Added UUID validation at RES54 download entry points so malformed file ids (e.g. \"3\") fail with a clean client error instead of a Postgres uuid syntax error.",
+    "Investigated CORS/WebSocket console errors: B2 presigned GET returns 200 with ACAO for squidcloud.vercel.app, so those failures are environmental (browser/network or non-production origin), not a code defect."
   ],
   "key_numbers": {
     "audits": 2,
@@ -21,9 +19,9 @@
     "repo": "https://github.com/Lamgerr/SquidCloud"
   },
   "blockers": [
-    "PDF/EPUB still need full files; only text/image/Markdown benefit from prefix preview."
+    "WebSocket/CORS console failures persist only in the user browser environment; server-side CORS and CSP verified correct."
   ],
   "next": [
-    "Tune the fixed 3-chunk preview budget to stop after the first complete frame."
+    "If the user still sees CORS errors, check the exact origin and browser network/tracking protection."
   ]
 }
