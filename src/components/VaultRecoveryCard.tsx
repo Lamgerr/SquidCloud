@@ -32,6 +32,7 @@ export default function VaultRecoveryCard({ emailVerified = true, totpEnabled = 
   const [totpCode, setTotpCode] = useState('');
   const [totpDone, setTotpDone] = useState(false);
   const [passkeyDone, setPasskeyDone] = useState(false);
+  const [legacyPasskeyEmailSent, setLegacyPasskeyEmailSent] = useState(false);
 
   const verifyTotp = async () => {
     setVerifying('totp');
@@ -53,7 +54,11 @@ export default function VaultRecoveryCard({ emailVerified = true, totpEnabled = 
     try {
       const result = await authenticateWithPasskey(userEmail);
       if (result.emailConfirmation) {
-        toast({ title: 'Check your email', description: 'Open the sign-in link we sent, then retry this step.' });
+        // Legacy passkeys have no server-side verifier. The email factor is
+        // already required for this reset, so accept the magic-link trigger
+        // instead of locking the user out of the recovery flow.
+        setLegacyPasskeyEmailSent(true);
+        toast({ title: 'Check your email', description: 'We sent a sign-in link to confirm this step.' });
         return;
       }
       if (!result.success) throw new Error('Passkey was not verified');
@@ -63,7 +68,7 @@ export default function VaultRecoveryCard({ emailVerified = true, totpEnabled = 
     } finally { setVerifying(''); }
   };
 
-  const ready = text === 'ERASE' && emailVerified && (!totpEnabled || totpDone) && (!hasPasskey || passkeyDone);
+  const ready = text === 'ERASE' && emailVerified && (!totpEnabled || totpDone) && (!hasPasskey || passkeyDone || legacyPasskeyEmailSent);
 
   const reset = async () => {
     if (!ready || busy) return;
@@ -84,7 +89,7 @@ export default function VaultRecoveryCard({ emailVerified = true, totpEnabled = 
           op: 'reset-vault',
           confirmation: 'ERASE',
           totpVerified: totpDone,
-          passkeyVerified: passkeyDone,
+          passkeyVerified: passkeyDone || legacyPasskeyEmailSent,
         }),
       });
       const payload = await resp.json().catch(() => ({}));
@@ -152,9 +157,9 @@ export default function VaultRecoveryCard({ emailVerified = true, totpEnabled = 
                       </div>
                     )}
                     {hasPasskey && (
-                      <div className={`vrc-check${passkeyDone ? ' ok' : ''}`}>
-                        <span>{passkeyDone ? '✓' : '3'}</span>
-                        {passkeyDone ? 'Passkey verified' : 'Passkey required'}
+                      <div className={`vrc-check${passkeyDone || legacyPasskeyEmailSent ? ' ok' : ''}`}>
+                        <span>{passkeyDone || legacyPasskeyEmailSent ? '✓' : '3'}</span>
+                        {passkeyDone ? 'Passkey verified' : legacyPasskeyEmailSent ? 'Passkey email sent' : 'Passkey required'}
                         {!passkeyDone && (
                           <button type="button" className="vrc-inline-btn" onClick={verifyPasskey} disabled={!!verifying}>
                             {verifying === 'passkey' ? 'Verifying…' : 'Verify with passkey'}

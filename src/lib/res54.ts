@@ -1,4 +1,4 @@
-import { isLegacyManagedUpload, V4_KEY_LABEL } from './e2e-upload-policy';
+import { isLegacyManagedUpload, V4_KEY_LABEL, canStartUpload } from './e2e-upload-policy';
 import { setPendingV4Meta, takePendingV4Meta, decryptV4File, isV4Sealed, type V4UploadMeta } from './e2e-v4-upload';
 import { supabase } from "@/integrations/supabase/client";
 import { decryptData, generateEncryptionKey, detectEncryptionVersion } from "./encryption";
@@ -547,6 +547,30 @@ export const uploadFileWithRes54 = async (
   const swkVerdict = await swkScanManifest(swkManifest);
   progressCallback?.(0, 'screening-done');
 
+  // Central no-escrow gate: every caller of this pipeline gets client-only
+  // encryption when the vault is unlocked, even if it did not prepare v4
+  // itself. Without a client-held key the upload is refused.
+  let sealed = sealedV4;
+  let sealedMeta = v4MetaOverride;
+  if (!sealed) {
+    const { hasV4Master } = await import('./e2e-v4-session');
+    const { prepareV4Upload } = await import('./e2e-v4-upload');
+    if (hasV4Master()) {
+      const prepared = await prepareV4Upload(file, user.id);
+      if (prepared) {
+        file = prepared.file;
+        sealedMeta = prepared.meta;
+        sealed = true;
+      }
+    }
+    if (!sealed) {
+      const policy = await getBYOKRuntimePolicy(user.id);
+      if (!canStartUpload({ v4Prepared: false, byokActive: policy.enabled })) {
+        throw new Error('Unlock your vault (or enable BYOK) before uploading');
+      }
+    }
+  }
+
   // Effective provider: the server may transparently fail over to a
   // sibling bucket with free space (BUCKET_FULL gate). Metadata must point
   // at the bucket that actually holds the chunks.
@@ -601,7 +625,7 @@ export const uploadFileWithRes54 = async (
   let metadata: Res54FileMetadata;
 
   const byokPolicy = await getBYOKRuntimePolicy(user.id);
-  const pendingV4 = sealedV4 ? (v4MetaOverride || takePendingV4Meta()) : null;
+  const pendingV4 = sealed ? (sealedMeta || takePendingV4Meta()) : null;
   const { encryptionKey } = pendingV4
     ? { encryptionKey: V4_KEY_LABEL }
     : await resolveUploadEncryptionKey(file, user.id, byokPolicy.enabled, totalChunks);
