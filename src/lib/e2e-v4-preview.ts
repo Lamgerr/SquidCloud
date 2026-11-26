@@ -18,7 +18,11 @@ export function readV4Meta(file: any): V4FileMeta | null {
     const tags = Array.isArray(file?.tags) ? file.tags : [];
     for (const tag of tags) {
       const parsed = JSON.parse(tag);
-      if (parsed?.v4?.fileId && parsed?.v4?.saltB64) return parsed.v4 as V4FileMeta;
+      if (parsed?.v4?.fileId && parsed?.v4?.saltB64) {
+        const meta = parsed.v4 as V4FileMeta;
+        if (!meta.userId && file?.user_id) meta.userId = String(file.user_id);
+        return meta;
+      }
     }
   } catch { /* not a v4 file */ }
   return null;

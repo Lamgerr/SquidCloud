@@ -366,3 +366,8 @@
 - Replaced video-specific unlock event/reason with generic squidcloud:vault-unlock-for-file / squidcloud:vault-unlocked-for-file used by any preview type.
 - Dashboard renders a generic unlock dialog in both layouts and dispatches completion event; EnhancedInstantPreviewModal requests unlock for v4 files lacking master and retries on completion; cbVideoPlayer uses the same generic events.
 - Fixes fatal overlay caused by dispatching the upload-unlock event with a fake file object.
+
+## 2026-11-26 — Preview speed and silent video failure
+- Preview budget reduced from 3 RES54 chunks (~6 MB) to 1 (~2 MB), which still contains a full 1 MiB v4 frame. KTL verification cached for 60s (pinned-head check still runs every call) to remove a network round trip per preview.
+- Centralized uploader-id fallback in readV4Meta so video and other previews bind AAD correctly for older metadata.
+- Video SW 503 was retried 8 times silently; now a v4 video error falls back once to main-thread decrypt with a visible error if that also fails.

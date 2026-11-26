@@ -338,6 +338,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   const v4Meta = useMemo(() => readV4Meta(file), [file]);
   const isV4 = useMemo(() => !!v4Meta, [v4Meta]);
   const [v4BlobUrl, setV4BlobUrl] = useState<string | null>(null);
+  const bufferFallbackUrls = useRef<string[]>([]);
 
   /* ── stream prep / transcode / retry: unchanged logic ── */
   useEffect(() => {
@@ -382,7 +383,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
     return () => { cancelled = true; };
   }, [shareId, file.id, isV4, setHasErrorTracked]);
 
-  useEffect(() => () => { if (transcodedUrl) URL.revokeObjectURL(transcodedUrl); if (v4BlobUrl) URL.revokeObjectURL(v4BlobUrl); clearTimeout(retryTimerRef.current); }, [transcodedUrl, v4BlobUrl]);
+  useEffect(() => () => { if (transcodedUrl) URL.revokeObjectURL(transcodedUrl); bufferFallbackUrls.current.forEach(u => URL.revokeObjectURL(u)); clearTimeout(retryTimerRef.current); }, [transcodedUrl]);
   // Retry the stream once the vault is unlocked from the preview dialog.
   useEffect(() => {
     if (!isV4) return;
@@ -839,6 +840,26 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
           poster={isAudio ? undefined : poster} playsInline preload="auto" autoPlay={autoPlay}
           onError={(e) => {
             console.error('Video playback error:', e);
+            // v4 range streaming can fail when the SW lacks the session key.
+            // Fall back to a main-thread decrypt once instead of silent retries.
+            if (isV4 && !v4BlobUrl) {
+              void (async () => {
+                try {
+                  const blob = await downloadFileWithRes54(file.id, undefined, shareId ? { shareId } : undefined);
+                  const url = URL.createObjectURL(blob);
+                  setV4BlobUrl(url);
+                  setBuffering(false);
+                  setLoadPhase('ready');
+                  bufferFallbackUrls.current.push(url);
+                } catch (err: any) {
+                  setHasErrorTracked(true);
+                  setBuffering(false);
+                  setLoadPhase('error');
+                  setErrorMessage('Could not decrypt this file: ' + (err?.message || 'unknown'));
+                }
+              })();
+              return;
+            }
             if (streamReadyRef.current) {
               if (retryCount < 8) {
                 const delay = Math.min(500 * Math.pow(1.5, retryCount), 5000);
