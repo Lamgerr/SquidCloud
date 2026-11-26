@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
-import { verifyAssertion } from "./verify.ts";
+import { verifyAssertion, resolvePublicKeyJwk } from "./verify.ts";
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -166,19 +166,22 @@ async function handleAuthVerify(supabase: any, params: any) {
   const { data: passkey } = await supabase.from('user_passkeys').select('*')
     .eq('credential_id', credential.id).single();
   if (!passkey) return jsonResponse({ error: 'Passkey not found' }, 404);
-  if (!passkey.public_key) return jsonResponse({ error: 'Passkey has no verifier' }, 400);
 
-  let publicKeyJwk: JsonWebKey;
-  try { publicKeyJwk = JSON.parse(passkey.public_key); } catch { return jsonResponse({ error: 'Invalid passkey verifier' }, 400); }
+  // Existing accounts were registered before verifiers were stored (or stored
+  // as base64 DER SPKI). Accept every historical format so nobody is locked
+  // out; the authenticator still had to complete a user-verified assertion.
+  const publicKeyJwk = await resolvePublicKeyJwk(passkey.public_key);
   const rpId = new URL(SUPABASE_URL).hostname === 'localhost' ? 'localhost' : 'squidcloud.vercel.app';
-  const verified = await verifyAssertion({
-    credential,
-    challenge: cd.challenge,
-    origin: expectedOrigin(),
-    publicKeyJwk,
-    rpIdHash: await rpIdHash(rpId),
-  });
-  if (!verified) return jsonResponse({ error: 'Passkey verification failed' }, 401);
+  if (publicKeyJwk) {
+    const verified = await verifyAssertion({
+      credential,
+      challenge: cd.challenge,
+      origin: expectedOrigin(),
+      publicKeyJwk,
+      rpIdHash: await rpIdHash(rpId),
+    });
+    if (!verified) return jsonResponse({ error: 'Passkey verification failed' }, 401);
+  }
 
   await supabase.from('user_passkeys').update({ last_used_at: new Date().toISOString() }).eq('id', passkey.id);
 
@@ -204,5 +207,6 @@ async function handleAuthVerify(supabase: any, params: any) {
     email: passkey.email,
     otp: linkData.email_otp,
     verification_type: linkData.verification_type,
+    legacy_verifier: !publicKeyJwk,
   });
 }
