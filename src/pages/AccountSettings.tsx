@@ -1280,7 +1280,7 @@ const AccountSettings = () => {
             version: Number(meta.key_version) || 1,
           }, currentPassword, newPassword);
           if (!rewrapped.ok || !rewrapped.next) throw new Error('Could not rewrap your vault key');
-          const previous = {
+          previous = {
             encrypted_master_key: String(meta.encrypted_master_key),
             kdf_salt: String(meta.kdf_salt),
             kdf_iterations: Number(meta.kdf_iterations) || 310000,
@@ -1306,6 +1306,7 @@ const AccountSettings = () => {
             encrypted_master_key: previous.encrypted_master_key,
             kdf_salt: previous.kdf_salt,
             kdf_iterations: previous.kdf_iterations,
+            key_version: previous.key_version,
             last_rotated: null,
           }).eq('user_id', user.id).eq('key_version', previous.key_version + 1);
         }

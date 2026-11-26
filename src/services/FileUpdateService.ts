@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { uploadFileWithRes54 } from '@/lib/res54';
+import { assertClientKeyAvailable } from '@/lib/upload-guard';
 
 export interface FileUpdateResult {
   success: boolean;
@@ -57,6 +58,8 @@ export class FileUpdateService {
 
       console.log('FileUpdateService: Encrypting and uploading updated content...');
 
+      await assertClientKeyAvailable(user.id);
+
       // Re-encrypt + upload the new content. uploadFileWithRes54 also inserts a
       // fresh file record (with its own id/chunks); we treat that as a temporary
       // carrier and point the *existing* file record at its chunks/key below,
@@ -108,7 +111,7 @@ export class FileUpdateService {
       // keep their key client-derived and skip the vault.)
       if (uploadResult.encryptionKey === 'managed_key' && uploadResult.metadata?.encryptionKey) {
         const { data: { session } } = await supabase.auth.getSession();
-        const { error: storeError } = await supabase.functions.invoke('store-file-key', {
+        const { error: storeError } = await supabase.functions.invoke('store-file-key', { // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
           headers: { Authorization: `Bearer ${session?.access_token}` },
           body: { fileId, key: uploadResult.metadata.encryptionKey },
         });

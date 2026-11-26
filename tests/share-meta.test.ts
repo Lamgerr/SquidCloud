@@ -32,5 +32,15 @@ describe("share metadata release policy", () => {
     expect(released).not.toHaveProperty("share_secret_hash");
     expect(released.file_encryption_key).toBe(false);
     expect(released.storage_path).toBe("res54_distributed");
+    expect(released).not.toHaveProperty("access_code");
+    expect(released).not.toHaveProperty("share_secret_hash");
   });
+});
+
+test("raw encryption-key strings are reduced to a BYOK boolean", () => {
+  const released = releaseShareMeta({ allowed: true }, {
+    file_id: "f2", storage_path: "res54_distributed", file_encryption_key: "sha256:byok_encrypted",
+  });
+  expect(released!.file_encryption_key).toBe(true);
+  expect(JSON.stringify(released)).not.toContain("byok_encrypted");
 });

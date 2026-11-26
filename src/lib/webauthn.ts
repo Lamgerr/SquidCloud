@@ -9,6 +9,7 @@ export interface PasskeyAuthResult {
   session?: any;
   user?: any;
   email?: string;
+  emailConfirmation?: boolean;
   redirect?: string;
 }
 
@@ -160,6 +161,12 @@ export async function authenticateWithPasskey(email?: string): Promise<PasskeyAu
     });
 
     if (verifyError) return { success: false };
+
+    // Legacy passkeys have no cryptographic verifier; the server emails a
+    // magic link and deliberately withholds the OTP from this response.
+    if (verifyData?.email_confirmation_required) {
+      return { success: false, emailConfirmation: true, email: verifyData.email };
+    }
 
     if (verifyData?.otp) {
       const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({

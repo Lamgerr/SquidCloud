@@ -38,7 +38,7 @@ export function checkMathRandomInCrypto(files) {
 
 export function checkRawKeyEscrow(files) {
   const violations = [];
-  const NEW_UPLOAD_PATH = /(^src\/lib\/(api|res54)\.ts$|^src\/lib\/e2e-v4|^src\/lib\/e2e-upload-policy)/;
+  const NEW_UPLOAD_PATH = /(^src\/lib\/(api|res54)\.ts$|^src\/lib\/e2e-v4|^src\/lib\/e2e-upload-policy|^src\/services\/(FileUpdateService|squid-ai-tools)\.ts$)/;
   for (const f of files) {
     if (SKIP_PATH.test(f.path) || !NEW_UPLOAD_PATH.test(f.path)) continue;
     f.content.split('\n').forEach((line, i) => {

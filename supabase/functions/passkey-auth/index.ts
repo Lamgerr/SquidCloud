@@ -145,39 +145,19 @@ async function handleRegisterVerify(req: Request, supabase: any, params: any) {
   return jsonResponse({ success: true });
 }
 
-function base64UrlToBytes(value: string): Uint8Array {
-  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((value.length + 3) % 4);
-  return Uint8Array.from(atob(padded), ch => ch.charCodeAt(0));
-}
-
 async function handleAuthOptions(supabase: any, params: any) {
   const challenge = await generateChallenge();
   const rpId = new URL(SUPABASE_URL).hostname === 'localhost' ? 'localhost' : 'squidcloud.vercel.app';
   const email = typeof params.email === 'string' ? params.email.trim().toLowerCase() : '';
-
-  // Bind the challenge to the credentials for this email. Legacy rows with no
-  // verifier can only be used through this bound path.
-  let credentialIds: string[] = [];
-  if (email) {
-    const { data: rows } = await supabase.from('user_passkeys')
-      .select('credential_id').eq('email', email);
-    credentialIds = (rows || []).map((r: any) => String(r.credential_id)).filter(Boolean);
-  }
-
   const { error } = await supabase.from('passkey_challenges').insert({
     user_id: '00000000-0000-0000-0000-000000000000', challenge, type: 'authentication',
-    expires_at: new Date(Date.now() + 120000).toISOString(),
-    credential_ids: credentialIds, email: email || null,
+    expires_at: new Date(Date.now() + 120000).toISOString(), email: email || null,
   });
   if (error) throw error;
+  // Never expose credential IDs to an anonymous caller.
   return jsonResponse({
     challenge_id: challenge,
-    publicKey: {
-      challenge, timeout: 60000, userVerification: 'required', rpId,
-      ...(credentialIds.length ? {
-        allowCredentials: credentialIds.map(id => ({ type: 'public-key', id: base64UrlToBytes(id) })),
-      } : {}),
-    },
+    publicKey: { challenge, timeout: 60000, userVerification: 'required', rpId },
   });
 }
 
@@ -188,7 +168,6 @@ async function handleAuthVerify(supabase: any, params: any) {
   const { data: cd, error: cdErr } = await supabase.from('passkey_challenges').select('*')
     .eq('challenge', challenge_id).eq('type', 'authentication').single();
   if (cdErr || !cd) return jsonResponse({ error: 'Invalid or expired challenge' }, 400);
-  await supabase.from('passkey_challenges').delete().eq('id', cd.id);
   if (!cd.expires_at || Date.parse(cd.expires_at) <= Date.now()) {
     return jsonResponse({ error: 'Invalid or expired challenge' }, 400);
   }
@@ -203,7 +182,7 @@ async function handleAuthVerify(supabase: any, params: any) {
   const publicKeyJwk = await resolvePublicKeyJwk(passkey.public_key);
   const rpId = new URL(SUPABASE_URL).hostname === 'localhost' ? 'localhost' : 'squidcloud.vercel.app';
   if (!publicKeyJwk) {
-    const bound = isBoundAuthenticationChallenge(cd, credential.id, passkey.email || '');
+    const bound = isBoundAuthenticationChallenge(cd, passkey.email || '');
     if (!bound) return jsonResponse({ error: 'Passkey verification failed' }, 401);
   }
   if (publicKeyJwk) {
@@ -217,6 +196,7 @@ async function handleAuthVerify(supabase: any, params: any) {
     if (!verified) return jsonResponse({ error: 'Passkey verification failed' }, 401);
   }
 
+  await supabase.from('passkey_challenges').delete().eq('id', cd.id);
   await supabase.from('user_passkeys').update({ last_used_at: new Date().toISOString() }).eq('id', passkey.id);
 
   // Use admin API to generate a magic link OTP for signing in
@@ -236,11 +216,20 @@ async function handleAuthVerify(supabase: any, params: any) {
   if (!linkResp.ok) return jsonResponse({ error: 'Failed to generate session' }, 500);
   const linkData = await linkResp.json();
 
+  // Legacy rows have no cryptographic verifier. The emailed magic link is the
+  // second factor: never hand the OTP back to the caller.
+  if (!publicKeyJwk) {
+    return jsonResponse({
+      success: true,
+      email: passkey.email,
+      email_confirmation_required: true,
+      legacy_verifier: true,
+    });
+  }
   return jsonResponse({
     success: true,
     email: passkey.email,
     otp: linkData.email_otp,
     verification_type: linkData.verification_type,
-    legacy_verifier: !publicKeyJwk,
   });
 }

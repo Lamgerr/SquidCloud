@@ -4,35 +4,28 @@ import { isBoundAuthenticationChallenge } from "../supabase/functions/passkey-au
 const now = Date.now();
 
 describe("passkey authentication challenge binding", () => {
-  test("accepts an unexpired challenge bound to this credential and email", () => {
+  test("accepts an unexpired challenge bound to the passkey email", () => {
     expect(isBoundAuthenticationChallenge({
       expires_at: new Date(now + 60_000).toISOString(),
-      credential_ids: ["cred-1", "cred-2"],
       email: "user@example.com",
-    }, "cred-1", "user@example.com", now)).toBe(true);
+    }, "user@example.com", now)).toBe(true);
   });
 
   test("rejects expired challenges", () => {
     expect(isBoundAuthenticationChallenge({
       expires_at: new Date(now - 1).toISOString(),
-      credential_ids: ["cred-1"],
       email: "user@example.com",
-    }, "cred-1", "user@example.com", now)).toBe(false);
+    }, "user@example.com", now)).toBe(false);
   });
 
-  test("rejects challenges that are not bound to a credential or email", () => {
+  test("rejects challenges bound to a different or missing email", () => {
     expect(isBoundAuthenticationChallenge({
       expires_at: new Date(now + 60_000).toISOString(),
-    }, "cred-1", "user@example.com", now)).toBe(false);
+    }, "user@example.com", now)).toBe(false);
     expect(isBoundAuthenticationChallenge({
       expires_at: new Date(now + 60_000).toISOString(),
-      credential_ids: ["other"],
-      email: "user@example.com",
-    }, "cred-1", "user@example.com", now)).toBe(false);
-    expect(isBoundAuthenticationChallenge({
-      expires_at: new Date(now + 60_000).toISOString(),
-      credential_ids: ["cred-1"],
       email: "victim@example.com",
-    }, "cred-1", "user@example.com", now)).toBe(false);
+    }, "user@example.com", now)).toBe(false);
+    expect(isBoundAuthenticationChallenge(null, "user@example.com", now)).toBe(false);
   });
 });

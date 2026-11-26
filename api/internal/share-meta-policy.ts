@@ -16,7 +16,15 @@ export function releaseShareMeta(access: ShareAccessResult, row: ShareRow): Shar
   if (!access.allowed) return null;
   const out: ShareRow = {};
   for (const key of ALLOWED_FIELDS) {
+    if (key === "file_encryption_key") continue;
     if (row[key] !== undefined) out[key] = row[key];
+  }
+  // Never release the stored key string. The share download path only needs
+  // to know whether this is a BYOK file.
+  if (row.file_encryption_key !== undefined) {
+    out.file_encryption_key = typeof row.file_encryption_key === "boolean"
+      ? row.file_encryption_key
+      : /^(?:sha256:)?byok(?:_encrypted)?$/i.test(String(row.file_encryption_key));
   }
   out.share_view_only = access.view_only ?? row.share_view_only ?? false;
   return out;

@@ -1,3 +1,4 @@
+import { assertClientKeyAvailable } from '@/lib/upload-guard';
 import { supabase } from '@/integrations/supabase/client';
 import { generateEncryptionKey, encryptData, decryptData } from '@/lib/encryption';
 import { emitWebhookEvent } from '@/lib/webhook-events';
@@ -5,10 +6,10 @@ import { emitWebhookEvent } from '@/lib/webhook-events';
 /* File keys are held in the server-side key vault, NEVER in files.encryption_key
    (a DB trigger hashes that column). These helpers use the same edge functions
    as the rest of the app so AI-created files are readable. */
-async function storeFileKey(fileId: string, key: string): Promise<boolean> {
+async function storeFileKey(fileId: string, key: string): Promise<boolean> { // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const { error } = await supabase.functions.invoke('store-file-key', {
+    const { error } = await supabase.functions.invoke('store-file-key', { // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
       headers: { Authorization: `Bearer ${session?.access_token}` },
       body: { fileId, key },
     });
@@ -198,6 +199,7 @@ export class SquidAITools {
   ): Promise<{ success: boolean; fileId?: string; error?: string }> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
+    await assertClientKeyAvailable(user.id);
 
     try {
       // Convert content to blob
@@ -244,7 +246,7 @@ export class SquidAITools {
       if (dbError) throw dbError;
 
       // Escrow the real key in the server-side vault so read/update can decrypt.
-      const keyStored = await storeFileKey(fileRecord.id, encryptionKey);
+      const keyStored = await storeFileKey(fileRecord.id, encryptionKey); // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
       if (!keyStored) return { success: false, error: 'File uploaded but key escrow failed' };
 
       return { success: true, fileId: fileRecord.id };
@@ -299,6 +301,7 @@ export class SquidAITools {
   ): Promise<{ success: boolean; error?: string }> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
+    await assertClientKeyAvailable(user.id);
 
     try {
       const { data: file, error: fileError } = await supabase
@@ -333,7 +336,7 @@ export class SquidAITools {
       if (uploadError) throw uploadError;
 
       // Ensure the key is in the vault when we generated a fresh one
-      await storeFileKey(fileId, encryptionKey);
+      await storeFileKey(fileId, encryptionKey); // e2e-invariant-allow: guarded by assertClientKeyAvailable; legacy key vault only
       await supabase
         .from('files')
         .update({

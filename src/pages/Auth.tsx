@@ -354,7 +354,9 @@ const Auth = () => {
       const promise = authenticateWithPasskey(email || undefined);
       setPasskeyLoading(true);
       const result = await promise;
-      if (!result.success) {
+      if (result.emailConfirmation) {
+        toast({ title: 'Check your email', description: `Open the sign-in link sent to ${result.email || 'your email'} to finish.` });
+      } else if (!result.success) {
         toast({ title: 'Authentication failed', description: 'Please try again or use password', variant: 'destructive' });
       } else {
         setPasskeySuccess(true);
