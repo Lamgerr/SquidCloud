@@ -299,3 +299,10 @@
 - Three fresh-context review rounds found and fixed: BFF TDZ crash on every POST, passkey registration email taken from the body (account takeover), v4 master set to the password KEK, DER signature incompatibility, legacy OTP oracle and credential-ID exposure, dropped share credentials/fields, non-atomic password change, and raw-key escrow through S3/GitHub/code-editor/AI/Tebi writers. Central v4 gate now lives in uploadFileWithRes54 so all callers are covered; Tebi raw-key path removed.
 - Verification: 42 targeted tests pass, `node scripts/check-e2e-invariants.mjs` passes over 702 files, `vercel --prod --yes` READY, passkey-auth function deployed, final review verdict safe-to-push.
 - Pushed 14 commits to origin/fresh-main (76abb4c5..8b3ef530). Working tree clean. Two pre-existing SDK test failures remain (sdk/js/test needs a built dist/).
+
+## 2026-11-26 — Full Supabase review (read-only) and cleanup plan
+- User asked to manage the DB properly with Supabase MCP, remove unwanted tables, save storage, and review all of Supabase.
+- Audited project aouqcwbdoyrccjcrhzzi via MCP: DB 380 MB; net._http_response 290 MB/733 responses (all today), cron.job_run_details 24 MB/35,525 runs, public 48 MB/151 tables, auth 6.5 MB, storage 5.9 MB; 10 buckets; 14 cron jobs; 15 security lint types and 5 performance lint types.
+- Verified all public tables have RLS enabled. Identified 27 empty tables with no application/function references, 7 safe unused secondary indexes, 4 empty/unreferenced buckets, a hardcoded anon JWT in cron job 9, and branch main in MIGRATIONS_FAILED state.
+- SKIPPED — needs a human: every DROP TABLE, DELETE, DROP INDEX, bucket deletion, cron edit, policy/grant change and key rotation. Standing rule forbids destructive live DB operations; wrote the exact guarded SQL instead.
+- Deliverables: docs/audits/supabase-review-2026-11-26.md and supabase/maintenance/01_log_retention.sql .. 04_cron_hardening.sql. Owner should run retention first (~314 MB expected recovery), then repair migration history, then the rest.

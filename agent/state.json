@@ -1,12 +1,10 @@
 {
-  "goal": "E2E file-pipeline hardening: new writes client-only E2E v4, legacy reads preserved",
+  "goal": "Supabase review and cleanup plan (read-only; destructive operations deferred to owner)",
   "goal_source": "User: \"do full work completely ... hundreds of user's files ... backward compatible only on read\"",
   "last_actions": [
-    "2026-11-26: Wrote and executed docs/superpowers/plans/2026-11-26-e2e-hardening.md (8 tasks) with TDD and an SDD ledger.",
-    "Tasks 1-8 complete: v4 crypto (random salt/IV, AAD), client-only new uploads, BFF share gate, WebAuthn verification, password-change rewrap, recovery/KTL wiring, sealed previews + CSP, CI invariants + docs.",
-    "User reported passkey login failing after successful WebAuthn: root cause was all existing user_passkeys.public_key values being NULL or base64 DER SPKI, never JWK. Fixed with format-tolerant resolver; verified and deployed.",
-    "Three fresh-context review rounds closed all Critical/Important findings: BFF TDZ crash, passkey email account-takeover, v4 master used KEK instead of unwrapped master, DER signatures, legacy OTP oracle, share credentials, atomic password change, and raw-key escrow via S3/GitHub/code-editor/AI/Tebi writers.",
-    "Final: 42 targeted tests pass, invariant gate passes (702 files), vercel READY, passkey-auth deployed, final review verdict safe-to-push, pushed 14 commits to origin fresh-main (76abb4c5..8b3ef530)."
+    "2026-11-26: Full Supabase MCP review of project aouqcwbdoyrccjcrhzzi: 380 MB DB, 151 public tables, 10 storage buckets, 14 cron jobs, security/performance advisors.",
+    "Found 290 MB in net._http_response and 24 MB in cron.job_run_details (84% of DB), 27 empty unreferenced table candidates, 7 safe unused secondary indexes, 4 empty/unreferenced buckets, hardcoded anon JWT in cron job 9, branch main = MIGRATIONS_FAILED.",
+    "Wrote docs/audits/supabase-review-2026-11-26.md and four guarded scripts under supabase/maintenance/. No live destructive operation was executed."
   ],
   "key_numbers": {
     "audits": 2,
@@ -21,13 +19,12 @@
     "repo": "https://github.com/Lamgerr/SquidCloud"
   },
   "blockers": [
-    "Supabase migration-history mismatch still blocks applying corrective DB migrations; anon grant on get_shared_file_info remains at DB layer (client gated through BFF; time-boxed in scripts/e2e-invariant-allowlist.json, review_by 2026-12-26).",
-    "Service-role key from old history remains live; user previously deprioritized rotation.",
-    "Forgot-password/reset still does not rewrap vault keys (only signed-in change does)."
+    "Standing rule forbids destructive live DB operations (DROP/DELETE/policy/cron/key changes): all cleanup is prepared as owner-run scripts, SKIPPED — needs a human.",
+    "Branch main MIGRATIONS_FAILED must be repaired before any migration/DDL.",
+    "get_shared_file_info anon grant and hardcoded anon JWT in cron job 9 remain live."
   ],
   "next": [
-    "Rotate the leaked service-role key and then apply a DB migration revoking anon EXECUTE on get_shared_file_info; remove both allowlist entries.",
-    "Consider chunked v4 encryption for very large files (current prepareV4Upload reads whole file into memory).",
-    "Re-enroll legacy passkeys (no stored verifier) so they gain signature verification instead of the emailed magic-link step."
+    "Owner reviews and runs supabase/maintenance/01_log_retention.sql first (expected ~314 MB recovery), then 02-04.",
+    "After cleanup, re-run advisors and ANALYZE public tables to refresh stale stats."
   ]
 }
