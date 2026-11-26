@@ -596,6 +596,6 @@ export const needsChunking = (fileSize: number): boolean => {
 
 // Generate a random string to serve as a chunk identifier
 export const generateChunkId = (): string => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15); // e2e-invariant-allow: storage identifier, not key material
 };
 

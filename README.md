@@ -39,9 +39,11 @@ unlawful activity (breaching, counterfeiting, malware, fraud, and similar harms)
 
 - **Res54 storage** — files split into encrypted chunks with resumable uploads
   and parallel downloads; legacy GitHub-repo chunks remain readable.
-- **Zero-knowledge vault** — optional client-held key (BIP39 recovery phrase),
-  AES-GCM with per-file salts; the server stores ciphertext only. See
-  [docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md](./docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md).
+- **E2E vault (v4)** — new uploads are encrypted in the browser with a random
+  per-file salt, random IVs and AAD-bound AES-GCM; no raw key is sent to the
+  server. Existing v2/v3/managed files stay readable through backward-compatible
+  read paths. See the [security model](./docs/SECURITY-MODEL.md) for the exact
+  guarantees and known gaps.
 - **Preview** — full-screen PDF, image, video, audio, text, EPUB, spreadsheet,
   archive and 3D viewers in one floating-dock interface.
 - **Sharing** — share links with optional password, wrapped keys, and revoked access.
@@ -128,6 +130,8 @@ prohibition on using the software for illegal activity.
 - [Live Supabase snapshot](./docs/LIVE-SUPABASE-SNAPSHOT.md)
 - [Security audit](./docs/audits/security-audit.md)
 - [E2E design](./docs/superpowers/specs/2026-11-24-full-e2e-redesign-design.md)
+- [File pipeline security review](./docs/superpowers/specs/2026-11-26-file-pipeline-security-review.md)
+- [E2E hardening plan](./docs/superpowers/plans/2026-11-26-e2e-hardening.md)
 - [Open-source runbook](./docs/OPEN-SOURCE-RUNBOOK.md)
 
 ---

@@ -12,6 +12,7 @@
     "build:production": "npm run version:bump && vite build --mode production",
     "version:bump": "node scripts/update-version.js",
     "lint": "eslint .",
+  "check:e2e-invariants": "node scripts/check-e2e-invariants.mjs",
     "preview": "vite preview",
     "mobile:sync": "npm run build && npx cap sync",
     "mobile:android": "npm run mobile:sync && npx cap open android",

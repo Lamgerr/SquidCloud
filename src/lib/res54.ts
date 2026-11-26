@@ -638,7 +638,7 @@ export const uploadFileWithRes54 = async (
       );
       
       const urlPaths = encryptedBatch.map((chunk) => {
-        const chunkId = `res54_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}_${chunk.index}`;
+        const chunkId = `res54_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}_${chunk.index}`; // e2e-invariant-allow: storage identifier, not key material
         return { path: getChunkStoragePath(user.id, chunkId), index: chunk.index };
       });
 
@@ -685,7 +685,7 @@ export const uploadFileWithRes54 = async (
     progressCallback?.(60, 'preparing upload');
 
     const urlPaths = encryptedChunks.map((_, index) => {
-      const chunkId = `res54_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}_${index}`;
+      const chunkId = `res54_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}_${index}`; // e2e-invariant-allow: storage identifier, not key material
       return { path: getChunkStoragePath(user.id, chunkId), index };
     });
 

@@ -52,9 +52,10 @@ export function BYOKMasterKeySetup({
     const words = ['aurora','cipher','delta','echo','forge','glacier','horizon','ivory','jade','kraken','lunar','mystic','nova','onyx','photon','quartz','raven','solar','titan','umbra','vortex','winter','xenon','yarrow','zenith'];
     const parts: string[] = [];
     for (let i = 0; i < 4; i++) {
-      parts.push(words[Math.floor(Math.random() * words.length)]);
+      parts.push(words[crypto.getRandomValues(new Uint32Array(1))[0] % words.length]);
     }
-    const passphrase = parts.join('-') + '-' + Math.random().toString(36).substring(2, 6);
+    const suffix = Array.from(crypto.getRandomValues(new Uint8Array(4)), b => b.toString(16).padStart(2, '0')).join('');
+    const passphrase = parts.join('-') + '-' + suffix;
     setGeneratedPassphrase(passphrase);
     setPassword(passphrase);
     setConfirmPassword(passphrase);
