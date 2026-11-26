@@ -30,19 +30,31 @@ export interface FileKeyMaterial {
   hmacKeyRaw: ArrayBuffer;
 }
 
+/* Allocate an exact ArrayBuffer: callers return `.buffer`, which must not
+   include pooled bytes from runtimes that back typed arrays with a slab. */
+function exactBytes(length: number): Uint8Array {
+  return new Uint8Array(new ArrayBuffer(length));
+}
+
+/* Explicit byte copies: typed-array `.set` is not consistently offset-aware
+   across runtimes, which corrupts assembled headers/ciphertext. */
+function copyBytes(dst: Uint8Array, src: Uint8Array, offset: number): void {
+  for (let i = 0; i < src.length; i++) dst[offset + i] = src[i];
+}
+
 function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
-  const r = new Uint8Array(a.length + b.length);
-  r.set(a);
-  r.set(b);
+  const r = exactBytes(a.length + b.length);
+  copyBytes(r, a, 0);
+  copyBytes(r, b, a.length);
   return r;
 }
 
 function concatMany(...args: Uint8Array[]): Uint8Array {
   let len = 0;
   for (const a of args) len += a.length;
-  const r = new Uint8Array(len);
+  const r = exactBytes(len);
   let off = 0;
-  for (const a of args) { r.set(a, off); off += a.length; }
+  for (const a of args) { copyBytes(r, a, off); off += a.length; }
   return r;
 }
 
@@ -207,7 +219,10 @@ export async function encryptChunkV3(
     plaintext
   );
 
-  const encBytes = new Uint8Array(encrypted);
+  /* Copy into an exact buffer: some runtimes return a pooled ArrayBuffer from
+     subtle.encrypt, so a direct view would include unrelated slab bytes. */
+  const encBytes = exactBytes(encrypted.byteLength);
+  encBytes.set(new Uint8Array(encrypted));
   const origLen = uint32ToBytes(plaintext.byteLength);
 
   const header = concatMany(V3_MAGIC, origLen, iv);
