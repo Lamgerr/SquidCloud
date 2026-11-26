@@ -7,6 +7,7 @@ import {
 } from '@/lib/icon-map';
 import { cn } from '@/lib/utils';
 import { downloadFilePreview } from '@/lib/res54';
+import { readV4Meta } from '@/lib/e2e-v4-preview';
 import { smartDownload, createFileShare } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
@@ -96,6 +97,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decodedBlob, setDecodedBlob] = useState<Blob | null>(null);
+  const v4PreviewRef = useRef(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [vaultUnlockOpen, setVaultUnlockOpen] = useState(false);
   const [vaultUnlockTick, setVaultUnlockTick] = useState(0);
@@ -116,10 +118,12 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   useEffect(() => {
     if (isOpen) return;
     setDecodedBlob(null);
+    v4PreviewRef.current = false;
     setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return null; });
   }, [isOpen]);
   useEffect(() => () => {
     setDecodedBlob(null);
+    v4PreviewRef.current = false;
     setBlobUrl(prev => { if (prev && prev !== 'virtual-hls-stream') URL.revokeObjectURL(prev); return null; });
   }, []);
 
@@ -160,6 +164,21 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     setLoading(true); setError(null);
     (async () => {
       try {
+        // New v4 files: decrypt only the frames covered by the first chunks.
+        // No full download, no legacy vault metadata lookup.
+        const v4Meta = readV4Meta(file);
+        if (v4Meta) {
+          const { downloadV4Preview } = await import('@/lib/res54');
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Sign in to preview this file');
+          const preview = await downloadV4Preview(file.id, 3, user.id, { fileRecord: file, shareId });
+          v4PreviewRef.current = true;
+          setBlobUrl(null);
+          setDecodedBlob(preview.blob);
+          setLoading(false);
+          return;
+        }
+
         const quick = kind === 'text' || kind === 'markdown' || kind === 'image';
         let blob: Blob;
         if (quick) {
@@ -223,11 +242,13 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
   const handleDownload = useCallback(async () => {
     if (onDownload) { onDownload(); return; }
     try {
-      const blob = decodedBlob || await smartDownload(file.id, { reason: 'download', fileName: file.name, shareId });
+      const blob = v4PreviewRef.current
+        ? await smartDownload(file.id, { reason: 'download', fileName: file.name, shareId })
+        : decodedBlob || await smartDownload(file.id, { reason: 'download', fileName: file.name, shareId });
       // If this is a client-encrypted vault file, decryptedBlob already holds
       // plaintext from the load path; only decrypt here when not already loaded.
       let out = blob;
-      if (!decodedBlob) {
+      if (!decodedBlob || v4PreviewRef.current) {
         const m = await getVaultFileMeta(file.id);
         if (m) {
           if (!isVaultUnlocked()) throw new Error('Unlock the vault to download this file');

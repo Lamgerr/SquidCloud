@@ -1,13 +1,12 @@
 {
-  "goal": "Supabase cleanup executed and verified (owner delegated the choice)",
+  "goal": "Instant preview for new E2E v4 uploads fixed and upgraded to chunked frames",
   "goal_source": "User: \"do full work completely ... hundreds of user's files ... backward compatible only on read\"",
   "last_actions": [
-    "2026-11-26: Owner said \"do ur choice, give me results\", authorizing the cleanup. Executed live DB cleanup via Supabase MCP.",
-    "VACUUM FULL net._http_response: 290 MB -> ~1 MB (only ~900 KB live rows; rest was bloat). Cron log retention deleted old rows + vacuum: 24 MB -> 1.5 MB. DB 380 MB -> 67 MB.",
-    "Scheduled hourly log-bloat-control job and changed job 11 to daily/1-day retention. Reduced cron jobs 3 and 6 to 5-minute intervals. Removed hardcoded anon JWT from cron job 9.",
-    "Verified exact row counts before dropping: stale stats claimed 27 empty tables, only 15 were truly empty; excluded 3 with view/trigger/publication dependencies and dropped 12. Dropped 7 unused secondary indexes. 151 -> 139 public tables.",
-    "Revoked anon EXECUTE on all 4 share RPCs; routed folder-share metadata through new BFF folder-share-meta gate. Service role retains access; live BFF returns 403 (not 500) for invalid shares. Invariant allowlist emptied.",
-    "All 42 tests pass, invariant gate passes, vercel READY. Final DB: 67 MB, 139 tables."
+    "2026-11-26: Root cause: preview modal passed the literal e2e_v4 label as an AES key and legacy getVaultFileMeta returns null for v4 files.",
+    "Added pure readV4Meta detector; modal now uses downloadV4Preview which fetches only the first RES54 chunks and decrypts complete v4 frames.",
+    "New v4 writes use 1 MiB independently AEAD-encrypted frames (magic 52 45 05) with AAD binding frame index/total; old single-frame v4 stays readable.",
+    "Downloads force the full smartDownload path so a partial preview can never be saved as a truncated file.",
+    "46 tests pass, invariant gate passes, vercel READY; design doc at docs/superpowers/specs/2026-11-26-instant-preview-design.md."
   ],
   "key_numbers": {
     "audits": 2,
@@ -22,11 +21,9 @@
     "repo": "https://github.com/Lamgerr/SquidCloud"
   },
   "blockers": [
-    "Service-role key from old history still live (previously deprioritized; not rotated).",
-    "Storage buckets not removed (no Postgres storage saving; owner decision pending)."
+    "PDF/EPUB still need full files; only text/image/Markdown benefit from prefix preview."
   ],
   "next": [
-    "Monitor for one day that log-bloat-control keeps net._http_response near 1 MB.",
-    "Consider dropping the 4 empty unused buckets only if no external consumers exist."
+    "Tune the fixed 3-chunk preview budget to stop after the first complete frame."
   ]
 }

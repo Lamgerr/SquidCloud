@@ -1,5 +1,5 @@
 import { isLegacyManagedUpload, V4_KEY_LABEL, canStartUpload } from './e2e-upload-policy';
-import { setPendingV4Meta, takePendingV4Meta, decryptV4File, isV4Sealed, type V4UploadMeta } from './e2e-v4-upload';
+import { setPendingV4Meta, takePendingV4Meta, decryptV4File, decryptV4Prefix, isV4Sealed, type V4UploadMeta } from './e2e-v4-upload';
 import { supabase } from "@/integrations/supabase/client";
 import { decryptData, generateEncryptionKey, detectEncryptionVersion } from "./encryption";
 import { getLoadBalancer } from "@/services/load-balancer";
@@ -1354,6 +1354,53 @@ export const downloadFilePreview = async (fileId: string, maxChunks: number = 3,
   for (const chunkData of sortedChunks) decrypted.push(await decryptData(chunkData, previewKey));
 
   return { blob: new Blob(decrypted, { type: metadata.fileType }), totalChunks: metadata.chunks.length, downloadedChunks: targetChunks.length, isPartial };
+};
+
+/** Fetch only the first RES54 chunks needed for a preview and decrypt the
+ *  complete v4 frames they contain. No whole-file download or reconstruction. */
+export const downloadV4Preview = async (
+  fileId: string,
+  userId: string,
+  maxChunks = 3,
+  options?: { fileRecord?: Record<string, any>; shareId?: string },
+): Promise<{ blob: Blob; totalChunks: number; downloadedChunks: number; isPartial: boolean }> => {
+  const file = options?.fileRecord || (() => supabase.from('files').select('*').eq('id', fileId).single()
+    .then(({ data, error }) => {
+      if (error) throw error;
+      return data as Record<string, any>;
+    }))();
+  const record = await file;
+  let metadata: Res54FileMetadata;
+  let v4: V4UploadMeta | undefined;
+  try {
+    const parsed = Array.isArray(record?.tags) && record.tags.length > 0
+      ? JSON.parse(record.tags[0]) : null;
+    metadata = parsed as Res54FileMetadata;
+    v4 = parsed?.v4 as V4UploadMeta | undefined;
+  } catch { throw new Error('Failed to parse chunk metadata'); }
+  if (!metadata?.chunks?.length || !v4?.fileId) throw new Error('File has no v4 preview metadata');
+
+  const isPartial = metadata.chunks.length > maxChunks;
+  const targets = isPartial ? metadata.chunks.slice(0, maxChunks) : metadata.chunks;
+  const downloaded = await processChunksInParallel(
+    targets.map((c, index) => ({ ...c, index })),
+    async (chunk, index, attempt) => downloadChunk(chunk, attempt, options?.shareId),
+    6,
+  );
+  const sorted = downloaded.sort((a, b) => a.index - b.index);
+  const bytes = sorted.map(c => base64ToArrayBuffer(c.data));
+  const total = bytes.reduce((n, b) => n + b.byteLength, 0);
+  const joined = new Uint8Array(total);
+  let off = 0;
+  for (const b of bytes) { const u = new Uint8Array(b); for (let i = 0; i < u.length; i++) joined[off++] = u[i]; }
+
+  const plain = await decryptV4Prefix(joined.buffer, userId, v4);
+  return {
+    blob: new Blob([plain], { type: v4.originalType || metadata.fileType || 'application/octet-stream' }),
+    totalChunks: metadata.chunks.length,
+    downloadedChunks: targets.length,
+    isPartial,
+  };
 };
 
 export async function resolveFileKeyForShare(fileId: string, encryptionKey: string | null): Promise<string | null> {

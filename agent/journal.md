@@ -314,3 +314,9 @@
 - Checked exact counts before dropping tables: stale stats overstated empty candidates (27) and 12 of them had real rows. Dropped only 12 truly empty, dependency-free tables; excluded 3 with views/triggers/publications. Public tables 151 -> 139. Dropped 7 unused secondary indexes (no PKs/uniques).
 - Revoked anon EXECUTE on get_shared_file_info, get_folder_share_contents, increment_share_download, increment_share_view. Added BFF folder-share-meta gate and wired client credentials so the share UI still works. Service role retains EXECUTE; live BFF returns 403 for invalid shares. Emptied scripts/e2e-invariant-allowlist.json.
 - Verification: 42 tests pass, invariant gate passes over 706 files, vercel READY, final DB 67 MB / 139 tables.
+
+## 2026-11-26 — Instant preview fixed and upgraded
+- Root cause of blank/error previews on new uploads: downloadFilePreview treated `e2e_v4` as a literal AES key, and the modal's legacy getVaultFileMeta path returns null for v4 files.
+- RED-GREEN: added tests for multi-chunk roundtrip, prefix decrypt of the first complete frame, and truncation rejection; implemented chunked v4 with 1 MiB independently encrypted frames (magic 52 45 05) while keeping legacy single-frame v4 readable.
+- Added downloadV4Preview (first 3 RES54 chunks only) and wired the modal through pure readV4Meta. Forced full smartDownload for downloads so partial preview data cannot be saved.
+- Verified: 46 tests pass, invariant gate passes (708 files), vercel READY. Wrote design doc with three approaches and the chosen tradeoff.
