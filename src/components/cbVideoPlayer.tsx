@@ -348,8 +348,8 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
         if (isV4 && !(await Streamer.seedV4Key(file.id, v4Meta!))) {
           // No in-memory master (e.g. after a reload): ask for a vault unlock,
           // then decrypt on the main thread so playback still works.
-          window.dispatchEvent(new CustomEvent('squidcloud:vault-unlock-required', {
-            detail: { files: [{ id: file.id, name: file.name }] },
+          window.dispatchEvent(new CustomEvent('squidcloud:vault-unlock-for-file', {
+            detail: { reason: 'Unlock your vault to view this encrypted file' },
           }));
           try {
             const blob = await downloadFileWithRes54(file.id, undefined, shareId ? { shareId } : undefined);
@@ -363,7 +363,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
           } catch (err: any) {
             if (cancelled) return;
             setHasErrorTracked(true);
-            setErrorMessage('Unlock your vault to play this encrypted video: ' + (err?.message || ''));
+            setErrorMessage('Unlock your vault to view this encrypted file: ' + (err?.message || ''));
           }
         }
         streamReadyRef.current = true;
@@ -383,6 +383,19 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
   }, [shareId, file.id, isV4, setHasErrorTracked]);
 
   useEffect(() => () => { if (transcodedUrl) URL.revokeObjectURL(transcodedUrl); if (v4BlobUrl) URL.revokeObjectURL(v4BlobUrl); clearTimeout(retryTimerRef.current); }, [transcodedUrl, v4BlobUrl]);
+  // Retry the stream once the vault is unlocked from the preview dialog.
+  useEffect(() => {
+    if (!isV4) return;
+    const retry = async () => {
+      if (!(await Streamer.seedV4Key(file.id, v4Meta!))) return;
+      setHasErrorTracked(false);
+      setV4BlobUrl(null);
+      setRetryCount((r) => r + 1);
+    };
+    window.addEventListener('squidcloud:vault-unlocked-for-file', retry);
+    return () => window.removeEventListener('squidcloud:vault-unlocked-for-file', retry);
+  }, [isV4, file.id, v4Meta]);
+
   useEffect(() => () => { clearTimeout(retryTimerRef.current); clearTimeout(tapTimer.current); audioGraph.current?.ctx.close?.().catch(() => {}); }, []);
 
   const startLocalTranscoding = async () => {

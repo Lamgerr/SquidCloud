@@ -8,6 +8,7 @@ import {
 import { cn } from '@/lib/utils';
 import { downloadFilePreview } from '@/lib/res54';
 import { readV4Meta } from '@/lib/e2e-v4-preview';
+import { hasV4Master } from '@/lib/e2e-v4-session';
 import { smartDownload, createFileShare } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
@@ -153,6 +154,13 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
     return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('keydown', onKey); };
   }, [isOpen, close, onClose, hasNext, hasPrevious, onNext, onPrevious]);
 
+  // Re-run the preview when the generic vault unlock completes.
+  useEffect(() => {
+    const retry = () => setVaultUnlockTick((t) => t + 1);
+    window.addEventListener('squidcloud:vault-unlocked-for-file', retry);
+    return () => window.removeEventListener('squidcloud:vault-unlocked-for-file', retry);
+  }, []);
+
   // Decrypt (skip for streaming video/3D handled by their own loaders)
   useEffect(() => {
     if (!isOpen || !file?.id) return;
@@ -168,6 +176,12 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
         // No full download, no legacy vault metadata lookup.
         const v4Meta = readV4Meta(file);
         if (v4Meta) {
+          if (!hasV4Master()) {
+            window.dispatchEvent(new CustomEvent('squidcloud:vault-unlock-for-file', {
+              detail: { reason: 'Unlock your vault to view this encrypted file' },
+            }));
+            throw new Error('Unlock your vault to view this file');
+          }
           const { downloadV4Preview } = await import('@/lib/res54');
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error('Sign in to preview this file');
@@ -234,6 +248,11 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
         });
         setDecodedBlob(finalBlob); setLoading(false);
       } catch (e: any) {
+        if (/vault locked|unlock your vault/i.test(String(e?.message || ''))) {
+          window.dispatchEvent(new CustomEvent('squidcloud:vault-unlock-for-file', {
+            detail: { reason: 'Unlock your vault to view this encrypted file' },
+          }));
+        }
         if (loadGen.current === gen) { setError(e?.message || 'Unable to load preview'); setLoading(false); }
       }
     })();

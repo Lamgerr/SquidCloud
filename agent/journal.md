@@ -361,3 +361,8 @@
 
 ## 2026-11-26 — v4 stream missing-key fallback
 - When the in-memory v4 master is absent (page reload / unlock via a non-master path), seedV4Key returns false and the SW would 503. Player now dispatches squidcloud:vault-unlock-required and falls back to main-thread decrypt + object URL so playback still works; streaming remains the primary path when the master is available.
+
+## 2026-11-26 — Generic vault unlock for previews
+- Replaced video-specific unlock event/reason with generic squidcloud:vault-unlock-for-file / squidcloud:vault-unlocked-for-file used by any preview type.
+- Dashboard renders a generic unlock dialog in both layouts and dispatches completion event; EnhancedInstantPreviewModal requests unlock for v4 files lacking master and retries on completion; cbVideoPlayer uses the same generic events.
+- Fixes fatal overlay caused by dispatching the upload-unlock event with a fake file object.

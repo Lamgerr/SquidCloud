@@ -271,6 +271,7 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   const [vaultUnlockFor, setVaultUnlockFor] = useState<{ id: string; name: string; blob: Blob; taskId?: string } | null>(null);
   const [vaultUploadQueue, setVaultUploadQueue] = useState<Array<{ file: File; folder: string }>>([]);
   const [vaultUploadOpen, setVaultUploadOpen] = useState(false);
+  const [vaultPreviewOpen, setVaultPreviewOpen] = useState(false);
 
   // Restoring a minimized preview tab reopens its file in the viewer
   useEffect(() => {
@@ -943,7 +944,12 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
       setVaultUploadOpen(true);
     };
     window.addEventListener('squidcloud:vault-unlock-required', onNeedUnlock);
-    return () => window.removeEventListener('squidcloud:vault-unlock-required', onNeedUnlock);
+    const onPreviewUnlock = () => setVaultPreviewOpen(true);
+    window.addEventListener('squidcloud:vault-unlock-for-file', onPreviewUnlock);
+    return () => {
+      window.removeEventListener('squidcloud:vault-unlock-required', onNeedUnlock);
+      window.removeEventListener('squidcloud:vault-unlock-for-file', onPreviewUnlock);
+    };
   }, []);
 
   const saveDecrypted = useCallback(async (file: FileItemType, blob: Blob, taskId?: string) => {
@@ -1852,6 +1858,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
             const q = vaultUploadQueue; setVaultUploadQueue([]);
             q.forEach(({ file, folder }) => void backgroundUploadService.addTask(file, folder));
           }} />
+        <VaultUnlockDialog open={vaultPreviewOpen} userId={user?.id || ''}
+          reason="Unlock your vault to view this encrypted file."
+          onClose={() => setVaultPreviewOpen(false)}
+          onUnlocked={() => { setVaultPreviewOpen(false); window.dispatchEvent(new Event('squidcloud:vault-unlocked-for-file')); }} />
       </AppStartupBiometricCheck>
       </FileViewInfoContext.Provider>
     );
@@ -2367,6 +2377,10 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
           const q = vaultUploadQueue; setVaultUploadQueue([]);
           q.forEach(({ file, folder }) => void backgroundUploadService.addTask(file, folder));
         }} />
+      <VaultUnlockDialog open={vaultPreviewOpen} userId={user?.id || ''}
+        reason="Unlock your vault to view this encrypted file."
+        onClose={() => setVaultPreviewOpen(false)}
+        onUnlocked={() => { setVaultPreviewOpen(false); window.dispatchEvent(new Event('squidcloud:vault-unlocked-for-file')); }} />
     </AppStartupBiometricCheck>
     </FileViewInfoContext.Provider>
   );
