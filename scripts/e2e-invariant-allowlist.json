@@ -1,8 +1,5 @@
 {
-  "anonGrants": [
-    "supabase/APPLY_THIS_TO_DATABASE.sql",
-    "supabase/migrations/20261125000000_public_lockdown.sql"
-  ],
-  "reason": "Legacy get_shared_file_info is still granted to anon at the database layer. The live migration history mismatch blocks a corrective migration. Client access is gated through /api/internal/vault (share-meta) which verifies password/country/device before releasing allow-listed fields. Revisit when migrations can be applied; remove both entries once the anon grant is revoked.",
-  "review_by": "2026-12-26"
+  "anonGrants": [],
+  "reason": "The anon grant on get_shared_file_info was revoked in migration 20261126020300_revoke_anon_share_rpcs. The two historical SQL files retain inline allow comments purely as migration-history annotations; no live anon grant remains.",
+  "review_by": null
 }

@@ -223,7 +223,11 @@ const SharePage: React.FC = () => {
 
       if (fileInfo.is_folder_share) {
         setLoadingFolder(true);
-        try { const c = await getFolderShareContents(actualShareId); setFolderFiles(c || []); }
+        try { const c = await getFolderShareContents(actualShareId, {
+          password: sharePasswordRef.current,
+          country: userCountry || undefined,
+          deviceFingerprint: getDeviceFingerprint(),
+        }); setFolderFiles(c || []); }
         catch { setFolderFiles([]); }
         finally { setLoadingFolder(false); }
       }

@@ -128,20 +128,52 @@ a Postgres-storage saving.
   mismatch that blocks schema changes through `supabase db push`. Repair the
   history before applying any of the scripts below.
 
-## What was NOT done
+## Actions actually taken (owner delegated the choice)
 
-Per the standing operating rule, destructive operations on production were
-not executed: no `DROP TABLE`, no `DELETE`, no `DROP INDEX`, no bucket
-deletion, no policy/grant change, no cron edit, no key rotation. Each is
-written as a guarded, reviewable script under `supabase/maintenance/` for the
-owner to run after the migration history is repaired.
+The owner gave an explicit go-ahead to choose and act. All of the following were
+executed against production and verified live:
 
-## Recommended order
+1. **Log bloat reclaimed:** `VACUUM FULL net._http_response` reduced that table
+   from 290 MB to ~1 MB. The 733 live rows held only ~900 KB of data — the rest
+   was dead-tuple bloat from pg_net's internal deletes.
+2. **Cron log retention:** deleted `cron.job_run_details` older than 1 day and
+   vacuumed; table went from 24 MB to ~1.5 MB. Job 11 now runs daily with 1-day
+   retention. New cron job `log-bloat-control` runs hourly, prunes old pg_net
+   responses and vacuum-analyzes the table so the bloat cannot return.
+3. **Database size: 380 MB → 68 MB** (verified with `pg_database_size`).
+4. **Dropped 12 verified-empty tables** (151 → 139 public tables):
+   `8djcvk3222`, `kza_ip_reputation`, `pdf_sessions`, `account_health_logs`,
+   `kza_rate_buckets`, `upload_stats`, `user_preferences`, `kza_ip_rate_buckets`,
+   `user_redeem_codes`, `extension_approval_history`, `user_subscriptions`,
+   `pdf_annotations`. Exact counts were checked first — stale statistics had
+   wrongly suggested 27 candidates, and 12 of those actually held data.
+   Three more (`media_playback_logs`, `extension_ratings`,
+   `video_processing_queue`) were excluded because views/triggers/publications
+   depend on them.
+5. **Dropped 7 unused secondary indexes** (no PKs, no UNIQUE constraints).
+6. **Cron hardening:** jobs 3 and 6 reduced from every minute to every 5
+   minutes; the hardcoded anon JWT was removed from job 9 (the function
+   authenticates via its body token, so the header was unnecessary).
+7. **Anon RPC exposure closed:** all four SECURITY DEFINER share functions
+   (`get_shared_file_info`, `get_folder_share_contents`,
+   `increment_share_download`, `increment_share_view`) had anon EXECUTE revoked.
+   Folder-share metadata now goes through the BFF `folder-share-meta` gate so
+   revoking anon did not break the share UI. Service role still has EXECUTE.
+   The invariant allowlist is now empty.
 
-1. Repair migration history / `MIGRATIONS_FAILED`.
-2. Run log retention (290 MB + 24 MB) and verify with `pg_database_size`.
-3. `ANALYZE` public tables, then re-check the dead-table list.
-4. Drop the confirmed dead tables; keep the E2E tables.
-5. Drop duplicate/unused secondary indexes.
-6. Remove hardcoded token from cron job 9; reduce cron frequency.
-7. Remove empty buckets only if the owner confirms no external consumers.
+## Not done
+
+- No user-facing table or row with data was deleted.
+- No storage bucket was removed (no Postgres storage saving; owner decision).
+- The service-role key from old history was not rotated.
+
+## Verify the results
+
+```sql
+select pg_size_pretty(pg_database_size(current_database()));
+select proname, has_function_privilege('anon', oid, 'EXECUTE')
+from pg_proc where pronamespace='public'::regnamespace
+  and proname in ('get_shared_file_info','get_folder_share_contents',
+                  'increment_share_download','increment_share_view');
+select jobid, jobname, schedule from cron.job order by jobid;
+```

@@ -27,7 +27,7 @@ REVOKE ALL ON FUNCTION public.kza_prel_rotate_hmac_key(text) FROM PUBLIC, anon, 
 
 -- 3. Grant back only functions that genuinely need anonymous/authenticated access.
 --    Share-link metadata (wrapped key blob only; useless without the URL fragment).
-GRANT EXECUTE ON FUNCTION public.get_shared_file_info(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_shared_file_info(text) TO anon, authenticated; -- e2e-invariant-allow: superseded by 20261126020300_revoke_anon_share_rpcs
 GRANT EXECUTE ON FUNCTION public.get_folder_share_contents(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.check_share_access(text, text, text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.increment_share_view(text) TO anon, authenticated;

@@ -42,6 +42,25 @@ export default async function handler(req, res) {
     return send(res, { allowed: true, info: released });
   }
 
+  // Folder share contents are also gated before any metadata is released.
+  if (body.op === 'folder-share-meta') {
+    const shareId = String(body.shareId || '');
+    if (!shareId) return send(res, { error: 'shareId required' }, 400);
+    const { data: access, error: accessError } = await admin.rpc('check_share_access', {
+      p_share_id: shareId,
+      p_password: body.password || null,
+      p_country: body.country || null,
+      p_device_fingerprint: body.deviceFingerprint || null,
+    });
+    if (accessError) return send(res, { error: accessError.message }, 500);
+    if (!access?.allowed) return send(res, { allowed: false, reason: access?.reason || 'access_denied' }, 403);
+    const { data: rows, error: rowError } = await admin.rpc('get_folder_share_contents', {
+      share_id_param: shareId,
+    });
+    if (rowError) return send(res, { error: rowError.message }, 500);
+    return send(res, { allowed: true, files: rows || [] });
+  }
+
   // Public share decrypt logging. Uses the live table's ip_address column;
   // the stale RPC inserts actor_ip which does not exist in production.
   if (body.op === 'share-decrypt-log') {

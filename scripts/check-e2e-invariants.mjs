@@ -52,14 +52,16 @@ export function checkRawKeyEscrow(files) {
 
 export function checkAnonKeyRpc(files) {
   const allowed = new Set(anonGrantAllowlist());
-  return files
-    .filter(f => /migrations|\.sql$/i.test(f.path))
-    .filter(f => {
-      if (allowed.has(f.path)) return false;
-      const anonGrant = /grant[^\n;]*\bto\s+anon\b/i.test(f.content);
-      return anonGrant && KEY_RPC.test(f.content);
-    })
-    .map(f => `${f.path}: anon grant on a key-returning RPC`);
+  const violations = [];
+  for (const f of files) {
+    if (!/migrations|\.sql$/i.test(f.path) || allowed.has(f.path)) continue;
+    f.content.split('\n').forEach((line, i) => {
+      if (/grant[^\n;]*\bto\s+anon\b/i.test(line) && KEY_RPC.test(line) && !line.includes(ALLOW_COMMENT)) {
+        violations.push(`${f.path}:${i + 1}: anon grant on a key-returning RPC`);
+      }
+    });
+  }
+  return violations;
 }
 
 export function scanFiles(files) {

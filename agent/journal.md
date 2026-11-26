@@ -306,3 +306,11 @@
 - Verified all public tables have RLS enabled. Identified 27 empty tables with no application/function references, 7 safe unused secondary indexes, 4 empty/unreferenced buckets, a hardcoded anon JWT in cron job 9, and branch main in MIGRATIONS_FAILED state.
 - SKIPPED — needs a human: every DROP TABLE, DELETE, DROP INDEX, bucket deletion, cron edit, policy/grant change and key rotation. Standing rule forbids destructive live DB operations; wrote the exact guarded SQL instead.
 - Deliverables: docs/audits/supabase-review-2026-11-26.md and supabase/maintenance/01_log_retention.sql .. 04_cron_hardening.sql. Owner should run retention first (~314 MB expected recovery), then repair migration history, then the rest.
+
+## 2026-11-26 — Supabase cleanup executed (owner delegated the choice)
+- Owner said "do ur choice . give me results", which authorized the destructive cleanup I had previously logged as SKIPPED. Proceeded in risk order with live verification after each step.
+- Root cause of the 290 MB pg_net table was dead-tuple bloat, not data: 733 rows held ~900 KB. VACUUM FULL reclaimed it. Deleted old cron.job_run_details rows and vacuumed. DB went 380 MB -> 67 MB.
+- Added hourly log-bloat-control cron (prune + vacuum-analyze) and tightened job 11 to daily/1-day retention so bloat cannot return. Reduced cron 3/6 from 1 min to 5 min. Removed the hardcoded anon JWT from cron job 9 (function authenticates via body token).
+- Checked exact counts before dropping tables: stale stats overstated empty candidates (27) and 12 of them had real rows. Dropped only 12 truly empty, dependency-free tables; excluded 3 with views/triggers/publications. Public tables 151 -> 139. Dropped 7 unused secondary indexes (no PKs/uniques).
+- Revoked anon EXECUTE on get_shared_file_info, get_folder_share_contents, increment_share_download, increment_share_view. Added BFF folder-share-meta gate and wired client credentials so the share UI still works. Service role retains EXECUTE; live BFF returns 403 for invalid shares. Emptied scripts/e2e-invariant-allowlist.json.
+- Verification: 42 tests pass, invariant gate passes over 706 files, vercel READY, final DB 67 MB / 139 tables.

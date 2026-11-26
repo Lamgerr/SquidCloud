@@ -1497,13 +1497,20 @@ export async function getSharedFileInfo(shareId: string, credentials?: {
 }
 
 // Get folder share contents (list files in a shared folder)
-export async function getFolderShareContents(shareId: string): Promise<any[]> {
+export async function getFolderShareContents(
+  shareId: string,
+  credentials?: { password?: string; country?: string; deviceFingerprint?: string },
+): Promise<any[]> {
   try {
-    const { data, error } = await supabase
-      .rpc('get_folder_share_contents', { share_id_param: shareId });
-
-    if (error) throw error;
-    return data || [];
+    const resp = await fetch('/api/internal/vault', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'folder-share-meta', shareId, ...credentials }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (payload?.allowed === false) throw new Error(payload.reason || 'Access denied');
+    if (!resp.ok || payload?.error) throw new Error(payload?.error || `Folder share failed (${resp.status})`);
+    return payload?.files || [];
   } catch (error: any) {
     console.error("Error getting folder share contents:", error);
     throw new Error(error.message || "Failed to get folder share contents");

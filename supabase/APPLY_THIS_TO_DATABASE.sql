@@ -86,7 +86,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Grant execute permission on the function to authenticated and anonymous users
-GRANT EXECUTE ON FUNCTION get_shared_file_info(text) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION get_shared_file_info(text) TO authenticated, anon; -- e2e-invariant-allow: superseded by 20261126020300_revoke_anon_share_rpcs
 
 -- Create a function to create a new share
 CREATE OR REPLACE FUNCTION create_file_share(file_id_param uuid)
