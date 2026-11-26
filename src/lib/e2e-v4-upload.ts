@@ -93,11 +93,16 @@ export async function prepareV4Upload(
   };
 }
 
+function hasMagic(bytes: Uint8Array, magic: Uint8Array): boolean {
+  return bytes.length >= 3 && bytes[0] === magic[0] && bytes[1] === magic[1] && bytes[2] === magic[2];
+}
+
+export function isChunkedV4Sealed(bytes: Uint8Array): boolean {
+  return hasMagic(bytes, CHUNKED_V4_MAGIC);
+}
+
 export function isV4Sealed(bytes: Uint8Array): boolean {
-  if (bytes.length < 3) return false;
-  const legacy = bytes[0] === LEGACY_V4_MAGIC[0] && bytes[1] === LEGACY_V4_MAGIC[1] && bytes[2] === LEGACY_V4_MAGIC[2];
-  const chunked = bytes[0] === CHUNKED_V4_MAGIC[0] && bytes[1] === CHUNKED_V4_MAGIC[1] && bytes[2] === CHUNKED_V4_MAGIC[2];
-  return legacy || chunked;
+  return hasMagic(bytes, CHUNKED_V4_MAGIC) || hasMagic(bytes, LEGACY_V4_MAGIC);
 }
 
 async function fileKey(userId: string, meta: V4UploadMeta, salt: Uint8Array) {

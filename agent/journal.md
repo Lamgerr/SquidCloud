@@ -335,3 +335,7 @@
 
 ## 2026-11-26 — KTL guard softened
 - The strict non-UUID error surfaced in the UI ("Invalid user id for key transparency log"). There is no per-user chain to verify without a valid user context, so verifyKtl now returns the GENESIS head instead of throwing; appendKtl still skips. Full verification remains for real UUIDs.
+
+## 2026-11-26 — Legacy v4 preview fallback
+- "Not a chunked v4 file" came from previewing files uploaded before the chunked v4 format: they have v4 tags but a single whole-frame ciphertext.
+- Added exported isChunkedV4Sealed and made downloadV4Preview detect the old magic and fall back to downloadFileWithRes54 (full decrypt) for those files; new chunked files keep the prefix-only path.

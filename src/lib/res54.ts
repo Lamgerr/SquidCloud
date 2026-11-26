@@ -1402,6 +1402,20 @@ export const downloadV4Preview = async (
   let off = 0;
   for (const b of bytes) { const u = new Uint8Array(b); for (let i = 0; i < u.length; i++) joined[off++] = u[i]; }
 
+  // Files uploaded before chunked v4 used a single whole-file AES-GCM frame,
+  // which cannot be decrypted from a prefix. Fall back to the full v4 path.
+  const { isChunkedV4Sealed } = await import('./e2e-v4-upload');
+  if (!isChunkedV4Sealed(joined)) {
+    const blob = await downloadFileWithRes54(fileId, undefined, options?.shareId
+      ? { shareId: options.shareId } : undefined);
+    return {
+      blob,
+      totalChunks: metadata.chunks.length,
+      downloadedChunks: metadata.chunks.length,
+      isPartial: false,
+    };
+  }
+
   const plain = await decryptV4Prefix(joined.buffer, userId, v4);
   return {
     blob: new Blob([plain], { type: v4.originalType || metadata.fileType || 'application/octet-stream' }),

@@ -62,3 +62,17 @@ test("preview modal detects v4 metadata in file tags", () => {
   expect(readV4Meta({ tags: [JSON.stringify({ chunks: [], v4: meta })] })).toEqual(meta);
   expect(readV4Meta({ tags: [JSON.stringify({ encryptionKey: "managed_key" })] })).toBeNull();
 });
+
+import { isChunkedV4Sealed } from "../src/lib/e2e-v4-upload";
+
+test("legacy single-frame v4 is distinguished from chunked v4", async () => {
+  setV4Master(crypto.getRandomValues(new Uint8Array(32)));
+  const prepared = await prepareV4Upload(new File(["legacy"], "old.txt"), "user-1");
+  const sealed = toBytes(await prepared!.file.arrayBuffer());
+  expect(isChunkedV4Sealed(sealed)).toBe(true);
+
+  const legacyHeader = new Uint8Array([0x52, 0x45, 0x04, ...new Uint8Array(44)]);
+  expect(isChunkedV4Sealed(legacyHeader)).toBe(false);
+  expect(isChunkedV4Sealed(new Uint8Array([0, 0, 0]))).toBe(false);
+  clearV4Master();
+});
