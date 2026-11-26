@@ -38,7 +38,7 @@ describe("v4 upload roundtrip", () => {
     const prepared = await prepareV4Upload(file, "user-1");
     expect(prepared).not.toBeNull();
     const sealed = await prepared!.file.arrayBuffer();
-    const plain = await decryptV4File(sealed, "user-1", prepared!.meta);
+    const plain = await decryptV4File(sealed, "user-1", prepared!.meta, async () => "GENESIS");
     expect(new TextDecoder().decode(plain)).toBe("v4 payload");
     clearV4Master();
   });

@@ -23,7 +23,7 @@ export interface Enrollment {
 }
 
 /** Create a new passkey credential and derive a device key via PRF. */
-export async function enrollDevice(userId: string): Promise<{ credentialId: string; publicKey: string; prfSalt: string }> {
+export async function enrollDevice(userId: string): Promise<{ credentialId: string; publicKey: string; prfSalt: string; prf: ArrayBuffer }> {
   if (!window.PublicKeyCredential) throw new Error('WebAuthn unavailable');
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const prfSalt = crypto.getRandomValues(new Uint8Array(32));
@@ -46,6 +46,7 @@ export async function enrollDevice(userId: string): Promise<{ credentialId: stri
     credentialId: b64(cred.rawId),
     publicKey: b64((cred.response as AuthenticatorAttestationResponse).getPublicKey()!),
     prfSalt: b64(prfSalt),
+    prf: ext as ArrayBuffer,
   };
 }
 

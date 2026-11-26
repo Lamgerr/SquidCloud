@@ -54,10 +54,15 @@ export async function appendKtl(userId: string, type: string, payload: Record<st
   if (!head.ok) throw new Error('Key transparency log is inconsistent');
   const seq = head.count + 1;
   const hash = await eventHash(head.head, seq, type, payload);
-  const { error } = await supabase.from('zk_ktl').insert({
-    user_id: userId, seq, event_type: type, payload, prev_hash: head.head, hash,
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Authentication required for KTL');
+  const resp = await fetch('/api/internal/vault', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ op: 'ktl-append', seq, event_type: type, payload, prev_hash: head.head, hash }),
   });
-  if (error) throw error;
+  const result = await resp.json().catch(() => ({}));
+  if (!resp.ok || result?.error) throw new Error(result?.error || `KTL append failed (${resp.status})`);
 }
 
 export const KTL_GENESIS = 'GENESIS';

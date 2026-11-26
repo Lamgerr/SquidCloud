@@ -3,6 +3,14 @@ import { deriveV4FileKey, encryptV4Chunk, makeV4Aad, randomBytes, v4SaltB64 } fr
 import { getV4Master } from './e2e-v4-session';
 import { V4_KEY_LABEL } from './e2e-upload-policy';
 
+/* KTL is an external boundary. Inject it so offline tests can verify the
+   crypto without a Supabase session; production always uses the real guard. */
+type KtlCheck = (userId: string) => Promise<unknown>;
+const realKtlCheck: KtlCheck = async (userId) => {
+  const { assertKtl } = await import('./zk/ktl-guard');
+  return assertKtl(userId);
+};
+
 export type V4UploadMeta = {
   fileId: string;
   saltB64: string;
@@ -58,7 +66,9 @@ export async function decryptV4File(
   sealed: ArrayBuffer,
   userId: string,
   meta: V4UploadMeta,
+  ktlCheck: KtlCheck = realKtlCheck,
 ): Promise<ArrayBuffer> {
+  await ktlCheck(userId);
   const master = getV4Master();
   if (!master) throw new Error('Vault locked');
   const bytes = new Uint8Array(sealed);
