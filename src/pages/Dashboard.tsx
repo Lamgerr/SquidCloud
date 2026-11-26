@@ -1181,6 +1181,8 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
 
   // ── Drag & Drop ──────────────────────────────────────────
   const handleFilesDropped = useCallback(async (droppedFiles: File[], folderPath?: string) => {
+    // A drop anywhere in the dashboard lands the user on the Files tab.
+    setActiveTab('files');
     if (!canUpload) {
       handleCreateBlocked();
       return;

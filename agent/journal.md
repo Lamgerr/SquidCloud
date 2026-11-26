@@ -344,3 +344,9 @@
 - WebCrypto OperationError came from AAD/HKDF binding the viewer's user id instead of the uploader's. Shared files (and sessions without a user) therefore failed authentication.
 - Added userId to V4UploadMeta at upload; cryptoUserId() uses meta.userId first, falling back to record.user_id for older metadata and then to the passed id. Wrapped chunk decrypt failures with an explicit diagnostic message.
 - Verified with a RED-GREEN test that decrypting with an empty viewer id works when metadata carries the uploader id. 50 tests pass, gate passes, vercel READY.
+
+## 2026-11-26 — Video v4 playback and dashboard UX
+- Video: the SW virtual-stream decryptor only handles legacy formats and cannot decrypt v4 (no key in SW). cbVideoPlayer now detects v4 via readV4Meta, decrypts on the main thread with downloadFileWithRes54, and plays from a local object URL; transcoding also reads that blob instead of /virtual-stream.
+- Vault unlock dialog z-index raised to 2147483600 so it sits above other overlays when the vault is locked.
+- Dashboard drag/drop now switches to the Files tab before processing the upload.
+- Note: /virtual-stream for legacy videos returns a 403 region-block page from middleware for India; that is a deliberate geo policy, not changed.

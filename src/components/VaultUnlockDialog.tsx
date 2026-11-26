@@ -103,7 +103,7 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
 }
 
 const CSS = `
-.vu-root{position:fixed;inset:0;z-index:500;display:grid;place-items:center;
+.vu-root{position:fixed;inset:0;z-index:2147483600;display:grid;place-items:center;
   background:rgba(3,4,3,.76);backdrop-filter:blur(8px);padding:20px}
 .vu-card{width:min(380px,100%);border-radius:22px;padding:26px;display:grid;justify-items:center;gap:10px;text-align:center;
   color:var(--sa-text,#e8e7e1);font-family:var(--sa-f,-apple-system,system-ui,sans-serif)}
