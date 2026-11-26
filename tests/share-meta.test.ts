@@ -22,7 +22,7 @@ describe("share metadata release policy", () => {
       share_expires_at: null, share_download_limit: 1, share_download_count: 0,
       share_view_only: true, share_require_email: false, shared_encryption_key: "wrapped",
       is_folder_share: false, folder_id: null, folder_name: null, is_byok: false,
-      file_tags: ["{}"], file_encryption_key: "raw-key", access_code: "code",
+      file_tags: ["{}"], file_encryption_key: false, access_code: "code",
       share_secret_hash: "hash",
     });
     expect(released).not.toBeNull();
@@ -30,7 +30,7 @@ describe("share metadata release policy", () => {
     expect(released!.shared_encryption_key).toBe("wrapped");
     expect(released).not.toHaveProperty("access_code");
     expect(released).not.toHaveProperty("share_secret_hash");
-    expect(released).not.toHaveProperty("file_encryption_key");
-    expect(released).not.toHaveProperty("storage_path");
+    expect(released.file_encryption_key).toBe(false);
+    expect(released.storage_path).toBe("res54_distributed");
   });
 });

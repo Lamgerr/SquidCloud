@@ -27,6 +27,8 @@ describe("e2e invariant checker", () => {
     expect(checkRawKeyEscrow([file("src/lib/e2e-v4-upload.ts", "invoke('store-file-key')")])).toHaveLength(1);
     expect(checkRawKeyEscrow([file("src/lib/e2e-upload-policy.ts", "fetch('/api/store-file-key')")])).toHaveLength(1);
     expect(checkRawKeyEscrow([file("src/lib/legacy.ts", "invoke('store-file-key')")])).toHaveLength(0);
+    expect(checkRawKeyEscrow([file("src/lib/api.ts", "invoke('store-file-key')")])).toHaveLength(1);
+    expect(checkRawKeyEscrow([file("src/lib/res54.ts", "invoke('store-file-key')")])).toHaveLength(1);
   });
 
   test("migrations may not grant anon access to key-returning RPCs", () => {

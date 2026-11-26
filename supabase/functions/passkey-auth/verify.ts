@@ -30,6 +30,51 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
   return out;
 }
 
+/** WebAuthn authenticators emit ASN.1 DER ECDSA signatures; WebCrypto wants
+ *  P1363 (fixed-width r||s). Convert DER when present, returning null for
+ *  anything malformed so the caller can fall back to P1363. */
+export function derToP1363(der: Uint8Array, coordinateBytes: number): Uint8Array | null {
+  try {
+    if (der.length < 8 || der[0] !== 0x30) return null;
+    const seqLen = readDerLength(der, 1);
+    if (!seqLen || seqLen.next + seqLen.length !== der.length) return null;
+
+    const r = readDerInteger(der, seqLen.next);
+    if (!r) return null;
+    const s = readDerInteger(der, r.next);
+    if (!s || s.next !== der.length) return null;
+
+    const out = new Uint8Array(coordinateBytes * 2);
+    for (const [value, offset] of [[r.value, 0], [s.value, coordinateBytes]] as const) {
+      if (value.length > coordinateBytes) return null;
+      out.set(value, offset + coordinateBytes - value.length);
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+function readDerLength(bytes: Uint8Array, pos: number): { length: number; next: number } | null {
+  const first = bytes[pos];
+  if (first === undefined) return null;
+  if (first < 0x80) return { length: first, next: pos + 1 };
+  const count = first & 0x7f;
+  if (count === 0 || count > 4 || pos + 1 + count > bytes.length) return null;
+  let length = 0;
+  for (let i = 0; i < count; i++) length = length * 256 + bytes[pos + 1 + i];
+  return { length, next: pos + 1 + count };
+}
+
+function readDerInteger(bytes: Uint8Array, pos: number): { value: Uint8Array; next: number } | null {
+  if (bytes[pos] !== 0x02) return null;
+  const len = readDerLength(bytes, pos + 1);
+  if (!len || len.next + len.length > bytes.length) return null;
+  let value = bytes.slice(len.next, len.next + len.length);
+  while (value.length > 1 && value[0] === 0) value = value.slice(1);
+  return { value, next: len.next + len.length };
+}
+
 export async function verifyAssertion(input: VerifyAssertionInput): Promise<boolean> {
   try {
     const response = input.credential?.response;
@@ -68,7 +113,17 @@ export async function verifyAssertion(input: VerifyAssertionInput): Promise<bool
     const verifyAlgorithm: AlgorithmIdentifier = isRsa
       ? { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }
       : { name: "ECDSA", hash: "SHA-256" };
-    return crypto.subtle.verify(verifyAlgorithm, key, signature, signedData);
+
+    const candidates: Uint8Array[] = [signature];
+    if (!isRsa) {
+      const size = jwk.crv === "P-384" ? 48 : jwk.crv === "P-521" ? 66 : 32;
+      const converted = derToP1363(signature, size);
+      if (converted) candidates.push(converted);
+    }
+    for (const candidate of candidates) {
+      if (await crypto.subtle.verify(verifyAlgorithm, key, candidate, signedData)) return true;
+    }
+    return false;
   } catch {
     return false;
   }

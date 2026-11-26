@@ -43,3 +43,13 @@ describe("v4 upload roundtrip", () => {
     clearV4Master();
   });
 });
+
+import { canStartUpload } from "../src/lib/e2e-upload-policy";
+
+describe("new upload gate", () => {
+  test("requires v4 or a client-held BYOK key", () => {
+    expect(canStartUpload({ v4Prepared: true, byokActive: false })).toBe(true);
+    expect(canStartUpload({ v4Prepared: false, byokActive: true })).toBe(true);
+    expect(canStartUpload({ v4Prepared: false, byokActive: false })).toBe(false);
+  });
+});

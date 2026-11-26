@@ -22,27 +22,6 @@ export default async function handler(req, res) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Append an event to the key transparency log with a verified identity.
-  if (op === 'ktl-append') {
-    if (!auth.startsWith('Bearer ')) return send(res, { error: 'unauthorized' }, 401);
-    const token = auth.slice(7);
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !user) return send(res, { error: 'unauthorized' }, 401);
-    const { seq, event_type, payload, prev_hash, hash } = body;
-    if (!Number.isInteger(seq) || typeof event_type !== 'string' || typeof hash !== 'string') {
-      return send(res, { error: 'invalid event' }, 400);
-    }
-    const { data: head, error: headErr } = await admin.from('zk_ktl')
-      .select('seq, hash').eq('user_id', user.id).order('seq', { ascending: false }).limit(1).maybeSingle();
-    if (headErr) return send(res, { error: headErr.message }, 500);
-    if (seq !== (head?.seq || 0) + 1) return send(res, { error: 'ktl sequence mismatch' }, 409);
-    const { error } = await admin.from('zk_ktl').insert({
-      user_id: user.id, seq, event_type, payload: payload || {}, prev_hash: prev_hash || head?.hash || 'GENESIS', hash,
-    });
-    if (error) return send(res, { error: error.message }, 500);
-    return send(res, { ok: true });
-  }
-
   // Share metadata is public only after check_share_access passes. No anon RPC.
   if (body.op === 'share-meta') {
     const shareId = String(body.shareId || '');
@@ -98,6 +77,27 @@ export default async function handler(req, res) {
   if ('userId' in body || 'user_id' in body || 'owner_id' in body) return send(res, { error: 'identity fields rejected' }, 400);
 
   const op = String(body.op || '');
+  // Append an event to the key transparency log with a verified identity.
+  if (op === 'ktl-append') {
+    if (!auth.startsWith('Bearer ')) return send(res, { error: 'unauthorized' }, 401);
+    const token = auth.slice(7);
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !user) return send(res, { error: 'unauthorized' }, 401);
+    const { seq, event_type, payload, prev_hash, hash } = body;
+    if (!Number.isInteger(seq) || typeof event_type !== 'string' || typeof hash !== 'string') {
+      return send(res, { error: 'invalid event' }, 400);
+    }
+    const { data: head, error: headErr } = await admin.from('zk_ktl')
+      .select('seq, hash').eq('user_id', user.id).order('seq', { ascending: false }).limit(1).maybeSingle();
+    if (headErr) return send(res, { error: headErr.message }, 500);
+    if (seq !== (head?.seq || 0) + 1) return send(res, { error: 'ktl sequence mismatch' }, 409);
+    const { error } = await admin.from('zk_ktl').insert({
+      user_id: user.id, seq, event_type, payload: payload || {}, prev_hash: prev_hash || head?.hash || 'GENESIS', hash,
+    });
+    if (error) return send(res, { error: error.message }, 500);
+    return send(res, { ok: true });
+  }
+
   if (op === 'vault-state') {
     const { data } = await supabase.from('zk_vaults').select('status, crypto_version, epoch, verifier').eq('user_id', user.id).maybeSingle();
     return send(res, { vault: data || null });

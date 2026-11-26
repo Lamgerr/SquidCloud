@@ -5,9 +5,11 @@ type ShareRow = Record<string, unknown>;
 
 const ALLOWED_FIELDS = [
   "file_id", "file_name", "file_type", "file_size", "file_created_at", "file_updated_at",
-  "is_encrypted", "owner_id", "share_created_at", "share_expires_at", "share_download_limit",
+  "is_encrypted", "storage_path", "owner_id", "share_created_at", "share_expires_at", "share_download_limit",
   "share_download_count", "share_view_only", "share_require_email", "shared_encryption_key",
   "is_folder_share", "folder_id", "folder_name", "is_byok", "file_tags",
+  // Flag only ("is BYOK"), never raw key material. Required by the share download path.
+  "file_encryption_key",
 ] as const;
 
 export function releaseShareMeta(access: ShareAccessResult, row: ShareRow): ShareRow | null {

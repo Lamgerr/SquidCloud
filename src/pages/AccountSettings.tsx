@@ -1,5 +1,6 @@
 import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
 import { rewrapMasterKey } from '@/lib/master-key-rewrap';
+import { setV4Master, clearV4Master } from '@/lib/e2e-v4-session';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -1252,6 +1253,8 @@ const AccountSettings = () => {
       return;
     }
     setLoading(true);
+    let previous: null | { encrypted_master_key: string; kdf_salt: string; kdf_iterations: number; key_version: number } = null;
+    let rewrapped: null | Awaited<ReturnType<typeof rewrapMasterKey>> = null;
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user?.email || '',
@@ -1271,12 +1274,18 @@ const AccountSettings = () => {
         const meta = await resp.json().catch(() => ({}));
         if (resp.ok && meta?.encrypted_master_key && meta?.kdf_salt) {
           const [wrapped, iv] = String(meta.encrypted_master_key).split(':');
-          const rewrapped = await rewrapMasterKey({
+          rewrapped = await rewrapMasterKey({
             wrapped, iv, salt: meta.kdf_salt,
             iterations: Number(meta.kdf_iterations) || 310000,
             version: Number(meta.key_version) || 1,
           }, currentPassword, newPassword);
           if (!rewrapped.ok || !rewrapped.next) throw new Error('Could not rewrap your vault key');
+          const previous = {
+            encrypted_master_key: String(meta.encrypted_master_key),
+            kdf_salt: String(meta.kdf_salt),
+            kdf_iterations: Number(meta.kdf_iterations) || 310000,
+            key_version: Number(meta.key_version) || 1,
+          };
           const { error: keyError } = await supabase.from('master_keys').update({
             encrypted_master_key: `${rewrapped.next.wrapped}:${rewrapped.next.iv}`,
             kdf_salt: rewrapped.next.salt,
@@ -1288,8 +1297,25 @@ const AccountSettings = () => {
         }
       }
 
+      let rewrappedMaster: Uint8Array | null = null;
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-      if (updateError) throw updateError;
+      if (updateError) {
+        // Roll the vault wrapper back so the old password still unlocks files.
+        if (previous && user) {
+          await supabase.from('master_keys').update({
+            encrypted_master_key: previous.encrypted_master_key,
+            kdf_salt: previous.kdf_salt,
+            kdf_iterations: previous.kdf_iterations,
+            last_rotated: null,
+          }).eq('user_id', user.id).eq('key_version', previous.key_version + 1);
+        }
+        throw updateError;
+      }
+      if (rewrapped?.ok && rewrapped.masterRaw) {
+        setV4Master(rewrapped.masterRaw);
+        rewrappedMaster = rewrapped.masterRaw;
+      }
+      rewrappedMaster?.fill(0);
       void emitSignal({
         type: 'password_changed',
         severity: 'warning',
@@ -2086,7 +2112,7 @@ const AccountSettings = () => {
             <button
               type="button"
               className="tv-pill-btn sm"
-              onClick={() => (vaultState ? (lockVault(), setVaultState(false)) : setVaultOpen(true))}
+              onClick={() => (vaultState ? (lockVault(), clearV4Master(), setVaultState(false)) : setVaultOpen(true))}
             >
               <span
                 className="tv-dot"

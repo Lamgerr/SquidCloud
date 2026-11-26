@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 import { verifyAssertion, resolvePublicKeyJwk } from "./verify.ts";
+import { resolveRegistrationEmail } from "./identity.ts";
+import { isBoundAuthenticationChallenge } from "./challenge-binding.ts";
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -31,12 +33,12 @@ function base64UrlEncode(buffer: ArrayBuffer): string {
 }
 
 
-async function authenticatedUserId(req: Request, supabase: any): Promise<string | null> {
+async function authenticatedUser(req: Request, supabase: any): Promise<{ id: string; email: string | null } | null> {
   const auth = req.headers.get('Authorization') || '';
   if (!auth.startsWith('Bearer ')) return null;
   const { data, error } = await supabase.auth.getUser(auth.slice(7));
   if (error || !data?.user) return null;
-  return data.user.id;
+  return { id: data.user.id, email: data.user.email ?? null };
 }
 
 function expectedOrigin(): string {
@@ -74,10 +76,12 @@ serve(async (req) => {
 });
 
 async function handleRegisterOptions(req: Request, supabase: any, params: any) {
-  const user_id = await authenticatedUserId(req, supabase);
-  if (!user_id) return jsonResponse({ error: 'Authenticated session required' }, 401);
-  const { email, display_name } = params;
-  if (!email) return jsonResponse({ error: 'email required' }, 400);
+  const user = await authenticatedUser(req, supabase);
+  if (!user) return jsonResponse({ error: 'Authenticated session required' }, 401);
+  const user_id = user.id;
+  const email = resolveRegistrationEmail(user.email, params.email);
+  if (!email) return jsonResponse({ error: 'Verified email required' }, 400);
+  const { display_name } = params;
 
   const challenge = await generateChallenge();
   const rpId = new URL(SUPABASE_URL).hostname === 'localhost' ? 'localhost' : 'squidcloud.vercel.app';
@@ -118,9 +122,12 @@ async function handleRegisterOptions(req: Request, supabase: any, params: any) {
 }
 
 async function handleRegisterVerify(req: Request, supabase: any, params: any) {
-  const user_id = await authenticatedUserId(req, supabase);
-  if (!user_id) return jsonResponse({ error: 'Authenticated session required' }, 401);
-  const { email, credential, challenge_id, publicKeyJwk } = params;
+  const user = await authenticatedUser(req, supabase);
+  if (!user) return jsonResponse({ error: 'Authenticated session required' }, 401);
+  const user_id = user.id;
+  const email = resolveRegistrationEmail(user.email, params.email);
+  if (!email) return jsonResponse({ error: 'Verified email required' }, 400);
+  const { credential, challenge_id, publicKeyJwk } = params;
   if (!credential?.id || !challenge_id || !publicKeyJwk?.x || !publicKeyJwk?.y) {
     return jsonResponse({ error: 'Missing required fields' }, 400);
   }
@@ -138,18 +145,38 @@ async function handleRegisterVerify(req: Request, supabase: any, params: any) {
   return jsonResponse({ success: true });
 }
 
+function base64UrlToBytes(value: string): Uint8Array {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((value.length + 3) % 4);
+  return Uint8Array.from(atob(padded), ch => ch.charCodeAt(0));
+}
+
 async function handleAuthOptions(supabase: any, params: any) {
   const challenge = await generateChallenge();
   const rpId = new URL(SUPABASE_URL).hostname === 'localhost' ? 'localhost' : 'squidcloud.vercel.app';
+  const email = typeof params.email === 'string' ? params.email.trim().toLowerCase() : '';
+
+  // Bind the challenge to the credentials for this email. Legacy rows with no
+  // verifier can only be used through this bound path.
+  let credentialIds: string[] = [];
+  if (email) {
+    const { data: rows } = await supabase.from('user_passkeys')
+      .select('credential_id').eq('email', email);
+    credentialIds = (rows || []).map((r: any) => String(r.credential_id)).filter(Boolean);
+  }
+
   const { error } = await supabase.from('passkey_challenges').insert({
     user_id: '00000000-0000-0000-0000-000000000000', challenge, type: 'authentication',
     expires_at: new Date(Date.now() + 120000).toISOString(),
+    credential_ids: credentialIds, email: email || null,
   });
   if (error) throw error;
   return jsonResponse({
     challenge_id: challenge,
     publicKey: {
       challenge, timeout: 60000, userVerification: 'required', rpId,
+      ...(credentialIds.length ? {
+        allowCredentials: credentialIds.map(id => ({ type: 'public-key', id: base64UrlToBytes(id) })),
+      } : {}),
     },
   });
 }
@@ -162,6 +189,9 @@ async function handleAuthVerify(supabase: any, params: any) {
     .eq('challenge', challenge_id).eq('type', 'authentication').single();
   if (cdErr || !cd) return jsonResponse({ error: 'Invalid or expired challenge' }, 400);
   await supabase.from('passkey_challenges').delete().eq('id', cd.id);
+  if (!cd.expires_at || Date.parse(cd.expires_at) <= Date.now()) {
+    return jsonResponse({ error: 'Invalid or expired challenge' }, 400);
+  }
 
   const { data: passkey } = await supabase.from('user_passkeys').select('*')
     .eq('credential_id', credential.id).single();
@@ -172,6 +202,10 @@ async function handleAuthVerify(supabase: any, params: any) {
   // out; the authenticator still had to complete a user-verified assertion.
   const publicKeyJwk = await resolvePublicKeyJwk(passkey.public_key);
   const rpId = new URL(SUPABASE_URL).hostname === 'localhost' ? 'localhost' : 'squidcloud.vercel.app';
+  if (!publicKeyJwk) {
+    const bound = isBoundAuthenticationChallenge(cd, credential.id, passkey.email || '');
+    if (!bound) return jsonResponse({ error: 'Passkey verification failed' }, 401);
+  }
   if (publicKeyJwk) {
     const verified = await verifyAssertion({
       credential,

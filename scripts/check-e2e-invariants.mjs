@@ -37,9 +37,17 @@ export function checkMathRandomInCrypto(files) {
 }
 
 export function checkRawKeyEscrow(files) {
-  return files
-    .filter(f => V4_PATH.test(f.path) && /(store-file-key|storeFileKey)/.test(f.content))
-    .map(f => `${f.path}: raw key escrow in a new E2E path`);
+  const violations = [];
+  const NEW_UPLOAD_PATH = /(^src\/lib\/(api|res54)\.ts$|^src\/lib\/e2e-v4|^src\/lib\/e2e-upload-policy)/;
+  for (const f of files) {
+    if (SKIP_PATH.test(f.path) || !NEW_UPLOAD_PATH.test(f.path)) continue;
+    f.content.split('\n').forEach((line, i) => {
+      if (/(invoke\(\s*['"]store-file-key|fetch\([^)]*store-file-key|\bstoreFileKey\s*\()/.test(line) && !line.includes(ALLOW_COMMENT)) {
+        violations.push(`${f.path}:${i + 1}: raw key escrow call`);
+      }
+    });
+  }
+  return violations;
 }
 
 export function checkAnonKeyRpc(files) {

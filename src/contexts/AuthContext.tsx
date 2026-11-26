@@ -1,4 +1,5 @@
 
+import { clearV4Master } from '@/lib/e2e-v4-session';
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -307,6 +308,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // Guard check failed — proceed with sign out anyway
       }
+      clearV4Master();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 

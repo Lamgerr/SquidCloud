@@ -10,3 +10,9 @@ export function isLegacyManagedUpload(meta: KeyMetadata): boolean {
 export function shouldEscrowKey(meta: KeyMetadata): boolean {
   return isLegacyManagedUpload(meta);
 }
+
+/** New uploads need a client-held key: either E2E v4 (unlocked vault) or
+ *  BYOK. Without one, the legacy path would escrow a raw AES key. */
+export function canStartUpload(state: { v4Prepared: boolean; byokActive: boolean }): boolean {
+  return state.v4Prepared || state.byokActive;
+}

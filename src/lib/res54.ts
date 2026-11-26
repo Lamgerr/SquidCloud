@@ -53,7 +53,7 @@ interface BYOKRuntimePolicy {
   hasAccountKey: boolean;
 }
 
-const getBYOKRuntimePolicy = async (userId: string): Promise<BYOKRuntimePolicy> => {
+export const getBYOKRuntimePolicy = async (userId: string): Promise<BYOKRuntimePolicy> => {
   try {
     const { data, error } = await supabase
       .from('user_encryption_settings')
@@ -529,7 +529,8 @@ export const uploadFileWithRes54 = async (
   file: File,
   progressCallback?: (progress: number, stage: string, details?: any) => void,
   providerId?: string,
-  sealedV4 = false
+  sealedV4 = false,
+  v4MetaOverride?: V4UploadMeta
 ): Promise<{ id: string, metadata: Res54FileMetadata, encryptionKey: string }> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Authentication required");
@@ -600,7 +601,7 @@ export const uploadFileWithRes54 = async (
   let metadata: Res54FileMetadata;
 
   const byokPolicy = await getBYOKRuntimePolicy(user.id);
-  const pendingV4 = sealedV4 ? takePendingV4Meta() : null;
+  const pendingV4 = sealedV4 ? (v4MetaOverride || takePendingV4Meta()) : null;
   const { encryptionKey } = pendingV4
     ? { encryptionKey: V4_KEY_LABEL }
     : await resolveUploadEncryptionKey(file, user.id, byokPolicy.enabled, totalChunks);
@@ -785,7 +786,7 @@ export const uploadFileWithRes54 = async (
   if (rawUploadKey && createdFile?.id) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const { error: storeError } = await supabase.functions.invoke('store-file-key', {
+      const { error: storeError } = await supabase.functions.invoke('store-file-key', { // e2e-invariant-allow: legacy managed path only; new uploads are gated by canStartUpload
         headers: { Authorization: `Bearer ${session?.access_token}` },
         body: { fileId: createdFile.id, key: rawUploadKey },
       });

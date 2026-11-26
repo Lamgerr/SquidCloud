@@ -1,4 +1,4 @@
-import { V4_KEY_LABEL } from './e2e-upload-policy';
+import { V4_KEY_LABEL, canStartUpload } from './e2e-upload-policy';
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileWithRes54, downloadFileWithRes54, isRawStorageRow, downloadRawStorageObject } from "./res54";
 import { decryptData, encryptData, generateEncryptionKey } from "./encryption";
@@ -831,11 +831,16 @@ export const uploadFile = async (
         if (sealed) { uploadSource = sealed.file; zkMeta = sealed.meta; }
       }
     }
-    if (v4Meta) {
-      const { setPendingV4Meta } = await import('./res54');
-      setPendingV4Meta(v4Meta);
+    if (authUser && !v4Meta) {
+      const { getBYOKRuntimePolicy } = await import('./res54');
+      const policy = await getBYOKRuntimePolicy(authUser.id);
+      if (!canStartUpload({ v4Prepared: false, byokActive: policy.enabled })) {
+        throw new Error('Unlock your vault before uploading (or enable BYOK)');
+      }
     }
-    const { id, metadata } = await uploadFileWithRes54(uploadSource, onProgress, undefined, !!v4Meta);
+    const { id, metadata } = await uploadFileWithRes54(
+      uploadSource, onProgress, undefined, !!v4Meta, v4Meta || undefined,
+    );
     if (v4Meta && authUser && id) {
       await import('./e2e-v4-store').then(m => m.saveV4Meta(id, authUser.id, v4Meta!.saltB64)).catch(() => {});
     }
@@ -1441,11 +1446,13 @@ export async function revokeFileShare(fileId: string): Promise<boolean> {
 }
 
 // Get file information by file ID or share ID (supports both public and private access)
-export async function getFileInfoById(id: string): Promise<any> {
+export async function getFileInfoById(id: string, credentials?: {
+  password?: string; country?: string; deviceFingerprint?: string;
+}): Promise<any> {
   try {
-    // First try to get as a shared file (public access)
+    // First try to get as a shared file (password/device-gated via BFF)
     try {
-      const sharedFileInfo = await getSharedFileInfo(id);
+      const sharedFileInfo = await getSharedFileInfo(id, credentials);
       return {
         file_id: sharedFileInfo.file_id,
         file_name: sharedFileInfo.file_name,

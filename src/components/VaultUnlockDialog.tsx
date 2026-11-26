@@ -6,6 +6,7 @@ import { verifyVaultPassword } from '@/lib/zk-vault-verify';
 import { verifyKeyHash, base64ToArrayBuffer } from '@/services/byok-encryption';
 import { deriveKeyFromPassword, unwrapKey } from '@/lib/key-derivation';
 import { setV4Master } from '@/lib/e2e-v4-session';
+import { exportMasterKey } from '@/lib/vault-master';
 import { supabase } from '@/integrations/supabase/client';
 import { useShake } from '@/hooks/use-shake';
 
@@ -50,9 +51,8 @@ export default function VaultUnlockDialog({ open, userId, onClose, onUnlocked, r
           const { key: passwordKey } = await deriveKeyFromPassword(
             password, base64ToArrayBuffer(master.kdf_salt), Number(master.kdf_iterations) || 100000,
           );
-          await unwrapKey(wrapped, iv, passwordKey);
-          const raw = await crypto.subtle.exportKey('raw', passwordKey);
-          setV4Master(new Uint8Array(raw));
+          const masterKey = await unwrapKey(wrapped, iv, passwordKey);
+          setV4Master(await exportMasterKey(masterKey));
           ok = true;
         } catch { ok = false; }
       }
