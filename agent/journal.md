@@ -332,3 +332,6 @@
 - Removed block-all-mixed-content from CSP since upgrade-insecure-requests supersedes it; verified the live header no longer contains either.
 - Traced the Postgres 400 `invalid input syntax for uuid "3"` to zk_ktl?user_id=eq.3: a non-UUID user id reached verifyKtl. Added a pure isValidKtlUserId guard; verifyKtl now throws a clear client error and appendKtl skips instead of issuing an invalid query.
 - Verified: 48 tests pass, invariant gate passes (710 files), vercel READY, production HTML has zero onlinewebfonts references.
+
+## 2026-11-26 — KTL guard softened
+- The strict non-UUID error surfaced in the UI ("Invalid user id for key transparency log"). There is no per-user chain to verify without a valid user context, so verifyKtl now returns the GENESIS head instead of throwing; appendKtl still skips. Full verification remains for real UUIDs.

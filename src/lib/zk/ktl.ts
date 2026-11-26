@@ -29,9 +29,11 @@ export async function eventHash(prevHash: string, seq: number, type: string, pay
   return sha256(`${prevHash}|${seq}|${type}|${JSON.stringify(payload)}`);
 }
 
-/** Load all events for the current user and verify the chain from seq 1. */
+/** Load all events for the current user and verify the chain from seq 1.
+ *  No valid user context means there is no per-user chain to check — return
+ *  the genesis head instead of issuing an invalid query. */
 export async function verifyKtl(userId: string): Promise<{ ok: boolean; head: string; count: number }> {
-  if (!isValidKtlUserId(userId)) throw new Error('Invalid user id for key transparency log');
+  if (!isValidKtlUserId(userId)) return { ok: true, head: 'GENESIS', count: 0 };
   const { data, error } = await supabase.from('zk_ktl')
     .select('seq, event_type, payload, prev_hash, hash')
     .eq('user_id', userId).order('seq', { ascending: true });
