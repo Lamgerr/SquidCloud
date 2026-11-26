@@ -1,9 +1,9 @@
 import { V4_KEY_LABEL, canStartUpload } from './e2e-upload-policy';
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFileWithRes54, downloadFileWithRes54, isRawStorageRow, downloadRawStorageObject } from "./res54";
-import { decryptData, encryptData, generateEncryptionKey } from "./encryption";
+import { decryptData } from "./encryption";
 import { buildPublicUrl } from "@/lib/appLinks";
-import { createSecureFileRecord, fetchFileEncryptionKey } from "@/lib/secure-file-metadata";
+import { fetchFileEncryptionKey } from "@/lib/secure-file-metadata";
 import { emitWebhookEvent } from "@/lib/webhook-events";
 import { zkEncryptForUpload, zkSaveMeta } from "./zk-mode";
 
@@ -176,95 +176,6 @@ async function uploadTebiPayloadWithFallback(
       );
     }
   }
-}
-
-async function uploadFileToTebi(
-  file: File,
-  folderPath: string,
-  workspaceId: string | null,
-  providerId: string,
-  onProgress?: (progress: number, stage?: string, details?: any) => void
-): Promise<FileItem> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Authentication required');
-
-  // S-Hawk metadata screening (plaintext-side, before encryption).
-  onProgress?.(2, 'screening', { provider: 'tebi' });
-  const { buildSwkManifest, swkScanManifest } = await import('./swk-manifest');
-  const swkManifest = await buildSwkManifest(file);
-  const swkVerdict = await swkScanManifest(swkManifest);
-  const swk: SwkPass = { token: swkVerdict.token as string, manifestHash: swkVerdict.manifestHash, totalSize: file.size };
-
-  onProgress?.(5, 'preparing', { provider: 'tebi' });
-  const objectKey = buildExternalObjectKey(user.id, workspaceId, folderPath, file.name);
-
-  const encryptionKey = generateEncryptionKey();
-  const totalChunks = Math.max(1, Math.ceil(file.size / TEBI_ENCRYPTED_CHUNK_SIZE));
-  const chunkMetadata: TebiEncryptedChunkMetadata[] = [];
-
-  for (let index = 0; index < totalChunks; index++) {
-    const start = index * TEBI_ENCRYPTED_CHUNK_SIZE;
-    const end = Math.min(start + TEBI_ENCRYPTED_CHUNK_SIZE, file.size);
-    const chunkBuffer = await file.slice(start, end).arrayBuffer();
-    const encryptedChunk = await encryptData(chunkBuffer, encryptionKey);
-    const chunkPath = `${objectKey}.chunks/${String(index).padStart(6, '0')}.enc`;
-
-    onProgress?.(10 + ((index / totalChunks) * 70), 'encrypting', {
-      provider: 'tebi',
-      current: index + 1,
-      total: totalChunks,
-    });
-
-    await uploadTebiPayloadWithFallback(
-      providerId,
-      chunkPath,
-      `${file.name}.chunk.${index}.enc`,
-      'text/plain',
-      encryptedChunk,
-      onProgress,
-      swk,
-    );
-
-    chunkMetadata.push({
-      index,
-      path: chunkPath,
-      size: end - start,
-      offset: start,
-    });
-  }
-
-  const encryptedMetadata: TebiEncryptedFileMetadata = {
-    format: 'tebi_encrypted_v1',
-    fileName: file.name,
-    fileType: file.type || 'application/octet-stream',
-    fileSize: file.size,
-    chunkSize: TEBI_ENCRYPTED_CHUNK_SIZE,
-    chunks: chunkMetadata,
-    encryptionKey: 'managed_key',
-    created: new Date().toISOString(),
-  };
-
-  onProgress?.(85, 'saving-metadata');
-  const inserted = await createSecureFileRecord({
-    name: file.name,
-    type: file.type || 'application/octet-stream',
-    size: file.size,
-    storagePath: 'tebi_external_encrypted',
-    encrypted: true,
-    encryptionKeyLabel: 'managed_key',
-    metadata: JSON.stringify(encryptedMetadata),
-    parentFolder: folderPath || null,
-    workspaceId,
-    storageProviderId: providerId,
-    externalObjectKey: objectKey,
-    encryptionKey,
-    swkManifestHash: swkVerdict.manifestHash,
-    swkManifest: swkManifest as unknown as Record<string, unknown>,
-    swkDecision: swkVerdict.decision,
-  });
-
-  onProgress?.(100, 'complete');
-  return inserted as FileItem;
 }
 
 async function uploadFileToS3Storage(
@@ -802,14 +713,6 @@ export const uploadFile = async (
     // External provider routes via s3-storage (unified S3 gateway)
     if (activeProvider !== 'squidcloud' && activeProviderId) {
       return await uploadFileToS3Storage(file, folderPath, activeWorkspaceId, activeProviderId, onProgress);
-    }
-
-    // Tebi legacy support
-    if (activeProvider === 'tebi') {
-      if (!activeProviderId) {
-        throw new Error('Selected provider is not configured. Please complete provider setup first.');
-      }
-      return await uploadFileToTebi(file, folderPath, activeWorkspaceId, activeProviderId, onProgress);
     }
 
     // Default SquidCloud route uses existing RES54 pipeline.

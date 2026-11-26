@@ -42,7 +42,7 @@ export function checkRawKeyEscrow(files) {
   for (const f of files) {
     if (SKIP_PATH.test(f.path) || !NEW_UPLOAD_PATH.test(f.path)) continue;
     f.content.split('\n').forEach((line, i) => {
-      if (/(invoke\(\s*['"]store-file-key|fetch\([^)]*store-file-key|\bstoreFileKey\s*\()/.test(line) && !line.includes(ALLOW_COMMENT)) {
+      if (/(invoke\(\s*['"]store-file-key|fetch\([^)]*store-file-key|\bstoreFileKey\s*\(|\bcreateSecureFileRecord\s*\()/.test(line) && !line.includes(ALLOW_COMMENT)) {
         violations.push(`${f.path}:${i + 1}: raw key escrow call`);
       }
     });
