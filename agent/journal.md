@@ -326,3 +326,9 @@
 - Added UUID validation in downloadFileWithRes54/downloadFilePreview/downloadV4Preview so a malformed id like "3" throws a clean client error instead of Postgres "invalid input syntax for uuid".
 - Investigated B2/supabase-function CORS and realtime WebSocket errors: B2 presigned GET responds 200 with ACAO for the production origin; fix-cors endpoint requires auth and is best-effort. Concluded these are browser/network-environment failures, not app-code defects; no speculative changes made.
 - Verified 46 tests pass, invariant gate passes, vercel READY.
+
+## 2026-11-26 — Console cleanup round 2
+- The onlinewebfonts font was dead markup (no CSS rule used it) and its CDN now returns a Cloudflare challenge HTML, causing CORP failure, CSP font block and the __cf_bm cookie warning. Removed both the preconnect and stylesheet link; no local font needed.
+- Removed block-all-mixed-content from CSP since upgrade-insecure-requests supersedes it; verified the live header no longer contains either.
+- Traced the Postgres 400 `invalid input syntax for uuid "3"` to zk_ktl?user_id=eq.3: a non-UUID user id reached verifyKtl. Added a pure isValidKtlUserId guard; verifyKtl now throws a clear client error and appendKtl skips instead of issuing an invalid query.
+- Verified: 48 tests pass, invariant gate passes (710 files), vercel READY, production HTML has zero onlinewebfonts references.

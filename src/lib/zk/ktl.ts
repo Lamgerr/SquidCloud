@@ -6,6 +6,7 @@
  * the log cannot produce a chain the client will accept.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { isValidKtlUserId } from './ktl-id';
 
 const enc = new TextEncoder();
 
@@ -30,6 +31,7 @@ export async function eventHash(prevHash: string, seq: number, type: string, pay
 
 /** Load all events for the current user and verify the chain from seq 1. */
 export async function verifyKtl(userId: string): Promise<{ ok: boolean; head: string; count: number }> {
+  if (!isValidKtlUserId(userId)) throw new Error('Invalid user id for key transparency log');
   const { data, error } = await supabase.from('zk_ktl')
     .select('seq, event_type, payload, prev_hash, hash')
     .eq('user_id', userId).order('seq', { ascending: true });
@@ -50,6 +52,7 @@ export async function verifyKtl(userId: string): Promise<{ ok: boolean; head: st
 
 /** Append a verified event. The caller must have just verified the head. */
 export async function appendKtl(userId: string, type: string, payload: Record<string, unknown>): Promise<void> {
+  if (!isValidKtlUserId(userId)) return;
   const head = await verifyKtl(userId);
   if (!head.ok) throw new Error('Key transparency log is inconsistent');
   const seq = head.count + 1;

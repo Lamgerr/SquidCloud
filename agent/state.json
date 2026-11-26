@@ -2,9 +2,9 @@
   "goal": "Instant preview for new E2E v4 uploads fixed and upgraded to chunked frames",
   "goal_source": "User: \"do full work completely ... hundreds of user's files ... backward compatible only on read\"",
   "last_actions": [
-    "2026-11-26: Fixed console CSP errors: added db.onlinewebfonts.com to style-src/font-src and data: to font-src/style-src; verified header live on production.",
-    "Added UUID validation at RES54 download entry points so malformed file ids (e.g. \"3\") fail with a clean client error instead of a Postgres uuid syntax error.",
-    "Investigated CORS/WebSocket console errors: B2 presigned GET returns 200 with ACAO for squidcloud.vercel.app, so those failures are environmental (browser/network or non-production origin), not a code defect."
+    "2026-11-26: Removed dead onlinewebfonts stylesheet/preconnect (CDN now serves a Cloudflare challenge; no CSS referenced the font) -> kills CORP failure, CSP font error and __cf_bm cookie.",
+    "Removed obsolete block-all-mixed-content from CSP; verified live header.",
+    "Root cause of zk_ktl?user_id=eq.3 400: non-UUID id reached the KTL query. Added isValidKtlUserId guard in a pure module; verifyKtl throws cleanly and appendKtl skips."
   ],
   "key_numbers": {
     "audits": 2,
