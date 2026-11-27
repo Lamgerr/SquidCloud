@@ -1,10 +1,10 @@
 {
-  "goal": "Choose and execute the next SquidCloud priority from agent/backlog.md",
+  "goal": "Full backlog execution pass — done except human-only key rotation and bucket deletion",
   "goal_source": "User: \"do full work completely ... hundreds of user's files ... backward compatible only on read\"",
   "last_actions": [
-    "2026-11-26: Removed dead onlinewebfonts stylesheet/preconnect (CDN now serves a Cloudflare challenge; no CSS referenced the font) -> kills CORP failure, CSP font error and __cf_bm cookie.",
-    "Removed obsolete block-all-mixed-content from CSP; verified live header.",
-    "Root cause of zk_ktl?user_id=eq.3 400: non-UUID id reached the KTL query. Added isValidKtlUserId guard in a pure module; verifyKtl throws cleanly and appendKtl skips."
+    "2026-11-27: Executed all actionable backlog items: reset-password master rewrap via recovery phrase, client error telemetry + table, opt-in legacy->v4 upgrade UI, adaptive preview, passkey re-enrollment, log retention cron jobs, repeatable production smoke script.",
+    "Service-role key rotation SKIPPED — needs a human; documented in docs/SECURITY-KEY-ROTATION-RUNBOOK.md. Empty bucket deletion SKIPPED — Supabase Storage API blocks direct SQL deletion and no MCP delete tool exists.",
+    "Verification: 53 tests pass, invariant gate passes (715 files), vercel READY, smoke-prod 5/5 (geo RPC checked separately: IN blocked=false)."
   ],
   "key_numbers": {
     "audits": 2,
@@ -19,11 +19,11 @@
     "repo": "https://github.com/Lamgerr/SquidCloud"
   },
   "blockers": [
-    "Web search unavailable (HTTP 402) — roadmap based on current repo state and observed regressions, not external research."
+    "Service-role key rotation (human dashboard action).",
+    "Empty bucket deletion (Storage API credentials needed).",
+    "Browser-based end-to-end sweep not run: X11 display unavailable."
   ],
   "next": [
-    "TOP: full live v4 pipeline verification (upload -> preview -> video stream -> download -> share -> unlock) on production with a real file; fix whatever breaks.",
-    "Then: fix forgot-password vault rewrap so resets do not lose file access.",
-    "Then: rotate leaked service-role key; add structured client error telemetry."
+    "Re-run live browser sweep when X11 is available using scripts/smoke-prod.mjs as the HTTP baseline."
   ]
 }

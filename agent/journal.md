@@ -375,3 +375,8 @@
 ## 2026-11-27 — Next-step planning
 - User asked what to do next. Repo clean, fresh-main pushed, all 50 tests green. Web search unavailable (402), so ranking is based on observed production regressions and open blockers.
 - Created agent/backlog.md with ranked candidates. Top pick: one systematic live verification pass over the whole v4 pipeline (upload, preview, video, download, share, unlock) instead of continuing one-at-a-time patch cycles. Second: forgot-password vault rewrap (real data-loss risk). Third: service-role key rotation and structured client error telemetry.
+
+## 2026-11-27 — Full backlog execution
+- Completed: recovery-phrase-based rewrap on password reset; rate-limited client_error_events telemetry via BFF; opt-in per-file legacy→v4 upgrade with progress; adaptive preview chunk fetch; passkey re-enrollment (deletes verifier-less legacy rows); retention cron jobs for security/threat/webhook/share logs; repeatable scripts/smoke-prod.mjs.
+- SKIPPED — needs a human: service-role key rotation (no MCP/CLI path; runbook written) and empty storage bucket deletion (Supabase blocks direct SQL deletes, no MCP delete tool).
+- X11 display was unavailable, so the browser-based sweep was replaced with HTTP-level production smoke checks; 5/5 passed plus geo RPC verified separately. 53 tests pass, gate passes (715 files), vercel READY.
