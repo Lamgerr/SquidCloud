@@ -394,3 +394,8 @@
 ## 2026-11-27 — Owner verification complete
 - Owner confirmed every flow verified after the passkey userHandle/binding fix: passkey login, previews, video streaming, downloads, shares and vault unlock. No new defects reported.
 - Backlog updated: browser sweep marked done; only owner-only key rotation/bucket deletion and small polish items remain.
+
+## 2026-11-27 — New work selection
+- Web search still unavailable (HTTP 402), so candidates scored against current repo state and recent incident history.
+- Candidates: (1) vault health screen with legacy/v4, passkey verifier, recovery/device status and one-click actions (buildable solo, fits existing React/Supabase stack, directly addresses repeated user confusion about legacy vs v4 and passkey verifiers); (2) admin viewer for client_error_events; (3) configurable preview/KTL constants; (4) auth error taxonomy; (5) orphan-chunk cleanup (SKIPPED — destructive, needs careful design).
+- Picked (1): highest user-visible value and it consolidates upgrades/re-enrollment we already shipped. Queued (2)-(4) behind it.

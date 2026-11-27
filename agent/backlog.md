@@ -10,6 +10,9 @@
 - [x] **Optional v4 upgrade for legacy files.** Client-side "upgrade my files" action that decrypts legacy ciphertext and re-encrypts as chunked v4, with progress, resume, and no server key escrow. Must remain opt-in and backward-compatible reads must stay.
 
 ## Later
+- [ ] Admin viewer for `client_error_events` with filters by stage/code and time range.
+- [ ] Auth error taxonomy: replace generic “Authentication failed” with specific, telemetry-backed messages.
+- [ ] Orphan chunk cleanup (SKIPPED — destructive; needs safe design and owner approval).
 - [x] Retention policies for `security_events`, `kza_threat_events`, and webhook logs; remove the 4 empty buckets if no external consumers.
 - [x] Adaptive preview budget (stop fetching after the first complete frame instead of a fixed chunk count).
 - [x] Re-enroll legacy passkeys so they gain real WebAuthn signature verification instead of the emailed magic-link step.
