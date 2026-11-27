@@ -186,7 +186,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
           const { downloadV4Preview } = await import('@/lib/res54');
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error('Sign in to preview this file');
-          const preview = await downloadV4Preview(file.id, 1, user.id, { fileRecord: file, shareId });
+          const preview = await downloadV4Preview(file.id, 3, user.id, { fileRecord: file, shareId });
           v4PreviewRef.current = true;
           setBlobUrl(null);
           setDecodedBlob(preview.blob);

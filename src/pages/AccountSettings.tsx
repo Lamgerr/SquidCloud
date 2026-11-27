@@ -1379,8 +1379,11 @@ const AccountSettings = () => {
     try {
       const passkeyResult = await registerPasskey(user.id, user.email || '');
       if (passkeyResult) {
-        await supabase.from('user_passkeys').update({ credential_id: passkeyResult.credentialId }).eq('user_id', user.id);
-        toast({ title: 'Passkey updated' });
+        // Drop verifier-less legacy rows so the new JWK-backed credential is
+        // the one used for sign-in. Registration already inserted the verifier.
+        await supabase.from('user_passkeys')
+          .delete().eq('user_id', user.id).neq('credential_id', passkeyResult.credentialId);
+        toast({ title: 'Passkey updated', description: 'This passkey now uses signature verification' });
         await checkUserPasskey();
       }
     } catch (error: any) {

@@ -1392,41 +1392,45 @@ export const downloadV4Preview = async (
   // next best source for the AAD/HKDF binding.
   if (!v4.userId && record?.user_id) v4 = { ...v4, userId: String(record.user_id) };
 
-  const isPartial = metadata.chunks.length > maxChunks;
-  const targets = isPartial ? metadata.chunks.slice(0, maxChunks) : metadata.chunks;
-  const downloaded = await processChunksInParallel(
-    targets.map((c, index) => ({ ...c, index })),
-    async (chunk, index, attempt) => downloadChunk(chunk, attempt, options?.shareId),
-    6,
-  );
-  const sorted = downloaded.sort((a, b) => a.index - b.index);
-  const bytes = sorted.map(c => base64ToArrayBuffer(c.data));
-  const total = bytes.reduce((n, b) => n + b.byteLength, 0);
-  const joined = new Uint8Array(total);
-  let off = 0;
-  for (const b of bytes) { const u = new Uint8Array(b); for (let i = 0; i < u.length; i++) joined[off++] = u[i]; }
+  // Adaptive: fetch one chunk at a time and stop as soon as a complete v4
+  // frame can be decrypted. Most previews need only the first chunk.
+  const budget = Math.max(1, Math.min(maxChunks, metadata.chunks.length));
+  const fetched: any[] = [];
+  for (let i = 0; i < budget; i++) {
+    const c = metadata.chunks[i];
+    const data = await downloadChunk(c, 0, options?.shareId);
+    fetched.push({ ...c, index: i, data });
+    const bytes = fetched.map(x => base64ToArrayBuffer(x.data));
+    const total = bytes.reduce((n, b) => n + b.byteLength, 0);
+    const joined = new Uint8Array(total);
+    let off = 0;
+    for (const b of bytes) { const u = new Uint8Array(b); for (let j = 0; j < u.length; j++) joined[off++] = u[j]; }
 
-  // Files uploaded before chunked v4 used a single whole-file AES-GCM frame,
-  // which cannot be decrypted from a prefix. Fall back to the full v4 path.
-  const { isChunkedV4Sealed } = await import('./e2e-v4-upload');
-  if (!isChunkedV4Sealed(joined)) {
-    const blob = await downloadFileWithRes54(fileId, undefined, options?.shareId
-      ? { shareId: options.shareId } : undefined);
-    return {
-      blob,
-      totalChunks: metadata.chunks.length,
-      downloadedChunks: metadata.chunks.length,
-      isPartial: false,
-    };
+    const { isChunkedV4Sealed } = await import('./e2e-v4-upload');
+    if (!isChunkedV4Sealed(joined)) {
+      const blob = await downloadFileWithRes54(fileId, undefined, options?.shareId
+        ? { shareId: options.shareId } : undefined);
+      return {
+        blob,
+        totalChunks: metadata.chunks.length,
+        downloadedChunks: metadata.chunks.length,
+        isPartial: false,
+      };
+    }
+    try {
+      const plain = await decryptV4Prefix(joined.buffer, userId, v4);
+      return {
+        blob: new Blob([plain], { type: v4.originalType || metadata.fileType || 'application/octet-stream' }),
+        totalChunks: metadata.chunks.length,
+        downloadedChunks: fetched.length,
+        isPartial: fetched.length < metadata.chunks.length,
+      };
+    } catch (err: any) {
+      if (!/No complete v4 chunk/.test(String(err?.message || ''))) throw err;
+      // Not enough bytes yet — fetch the next chunk.
+    }
   }
-
-  const plain = await decryptV4Prefix(joined.buffer, userId, v4);
-  return {
-    blob: new Blob([plain], { type: v4.originalType || metadata.fileType || 'application/octet-stream' }),
-    totalChunks: metadata.chunks.length,
-    downloadedChunks: targets.length,
-    isPartial,
-  };
+  throw new Error('No complete v4 chunk available for preview');
 };
 
 export async function resolveFileKeyForShare(fileId: string, encryptionKey: string | null): Promise<string | null> {
