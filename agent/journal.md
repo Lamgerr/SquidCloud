@@ -390,3 +390,7 @@
 - Logs showed repeated POST 401 from auth_verify. Root cause: registration stored userHandle as UTF-8 UUID text (36 bytes), but verification decoded it as 16 raw bytes, so the email binding for legacy verifier-less passkeys always failed.
 - Fixed decoder to accept both UTF-8 UUID and raw 16-byte forms; added explicit allowUnbound fallback for legacy rows (safe because legacy path returns no OTP, only an emailed magic link), plus diagnostic logging for binding vs signature failures.
 - Verified: 55 tests pass, gate passes, vercel READY, function deployed.
+
+## 2026-11-27 — Owner verification complete
+- Owner confirmed every flow verified after the passkey userHandle/binding fix: passkey login, previews, video streaming, downloads, shares and vault unlock. No new defects reported.
+- Backlog updated: browser sweep marked done; only owner-only key rotation/bucket deletion and small polish items remain.

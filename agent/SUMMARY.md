@@ -1,18 +1,19 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- E2E hardening, Supabase cleanup (380 MB → 67 MB), and anon share-RPC closure all shipped and pushed.
-- Instant preview fixed: new v4 uploads use 1 MiB independently decryptable frames, and the modal fetches only the first chunks instead of reconstructing the whole file. Existing v4 ciphertext remains readable.
+- All E2E hardening, preview/streaming, geo, passkey and Supabase cleanup work is shipped and pushed to `fresh-main`.
+- Owner verified all flows: passkey login, previews, video streaming, downloads, shares and vault unlock.
+- 55 tests pass, invariant gate passes, Vercel READY, production smoke checks pass.
 
 ## In progress
 - Nothing mid-edit. Working tree clean.
 
 ## Blocked — needs a decision
-- Service-role key from old history remains live (previously deprioritized).
-- PDF/EPUB previews still require full files.
+- Service-role key rotation: human dashboard action (`docs/SECURITY-KEY-ROTATION-RUNBOOK.md`).
+- Empty bucket deletion: Storage API credentials required.
 
 ## Queued next
-1. Make the preview chunk budget adaptive (stop after the first complete frame).
-2. Rotate the leaked service-role key.
+1. Make preview chunk budget and KTL cache TTL configurable.
+2. Optional vault health screen for legacy-vs-v4 status, passkey verifier status, and one-click upgrade/re-enroll.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud
