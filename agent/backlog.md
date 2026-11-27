@@ -10,6 +10,7 @@
 - [x] **Optional v4 upgrade for legacy files.** Client-side "upgrade my files" action that decrypts legacy ciphertext and re-encrypts as chunked v4, with progress, resume, and no server key escrow. Must remain opt-in and backward-compatible reads must stay.
 
 ## Later
+- [x] Integrated owner-provided redesigned Auth.tsx with font dependencies and preserved auth logic.
 - [x] Glisse-inspired glass context menus for file and folder three-dot actions (visual click-through pending a display).
 - [ ] Admin viewer for `client_error_events` with filters by stage/code and time range.
 - [ ] Auth error taxonomy: replace generic “Authentication failed” with specific, telemetry-backed messages.
