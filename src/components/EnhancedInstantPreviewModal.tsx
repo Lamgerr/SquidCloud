@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { downloadFilePreview } from '@/lib/res54';
 import { readV4Meta } from '@/lib/e2e-v4-preview';
 import { hasV4Master } from '@/lib/e2e-v4-session';
+import { reportClientError } from '@/lib/client-errors';
 import { smartDownload, createFileShare } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
@@ -248,6 +249,7 @@ const EnhancedInstantPreviewModal: React.FC<EnhancedInstantPreviewModalProps> = 
         });
         setDecodedBlob(finalBlob); setLoading(false);
       } catch (e: any) {
+        void reportClientError('preview', e, file?.id);
         if (/vault locked|unlock your vault/i.test(String(e?.message || ''))) {
           window.dispatchEvent(new CustomEvent('squidcloud:vault-unlock-for-file', {
             detail: { reason: 'Unlock your vault to view this encrypted file' },

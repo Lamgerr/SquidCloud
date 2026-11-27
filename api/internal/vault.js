@@ -9,6 +9,7 @@ import { releaseShareMeta } from './share-meta-policy.js';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const send = (res, body, status = 200) => res.status(status).json(body);
+const clientErrorRate = new Map();
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, { error: 'method' }, 405);
@@ -21,6 +22,32 @@ export default async function handler(req, res) {
   const admin = createClient(SUPABASE_URL, SERVICE, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // Structured client failure telemetry. No keys, plaintext, or raw stacks.
+  if (body.op === 'client-error') {
+    const auth = String(req.headers.authorization || '');
+    if (!auth.startsWith('Bearer ')) return send(res, { ok: true });
+    const temp = createClient(SUPABASE_URL, SERVICE, { global: { headers: { Authorization: `Bearer ${auth.slice(7)}` } }, auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: { user }, error: authErr } = await temp.auth.getUser(auth.slice(7));
+    if (!authErr && user) {
+      const key = user.id;
+      const now = Date.now();
+      const hits = (clientErrorRate.get(key) || []).filter(t => now - t < 60_000);
+      if (hits.length < 10) {
+        hits.push(now);
+        clientErrorRate.set(key, hits);
+        const clean = (v) => String(v || '').replace(/https?:\/\/\S+/g, '[url]').slice(0, 500);
+        await admin.from('client_error_events').insert({
+          user_id: user.id,
+          stage: clean(body.stage).slice(0, 60) || 'unknown',
+          code: clean(body.code).slice(0, 60) || null,
+          message: clean(body.message) || null,
+          file_id: /^[0-9a-f-]{36}$/i.test(String(body.fileId || '')) ? body.fileId : null,
+        });
+      }
+    }
+    return send(res, { ok: true });
+  }
 
   // Share metadata is public only after check_share_access passes. No anon RPC.
   if (body.op === 'share-meta') {

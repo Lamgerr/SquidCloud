@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { StreamDecryptorService } from '@/lib/videoStreamer';
 import { downloadFileWithRes54 } from '@/lib/res54';
 import { readV4Meta } from '@/lib/e2e-v4-preview';
+import { reportClientError } from '@/lib/client-errors';
 import { StreamDecryptorService as Streamer } from '@/lib/videoStreamer';
 
 interface CBVideoPlayerProps {
@@ -840,6 +841,7 @@ const CBVideoPlayer: React.FC<CBVideoPlayerProps> = ({ file, poster, autoPlay = 
           poster={isAudio ? undefined : poster} playsInline preload="auto" autoPlay={autoPlay}
           onError={(e) => {
             console.error('Video playback error:', e);
+            void reportClientError('video-playback', e.nativeEvent || e, file.id);
             // v4 range streaming can fail when the SW lacks the session key.
             // Fall back to a main-thread decrypt once instead of silent retries.
             if (isV4 && !v4BlobUrl) {
