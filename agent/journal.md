@@ -407,9 +407,3 @@
 ## 2026-11-27 — Glisse-inspired context menus
 - Ported only the interaction ideas, not the library or its coloured tokens: frosted neutral menu surface with anchored transform-origin, pointer-following highlight plate, instant press feedback on three-dot triggers, reduced-motion/transparency fallbacks. Applied globally to dropdown content/subcontent and specifically to FileActionMenu/FileItem and FolderRow triggers (file + folder context menus in dashboard).
 - Plate geometry extracted to a pure helper with tests. 3 new tests; full suite 61 tests pass, gate passes (720 files), vercel READY. Design-doctrine gate scripts were not present in this checkout, and X11 display was unavailable, so live click-through was NOT visually verified.
-
-## 2026-11-27 — Integrate provided Auth.tsx
-- Owner supplied a redesigned Auth.tsx and explicitly confirmed it fully safe. Diff against our version showed presentation-only changes (fonts, colours, copy, mode switch replaced by a text link); all auth logic was identical, so our reset rewrap and passkey fixes remained intact.
-- Added @fontsource-variable/bricolage-grotesque and @fontsource/ibm-plex-sans dependencies (5.3.0) and regenerated the lockfile; npm pruned stale lock entries no longer in package.json.
-- Added ASVS V6.2/V6.4/V6.6/V6.7 inline citations on reset rewrap and legacy passkey email flow. 61 tests pass, gate passes (720 files), vercel READY, zero emoji in file.
-- security-guidance skill reference files were absent on disk, so full ASVS detail could not be read; citations use chapter-level references only.

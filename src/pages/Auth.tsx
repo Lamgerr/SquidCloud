@@ -1,7 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import '@fontsource-variable/bricolage-grotesque';
-import '@fontsource/ibm-plex-sans/400.css';
-import '@fontsource/ibm-plex-sans/500.css';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Mail, Lock, User, Eye, EyeOff, Github, Fingerprint, KeyRound } from '@/lib/icon-map';
@@ -24,91 +21,108 @@ import {
   AppShell, Spinner, Ico, useDocTitle,
 } from '@/components/custom/squid-app';
 
+/* Same glass-segment vocabulary as EnterpriseSidebar. */
+const THUMB = { type: 'spring' as const, stiffness: 380, damping: 21, mass: 0.8 };
+const TAP = { type: 'spring' as const, stiffness: 600, damping: 16 };
+
 const AUTH_CSS = `
 .ax-root{
-  --ink:#17143A;--ink2:#201C4C;--tx:#ECE7F7;--mute:#8E8AB0;--hair:#3A3566;--coral:#F0527A;--teal:#2FA89A;
-  --fh:"Bricolage Grotesque Variable","Bricolage Grotesque",system-ui,sans-serif;
-  --fb:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  position:relative;min-height:100vh;background:var(--ink);color:var(--tx);font-family:var(--fb);
+  --tx:var(--sa-text,#e8e7e1);--mute:var(--sa-mute,#8d8f89);--dim:var(--sa-dim,#62655f);
+  --hair:var(--sa-line,#1f2221);
+  position:relative;min-height:100vh;background:var(--sa-bg,#090b0a);color:var(--tx);
+  font-family:var(--sa-f,-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif);
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
 }
-.ax-top{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:26px 34px}
-.ax-brand{display:inline-flex;align-items:center;gap:9px;color:var(--tx);text-decoration:none;font-family:var(--fh);font-size:17px;font-weight:700;letter-spacing:-.02em}
-.ax-brand svg{color:var(--coral)}
+.ax-root::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(65% 45% at 88% -12%,rgba(232,231,225,.05),transparent 70%),
+             radial-gradient(55% 40% at -8% 108%,rgba(134,195,161,.05),transparent 72%)}
+.ax-top{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  padding:26px 34px}
+.ax-brand{display:inline-flex;align-items:center;gap:8px;color:var(--tx);text-decoration:none;font-size:14px;font-weight:600;letter-spacing:-.02em}
+.ax-brand svg{color:var(--tx)}
 .ax-nav{display:flex;align-items:center;gap:2px}
-.ax-nav-link{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border-radius:6px;color:var(--mute);text-decoration:none;font-size:14px;transition:color .2s}
-.ax-nav-link:hover{color:var(--tx)}
+.ax-nav-link{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border-radius:980px;
+  color:var(--mute);text-decoration:none;font-size:13px;transition:color .2s,background .2s}
+.ax-nav-link:hover{color:var(--tx);background:rgba(255,255,255,.06)}
 
-.ax-main{position:relative;z-index:1;min-height:100vh;display:grid;place-items:center;padding:92px 24px 44px}
-.ax-col{width:100%;max-width:380px}
-.ax-title{margin:0;text-align:left;font-family:var(--fh);font-size:clamp(32px,6vw,42px);font-weight:700;letter-spacing:-.035em;line-height:1.05}
-.ax-sub{margin:12px 0 0;text-align:left;font-size:15px;line-height:1.55;color:var(--mute)}
+.ax-main{position:relative;z-index:1;min-height:100vh;display:grid;place-items:center;padding:92px 20px 44px}
+.ax-col{width:100%;max-width:372px}
+.ax-title{margin:0;text-align:center;font-size:clamp(32px,5vw,46px);font-weight:600;letter-spacing:-.045em;line-height:1.06;color:var(--tx)}
+.ax-sub{margin:12px 0 0;text-align:center;font-size:14px;line-height:1.55;color:var(--mute)}
 
-.ax-passkey{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:54px;margin-top:30px;padding:0 16px;
-  border:0;border-radius:999px;background:var(--coral);color:var(--ink);font:inherit;font-size:16px;font-weight:500;cursor:pointer;
-  transition:transform .15s,filter .15s}
-.ax-passkey:hover{filter:brightness(1.07)}
-.ax-passkey:active{transform:scale(.985)}
-.ax-passkey:disabled{cursor:default;filter:saturate(.6) brightness(.85)}
+.ax-modes{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:26px;padding:4px;border-radius:999px;
+  background:var(--sa-bg-2,#0e1110);
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.05),0 0 0 1px var(--hair),0 12px 30px -18px rgba(0,0,0,.7)}
+.ax-mode{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:0 10px;
+  border:0;border-radius:999px;background:transparent;color:var(--mute);font:inherit;font-size:13px;cursor:pointer;
+  transition:color .18s;-webkit-tap-highlight-color:transparent}
+.ax-mode:hover,.ax-mode[data-on="true"]{color:var(--tx)}
+.ax-mode-thumb{position:absolute;inset:0;border-radius:999px;
+  background:linear-gradient(180deg,var(--sa-bg-4,#1b201d),var(--sa-bg-3,#141816));
+  box-shadow:inset 0 1px 0 rgba(232,231,225,.08),0 0 0 1px rgba(232,231,225,.1),0 6px 18px -6px rgba(0,0,0,.55)}
+.ax-mode-label{position:relative;z-index:1}
+
+.ax-passkey{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:46px;margin-top:24px;
+  padding:0 12px;border:0;border-bottom:1px solid var(--hair);background:transparent;color:var(--mute);
+  font:inherit;font-size:13px;cursor:pointer;transition:color .2s,border-color .2s}
+.ax-passkey:hover{color:var(--tx);border-color:var(--tx)}
+.ax-passkey:disabled{cursor:default;color:var(--dim)}
 .ax-passkey svg{flex:none}
 .ax-passkey-busy{animation:ax-breathe 1.6s ease-in-out infinite}
-@keyframes ax-breathe{0%,100%{opacity:.4}50%{opacity:1}}
+@keyframes ax-breathe{0%,100%{opacity:.35}50%{opacity:1}}
 
-.ax-divider{display:flex;align-items:center;gap:14px;margin:24px 0 0;color:var(--mute);font-size:13px}
+.ax-divider{display:flex;align-items:center;gap:14px;margin:22px 0 0;color:var(--dim);font-size:11px}
 .ax-divider::before,.ax-divider::after{content:"";height:1px;flex:1;background:var(--hair)}
 
-.ax-form{display:flex;flex-direction:column;gap:22px;margin-top:26px}
+.ax-form{display:flex;flex-direction:column;gap:20px;margin-top:24px}
 .ax-field{position:relative}
-.ax-field-label{display:block;margin-bottom:6px;font-size:13px;font-weight:500;color:var(--tx)}
-.ax-field-line{display:flex;align-items:center;gap:10px;min-height:42px}
-.ax-field-ico{flex:none;width:16px;display:grid;place-items:center;color:var(--mute)}
-.ax-input{flex:1;min-width:0;padding:0;border:0;outline:0;background:transparent;color:var(--tx);font:inherit;font-size:16px}
-.ax-input::placeholder{color:var(--mute);opacity:.8}
-.ax-field-rule{position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--hair);transition:background .2s,height .2s}
-.ax-field:focus-within .ax-field-rule{background:var(--teal);height:2px}
+.ax-field-label{display:block;margin-bottom:7px;font-size:11px;color:var(--mute)}
+.ax-field-line{display:flex;align-items:center;gap:9px;min-height:38px}
+.ax-field-ico{flex:none;width:16px;display:grid;place-items:center;color:var(--dim)}
+.ax-input{flex:1;min-width:0;padding:0;border:0;outline:0;background:transparent;color:var(--tx);
+  font:inherit;font-size:16px;letter-spacing:-.01em}
+.ax-input::placeholder{color:#48484a}
+.ax-field-rule{position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--hair);transition:background .2s}
+.ax-field:focus-within .ax-field-rule{background:var(--tx)}
 .ax-end{display:flex;align-items:center;flex:none}
-.ax-eye{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:6px;background:transparent;color:var(--mute);cursor:pointer;transition:color .2s}
+.ax-eye{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:50%;background:transparent;
+  color:var(--mute);cursor:pointer;transition:color .2s}
 .ax-eye:hover{color:var(--tx)}
-.ax-row-end{display:flex;justify-content:flex-end;margin-top:-6px}
-.ax-text-btn{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:0;border:0;background:none;color:var(--mute);font:inherit;font-size:13px;cursor:pointer;transition:color .2s}
+.ax-row-end{display:flex;justify-content:flex-end;margin-top:-8px}
+.ax-text-btn{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:0;border:0;background:none;
+  color:var(--mute);font:inherit;font-size:12px;cursor:pointer;transition:color .2s}
 .ax-text-btn:hover{color:var(--tx)}
 .ax-back{margin-top:22px}
 
-.ax-strength{display:flex;align-items:center;gap:10px;margin-top:-8px}
+.ax-strength{display:flex;align-items:center;gap:10px;margin-top:-9px}
 .ax-strength-bars{display:flex;gap:3px;flex:1}
-.ax-strength-bars i{height:3px;flex:1;border-radius:2px;background:var(--hair);transition:background .2s}
-.ax-strength-bars i.on{background:var(--teal)}
-.ax-strength-label{min-width:44px;text-align:right;font-size:12px;color:var(--mute)}
+.ax-strength-bars i{height:1px;flex:1;background:var(--hair);transition:background .2s}
+.ax-strength-bars i.on{background:var(--tx)}
+.ax-strength-label{min-width:38px;text-align:right;font-size:10px;color:var(--dim)}
 
-.ax-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;padding:0 20px;border:0;border-radius:8px;
-  background:var(--tx);color:var(--ink);font:inherit;font-size:16px;font-weight:500;cursor:pointer;transition:transform .15s,filter .15s}
-.ax-btn:hover{filter:brightness(.93)}
+.ax-btn{display:block;width:100%;min-height:50px;padding:0 20px;border:0;border-radius:980px;
+  background:var(--tx);color:#000;font:inherit;font-size:15px;font-weight:500;letter-spacing:-.01em;cursor:pointer;
+  transition:transform .18s cubic-bezier(.2,.8,.2,1),opacity .18s}
+.ax-btn:hover{opacity:.86}
 .ax-btn:active{transform:scale(.985)}
-.ax-btn:disabled{cursor:default;opacity:.5}
+.ax-btn:disabled{cursor:default;opacity:.45}
 .ax-btn-quiet{background:transparent;color:var(--tx);border:1px solid var(--hair)}
+.ax-btn-quiet:hover{background:rgba(255,255,255,.06);opacity:1}
 
-.ax-switch{margin:22px 0 0;font-size:14px;color:var(--mute)}
-.ax-link{padding:0;border:0;background:none;color:var(--tx);font:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.ax-link:hover{color:var(--teal)}
+.ax-oauth{display:flex;justify-content:center;gap:12px;margin-top:26px}
+.ax-oauth-item{width:48px;height:48px;display:grid;place-items:center;border:1px solid var(--hair);border-radius:50%;
+  background:transparent;color:var(--mute);cursor:pointer;transition:color .2s,border-color .2s,transform .2s}
+.ax-oauth-item:hover{color:var(--tx);border-color:var(--tx);transform:translateY(-2px)}
+.ax-oauth-item svg{width:17px;height:17px}
 
-.ax-oauth{margin-top:30px;padding-top:24px;border-top:1px solid var(--hair)}
-.ax-oauth-item{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:46px;border:1px solid var(--hair);border-radius:8px;
-  background:transparent;color:var(--tx);font:inherit;font-size:14px;cursor:pointer;transition:background .2s}
-.ax-oauth-item:hover{background:var(--ink2)}
-.ax-oauth-item svg{width:17px;height:17px;flex:none}
-.ax-more{margin-top:12px;font-size:13px;color:var(--mute)}
-.ax-more summary{cursor:pointer;list-style:none;padding:6px 0}
-.ax-more summary::-webkit-details-marker{display:none}
-.ax-more summary:hover{color:var(--tx)}
-.ax-more-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
-
-.ax-status{padding:14px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);font-size:14px;line-height:1.5;color:var(--mute)}
-.ax-legal{display:flex;gap:18px;margin:28px 0 0;font-size:12px;color:var(--mute)}
+.ax-status{padding:14px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+  font-size:13px;line-height:1.5;color:var(--mute)}
+.ax-legal{margin:26px 0 0;text-align:center;font-size:11px;color:var(--dim)}
 .ax-legal a{color:inherit;text-decoration:none}
 .ax-legal a:hover{color:var(--tx)}
 
-.ax-root :is(button,a,summary):focus-visible{outline:2px solid var(--tx);outline-offset:3px;border-radius:6px}
-@media(max-width:520px){.ax-top{padding:20px}.ax-nav-link{display:none}.ax-main{padding:84px 24px 32px}}
+.ax-root :is(button,a):focus-visible{outline:2px solid var(--sa-accent,#e8e7e1);outline-offset:3px;border-radius:6px}
+@media(max-width:520px){.ax-top{padding:20px}.ax-nav-link{display:none}.ax-main{padding:84px 20px 32px}}
 @media(prefers-reduced-motion:reduce){.ax-root *{animation:none!important;transition-duration:.01ms!important}}
 `;
 
@@ -267,8 +281,7 @@ const Auth = () => {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
-      // ASVS V6.2 / V6.4: a password reset must not destroy access to encrypted
-      // data. Rewrap the same master key from the recovery phrase.
+      // A password reset changes the KEK that wraps the vault master key.
       // Rewrap the same master from the recovery phrase so files stay readable.
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -375,8 +388,6 @@ const Auth = () => {
       const promise = authenticateWithPasskey(email || undefined);
       setPasskeyLoading(true);
       const result = await promise;
-      // ASVS V6.6 / V6.7: legacy verifier-less passkeys finish through an
-      // out-of-band email link; never surface a bare failure for that path.
       if (result.emailConfirmation) {
         toast({ title: 'Check your email', description: `Open the sign-in link sent to ${result.email || 'your email'} to finish.` });
       } else if (!result.success) {
@@ -474,7 +485,7 @@ const Auth = () => {
             <AnimatePresence mode="wait" initial={false}>
               {view === 'reset' && (
                 <motion.div key="reset" {...viewAnim} transition={{ duration: reduce ? 0.01 : 0.18 }}>
-                  <h1 className="ax-title">New password</h1>
+                  <h1 className="ax-title">New password.</h1>
                   <p className="ax-sub">Choose a strong password for your account.</p>
                   <form onSubmit={handlePasswordReset} className="ax-form">
                     <Field id="new-password" label="New password" icon={<Lock className="h-4 w-4" />}
@@ -495,7 +506,7 @@ const Auth = () => {
 
               {view === 'forgot' && (
                 <motion.div key="forgot" {...viewAnim} transition={{ duration: reduce ? 0.01 : 0.18 }}>
-                  <h1 className="ax-title">Reset password</h1>
+                  <h1 className="ax-title">Reset password.</h1>
                   <p className="ax-sub">We’ll email you a link to set a new password.</p>
                   <button type="button" className="ax-text-btn ax-back" onClick={handleBackToLogin}>
                     <Ico.ArrowLeft size={13} /> Back to sign in
@@ -520,18 +531,40 @@ const Auth = () => {
 
               {(view === 'login' || view === 'signup') && (
                 <motion.div key="auth" {...viewAnim} transition={{ duration: reduce ? 0.01 : 0.18 }}>
-                  <h1 className="ax-title">{isLogin ? 'Unlock your storage' : 'Create your vault'}</h1>
+                  <h1 className="ax-title">{isLogin ? 'Welcome back.' : 'Create account.'}</h1>
                   <p className="ax-sub">
-                    {isLogin ? 'Your files stay encrypted until they reach this device.' : 'Unlimited storage that only you can read.'}
+                    {isLogin ? 'Sign in to your SquidCloud account.' : 'A private home for everything you keep.'}
                   </p>
+
+                  <div className="ax-modes" role="group" aria-label="Authentication mode">
+                    {(['login', 'signup'] as const).map((m) => {
+                      const active = (m === 'login') === isLogin;
+                      return (
+                        <button key={m} type="button" className="ax-mode" data-on={active} aria-pressed={active}
+                          onClick={() => {
+                            if ((m === 'login') === isLogin) return;
+                            setIsLogin(m === 'login');
+                            setPassword('');
+                            setShowPassword(false);
+                          }}>
+                          {active && <motion.span layoutId="ax-mode-thumb" className="ax-mode-thumb"
+                            transition={reduce ? { duration: 0.01 } : THUMB} />}
+                          <motion.span className="ax-mode-label"
+                            whileTap={reduce ? undefined : { scale: 0.92 }} transition={reduce ? { duration: 0.01 } : TAP}>
+                            {m === 'login' ? 'Sign in' : 'Create account'}
+                          </motion.span>
+                        </button>
+                      );
+                    })}
+                  </div>
 
                   {isLogin && passkeyAvailable && (
                     <>
                       <button type="button" className="ax-passkey" onClick={handlePasskeyLogin} disabled={passkeyLoading}>
                         <Fingerprint className={passkeyLoading ? 'ax-passkey-busy' : ''} style={{ width: 17, height: 17 }} />
-                        {passkeyLoading ? 'Waiting for your device…' : 'Unlock with passkey'}
+                        {passkeyLoading ? 'Waiting for your device…' : 'Sign in with a passkey'}
                       </button>
-                      <div className="ax-divider">or use your password</div>
+                      <div className="ax-divider">or</div>
                     </>
                   )}
 
@@ -575,32 +608,17 @@ const Auth = () => {
 
                     <PillButton type="submit" disabled={isLoading}>
                       {isLoading && <Spinner size={14} />}
-                      {isLogin ? 'Unlock' : 'Create account'}
+                      {isLogin ? 'Sign in' : 'Create account'}
                     </PillButton>
                   </form>
 
-                  <p className="ax-switch">
-                    {isLogin ? 'New here? ' : 'Already have an account? '}
-                    <button type="button" className="ax-link"
-                      onClick={() => { setIsLogin(!isLogin); setPassword(''); setShowPassword(false); }}>
-                      {isLogin ? 'Create an account' : 'Sign in'}
-                    </button>
-                  </p>
-
-                  <div className="ax-oauth">
-                    <button type="button" className="ax-oauth-item" onClick={() => handleOAuthSignIn('github')}>
-                      <Github className="h-4 w-4" /> Continue with GitHub
-                    </button>
-                    <details className="ax-more">
-                      <summary>Other ways to sign in</summary>
-                      <div className="ax-more-row">
-                        <button type="button" className="ax-oauth-item" onClick={() => handleOAuthSignIn('google')}><GoogleMark /> Google</button>
-                        <button type="button" className="ax-oauth-item" onClick={() => handleOAuthSignIn('discord')}><DiscordMark /> Discord</button>
-                      </div>
-                    </details>
+                  <div className="ax-oauth" aria-label="Continue with a provider">
+                    <button type="button" className="ax-oauth-item" onClick={() => handleOAuthSignIn('github')} aria-label="Continue with GitHub"><Github className="h-4 w-4" /></button>
+                    <button type="button" className="ax-oauth-item" onClick={() => handleOAuthSignIn('google')} aria-label="Continue with Google"><GoogleMark /></button>
+                    <button type="button" className="ax-oauth-item" onClick={() => handleOAuthSignIn('discord')} aria-label="Continue with Discord"><DiscordMark /></button>
                   </div>
 
-                  <p className="ax-legal"><Link to="/terms">Terms</Link><Link to="/privacy">Privacy</Link></p>
+                  <p className="ax-legal"><Link to="/terms">Terms</Link> · <Link to="/privacy">Privacy</Link></p>
                 </motion.div>
               )}
             </AnimatePresence>
