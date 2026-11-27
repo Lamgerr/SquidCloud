@@ -39,6 +39,7 @@ import {
 } from '@/components/custom/squid-app';
 import VaultUnlockDialog from '@/components/VaultUnlockDialog';
 import VaultSecurityPanel from '@/components/VaultSecurityPanel';
+import VaultHealthPanel from '@/components/VaultHealthPanel';
 import VaultRecoveryCard from '@/components/VaultRecoveryCard';
 import { isVaultUnlocked, lockVault } from '@/lib/zk-vault-session';
 
@@ -1845,6 +1846,13 @@ const AccountSettings = () => {
             </button>
           </TvRow>
         </TvPod>
+
+        <VaultHealthPanel
+          userId={user?.id || ''}
+          onUpgrade={handleUpgradeLegacy}
+          onReenrollPasskey={handleUpdatePasskey}
+          onUnlock={() => setVaultOpen(true)}
+        />
       </>
     );
   }

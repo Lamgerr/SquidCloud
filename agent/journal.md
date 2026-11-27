@@ -399,3 +399,7 @@
 - Web search still unavailable (HTTP 402), so candidates scored against current repo state and recent incident history.
 - Candidates: (1) vault health screen with legacy/v4, passkey verifier, recovery/device status and one-click actions (buildable solo, fits existing React/Supabase stack, directly addresses repeated user confusion about legacy vs v4 and passkey verifiers); (2) admin viewer for client_error_events; (3) configurable preview/KTL constants; (4) auth error taxonomy; (5) orphan-chunk cleanup (SKIPPED — destructive, needs careful design).
 - Picked (1): highest user-visible value and it consolidates upgrades/re-enrollment we already shipped. Queued (2)-(4) behind it.
+
+## 2026-11-27 — Vault health panel
+- Built pure classifyVaultHealth helper with tests (v4 vs legacy files, verified vs legacy passkeys, recovery/device counts, recommendations).
+- Added VaultHealthPanel in account security settings showing counts, needs-attention list and one-click upgrade/re-enroll/recovery actions wired to existing handlers. 58 tests pass, gate passes (718 files), vercel READY.

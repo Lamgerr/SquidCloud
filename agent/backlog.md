@@ -17,5 +17,6 @@
 - [x] Adaptive preview budget (stop fetching after the first complete frame instead of a fixed chunk count).
 - [x] Re-enroll legacy passkeys so they gain real WebAuthn signature verification instead of the emailed magic-link step.
 - [x] Full browser sweep verified by owner (passkey login, previews, video, download, share, unlock).
+- [x] Vault health screen — built and mounted in account security settings.
 - [ ] Make preview chunk budget and KTL cache TTL configurable rather than hardcoded.
 - [ ] SKIPPED — needs a human: empty bucket deletion (Supabase blocks direct SQL deletes; no MCP delete tool).
