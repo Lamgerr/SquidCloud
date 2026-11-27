@@ -161,13 +161,20 @@ async function handleAuthOptions(supabase: any, params: any) {
   });
 }
 
-function base64UrlToUuid(value: string): string | null {
+const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function decodeUserHandle(value: string): string | null {
   try {
     const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((value.length + 3) % 4);
     const bytes = Uint8Array.from(atob(padded), ch => ch.charCodeAt(0));
+    // Registration stored the UUID as UTF-8 text; some authenticators return
+    // the raw 16-byte form instead. Accept both.
+    const text = new TextDecoder().decode(bytes).trim();
+    if (UUID_TEXT.test(text)) return text;
     if (bytes.length !== 16) return null;
     const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    return UUID_TEXT.test(uuid) ? uuid : null;
   } catch { return null; }
 }
 
@@ -197,14 +204,14 @@ async function handleAuthVerify(supabase: any, params: any) {
     // auth_options had no email to bind to.
     let expectedEmail = cd.email || '';
     if (!expectedEmail && credential?.response?.userHandle) {
-      const userId = base64UrlToUuid(String(credential.response.userHandle));
+      const userId = decodeUserHandle(String(credential.response.userHandle));
       if (userId) {
         const { data: owner } = await supabase.auth.admin.getUserById(userId);
         expectedEmail = owner?.user?.email || '';
       }
     }
-    const bound = isBoundAuthenticationChallenge(cd, passkey.email || '', expectedEmail);
-    if (!bound) return jsonResponse({ error: 'Passkey verification failed' }, 401);
+    const bound = isBoundAuthenticationChallenge(cd, passkey.email || '', expectedEmail, Date.now(), true);
+    if (!bound) { console.error('[passkey] legacy challenge binding failed'); return jsonResponse({ error: 'Passkey verification failed' }, 401); }
   }
   if (publicKeyJwk) {
     const verified = await verifyAssertion({
@@ -214,7 +221,7 @@ async function handleAuthVerify(supabase: any, params: any) {
       publicKeyJwk,
       rpIdHash: await rpIdHash(rpId),
     });
-    if (!verified) return jsonResponse({ error: 'Passkey verification failed' }, 401);
+    if (!verified) { console.error('[passkey] assertion verification failed', credential?.id); return jsonResponse({ error: 'Passkey verification failed' }, 401); }
   }
 
   await supabase.from('passkey_challenges').delete().eq('id', cd.id);

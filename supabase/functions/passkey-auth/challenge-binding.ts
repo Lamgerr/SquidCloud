@@ -8,6 +8,7 @@ export function isBoundAuthenticationChallenge(
   passkeyEmail: string,
   boundEmailOverride?: string,
   now = Date.now(),
+  allowUnbound = false,
 ): boolean {
   if (!challenge?.expires_at) return false;
   const expiry = Date.parse(challenge.expires_at);
@@ -16,5 +17,6 @@ export function isBoundAuthenticationChallenge(
     ? boundEmailOverride
     : typeof challenge.email === "string" ? challenge.email : "").trim().toLowerCase();
   const ownerEmail = passkeyEmail.trim().toLowerCase();
-  return !!boundEmail && boundEmail === ownerEmail;
+  if (!boundEmail) return allowUnbound;
+  return boundEmail === ownerEmail;
 }

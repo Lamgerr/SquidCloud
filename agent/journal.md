@@ -385,3 +385,8 @@
 - Logs showed passkey-auth POST 500 with PGRST204: passkey_challenges had no email column; auth_options wrote email and credential_ids. Added both columns via migration; direct auth_options now returns 200.
 - Second blocker: discoverable passkeys used without typing an email left the challenge unbound, so legacy rows (no JWK verifier) returned 401. Auth verify now derives the expected email from the WebAuthn userHandle via admin.getUserById when no email was supplied; challenge-binding accepts an override.
 - Deployed function, verified code live. 54 tests pass, gate passes, vercel READY, smoke 5/5.
+
+## 2026-11-27 — Passkey 401 after successful device challenge
+- Logs showed repeated POST 401 from auth_verify. Root cause: registration stored userHandle as UTF-8 UUID text (36 bytes), but verification decoded it as 16 raw bytes, so the email binding for legacy verifier-less passkeys always failed.
+- Fixed decoder to accept both UTF-8 UUID and raw 16-byte forms; added explicit allowUnbound fallback for legacy rows (safe because legacy path returns no OTP, only an emailed magic link), plus diagnostic logging for binding vs signature failures.
+- Verified: 55 tests pass, gate passes, vercel READY, function deployed.

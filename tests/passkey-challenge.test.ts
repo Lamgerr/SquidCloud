@@ -39,3 +39,10 @@ test("accepts an email resolved from the WebAuthn userHandle when none was typed
     expires_at: new Date(Date.now() + 60_000).toISOString(),
   }, "user@example.com", "attacker@example.com", Date.now())).toBe(false);
 });
+
+
+test("allows an unbound legacy challenge when explicitly permitted", () => {
+  const ch = { expires_at: new Date(Date.now() + 60_000).toISOString() };
+  expect(isBoundAuthenticationChallenge(ch, "user@example.com", "", Date.now(), true)).toBe(true);
+  expect(isBoundAuthenticationChallenge(ch, "user@example.com", "", Date.now(), false)).toBe(false);
+});
