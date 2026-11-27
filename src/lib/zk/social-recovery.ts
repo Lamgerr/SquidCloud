@@ -11,15 +11,8 @@ const enc = new TextEncoder();
 /** Create 5 recovery shares from a verified recovery phrase. Caller must keep
  *  the phrase; this returns opaque share strings to distribute to contacts. */
 export async function createRecoveryShares(phrase: string): Promise<string[]> {
-  // Import the same derivation used by zk-crypto (BIP39 -> seed -> MK).
-  const { mnemonicToSeed } = await import('./bip39');
-  const seed = await mnemonicToSeed(phrase);
-  const base = await crypto.subtle.importKey('raw', seed.subarray(0, 32) as any, 'HKDF', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32) as any, info: enc.encode('sq-v2/master') as any },
-    base, 256,
-  );
-  const mk = new Uint8Array(bits);
+  const { masterFromRecoveryPhrase } = await import('./recovery-master');
+  const mk = await masterFromRecoveryPhrase(phrase);
   const shares = split(mk, 3, 5);
   mk.fill(0);
   return shares.map(encodeShare);

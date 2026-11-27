@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff, Github, Fingerprint } from '@/lib/icon-map';
+import { Mail, Lock, User, Eye, EyeOff, Github, Fingerprint, KeyRound } from '@/lib/icon-map';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,9 @@ import { securityService } from '@/services/security-service';
 import { INKModal } from '@/components/INKModal';
 import { useINK } from '@/hooks/useINK';
 import { isPasskeyAvailable, authenticateWithPasskey } from '@/lib/webauthn';
+import { rewrapMasterKey } from '@/lib/master-key-rewrap';
+import { masterFromRecoveryPhrase } from '@/lib/zk/recovery-master';
+import { setV4Master } from '@/lib/e2e-v4-session';
 import { getOAuthRedirectUrl, getPasswordRecoveryRedirectUrl } from '@/lib/appLinks';
 import { getClientIp } from '@/lib/clientIp';
 import { emitSignal } from '@/lib/api';
@@ -191,6 +194,7 @@ const Auth = () => {
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [recoveryPhrase, setRecoveryPhrase] = useState('');
   const [passkeyAvailable, setPasskeyAvailable] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeySuccess, setPasskeySuccess] = useState(false);
@@ -276,6 +280,35 @@ const Auth = () => {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+
+      // A password reset changes the KEK that wraps the vault master key.
+      // Rewrap the same master from the recovery phrase so files stay readable.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const resp = await fetch('/api/internal/vault', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ op: 'vault-master-meta' }),
+        });
+        const meta = await resp.json().catch(() => ({}));
+        if (resp.ok && meta?.encrypted_master_key && meta?.kdf_salt) {
+          if (!recoveryPhrase.trim()) throw new Error('Enter your vault recovery phrase to keep access to your encrypted files');
+          const master = await masterFromRecoveryPhrase(recoveryPhrase);
+          const rewrapped = await rewrapMasterKey(null, '', newPassword, master);
+          master.fill(0);
+          if (!rewrapped.ok || !rewrapped.next) throw new Error('Could not rewrap your vault key');
+          const { error: keyError } = await supabase.from('master_keys').update({
+            encrypted_master_key: `${rewrapped.next.wrapped}:${rewrapped.next.iv}`,
+            kdf_salt: rewrapped.next.salt,
+            kdf_iterations: rewrapped.next.iterations,
+            key_version: rewrapped.next.version,
+            last_rotated: new Date().toISOString(),
+          }).eq('user_id', session.user.id).eq('key_version', Number(meta.key_version) || 1);
+          if (keyError) throw new Error(keyError.message);
+          if (rewrapped.masterRaw) setV4Master(rewrapped.masterRaw);
+        }
+      }
+
       void emitSignal({
         type: 'password_changed',
         severity: 'warning',
@@ -288,6 +321,7 @@ const Auth = () => {
       setIsPasswordReset(false);
       setNewPassword('');
       setConfirmPassword('');
+      setRecoveryPhrase('');
     } catch (error: any) {
       toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
     } finally {
@@ -460,6 +494,9 @@ const Auth = () => {
                     <Field id="confirm-password" label="Confirm password" icon={<Lock className="h-4 w-4" />}
                       type={showPassword ? 'text' : 'password'} placeholder="Repeat your password"
                       value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" />
+                    <Field id="recovery-phrase" label="Vault recovery phrase" icon={<KeyRound className="h-4 w-4" />}
+                      type="password" placeholder="Required to keep access to encrypted files"
+                      value={recoveryPhrase} onChange={setRecoveryPhrase} autoComplete="off" />
                     <PillButton type="submit" disabled={isLoading}>
                       {isLoading && <Spinner size={14} />} Update password
                     </PillButton>
