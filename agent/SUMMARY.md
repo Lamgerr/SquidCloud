@@ -1,19 +1,19 @@
 # SUMMARY — SquidCloud
 
 ## Done
-- All E2E hardening, preview/streaming, geo, passkey and Supabase cleanup work is shipped and pushed to `fresh-main`.
-- Owner verified all flows: passkey login, previews, video streaming, downloads, shares and vault unlock.
-- 55 tests pass, invariant gate passes, Vercel READY, production smoke checks pass.
+- All verified E2E, preview, streaming, passkey and Supabase cleanup work remains shipped.
+- Vault health panel and glass context menus are shipped.
+- Owner-provided Auth.tsx redesign was reverted on request; the previous auth page is restored.
 
 ## In progress
-- Nothing mid-edit. Working tree clean.
+- Nothing mid-edit. Working tree clean, `fresh-main` pushed.
 
 ## Blocked — needs a decision
 - Service-role key rotation: human dashboard action (`docs/SECURITY-KEY-ROTATION-RUNBOOK.md`).
-- Empty bucket deletion: Storage API credentials required.
+- Empty bucket deletion: Supabase Storage API credentials required.
 
 ## Queued next
 1. Make preview chunk budget and KTL cache TTL configurable.
-2. Optional vault health screen for legacy-vs-v4 status, passkey verifier status, and one-click upgrade/re-enroll.
+2. Admin viewer for `client_error_events`.
 
 Live: https://squidcloud.vercel.app · Repo: https://github.com/Lamgerr/SquidCloud

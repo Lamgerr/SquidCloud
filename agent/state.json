@@ -2,8 +2,8 @@
   "goal": "SquidCloud stable after full owner verification; only owner-only and small polish items remain",
   "goal_source": "User: \"do full work completely ... hundreds of user's files ... backward compatible only on read\"",
   "last_actions": [
-    "Owner confirmed all flows verified: passkey login (including legacy email-confirmation path), previews, video streaming, downloads, shares and vault unlock.",
-    "All E2E hardening, Supabase cleanup, streaming, geo and preview work is deployed and pushed."
+    "2026-11-28: Reverted the owner-provided Auth.tsx integration (commit 52f865a3) with a normal revert commit c5bca56b and pushed it. Restored the previous auth page, package.json and lockfile.",
+    "Post-revert verification: 61 tests pass, invariant gate passes (720 files), vercel READY."
   ],
   "key_numbers": {
     "audits": 2,
@@ -18,11 +18,11 @@
     "repo": "https://github.com/Lamgerr/SquidCloud"
   },
   "blockers": [
-    "Service-role key rotation \u2014 human dashboard action (runbook: docs/SECURITY-KEY-ROTATION-RUNBOOK.md).",
-    "Empty bucket deletion \u2014 needs Storage API credentials; MCP cannot delete buckets."
+    "Service-role key rotation — human dashboard action (runbook: docs/SECURITY-KEY-ROTATION-RUNBOOK.md).",
+    "Empty bucket deletion — needs Storage API credentials; MCP cannot delete buckets."
   ],
   "next": [
     "Optional: make preview chunk budget and KTL cache TTL configurable.",
-    "Optional: vault health screen (legacy vs v4 files, passkey verifier status, upgrade/re-enroll actions)."
+    "Owner-only: rotate service-role key; delete empty buckets via Storage API."
   ]
 }

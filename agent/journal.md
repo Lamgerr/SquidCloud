@@ -407,3 +407,7 @@
 ## 2026-11-27 — Glisse-inspired context menus
 - Ported only the interaction ideas, not the library or its coloured tokens: frosted neutral menu surface with anchored transform-origin, pointer-following highlight plate, instant press feedback on three-dot triggers, reduced-motion/transparency fallbacks. Applied globally to dropdown content/subcontent and specifically to FileActionMenu/FileItem and FolderRow triggers (file + folder context menus in dashboard).
 - Plate geometry extracted to a pure helper with tests. 3 new tests; full suite 61 tests pass, gate passes (720 files), vercel READY. Design-doctrine gate scripts were not present in this checkout, and X11 display was unavailable, so live click-through was NOT visually verified.
+
+## 2026-11-28 — Revert auth redesign integration
+- Owner asked to revert the provided Auth.tsx integration. Created normal revert commit c5bca56b (no force-push, no history rewrite) and pushed. Restored previous Auth.tsx, package.json and package-lock.json.
+- Verified after revert: 61 tests pass, invariant gate passes (720 files), vercel READY, tree clean.
