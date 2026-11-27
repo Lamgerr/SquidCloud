@@ -29,3 +29,13 @@ describe("passkey authentication challenge binding", () => {
     expect(isBoundAuthenticationChallenge(null, "user@example.com", now)).toBe(false);
   });
 });
+
+
+test("accepts an email resolved from the WebAuthn userHandle when none was typed", () => {
+  expect(isBoundAuthenticationChallenge({
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+  }, "user@example.com", "user@example.com", Date.now())).toBe(true);
+  expect(isBoundAuthenticationChallenge({
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+  }, "user@example.com", "attacker@example.com", Date.now())).toBe(false);
+});

@@ -6,12 +6,15 @@
 export function isBoundAuthenticationChallenge(
   challenge: { expires_at?: string | null; email?: string | null } | null | undefined,
   passkeyEmail: string,
+  boundEmailOverride?: string,
   now = Date.now(),
 ): boolean {
   if (!challenge?.expires_at) return false;
   const expiry = Date.parse(challenge.expires_at);
   if (!Number.isFinite(expiry) || expiry <= now) return false;
-  const boundEmail = typeof challenge.email === "string" ? challenge.email.trim().toLowerCase() : "";
+  const boundEmail = (typeof boundEmailOverride === "string" && boundEmailOverride
+    ? boundEmailOverride
+    : typeof challenge.email === "string" ? challenge.email : "").trim().toLowerCase();
   const ownerEmail = passkeyEmail.trim().toLowerCase();
   return !!boundEmail && boundEmail === ownerEmail;
 }

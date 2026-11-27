@@ -380,3 +380,8 @@
 - Completed: recovery-phrase-based rewrap on password reset; rate-limited client_error_events telemetry via BFF; opt-in per-file legacy→v4 upgrade with progress; adaptive preview chunk fetch; passkey re-enrollment (deletes verifier-less legacy rows); retention cron jobs for security/threat/webhook/share logs; repeatable scripts/smoke-prod.mjs.
 - SKIPPED — needs a human: service-role key rotation (no MCP/CLI path; runbook written) and empty storage bucket deletion (Supabase blocks direct SQL deletes, no MCP delete tool).
 - X11 display was unavailable, so the browser-based sweep was replaced with HTTP-level production smoke checks; 5/5 passed plus geo RPC verified separately. 53 tests pass, gate passes (715 files), vercel READY.
+
+## 2026-11-27 — Passkey auth 500/Authentication failed
+- Logs showed passkey-auth POST 500 with PGRST204: passkey_challenges had no email column; auth_options wrote email and credential_ids. Added both columns via migration; direct auth_options now returns 200.
+- Second blocker: discoverable passkeys used without typing an email left the challenge unbound, so legacy rows (no JWK verifier) returned 401. Auth verify now derives the expected email from the WebAuthn userHandle via admin.getUserById when no email was supplied; challenge-binding accepts an override.
+- Deployed function, verified code live. 54 tests pass, gate passes, vercel READY, smoke 5/5.

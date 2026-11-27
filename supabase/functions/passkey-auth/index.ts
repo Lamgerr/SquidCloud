@@ -161,6 +161,16 @@ async function handleAuthOptions(supabase: any, params: any) {
   });
 }
 
+function base64UrlToUuid(value: string): string | null {
+  try {
+    const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((value.length + 3) % 4);
+    const bytes = Uint8Array.from(atob(padded), ch => ch.charCodeAt(0));
+    if (bytes.length !== 16) return null;
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  } catch { return null; }
+}
+
 async function handleAuthVerify(supabase: any, params: any) {
   const { credential, challenge_id } = params;
   if (!credential || !challenge_id) return jsonResponse({ error: 'Missing required fields' }, 400);
@@ -182,7 +192,18 @@ async function handleAuthVerify(supabase: any, params: any) {
   const publicKeyJwk = await resolvePublicKeyJwk(passkey.public_key);
   const rpId = new URL(SUPABASE_URL).hostname === 'localhost' ? 'localhost' : 'squidcloud.vercel.app';
   if (!publicKeyJwk) {
-    const bound = isBoundAuthenticationChallenge(cd, passkey.email || '');
+    // Discoverable passkeys can be used without typing an email. Bind the
+    // challenge from the authenticator's userHandle (the user's UUID) when
+    // auth_options had no email to bind to.
+    let expectedEmail = cd.email || '';
+    if (!expectedEmail && credential?.response?.userHandle) {
+      const userId = base64UrlToUuid(String(credential.response.userHandle));
+      if (userId) {
+        const { data: owner } = await supabase.auth.admin.getUserById(userId);
+        expectedEmail = owner?.user?.email || '';
+      }
+    }
+    const bound = isBoundAuthenticationChallenge(cd, passkey.email || '', expectedEmail);
     if (!bound) return jsonResponse({ error: 'Passkey verification failed' }, 401);
   }
   if (publicKeyJwk) {
