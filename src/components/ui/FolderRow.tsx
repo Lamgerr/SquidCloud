@@ -107,11 +107,11 @@ const FolderRow: React.FC<FolderRowProps> = ({
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center justify-center w-6 h-6 rounded-md hover:bg-accent transition-colors">
+                <button className="gm-trigger flex items-center justify-center w-6 h-6 rounded-md hover:bg-accent">
                   <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 p-1">
+              <DropdownMenuContent align="end" className="gm-menu w-44 p-1">
                 <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); setRenaming(true); }}>
                   <Pencil className="w-3.5 h-3.5" />Rename
                 </DropdownMenuItem>
@@ -196,13 +196,13 @@ const FolderRow: React.FC<FolderRowProps> = ({
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-colors"
+                  className="gm-trigger flex items-center justify-center w-7 h-7 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                   aria-label="Folder actions"
                 >
                   <MoreVertical className="w-4 h-4 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 p-1">
+              <DropdownMenuContent align="end" className="gm-menu w-44 p-1">
                 <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); setRenaming(true); }}>
                   <Pencil className="w-3.5 h-3.5" />Rename
                 </DropdownMenuItem>
@@ -226,7 +226,7 @@ const FolderRow: React.FC<FolderRowProps> = ({
                     <DropdownMenuSubTrigger className="rounded-md gap-2 cursor-pointer text-xs">
                       <span>Additional</span>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-44 p-1">
+                    <DropdownMenuSubContent className="gm-menu w-44 p-1">
                       <DropdownMenuItem className="rounded-md gap-2 cursor-pointer text-xs" onClick={() => { setMenuOpen(false); onNotes(); }}>
                         <MessageSquare className="w-3.5 h-3.5" />Notes
                       </DropdownMenuItem>

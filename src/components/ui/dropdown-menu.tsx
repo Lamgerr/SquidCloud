@@ -3,6 +3,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "@/lib/icon-map"
 
 import { cn } from "@/lib/utils"
+import { glassPlateVars } from "@/lib/glass-menu"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
@@ -41,38 +42,81 @@ DropdownMenuSubTrigger.displayName =
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
->(({ className, ...props }, ref) => (
+>(({ className, onPointerMove, onPointerLeave, ...props }, ref) => (
   <DropdownMenuPrimitive.SubContent
     ref={ref}
+    {...glassMenuHandlers({ onPointerMove, onPointerLeave })}
     className={cn(
-      "z-[120] min-w-[8rem] rounded-xl lg-dropdown p-1.5 text-popover-foreground",
+      "gm-menu z-[120] min-w-[8rem] rounded-xl p-1.5 text-popover-foreground",
       "data-[state=open]:motion-pop data-[state=closed]:motion-pop-out",
       className
     )}
     {...props}
-  />
+  >
+    <span className="gm-plate" aria-hidden="true" />
+    {props.children}
+  </DropdownMenuPrimitive.SubContent>
 ))
 DropdownMenuSubContent.displayName =
   DropdownMenuPrimitive.SubContent.displayName
 
+type GlassPointerEvent = React.PointerEvent<HTMLDivElement>;
+type GlassPointerHandlers = {
+  onPointerMove?: (e: GlassPointerEvent) => void;
+  onPointerLeave?: (e: GlassPointerEvent) => void;
+};
+
+function glassMenuHandlers(handlers: GlassPointerHandlers): GlassPointerHandlers {
+  return {
+    onPointerMove: (e) => {
+      const host = e.currentTarget;
+      const item = (e.target as HTMLElement)?.closest?.(
+        '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [data-glass-item]'
+      ) as HTMLElement | null;
+      if (item && host.contains(item)) {
+        const vars = glassPlateVars(item, e.clientX);
+        host.style.setProperty('--gm-y', `${vars.y}px`);
+        host.style.setProperty('--gm-h', `${vars.h}px`);
+        host.style.setProperty('--gm-x', `${vars.x}px`);
+        host.dataset.glassHover = 'true';
+      } else {
+        delete host.dataset.glassHover;
+      }
+      handlers.onPointerMove?.(e);
+    },
+    onPointerLeave: (e) => {
+      delete e.currentTarget.dataset.glassHover;
+      handlers.onPointerLeave?.(e);
+    },
+  };
+}
+
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
-    <DropdownMenuPrimitive.Content
-      ref={ref}
-      sideOffset={sideOffset}
-      collisionPadding={16}
-      className={cn(
-        "z-[120] min-w-[8rem] rounded-xl lg-dropdown p-1.5 text-popover-foreground",
-        "data-[state=open]:motion-pop data-[state=closed]:motion-pop-out",
-        className
-      )}
-      {...props}
-    />
-  </DropdownMenuPrimitive.Portal>
-))
+>(({ className, sideOffset = 4, onPointerMove, onPointerLeave, ...props }, ref) => {
+  const glass = glassMenuHandlers({ onPointerMove, onPointerLeave });
+
+  return (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.Content
+        ref={ref}
+        sideOffset={sideOffset}
+        collisionPadding={16}
+        {...glass}
+        className={cn(
+          "gm-menu z-[120] min-w-[8rem] rounded-xl p-1.5 text-popover-foreground",
+          "data-[state=open]:motion-pop data-[state=closed]:motion-pop-out",
+          className
+        )}
+        {...props}
+      >
+        <span className="gm-plate" aria-hidden="true" />
+        {props.children}
+      </DropdownMenuPrimitive.Content>
+    </DropdownMenuPrimitive.Portal>
+  );
+});
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
 const DropdownMenuItem = React.forwardRef<

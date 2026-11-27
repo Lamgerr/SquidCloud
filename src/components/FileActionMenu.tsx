@@ -216,7 +216,7 @@ const FileActionMenu: React.FC<FileActionMenuProps> = ({
         {trigger || (
           <Button 
             variant="ghost" 
-            className="h-8 w-8 p-0"
+            className="gm-trigger h-8 w-8 p-0"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -229,7 +229,7 @@ const FileActionMenu: React.FC<FileActionMenuProps> = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end" 
-        className="w-48 z-[9999]"
+        className="gm-menu w-48 z-[9999]"
         onClick={(e) => {
           e.stopPropagation();
         }}
@@ -293,7 +293,7 @@ const FileActionMenu: React.FC<FileActionMenuProps> = ({
             <DropdownMenuSubTrigger className="rounded-md gap-2 cursor-pointer text-sm">
               <span>Additional</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-44 p-1">
+            <DropdownMenuSubContent className="gm-menu w-44 p-1">
               {isHtmlFile && pubStatus?.status === 'live' && (
                 <DropdownMenuItem onClick={handleAction(() => setPublishModalOpen(true), 'Manage Published Site')}>
                   <Globe className="mr-2 h-4 w-4" />

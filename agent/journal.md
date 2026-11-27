@@ -403,3 +403,7 @@
 ## 2026-11-27 — Vault health panel
 - Built pure classifyVaultHealth helper with tests (v4 vs legacy files, verified vs legacy passkeys, recovery/device counts, recommendations).
 - Added VaultHealthPanel in account security settings showing counts, needs-attention list and one-click upgrade/re-enroll/recovery actions wired to existing handlers. 58 tests pass, gate passes (718 files), vercel READY.
+
+## 2026-11-27 — Glisse-inspired context menus
+- Ported only the interaction ideas, not the library or its coloured tokens: frosted neutral menu surface with anchored transform-origin, pointer-following highlight plate, instant press feedback on three-dot triggers, reduced-motion/transparency fallbacks. Applied globally to dropdown content/subcontent and specifically to FileActionMenu/FileItem and FolderRow triggers (file + folder context menus in dashboard).
+- Plate geometry extracted to a pure helper with tests. 3 new tests; full suite 61 tests pass, gate passes (720 files), vercel READY. Design-doctrine gate scripts were not present in this checkout, and X11 display was unavailable, so live click-through was NOT visually verified.

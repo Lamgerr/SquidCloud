@@ -221,7 +221,7 @@ const FileItem: React.FC<FileItemProps> = ({
                 type="button"
                 aria-label={menuLabel}
                 onClick={handleMobileMenuClick}
-                className="w-9 h-9 rounded-md bg-background/90 border border-border hover:bg-accent flex items-center justify-center text-foreground transition-colors"
+                className="gm-trigger w-9 h-9 rounded-md bg-background/90 border border-border hover:bg-accent flex items-center justify-center text-foreground"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
@@ -235,7 +235,7 @@ const FileItem: React.FC<FileItemProps> = ({
                   onDelete={() => onDelete?.(file)}
                   onMoveToFolder={() => onMoveToFolder?.(file)}
                   trigger={
-                    <button type="button" aria-label={menuLabel} className="w-7 h-7 rounded-md bg-background/90 border border-border hover:bg-accent flex items-center justify-center text-foreground transition-colors">
+                    <button type="button" aria-label={menuLabel} className="gm-trigger w-7 h-7 rounded-md bg-background/90 border border-border hover:bg-accent flex items-center justify-center text-foreground">
                       <MoreVertical className="w-3.5 h-3.5" />
                     </button>
                   }
@@ -328,7 +328,7 @@ const FileItem: React.FC<FileItemProps> = ({
               type="button"
               aria-label={menuLabel}
               onClick={handleMobileMenuClick}
-              className="w-9 h-9 rounded-md hover:bg-accent flex items-center justify-center transition-colors"
+              className="gm-trigger w-9 h-9 rounded-md hover:bg-accent flex items-center justify-center"
             >
               <MoreVertical className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -342,7 +342,7 @@ const FileItem: React.FC<FileItemProps> = ({
                 onDelete={() => onDelete?.(file)}
                 onMoveToFolder={() => onMoveToFolder?.(file)}
                 trigger={
-                  <button type="button" aria-label={menuLabel} className="w-7 h-7 rounded-md hover:bg-accent flex items-center justify-center">
+                  <button type="button" aria-label={menuLabel} className="gm-trigger w-7 h-7 rounded-md hover:bg-accent flex items-center justify-center">
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                   </button>
                 }
