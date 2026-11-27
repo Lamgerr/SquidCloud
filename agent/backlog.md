@@ -1,0 +1,16 @@
+# SquidCloud backlog (ranked)
+
+## Now
+- [ ] **Live v4 pipeline verification pass.** Upload a real file on production; verify preview (text/image/markdown), video streaming, full download, share link with password, and vault unlock in the same session. Fix any break found. The last several days were a cascade of preview/video regressions found one at a time by the user — needs one systematic sweep, not another patch cycle.
+- [ ] **Forgot-password vault key recovery.** Password reset does not rewrap master keys; a user who resets password can lose access to v4 files. Need a recovery-phrase-backed rewrap path and a clear UI warning.
+
+## Next
+- [ ] **Rotate the leaked service-role key** (long-standing security blocker, previously deprioritized). After rotation, revoke/replace any derived tokens and re-run the invariant gate.
+- [ ] **Client error telemetry.** Add a rate-limited BFF `client-error` op so decrypt/stream failures arrive as structured events instead of screenshots. Include file format, step, and error code — never key material or plaintext.
+- [ ] **Optional v4 upgrade for legacy files.** Client-side "upgrade my files" action that decrypts legacy ciphertext and re-encrypts as chunked v4, with progress, resume, and no server key escrow. Must remain opt-in and backward-compatible reads must stay.
+
+## Later
+- [ ] Retention policies for `security_events`, `kza_threat_events`, and webhook logs; remove the 4 empty buckets if no external consumers.
+- [ ] Adaptive preview budget (stop fetching after the first complete frame instead of a fixed chunk count).
+- [ ] Re-enroll legacy passkeys so they gain real WebAuthn signature verification instead of the emailed magic-link step.
+- [ ] Make preview chunk budget and KTL cache TTL configurable rather than hardcoded.

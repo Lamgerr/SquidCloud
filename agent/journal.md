@@ -371,3 +371,7 @@
 - Preview budget reduced from 3 RES54 chunks (~6 MB) to 1 (~2 MB), which still contains a full 1 MiB v4 frame. KTL verification cached for 60s (pinned-head check still runs every call) to remove a network round trip per preview.
 - Centralized uploader-id fallback in readV4Meta so video and other previews bind AAD correctly for older metadata.
 - Video SW 503 was retried 8 times silently; now a v4 video error falls back once to main-thread decrypt with a visible error if that also fails.
+
+## 2026-11-27 — Next-step planning
+- User asked what to do next. Repo clean, fresh-main pushed, all 50 tests green. Web search unavailable (402), so ranking is based on observed production regressions and open blockers.
+- Created agent/backlog.md with ranked candidates. Top pick: one systematic live verification pass over the whole v4 pipeline (upload, preview, video, download, share, unlock) instead of continuing one-at-a-time patch cycles. Second: forgot-password vault rewrap (real data-loss risk). Third: service-role key rotation and structured client error telemetry.

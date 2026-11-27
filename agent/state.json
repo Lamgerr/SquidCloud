@@ -1,5 +1,5 @@
 {
-  "goal": "Instant preview for new E2E v4 uploads fixed and upgraded to chunked frames",
+  "goal": "Choose and execute the next SquidCloud priority from agent/backlog.md",
   "goal_source": "User: \"do full work completely ... hundreds of user's files ... backward compatible only on read\"",
   "last_actions": [
     "2026-11-26: Removed dead onlinewebfonts stylesheet/preconnect (CDN now serves a Cloudflare challenge; no CSS referenced the font) -> kills CORP failure, CSP font error and __cf_bm cookie.",
@@ -19,9 +19,11 @@
     "repo": "https://github.com/Lamgerr/SquidCloud"
   },
   "blockers": [
-    "WebSocket/CORS console failures persist only in the user browser environment; server-side CORS and CSP verified correct."
+    "Web search unavailable (HTTP 402) — roadmap based on current repo state and observed regressions, not external research."
   ],
   "next": [
-    "If the user still sees CORS errors, check the exact origin and browser network/tracking protection."
+    "TOP: full live v4 pipeline verification (upload -> preview -> video stream -> download -> share -> unlock) on production with a real file; fix whatever breaks.",
+    "Then: fix forgot-password vault rewrap so resets do not lose file access.",
+    "Then: rotate leaked service-role key; add structured client error telemetry."
   ]
 }
