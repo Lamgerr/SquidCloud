@@ -1,6 +1,7 @@
 import { PAGES_POLISH } from "@/components/polish/pages-polish.css";
 import { rewrapMasterKey } from '@/lib/master-key-rewrap';
 import { setV4Master, clearV4Master } from '@/lib/e2e-v4-session';
+import { upgradeFileToV4 } from '@/lib/e2e-v4-upgrade';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -894,6 +895,10 @@ const AccountSettings = () => {
   const [activeCategory, setActiveCategory] = useHashState<SettingsCategory>('section', 'profile', SECTION_IDS);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [vaultState, setVaultState] = useState(isVaultUnlocked());
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeProgress, setUpgradeProgress] = useState(0);
+  const [upgradeDone, setUpgradeDone] = useState(0);
+  const [upgradeTotal, setUpgradeTotal] = useState(0);
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [loading, setLoading] = useState(false);
@@ -1245,6 +1250,25 @@ const AccountSettings = () => {
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });
     } finally { setLoading(false); }
+  };
+
+  const handleUpgradeLegacy = async () => {
+    if (!user || upgrading) return;
+    setUpgrading(true); setUpgradeProgress(0); setUpgradeDone(0);
+    try {
+      const { data: rows, error } = await supabase.from('files')
+        .select('id, name, type, storage_path, encryption_key').eq('user_id', user.id).neq('encryption_key', 'e2e_v4').is('is_deleted', false);
+      if (error) throw error;
+      const files = (rows || []).filter(f => !String((f as any).storage_path || '').startsWith('tebi_'));
+      setUpgradeTotal(files.length);
+      for (let i = 0; i < files.length; i++) {
+        await upgradeFileToV4(files[i] as any, user.id, (pct) => setUpgradeProgress(pct));
+        setUpgradeDone(i + 1);
+      }
+      toast({ title: 'Upgrade complete', description: `${files.length} file(s) now use E2E v4` });
+    } catch (e: any) {
+      toast({ title: 'Upgrade failed', description: e?.message || 'Could not upgrade files', variant: 'destructive' });
+    } finally { setUpgrading(false); setUpgradeProgress(0); }
   };
 
   const handleChangePassword = async () => {
@@ -1809,6 +1833,15 @@ const AccountSettings = () => {
 
         {/* Vault security belongs with the rest of account security. */}
         <VaultSecurityPanel userId={user?.id || ''} onUnlock={() => setVaultOpen(true)} />
+
+        <TvPod title="E2E upgrade" subtitle="Re-encrypt existing files with client-only keys">
+          <TvRow label="Legacy files" sub={upgradeProgress ? `Upgrading ${upgradeDone}/${upgradeTotal} — ${upgradeProgress}%` : 'Optional, one file at a time'}>
+            <button type="button" className="tv-pill-btn sm lead" disabled={upgrading} onClick={handleUpgradeLegacy}>
+              {upgrading && <Spinner size={12} />}
+              Upgrade
+            </button>
+          </TvRow>
+        </TvPod>
       </>
     );
   }
